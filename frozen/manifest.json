@@ -1,0 +1,60 @@
+{
+  "sources": {
+    "arc_easy": {
+      "n": 2251,
+      "train": 2206,
+      "val": 45
+    },
+    "arc_challenge": {
+      "n": 1119,
+      "train": 1097,
+      "val": 22
+    },
+    "openbookqa": {
+      "n": 4957,
+      "train": 4858,
+      "val": 99
+    },
+    "commonsense_qa": {
+      "n": 9741,
+      "train": 9547,
+      "val": 194
+    },
+    "sciq": {
+      "n": 11679,
+      "train": 11446,
+      "val": 233
+    },
+    "qasc": {
+      "n": 8134,
+      "train": 7972,
+      "val": 162
+    },
+    "logiqa": {
+      "n": 12567,
+      "train": 12317,
+      "val": 250
+    },
+    "aqua_rat": {
+      "n": 40000,
+      "train": 39202,
+      "val": 798
+    },
+    "medmcqa": {
+      "n": 20000,
+      "train": 19601,
+      "val": 399
+    },
+    "mmlu_aux": {
+      "n": 40000,
+      "train": 39201,
+      "val": 799
+    }
+  },
+  "held_out": {
+    "truthfulqa_mc1": 817,
+    "gpqa": "skipped (Dataset 'Idavidrein/gpqa' is a gated dataset on the Hub. Visit the dataset page at https://huggingface.co/datasets/Idavidrein/gpqa to ask for access.)"
+  },
+  "total_train": 147447,
+  "total_val": 3001
+}

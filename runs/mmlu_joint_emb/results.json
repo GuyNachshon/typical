@@ -1,0 +1,65 @@
+{
+  "T": 0.9617248711152964,
+  "val_nll": 0.3895550656318665,
+  "args": {
+    "name": "mmlu_joint_emb",
+    "backbone": "Qwen/Qwen3-1.7B-Base",
+    "lora_layers": 8,
+    "lora_r": 16,
+    "steps": 12000,
+    "bs": 64,
+    "lr": 0.0003,
+    "lora_lr": 0.0001,
+    "seed": 0,
+    "no_hybrid": false,
+    "no_cand_null": false,
+    "no_null": false,
+    "hard_only": false,
+    "mix": "full",
+    "eval_every": 4000,
+    "val_every": 1000,
+    "ckpt_every": 2000,
+    "eval_bs": 128,
+    "device": "auto",
+    "wandb": false,
+    "hf_repo": null,
+    "data": "data_mmlu",
+    "smoke": false,
+    "eval_limit": 0,
+    "tap_layer": 20,
+    "zscore": false,
+    "eval_only": true,
+    "dump_logits": null,
+    "tower_d": 512,
+    "tower_layers": 0,
+    "tower_heads": 8,
+    "joint": true,
+    "listwise": false,
+    "init_from": null,
+    "readout": "energy",
+    "zero_shot": false,
+    "cand_encoder": "qwen3emb"
+  },
+  "eval": {
+    "mmlu_pro": {
+      "raw": {
+        "nll": 3.3228421137806783,
+        "brier": 1.1060108765728316,
+        "jsd": 0.5635709450127727,
+        "acc": 0.08166666666666667,
+        "acc_k": 0.13166666666666665,
+        "ece": 0.31863919305304683,
+        "sel_acc80": 0.08229166666666667
+      },
+      "scaled": {
+        "nll": 3.3873393238552687,
+        "brier": 1.1167241954905265,
+        "jsd": 0.5649313999250899,
+        "acc": 0.08166666666666667,
+        "acc_k": 0.13166666666666665,
+        "ece": 0.3291026183217764,
+        "sel_acc80": 0.08229166666666667
+      }
+    }
+  }
+}
