@@ -811,6 +811,23 @@ def save_checkpoint(path, model, backbone, step, opt, sched, best_val, args, tow
     torch.save(ckpt, path)
 
 
+def upload_ckpt(args, run_dir):
+    """--ckpt_upload: push last.pt/best.pt to hf_repo/<name>/ so a pod that gets pre-empted (no local
+    volume) can resume elsewhere -- the boot script hf-downloads <name>/last.pt before this process
+    starts, and main()'s own last_path.exists() check resumes from it. Best-effort: a transient upload
+    failure shouldn't kill an otherwise-healthy training step."""
+    import huggingface_hub
+    for fname in ("last.pt", "best.pt"):
+        p = run_dir / fname
+        if not p.exists():
+            continue
+        try:
+            huggingface_hub.upload_file(path_or_fileobj=str(p), path_in_repo=f"{args.name}/{fname}",
+                                        repo_id=args.hf_repo, repo_type="model")
+        except Exception as e:  # noqa: BLE001
+            print(f"warning: ckpt upload failed ({fname}): {e}")
+
+
 def load_checkpoint(path, model, backbone, opt, sched, device):
     # weights_only=False: trusted, self-produced checkpoint (opt/sched/rng state, not third-party input)
     ckpt = torch.load(path, map_location=device, weights_only=False)
@@ -901,6 +918,11 @@ def parse_args():
     p.add_argument("--device", default="auto")
     p.add_argument("--wandb", action="store_true")
     p.add_argument("--hf_repo", default=None)
+    p.add_argument("--ckpt_upload", action="store_true",
+                    help="push last.pt/best.pt (LoRA+tower only, small) to --hf_repo/<name>/ at every "
+                         "--ckpt_every, so a pre-empted pod can resume: boot script hf-downloads "
+                         "<name>/last.pt into runs/<name>/ before this invocation, and the existing "
+                         "last_path.exists() check above picks it up")
     p.add_argument("--data", default="data")
     p.add_argument("--extra_data", default=None, help="comma-separated extra data dirs mixed into train (their val/eval become eval sets)")
     p.add_argument("--eval_cap", type=int, default=None, help="head-N cap per --extra_data val/eval set (big external evals run post-hoc via scripts/eval_wf.py)")
@@ -1165,6 +1187,8 @@ def main():
 
         if step % args.ckpt_every == 0 or step == args.steps:
             save_checkpoint(last_path, model, backbone, step, opt, sched, best_val, args)
+            if args.ckpt_upload and args.hf_repo:
+                upload_ckpt(args, run_dir)
 
     # final eval on the best-by-val checkpoint (as v0), not the last step
     if best_path.exists():
