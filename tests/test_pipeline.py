@@ -2009,3 +2009,91 @@ def test_gate_experts_trains_and_writes_results(tmp_path, monkeypatch):
     import report_native
     row = report_native.row("gate_x")
     assert np.isclose(row["mmlu_among_k"], res["eval"]["setA"]["scaled"]["acc_k"])
+
+
+# ---------------------------------------------------------------------------
+# 19. scripts/eval_wf.py (PLAN7 §3x): stratified --limit + batched native scoring
+# ---------------------------------------------------------------------------
+
+import scripts.eval_wf as EW  # noqa: E402
+
+
+def _flip_row(fam, gid, cands, label):
+    return {"candidates": cands, "label": label, "p_null": 0.0,
+            "target": [1.0 if j == label else 0.0 for j in range(len(cands))],
+            "meta": {"family": fam, "flip_pair": gid}}
+
+
+def test_stratified_limit_covers_every_family_and_keeps_pairs_adjacent():
+    rows = []
+    for fam, n in [("eligibility", 50), ("tool_select", 30), ("urgency", 10)]:
+        for i in range(n):
+            rows.append({"candidates": ["no", "yes"], "label": i % 2, "p_null": 0.0,
+                         "target": [1.0, 0.0] if i % 2 == 0 else [0.0, 1.0],
+                         "meta": {"family": fam, "qtype": "noul"}})
+    for i in range(8):  # a family entirely made of flip pairs
+        rows.append(_flip_row("flip_fam", f"g{i}", ["x", "y"], i % 2))
+        rows.append(_flip_row("flip_fam", f"g{i}", ["x", "y"], 1 - i % 2))
+
+    sample = EW.stratified_limit(rows, 40, seed=0)
+    fams = {r["meta"]["family"] for r in rows}
+    sampled_fams = {r["meta"]["family"] for r in sample}
+    assert sampled_fams == fams  # every family represented, none dropped by a naive head-N
+
+    from collections import defaultdict
+    by_pair = defaultdict(list)
+    for i, r in enumerate(sample):
+        fp = r["meta"].get("flip_pair")
+        if fp is not None:
+            by_pair[fp].append(i)
+    for gid, idxs in by_pair.items():
+        assert len(idxs) == 2 and abs(idxs[0] - idxs[1]) == 1, (gid, idxs)  # pair rows stay adjacent
+
+    # deterministic given the fixed seed, and a no-op for limit<=0 or >= len(rows)
+    assert EW.stratified_limit(rows, 40, seed=0) == sample
+    assert EW.stratified_limit(rows, 0, seed=0) == rows
+    assert EW.stratified_limit(rows, len(rows) + 5, seed=0) == rows
+
+
+@pytest.mark.skipif(not os.environ.get("RUN_SLOW"), reason="loads the real nc_v3 checkpoint "
+                     "(Qwen3-1.7B-Base); set RUN_SLOW=1 to run")
+def test_eval_wf_batched_matches_single_row_on_nc_v3():
+    """PLAN7 §3x: scripts/eval_wf.py used to call native_kv_decide once per row (~3 rows/s); the
+    fix batches rows through run_batch_native instead. Same checkpoint, same 6 rows, both paths ->
+    the same argmax decision and probabilities within bf16 noise (the backbone runs in bfloat16,
+    see encode.Backbone; test_native_kv_decide_matches_run_batch already covers exact agreement on
+    a float32 toy model -- this checks the real checkpoint doesn't drift further than that)."""
+    repo_root = Path(__file__).resolve().parent.parent
+    if not (repo_root / "runs" / "nc_v3" / "best.pt").exists():
+        pytest.skip("runs/nc_v3/best.pt not present")
+    from pcdm_jev.decider import PCDMDecider
+
+    dec = PCDMDecider(str(repo_root / "runs" / "nc_v3"), mode="native", max_state=256)
+    rows = [
+        {"state": "A user reports a billing issue with invoice 4021.",
+         "query": "Is the request eligible for a refund?", "candidates": ["no", "yes"],
+         "label": 1, "p_null": 0.0, "target": [0.0, 1.0]},
+        {"state": "System log: disk usage at 92% on node 7.",
+         "query": "Should this trigger a page?", "candidates": ["no", "yes"],
+         "label": 0, "p_null": 0.0, "target": [1.0, 0.0]},
+        {"state": "Ticket: customer wants to change their shipping address.",
+         "query": "Route to which team?", "candidates": ["billing", "logistics", "support"],
+         "label": 1, "p_null": 0.0, "target": [0.0, 1.0, 0.0]},
+        {"state": "Meeting notes about Q3 roadmap.", "query": "What is the urgency?",
+         "candidates": ["low", "medium", "high"], "label": 2, "p_null": 0.0, "target": [0.0, 0.0, 1.0]},
+        {"state": "A form was submitted with a missing signature field.",
+         "query": "Is the form complete?", "candidates": ["no", "yes"],
+         "label": 0, "p_null": 0.0, "target": [1.0, 0.0]},
+        {"state": "Chat: I want to cancel my subscription please.",
+         "query": "Which action should be taken?", "candidates": ["cancel", "renew", "escalate", "ignore"],
+         "label": 0, "p_null": 0.0, "target": [1.0, 0.0, 0.0, 0.0]},
+    ]
+    single = [dec._probs("native", r["state"], r["query"], r["candidates"]).float().cpu().numpy() for r in rows]
+    batched, overflow = EW._score_native(dec, rows, batch_size=len(rows))
+    assert overflow == 0
+    for i, r in enumerate(rows):
+        k = len(r["candidates"])
+        a = np.concatenate([single[i][:k], single[i][-1:]])
+        b = np.concatenate([batched[i][:k], batched[i][-1:]])
+        assert a.argmax() == b.argmax(), (i, a, b)
+        assert np.abs(a - b).max() < 0.05, (i, a, b)
