@@ -971,6 +971,45 @@ to (1) a mixing fix — null-bearing rows inside W and/or E ≥ .45 — re-run a
 primitives (Noul as Bernoulli vs 2-way Choice; Score as ordinal vs K-way Choice — the ordinal gain 5 → 10 on JevBench
 says Score is the type to test first), then (3) calibration with proper scoring on soft targets. Not: more data volume, scale.
 
+## 3x. Phase 6A re-evaluated on every row (`scripts/eval_wf.py` batched + stratified; H100, 2026-09-20, ~$1)
+
+Supersedes the W/external numbers of §3w. Both checkpoints, all 63,932 rows of `data_wf/eval` + `data_wf_hf/eval`, full
+state length (4,096), batched scoring (241 rows/s vs 3 rows/s for the old one-row decider path; suffix overflow 0 on every
+file, so tree-choice K = 320 is now scored rather than counted as chance). `wf_rubric_flip.jsonl` regenerated so its
+1,031 pairs interleave all three held-out families. Full tables: `REPORT_3x_draft.md`; raw: `runs/*/eval_wf_full.json`.
+
+| file (n) | base | **wf** | floor (majority) | note |
+|---|---|---|---|---|
+| held-out family: tool_select choice (1,500) | .894 | .989 | .213 | ceiling effect (base already .89) |
+| held-out family: eligibility noul (1,500) | .555 | **.699** | .583 | base below floor |
+| held-out family: urgency score (1,502) | .404 | **.498** | .355 | NLL 1.24 → **2.09**, Brier .68 → .81 |
+| held-out rubric styles, 12 trained families (1,627) | .559 | **.901** | .364 | 11/12 families gain (+9 to +65); fact flat |
+| rubric-flip, 3 families (1,031 pairs) | flip .615 / both .429 | **.720 / .565** | – | eligibility both-correct .24 → .50; urgency .16 → .19; tool_select .88 → .99 |
+| rubric-shuffled (3,775) | .330 | .390 | .360 | NLL 1.51 → **4.65** (tool_select 2.6 → 10.1) |
+| trained-source shift: systemone hard (5,400) / jev-4b adversarial (600) | .447 / .637 | **.897 / .932** | .442 / .428 | |
+| trained-source: cua test (24,370) / real demo (196) | .335 / .179 | **.997 / 1.000** | .070 / .270 | |
+| **external** tree-choice, K to 320 (720) | .506 | .539 | .114 | genuine, small |
+| **external** typed-decisions test, soft gold (2,000) | .487 | .457 | .290 | NLL 1.22 → **2.03**, Brier .24 → .42 |
+| **external** jevlogs (5,080) | .697 | .522 | **.697** | base = floor; wf **below** floor |
+| **external** PagerDuty (6,000) | .776 | .779 | **.792** | both below floor |
+| **external** Mind2Web (1,600) | .300 | .427 | **.427** | wf = floor |
+
+**What survives.** Held-out rubric *styles* +34 across 11 of 12 families, held-out noul/score families +14/+9 (choice is
+a ceiling), rubric-flip both-correct .43 → .57 with the flip rate up in all three families, and the trained-source shift
+splits (+45/+30). **What does not.** Every untouched external set is at or below its constant-prediction floor for both
+checkpoints except tree-choice (+3, real) and typed-decisions (−3 accuracy, NLL 1.22 → 2.03): jevlogs base sits exactly
+on the majority floor and wf falls *below* it; PagerDuty both below floor; Mind2Web wf equals the floor. So the honest
+external line for Phase 6A is **1 up, 1 down, 3 at floor** — the workflow corpora teach our generator's and the trained
+sources' decision shapes, not yet the general abstraction. **On rubric dependence the two probes disagree** and both are
+reported: on our held-out families wf is far more confident-and-wrong under a swapped rubric (NLL ×3, up to ×4 on
+tool_select) and flips answers more often; on the 36 short JevBench-hard items, swapping each rubric for another
+same-type item's rubric leaves accuracy unchanged (.611 → .611, chance .384; `scripts/probe_jev_shuffle.py`) — there,
+the ≤ 256-token gain of §3w's second review is state/candidate prior, not rubric execution (n = 36; same-type rubrics
+may be near-interchangeable, which weakens the probe). The calibration regression is confirmed everywhere gold is soft
+or ordinal and is larger than the train-time pass showed. Verdict unchanged in direction, sharper in wording: rubric
+training moves *our* workflow families and the trained sources; it has not moved the general external tests, and it
+costs probability quality — PLAN6 branch (b) plus calibration, which PLAN7's tracks B/C and the (T, b) refit address.
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
