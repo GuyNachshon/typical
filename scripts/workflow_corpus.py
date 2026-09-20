@@ -1147,6 +1147,23 @@ def flip_pairs(rows):
     return out
 
 
+def pair_shuffle(rows, rng):
+    """Shuffle wf_rubric_flip by PAIR, not by row: rows come in consecutive (a, b) units sharing
+    meta.flip_pair (see flip_pairs above); a plain rng.shuffle(rows) would split a pair across the
+    file, and skipping the shuffle entirely (the old behaviour) left every pair in family-block
+    order -- rubric_group ids are assigned per family in a single pass, so the file's head was 250
+    eligibility pairs, 1 of 3 held-out families (REPORT.md §3w correction). Shuffling whole pairs
+    keeps each pair adjacent while interleaving families across the file, so any head-N slice
+    (e.g. eval_wf.py's old --limit) is representative. A pair with only one surviving row (its
+    partner deduped away against train/val) is kept as its own singleton unit."""
+    by_pair = defaultdict(list)
+    for r in rows:
+        by_pair[r["meta"]["flip_pair"]].append(r)
+    units = list(by_pair.values())
+    rng.shuffle(units)
+    return [r for u in units for r in u]
+
+
 def shuffled_rubric(rows, rng):
     """Each row gets another row's query from the same family with the identical candidate list (a coherent but
     wrong rubric); label kept. Δ_r = acc(normal) - acc(shuffled), the analogue of scripts/mmlu_probes.py's Δ_q."""
@@ -1234,7 +1251,9 @@ def main():
     all_rows = list(train_rows) + list(val_rows)
     for name, rows in evals.items():
         rows = [r for r in rows if norm_text(r["state"]) not in seen]
-        if name != "wf_rubric_flip":  # flip pairs stay adjacent
+        if name == "wf_rubric_flip":  # shuffle by pair so families interleave but pairs stay adjacent
+            rows = pair_shuffle(rows, rng)
+        else:
             rng.shuffle(rows)
         write_jsonl(out / "eval" / f"{name}.jsonl", rows)
         manifest[name] = len(rows)
