@@ -5,7 +5,10 @@ candidates = the task's labels verbatim ("no"/"yes" for noul, "0".."n" for score
 null mass is dropped and the rest renormalised over the labels -- p_null is reported in the
 runtime block, not scored. Modes: energy (model.decide, KV-cached state), native
 (native.native_kv_decide), compose (PLAN5 sec 3: P(null) = 1 - r_energy, P(a_j) = r_energy *
-P_native(a_j | answerable)). Cold path: no candidate cache, every label embedded on the fly.
+P_native(a_j | answerable)), mcq_zero_shot (PLAN7 track A: frozen --backbone, no checkpoint,
+no LoRA -- next-token logits over the option letters via mcq.py's rendering, restricted to
+the option set; ∅ is never rendered, so p_null = 0). Cold path: no candidate cache, every
+label embedded on the fly.
 """
 import json
 import time
@@ -15,12 +18,22 @@ import torch
 
 import bench  # load_ours / fresh_empty_cache: the checkpoint -> (backbone, model) contract lives there
 from encode import pick_device
+from mcq import MAXK_DIRECT, MCQHead, _ids, _label, _pack
 from model import decide as energy_decide
 from native import NativeHead, native_kv_decide
 
 MAX_QUERY = 64  # the energy checkpoints TRAINED with 64-token queries; decide() now accepts max_query, so longer rubrics are in-context but out-of-distribution
 MAX_STATE = 256  # both model.decide and native_kv_decide default max_state=256 -- the trained length, independent of the --max_state extrapolation cap
-MODES = ("energy", "native", "compose")
+MODES = ("energy", "native", "compose", "mcq_zero_shot")
+
+
+def _render_zero_shot(query: str, labels: list[str]) -> str:
+    """query + lettered options + "Answer:" -- no rendered null line (unlike mcq._render):
+    mcq_zero_shot never scores a null option, ∅ is hardcoded 0 by the caller."""
+    text = query + "\n"
+    for i, c in enumerate(labels):
+        text += f"{_label(i)}. {c}\n"
+    return text + "Answer:"
 
 
 def query_text(question: dict) -> str:
@@ -50,13 +63,20 @@ def to_labels(p: torch.Tensor, labels: list[str]) -> tuple[dict, float]:
 
 
 class PCDMDecider:
-    def __init__(self, run_dir: str, device: str = "auto", mode: str = "energy",
-                 energy_run: str | None = None, max_state: int = 4096, max_query: int = 256):
+    def __init__(self, run_dir: str | None = None, device: str = "auto", mode: str = "energy",
+                 energy_run: str | None = None, max_state: int = 4096, max_query: int = 256,
+                 backbone: str | None = None, tap_layer: int = 0):
         assert mode in MODES, mode
         if mode == "compose" and not energy_run:
             raise ValueError("compose needs energy_run (the support-gate checkpoint)")
+        if mode == "mcq_zero_shot" and not backbone:
+            raise ValueError("mcq_zero_shot needs backbone (frozen, no checkpoint)")
         self.device, self.mode, self.max_state, self.max_query = pick_device(device), mode, max_state, max_query
-        self.energy = self.native = None
+        self.energy = self.native = self.zero = None
+        if mode == "mcq_zero_shot":
+            self.zero = MCQHead(backbone, lora_layers=0, lora_r=0, device=self.device, tap_layer=tap_layer).eval()
+            self.tok = self.zero.backbone.tokenizer
+            return
         for kind, rd in {"energy": [("energy", run_dir)], "native": [("native", run_dir)],
                          "compose": [("energy", energy_run), ("native", run_dir)]}[mode]:
             setattr(self, kind, self._load(rd, kind))
@@ -81,6 +101,25 @@ class PCDMDecider:
         return energy_decide(r["bb"], r["m"], bench.fresh_empty_cache(r["bb"]), state, [(query, labels)],
                              joint=r["joint"], encoder=r["enc"], max_state=self.max_state, max_query=self.max_query)[0]
 
+    def _probs_zero_shot(self, state, query, labels) -> torch.Tensor:
+        """[K+1] next-token letter logits over exactly `labels`, softmax-normalised, p_null
+        hardcoded 0 (no null option is ever rendered). ponytail: direct-scoring only (no
+        mcq._score_chunked fallback) -- JevBench label sets never exceed MAXK_DIRECT."""
+        head = self.zero
+        assert len(labels) <= MAXK_DIRECT, f"mcq_zero_shot: K={len(labels)} > {MAXK_DIRECT} (not chunked)"
+        tok = head.backbone.tokenizer
+        suffix = _render_zero_shot(query, labels)
+        s_ids = _ids(tok, [state], self.max_state)
+        x_ids = _ids(tok, [suffix], self.max_query)
+        input_ids, attention_mask, lengths = _pack(tok, s_ids, x_ids)
+        input_ids, attention_mask = input_ids.to(head.device), attention_mask.to(head.device)
+        out = head.backbone.model(input_ids=input_ids, attention_mask=attention_mask)
+        last = out.last_hidden_state[0, lengths[0] - 1].float()
+        letter_ids = head.letter_ids[:len(labels)].to(head.device)
+        w = head.lm_head_weight.to(head.device)[letter_ids].float()
+        probs = torch.softmax(last @ w.T, dim=-1)
+        return torch.cat([probs, probs.new_zeros(1)])
+
     def decide(self, state, question: dict, labels: list[str]) -> tuple[dict, dict]:
         """-> (probs over exactly `labels`, runtime block)."""
         if not isinstance(state, str):
@@ -94,6 +133,8 @@ class PCDMDecider:
                 r = 1.0 - self._probs("energy", state, query, labels)[-1]
                 pn = self._probs("native", state, query, labels)[:-1]
                 p = torch.cat([r * pn / pn.sum(), (1.0 - r).reshape(1)])
+            elif self.mode == "mcq_zero_shot":
+                p = self._probs_zero_shot(state, query, labels)
             else:
                 p = self._probs(self.mode, state, query, labels)
         probs, p_null = to_labels(p, labels)  # includes the .cpu() sync -- latency below covers the real wall-clock cost
@@ -105,4 +146,4 @@ class PCDMDecider:
                        "query_tokens": n_query,
                        "query_truncated": bool(self.energy) and n_query > self.max_query,
                        "trained_max_query": MAX_QUERY, "query_beyond_train_len": bool(self.energy) and n_query > MAX_QUERY,
-                       "probability_origin": "native-softmax"}
+                       "probability_origin": "mcq-zero-shot-softmax" if self.mode == "mcq_zero_shot" else "native-softmax"}

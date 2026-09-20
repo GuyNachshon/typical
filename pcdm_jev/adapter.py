@@ -15,20 +15,22 @@ class LocalPCDMAdapter:
 
     def __init__(self, endpoint=None, model=None, key_env="", timeout_s=None,
                  price_input_per_m=None, price_output_per_m=None, revision=None,
-                 mode="energy", device="auto", max_state=4096):
-        self.path = model  # run dir
-        self.model = f"pcdm:{mode}:{model}"
+                 mode="energy", device="auto", max_state=4096, backbone=None, tap_layer=0):
+        self.path = model  # run dir (None for mode="mcq_zero_shot": frozen backbone, no checkpoint)
+        self.model = f"pcdm:{mode}:{model or backbone}"
         self.energy_run = endpoint
         self.key_env, self.timeout_s, self.revision = key_env, timeout_s, revision
         self.price_input_per_m, self.price_output_per_m = price_input_per_m, price_output_per_m
         self.mode, self.device, self.max_state = mode, device, max_state
+        self.backbone, self.tap_layer = backbone, tap_layer
         self._decider = None
 
     def load(self):
         if self._decider is None:
             t0 = time.perf_counter()
             self._decider = PCDMDecider(self.path, device=self.device, mode=self.mode,
-                                        energy_run=self.energy_run, max_state=self.max_state)
+                                        energy_run=self.energy_run, max_state=self.max_state,
+                                        backbone=self.backbone, tap_layer=self.tap_layer)
             # ponytail: one throwaway decision so CUDA init lands in load_s, not item 1's latency
             self._decider.decide("x", {"type": "noul", "instructions": "?"}, ["yes", "no"])
             self.load_s = time.perf_counter() - t0

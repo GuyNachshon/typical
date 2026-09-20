@@ -2,6 +2,7 @@
 runs/mini_emb over 3 public tasks (skipped when the checkpoint or /tmp/jevbench is missing)."""
 import json
 import math
+import os
 import sys
 from pathlib import Path
 
@@ -91,6 +92,35 @@ def test_adapter_returns_valid_result_on_fake_decider():
     assert list(res.probs) == score.labels == ["0", "1", "2", "3"]  # ordinal labels, in order
     validate_probs(res.probs, score.labels)
     assert ad.price_input_per_m is None and ad.reserve_estimate(score) == 0.0
+
+
+@pytest.mark.skipif(not os.environ.get("RUN_SLOW"), reason="downloads/loads the real Qwen3-1.7B-Base "
+                     "backbone; set RUN_SLOW=1 to run")
+def test_mcq_zero_shot_real_backbone_two_items():
+    """PLAN7 track A: frozen backbone, no checkpoint, no LoRA -- next-token letter logits
+    restricted to the option set (no rendered null), p_null hardcoded 0. Two items: a
+    noul (K=2) and a score (K=4) task from the public set, run through both the decider
+    directly and the adapter contract."""
+    from jevbench.scoring import validate_probs
+    from jevbench.tasks import load_jsonl
+    from pcdm_jev.adapter import LocalPCDMAdapter
+    from pcdm_jev.decider import PCDMDecider
+
+    dec = PCDMDecider(mode="mcq_zero_shot", backbone="Qwen/Qwen3-1.7B-Base", tap_layer=0, device="cpu")
+    tasks = load_jsonl(str(JEV / "datasets/public/original.jsonl"))
+    picks = [next(t for t in tasks if t.question["type"] == k) for k in ("noul", "score")]
+    for t in picks:
+        probs, rt = dec.decide(t.state, t.question, list(t.labels))
+        clean = validate_probs(probs, t.labels)  # sums to 1, no null column to drop twice
+        assert list(clean) == list(t.labels) and math.isclose(sum(clean.values()), 1.0, abs_tol=1e-6)
+        assert rt["p_null"] == 0.0 and rt["mode"] == "mcq_zero_shot"
+        assert rt["probability_origin"] == "mcq-zero-shot-softmax"
+
+    ad = LocalPCDMAdapter(mode="mcq_zero_shot", backbone="Qwen/Qwen3-1.7B-Base", device="cpu")
+    res = ad.run(picks[0])
+    assert res.ok, res.error
+    validate_probs(res.probs, picks[0].labels)
+    assert res.raw["runtime"]["p_null"] == 0.0
 
 
 @pytest.mark.skipif(not Path("runs/mini_emb/best.pt").exists(), reason="runs/mini_emb missing")

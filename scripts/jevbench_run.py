@@ -4,6 +4,7 @@ public files and print a compact table.
 uv run scripts/jevbench_run.py --model runs/joint_emb_lw_v5 --mode energy --name e_v5
 uv run scripts/jevbench_run.py --model runs/nc_n3 --mode native --name n3
 uv run scripts/jevbench_run.py --model runs/nc_n3 --mode compose --energy_run runs/joint_emb_lw_v5 --name comp
+uv run scripts/jevbench_run.py --mode mcq_zero_shot --backbone Qwen/Qwen3-4B-Base --name zs_4b
 
 -> runs/jev_<name>/<tier>/{results.jsonl, summary.json, manifest.json, raw/} per public file
    (original | easy | hard; the harness keeps tiers apart) + runs/jev_<name>/summary.json.
@@ -39,9 +40,11 @@ def _sha256(path: Path) -> str:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", required=True, help="run dir (best.pt)")
-    ap.add_argument("--mode", default="energy", choices=["energy", "native", "compose"])
+    ap.add_argument("--model", default=None, help="run dir (best.pt); unused for --mode mcq_zero_shot")
+    ap.add_argument("--mode", default="energy", choices=["energy", "native", "compose", "mcq_zero_shot"])
     ap.add_argument("--energy_run", default=None, help="energy run dir (support gate) for --mode compose")
+    ap.add_argument("--backbone", default=None, help="--mode mcq_zero_shot: frozen HF backbone, no checkpoint")
+    ap.add_argument("--tap_layer", type=int, default=0, help="--mode mcq_zero_shot: layer to truncate to (0 = full depth)")
     ap.add_argument("--name", required=True)
     ap.add_argument("--tasks", default="original,easy,hard", help="public files, comma-separated")
     ap.add_argument("--limit", type=int, default=None)
@@ -55,6 +58,10 @@ def main():
     if args.mode == "compose":
         ap.error("compose ≡ native under the harness (r cancels out of the renormalised label "
                   "distribution -- see to_labels); use scripts/compose_support.py for the abstention-gate analysis instead")
+    if args.mode == "mcq_zero_shot" and not args.backbone:
+        ap.error("--mode mcq_zero_shot needs --backbone")
+    if args.mode != "mcq_zero_shot" and not args.model:
+        ap.error("--model is required for --mode energy|native")
 
     sys.path.insert(0, args.jevbench_dir)
     import jevbench.adapters
@@ -69,7 +76,8 @@ def main():
     out = ROOT / "runs" / f"jev_{args.name}{'_rev' if args.reverse_labels else ''}"
     out.mkdir(parents=True)  # exclusive, like every jevbench run dir
     adapter = LocalPCDMAdapter(endpoint=args.energy_run, model=args.model, mode=args.mode,
-                               device=args.device, max_state=args.max_state)
+                               device=args.device, max_state=args.max_state,
+                               backbone=args.backbone, tap_layer=args.tap_layer)
     adapter.load()
     print(f"[jev] loaded {args.mode} in {adapter.load_s:.1f}s", flush=True)
     if args.reverse_labels:  # ponytail: swap label order at the request boundary, no Task/adapter internals touched
@@ -86,7 +94,7 @@ def main():
                                         capture_output=True, text=True, check=True).stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         harness_commit = None
-    ckpt = Path(args.model, "best.pt")
+    ckpt = Path(args.model, "best.pt") if args.model else None
 
     ledger = Ledger(out / "ledger.jsonl")
     summaries = {}
@@ -99,7 +107,8 @@ def main():
         records = Runner(adapter, ledger, raw_dir=d / "raw", default_reserve_usd=0.0).run_all(
             tasks, results_path=d / "results.jsonl")
         manifest = {
-            "run_label": args.name, "adapter": adapter.name, "requested_model": args.model, "mode": args.mode,
+            "run_label": args.name, "adapter": adapter.name, "requested_model": args.model or args.backbone,
+            "mode": args.mode, "backbone": args.backbone, "tap_layer": args.tap_layer,
             "energy_run": args.energy_run, "device": adapter.load().device, "max_state": args.max_state,
             "reverse_labels": args.reverse_labels,
             "cost_basis": adapter.cost_basis, "dataset_hash": dataset_hash(tasks), "n_planned": len(tasks),
@@ -107,7 +116,7 @@ def main():
             "finished_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() and "cuda" in adapter.load().device else None,
             "torch_version": torch.__version__,
-            "checkpoint_sha256": _sha256(ckpt) if ckpt.exists() else None,
+            "checkpoint_sha256": _sha256(ckpt) if ckpt and ckpt.exists() else None,
             "harness_commit": harness_commit,
             "trained_max_state": MAX_STATE, "trained_max_query": MAX_QUERY,
             "load_s": adapter.load_s,
