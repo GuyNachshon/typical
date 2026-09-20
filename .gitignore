@@ -15,6 +15,7 @@ runs/*/*
 !runs/*/results.json
 !runs/*/bench.json
 !runs/*/eval_wf.json
+!runs/*/eval_wf_full.json
 !runs/*.json
 runs/dump_*/
 .agents/
