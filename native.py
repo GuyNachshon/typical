@@ -33,6 +33,7 @@ import math
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from encode import EMBED_DIM, CAND_RENDER
 from mcq import _label, _render, _ids, _pack, _score_chunked, collate_mcq
@@ -65,17 +66,48 @@ def _render_letters_nonull(query: str, cand_texts: list[str]):
     return text, spans
 
 
-RENDERS = {"letters": _render, "tags": _render_tags, "letters_nonull": _render_letters_nonull}
+def _render_query_only(query: str, cand_texts: list[str]):
+    """PLAN7 track C --noul_head bern: suffix is the query alone, no options rendered (the
+    Bernoulli head reads h_D only). Empty spans -> native_features pools every candidate slot
+    to a zero vector, same as a truncated option; candidate identity for placing P(yes) is
+    resolved by the caller (run_batch_native/native_kv_decide) from the candidate strings."""
+    return query + "\n", []
+
+
+RENDERS = {"letters": _render, "tags": _render_tags, "letters_nonull": _render_letters_nonull,
+           "query_only": _render_query_only}
+
+
+def _effective_render(model):
+    """--noul_head bern always renders query-only, overriding --nc_render (there's nothing
+    candidate-shaped to render); every other head uses model.render as usual."""
+    return "query_only" if getattr(model, "noul_head", "choice") == "bern" else getattr(model, "render", "letters")
+
+
+def _yes_idx(cand_lists, dev):
+    """[B] index of the literal "yes" candidate per row (case-insensitive) -- --noul_head bern
+    places P(yes) there regardless of rendered order, so a reversed ["yes","no"] eval row gets
+    the identical P(yes) as ["no","yes"] (PLAN7 track C reversed-label control)."""
+    idx = []
+    for cl in cand_lists:
+        matches = [i for i, c in enumerate(cl) if c.strip().lower() == "yes"]
+        assert matches, f"--noul_head bern needs a literal 'yes' candidate, got {cl}"
+        idx.append(matches[0])
+    return torch.tensor(idx, dtype=torch.long, device=dev)
 
 
 class NativeHead(nn.Module):
     def __init__(self, d: int, nc_head: str = "n2n3", null: str = "factored", d_proj: int = 256,
-                 d_emb: int = EMBED_DIM, render: str = "letters"):
+                 d_emb: int = EMBED_DIM, render: str = "letters", score_head: str = "choice",
+                 noul_head: str = "choice"):
         super().__init__()
         assert nc_head in ("n2", "n3", "n2n3"), nc_head
         assert null in ("softmax", "factored"), null
         assert render in RENDERS, render
+        assert score_head in ("choice", "cumlink"), score_head
+        assert noul_head in ("choice", "bern"), noul_head
         self.nc_head, self.null, self.render = nc_head, null, render  # render: restored from args, not state_dict
+        self.score_head, self.noul_head = score_head, noul_head
         self.use2, self.use3 = "n2" in nc_head, "n3" in nc_head
         dv = d_proj * (self.use2 + self.use3)
         self.dv = dv
@@ -95,6 +127,18 @@ class NativeHead(nn.Module):
             self.null_gate = nn.Sequential(nn.Linear(4 + 4 * dv, 256), nn.GELU(), nn.Linear(256, 1))
         else:
             self.score_null = nn.Sequential(nn.Linear(2 * dv, dv // 2), nn.GELU(), nn.Linear(dv // 2, 1))
+        # PLAN7 track C typed heads: score_head=cumlink / noul_head=bern both produce a per-row
+        # categorical p over the (up to Kmax) candidates from raw (z-scored) backbone-width
+        # features -- independent of nc_head/dv -- then share one factored-null gate (below)
+        # to place ∅ exactly like the K-way Choice control (factored_null_logits on log p).
+        if score_head == "cumlink" or noul_head == "bern":
+            self.null_gate_typed = nn.Sequential(nn.Linear(4 + 4 * d, 256), nn.GELU(), nn.Linear(256, 1))
+        if score_head == "cumlink":
+            self.w_o = nn.Linear(d, 1)  # scalar location u = w_o . h_D
+            self.w_t = nn.Linear(d, 1)  # per-level threshold increment (softplus'd, cumsum'd)
+            self.theta0 = nn.Parameter(torch.zeros(1))
+        if noul_head == "bern":
+            self.w_n = nn.Linear(d, 1)  # P(yes) = sigmoid(w_n . h_D)
         self.temperature = 1.0  # see DecisionModel.temperature / train.fit_temperature
 
     @torch.no_grad()
@@ -103,11 +147,18 @@ class NativeHead(nn.Module):
         self.mu_h.copy_(h.mean(0)); self.sd_h.copy_(h.std(0).clamp_min(1e-3))
         self.mu_c.copy_(c3.mean(0)); self.sd_c.copy_(c3.std(0).clamp_min(1e-3))
 
-    def forward(self, h, cmask, c3=None, c2=None):
+    def forward(self, h, cmask, c3=None, c2=None, yes_idx=None):
         """h [B, d]; cmask [B, Kmax]; c3 [B, Kmax+1, d] (null line last); c2 [B, Kmax, d_emb].
-        -> logits [B, Kmax+1], null last, pads finfo.min."""
+        yes_idx: [B] long, --noul_head bern only (see _yes_idx). -> logits [B, Kmax+1], null
+        last, pads finfo.min."""
+        hz = (h - self.mu_h) / self.sd_h
+        if self.noul_head == "bern":
+            return self._typed_logits(self._bern_probs(hz, cmask, yes_idx), hz, c3, cmask)
+        if self.score_head == "cumlink":
+            return self._typed_logits(self._cumlink_probs(hz, c3, cmask), hz, c3, cmask)
+
         B = h.shape[0]
-        u = self.proj_h((h - self.mu_h) / self.sd_h)                              # [B, dv]
+        u = self.proj_h(hz)                                                       # [B, dv]
         vs = []
         if self.use2:
             vs.append(self.proj_2(torch.cat([c2, self.null_emb.expand(B, 1, -1)], 1)))
@@ -122,6 +173,55 @@ class NativeHead(nn.Module):
         if self.null == "factored":
             return factored_null_logits(self.null_gate, s, vc, hn, cmask, self.temperature)
         return torch.cat([s, self.score_null(hn)], dim=-1)
+
+    def _bern_probs(self, hz, cmask, yes_idx):
+        """PLAN7 track C --noul_head bern: P(yes) = sigmoid(w_n . h_D), no candidate text ever
+        read -> position-invariant by construction. 2-way only (assert): yes_idx places p_yes
+        at the caller-resolved "yes" column, 1-p_yes at the other -- this is exactly why the
+        reversed-label ["yes","no"] control must reproduce ["no","yes"]'s P(yes) exactly."""
+        assert (cmask.sum(-1) == 2).all(), "--noul_head bern is 2-way only"
+        B, Kmax = cmask.shape
+        p_yes = torch.sigmoid(self.w_n(hz).squeeze(-1))
+        idx = yes_idx if yes_idx is not None else torch.ones(B, dtype=torch.long, device=hz.device)
+        p = hz.new_zeros(B, Kmax)
+        ar = torch.arange(B, device=hz.device)
+        p[ar, idx] = p_yes
+        p[ar, 1 - idx] = 1 - p_yes
+        return p
+
+    def _cumlink_probs(self, hz, c3, cmask):
+        """PLAN7 track C --score_head cumlink: cumulative-link ordinal head. u = w_o . h_D;
+        thresholds tau_j = theta0 + cumsum_{i<=j} softplus(w_t . c_i) for j = 0..K-2 (c_i =
+        the i-th rendered level's z-scored pooled span, so wider gaps between adjacent level
+        texts can widen the threshold spacing); P(y<=j) = sigmoid(tau_j - u); category probs
+        by differencing, with the last valid category per row (K-1, K = cmask row-sum, varies
+        per row) taking the remainder 1 - P(y<=K-2) rather than a modeled threshold. K = 2
+        reduces to a single threshold tau_0 -> P(0)=sigmoid(tau_0-u), P(1)=sigmoid(u-tau_0), a
+        plain sigmoid; thresholds are strictly increasing in j (softplus > 0) -> P(y<=j) is a
+        monotone (non-decreasing) function of j for fixed u."""
+        B, Kmax = cmask.shape
+        c3z = (c3 - self.mu_c) / self.sd_c
+        u = self.w_o(hz).squeeze(-1)                                              # [B]
+        width = F.softplus(self.w_t(c3z[:, :-1]).squeeze(-1)).masked_fill(~cmask, 0.0)  # [B, Kmax]
+        theta = self.theta0 + torch.cumsum(width, dim=-1)                         # [B, Kmax]
+        cdf = torch.sigmoid(theta - u.unsqueeze(-1))                              # P(y<=j), j=0..Kmax-1
+        p_prev = F.pad(cdf, (1, 0))[:, :-1]
+        p = (cdf - p_prev).clamp_min(0.0)
+        K = cmask.sum(-1)
+        last = (K - 1).clamp_min(0)
+        remainder = torch.where(K > 1, 1.0 - cdf.gather(1, (last - 1).clamp_min(0).unsqueeze(1)).squeeze(1),
+                                 torch.ones_like(u))
+        p = p.scatter(1, last.unsqueeze(1), remainder.unsqueeze(1)).masked_fill(~cmask, 0.0)
+        return p
+
+    def _typed_logits(self, p, hz, c3, cmask):
+        """Shared tail for _bern_probs/_cumlink_probs: log p -> the same factored-null
+        composition as the K-way Choice control (null_gate_typed, over raw z-scored h_D + the
+        null-line span, width d -- independent of nc_head/dv)."""
+        c3z = (c3 - self.mu_c) / self.sd_c
+        s = torch.log(p.clamp_min(1e-12)).masked_fill(~cmask, torch.finfo(p.dtype).min)
+        hn = torch.cat([hz, c3z[:, -1]], dim=-1)
+        return factored_null_logits(self.null_gate_typed, s, c3z[:, :-1], hn, cmask, self.temperature)
 
 
 def _pool_matrix(spans, offsets, base, Kmax, T, K=None):
@@ -182,7 +282,7 @@ def _n2_vectors(head, cand_lists, vec_cache, dev):
 def _fit_chunks(tok, query, cand_texts, max_suffix, render="letters"):
     """Consecutive option index chunks whose rendered suffix fits max_suffix tokens (per-line
     counts are exact for single-token letters; +2/option slack covers numeric labels)."""
-    per = f"{CHOICE_OPEN}{{}}{CHOICE_CLOSE}" if render == "tags" else "A. {}\n"
+    per = f"{CHOICE_OPEN}{{}}{CHOICE_CLOSE}" if render == "tags" else "" if render == "query_only" else "A. {}\n"
     lens = [len(x) for x in tok([per.format(c) for c in cand_texts], add_special_tokens=False)["input_ids"]]
     overhead = len(tok(query + "\n", add_special_tokens=False)["input_ids"]) + 2
     if render == "letters":
@@ -208,12 +308,13 @@ def run_batch_native(head, model, batch, examples, max_state: int = 256, max_suf
     logits = torch.full((len(examples), Kmax + 1), torch.finfo(torch.float32).min, device=dev)
     n_tokens = 0
 
-    render = getattr(model, "render", "letters")
+    render = _effective_render(model)
 
     def score(sts, qs, cls):
         h, C3, cm, n_tok = native_features(head, sts, qs, cls, max_state, max_suffix, render=render)
         C2 = _n2_vectors(head, cls, vec_cache, dev) if model.use2 else None
-        return model(h, cm, C3, C2), n_tok
+        yi = _yes_idx(cls, dev) if model.noul_head == "bern" else None
+        return model(h, cm, C3, C2, yes_idx=yi), n_tok
 
     n_suf = [len(x) for x in tok([RENDERS[render](q, c)[0] for q, c in zip(queries, cand_lists)],
                                  add_special_tokens=False)["input_ids"]]
@@ -275,7 +376,7 @@ def native_kv_decide(head, model, state, queries, chunk: int = 32, max_state: in
     for start in range(0, len(queries), chunk):
         qs = queries[start:start + chunk]
         m = len(qs)
-        rendered = [RENDERS[getattr(model, "render", "letters")](q, c) for q, c in qs]
+        rendered = [RENDERS[_effective_render(model)](q, c) for q, c in qs]
         enc = tok([r[0] for r in rendered], add_special_tokens=False, return_offsets_mapping=True)
         x_ids, offs = enc["input_ids"], enc["offset_mapping"]
         assert max(len(x) for x in x_ids) <= max_suffix, f"suffix > max_suffix={max_suffix}; raise it"
@@ -296,7 +397,8 @@ def native_kv_decide(head, model, state, queries, chunk: int = 32, max_state: in
         h = H[torch.arange(m, device=dev), (lengths - 1).to(dev)]
         C3 = torch.bmm(pool.to(dev), H)
         C2 = _n2_vectors(head, [c for _, c in qs], vec_cache, dev) if model.use2 else None
-        probs = torch.softmax(model(h, cmask.to(dev), C3, C2), dim=-1)
+        yi = _yes_idx([c for _, c in qs], dev) if model.noul_head == "bern" else None
+        probs = torch.softmax(model(h, cmask.to(dev), C3, C2, yes_idx=yi), dim=-1)
         for i, (_, c) in enumerate(qs):
             out.append(torch.cat([probs[i, :len(c)], probs[i, -1:]]))
     return out
