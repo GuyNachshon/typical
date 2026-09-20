@@ -2311,3 +2311,128 @@ def test_eval_wf_batched_matches_single_row_on_nc_v3():
         b = np.concatenate([batched[i][:k], batched[i][-1:]])
         assert a.argmax() == b.argmax(), (i, a, b)
         assert np.abs(a - b).max() < 0.05, (i, a, b)
+
+
+# ---------------------------------------------------------------------------
+# N. null-logit offset knob (REPORT S3w calibration experiment #1)
+# ---------------------------------------------------------------------------
+
+def _factored_probs_inputs(seed=0, n=6, Kmax=3):
+    """A valid factored-null logits tensor built the same way DecisionModel._factored_logits
+    composes one (logits_j = log p_j + log(1-r), logits_null = log r), so
+    probs_from_logits(..., null="factored") sees the same invariants a real model produces."""
+    g = torch.Generator().manual_seed(seed)
+    cmask = torch.zeros(n, Kmax, dtype=torch.bool)
+    for i in range(n):
+        cmask[i, :((i % Kmax) + 1)] = True
+    r_logit = torch.randn(n, generator=g)
+    log_r, log_1mr = F.logsigmoid(r_logit), F.logsigmoid(-r_logit)
+    cand_logp = torch.log_softmax(torch.randn(n, Kmax, generator=g).masked_fill(~cmask, -1e9), dim=-1)
+    cand_logits = (log_1mr.unsqueeze(-1) + cand_logp).masked_fill(~cmask, torch.finfo(torch.float32).min)
+    logits = torch.cat([cand_logits, log_r.unsqueeze(-1)], dim=-1)
+    return logits, cmask
+
+
+def test_probs_from_logits_offset_b_zero_matches_legacy():
+    torch.manual_seed(0)
+    B, Kmax = 6, 4
+    cmask = torch.zeros(B, Kmax, dtype=torch.bool)
+    for i in range(B):
+        cmask[i, :((i % Kmax) + 1)] = True
+    logits = torch.randn(B, Kmax + 1) * 2
+    for Tval in (1.0, 1.7):
+        legacy = T.probs_from_logits(logits, cmask, Tval, null="softmax")
+        assert torch.allclose(legacy, T.probs_from_logits(logits, cmask, Tval, null="softmax", b=0.0))
+
+    flogits, fcmask = _factored_probs_inputs()
+    for Tval in (1.0, 1.7):
+        legacy = T.probs_from_logits(flogits, fcmask, Tval, null="factored")
+        assert torch.allclose(legacy, T.probs_from_logits(flogits, fcmask, Tval, null="factored", b=0.0))
+
+
+def test_probs_from_logits_offset_shifts_logit_pnull_by_b():
+    """Both null forms document the same operation: b is added to logit(P(null)). Verify the
+    algebraic identity directly instead of just trusting the docstring."""
+    def logit_pnull(probs):
+        p = probs[:, -1].clamp(1e-6, 1 - 1e-6)
+        return torch.log(p) - torch.log1p(-p)
+
+    torch.manual_seed(1)
+    B, Kmax = 5, 3
+    cmask = torch.ones(B, Kmax, dtype=torch.bool)
+    logits = torch.randn(B, Kmax + 1)
+    b_val = 1.75
+    cases = {"softmax": (logits, cmask), "factored": _factored_probs_inputs(seed=2, n=B, Kmax=Kmax)}
+    for null_mode, (lg, cm) in cases.items():
+        base = T.probs_from_logits(lg, cm, T=1.0, null=null_mode, b=0.0)
+        shifted = T.probs_from_logits(lg, cm, T=1.0, null=null_mode, b=b_val)
+        assert torch.allclose(logit_pnull(shifted) - logit_pnull(base), torch.full((B,), b_val), atol=1e-4)
+        assert torch.allclose(shifted.sum(-1), torch.ones(B), atol=1e-5)  # still a valid distribution
+
+
+def test_fit_temperature_b_grid_recovers_known_null_miscalibration(monkeypatch):
+    """Synthetic set: cand0 (gold when not null) at logit +4, cand1 at -4 (both always valid),
+    null logit fixed at -1.5 -- but the true label is null 85% of the time. b=0 (today's fit)
+    can only reach ~0.28 average P(null) by trading T off against candidate sharpness; letting
+    b range over [-4, 4] (the PLAN7/S3w calib #1 grid) recovers the missing null mass (~0.85)
+    at a strictly lower NLL. "Recovers a known offset" is cashed out as calibration recovery,
+    not a single hand-picked b* -- T and b trade off against each other, so the *combination*
+    the grid lands on, not either scalar alone, is what's identifiable here."""
+    n = 400
+    rng = np.random.RandomState(0)
+    is_null = rng.rand(n) < 0.85
+    logits = torch.zeros(n, 3)
+    logits[:, 0], logits[:, 1], logits[:, 2] = 4.0, -4.0, -1.5
+    cmask = torch.ones(n, 2, dtype=torch.bool)
+    target = torch.zeros(n, 2)
+    target[~torch.from_numpy(is_null), 0] = 1.0
+    p_null = torch.from_numpy(is_null.astype(np.float32))
+
+    def fake_forward_batches(backbone, model, cache, examples, bs, joint=False, readout="energy", vec_cache=None,
+                              shots=0, max_state=256):
+        return [(logits, cmask, target, p_null, [None] * n)]
+
+    monkeypatch.setattr(T, "forward_batches", fake_forward_batches)
+    model = argparse.Namespace(null="softmax")
+    dummy_examples = list(range(n))
+
+    T0, b0, nll0 = T.fit_temperature(None, model, None, dummy_examples, bs=64, b_grid=None)
+    assert b0 == 0.0  # b_grid=None never searches an offset -- the "b=0 path unchanged" contract
+
+    b_grid = np.arange(-4.0, 4.0 + 1e-9, 0.25)
+    T1, b1, nll1 = T.fit_temperature(None, model, None, dummy_examples, bs=64, b_grid=b_grid)
+    assert b1 > 2.0             # a real, positive offset recovered (raw null logit under-shoots)
+    assert nll1 < nll0 - 0.3    # meaningfully lower NLL than the b=0 fit
+
+    p_null0 = T.probs_from_logits(logits, cmask, T0, null="softmax", b=b0)[:, -1].mean().item()
+    p_null1 = T.probs_from_logits(logits, cmask, T1, null="softmax", b=b1)[:, -1].mean().item()
+    assert abs(p_null1 - 0.85) < 0.05   # recovers the true null rate
+    assert abs(p_null0 - 0.85) > 0.2    # while the b=0 fit stays far off
+
+
+def test_resolve_calib_examples_default_and_named():
+    val_examples = [{"id": "v"}]
+    eval_sets = {"typed_decisions_train": [{"id": "a"}, {"id": "b"}], "data_wf_val": [{"id": "c"}]}
+
+    examples, names, b_grid = T.resolve_calib_examples(None, val_examples, eval_sets)
+    assert examples is val_examples and names == ["val"] and b_grid is None
+
+    examples, names, b_grid = T.resolve_calib_examples("typed_decisions_train,data_wf_val", val_examples, eval_sets)
+    assert [e["id"] for e in examples] == ["a", "b", "c"]
+    assert names == ["typed_decisions_train", "data_wf_val"]
+    assert b_grid is not None and b_grid[0] == -4.0 and b_grid[-1] == 4.0
+
+    with pytest.raises(AssertionError):
+        T.resolve_calib_examples("nope", val_examples, eval_sets)
+
+
+def test_eval_dataset_accepts_T_offset_pairs(tiny_backbone, tiny_cache):
+    torch.manual_seed(0)
+    examples = make_examples()
+    model = DecisionModel(d_in=tiny_backbone.d, dropout=0)
+    probs, target, label = T.eval_dataset(tiny_backbone, model, tiny_cache, examples, bs=4,
+                                           Ts=(1.0, (1.3, 0.5)))
+    assert set(probs.keys()) == {1.0, 1.3}
+    assert np.allclose(probs[1.0].sum(-1), 1.0, atol=1e-5)
+    assert np.allclose(probs[1.3].sum(-1), 1.0, atol=1e-5)
+    assert not np.allclose(probs[1.0], probs[1.3])  # the offset actually changed the scaled probs
