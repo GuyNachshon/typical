@@ -928,8 +928,12 @@ TruthfulQA −0.9. Val NLL .347 → .384 (E sampled at .35 instead of ~.8).
 **Verdict against the PLAN6 rule.** W ✓ (every held-out axis ≥ +10; styles +33), rubric dependence ✓ (flip rate
 .31 → .50, Δ_r up, shuffled-rubric NLL 3× worse — it is reading the rubric, not memorising priors), K ✓ (within 3),
 external ✓ on 4 of 5 with one clean-external regression (typed-decisions). **E ✗ on two label-space sets**, and the failure
-mode is specific: only 0.9% of W training rows carry a null target (1,481 of 158,606; v5 has 21.4%), so 40% of every batch taught "never abstain" and the head's ∅ threshold moved and the model now
-abstains on in-vocabulary CLINC/TREC items — a mixing/null-weighting defect (PI branch *b*), not lost discrimination.
+mode is specific: the ∅ threshold on intent/topic label spaces shifted toward abstaining (CLINC-OOS +10.5 at the same
+time), while discrimination is intact (CLINC-K .892, paired-null AUROC unchanged). The direction is not the naive one —
+only 0.9% of W rows carry a null target (1,481 of 158,606; v5 has 21.4%) — so the cause is a mixing effect to be tested
+rather than asserted: E's share fell from ~.8 to .35 of each batch, and W's routing/extraction/cua rows train a
+rendered catch-all option (`other` / `not_stated` / `skip`) that competes with ∅ on exactly these label spaces. Either
+way it is a sampling/null-weighting defect (PI branch *b*), not lost discrimination.
 The second defect is calibration: everywhere the gold is soft or ordinal (held-out score NLL 1.24 → 2.07, typed-decisions,
 JevBench hard Brier) accuracy rose or held while probability quality fell — the workflow data is almost all hard
 labels. So the answer to the Phase-6 question is **yes for rubric execution, no for probability quality**: rubric-conditioned
