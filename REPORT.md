@@ -843,6 +843,29 @@ and above open-jev-deberta (.431); hard is still within 1 SE of chance (.378 vs 
 temporal/probability/tradeoff flat or down). So part of the §3q "training-distribution" gap was our own null artifact;
 the remaining standard gap to the workflow-trained systems (.83–.99) and all of the hard gap are what Phase 6A tests.
 
+## 3u. Learned per-input expert gate — negative (`scripts/gate_experts.py`, eval-time on dumped logits, ~$1)
+
+PLAN6 item 3: a tiny gate (193 params, MLP over per-input signals available at inference — energy max-p / entropy /
+top-2 margin / P(∅), the same four for native, log K, log query length; `energy_only` and `native_only` ablations
+with 129 params) mixes the energy expert `joint_emb_lw_v5` and the native expert `nc_n3` in log-space, trained on the
+v5 val logits only (no task ids), evaluated on 31 held-out sets. The number that decides whether routing is worth
+anything is the oracle envelope P(either expert correct) against the best single expert *per set* (which itself
+needs a task id) and the gate.
+
+| mean accuracy over the 31 sets | energy | native `nc_n3` | best single expert per set | **learned gate** | oracle (either correct) |
+|---|---|---|---|---|---|
+| all features | .736 | .700 | .769 | **.745** | .861 |
+| energy-only / native-only features | | | | .742 / .743 | |
+
+Val NLL .368 (g = 0) → .345 (gate) → .338 (+T). The gate recovers **+0.9 of the +12.5 envelope** and stays 2.4 pts below
+the per-set best expert: where native is clearly better (CLINC-heldout .916 vs .762, 20NG .559 vs .336, TREC-coarse
+.630 vs .356) the gate sits near the energy number (.772 / .455 / .422) — its mean g on those sets is .13–.52, i.e. the
+per-input signals do not identify "this is a label-space decision the native reader should own". The three feature sets
+are indistinguishable (±.003). The envelope is large (+12.5), so complementarity is real, but it is not recoverable from
+confidence statistics; a task id would be needed, and that is not a System-One primitive. Not promoted — and with
+§3t's `nc_v3_tap20` at energy level on evidence, the two-expert frontier this gate was meant to exploit has mostly
+closed on its own (the remaining energy-only advantages are K-flat cost and the paired-null probes).
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.

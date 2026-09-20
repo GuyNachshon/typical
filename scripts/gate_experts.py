@@ -72,7 +72,7 @@ def _cand_stats(logits, K, prefix):
     z = z - z.max(-1, keepdims=True)
     p = np.exp(z)
     p /= p.sum(-1, keepdims=True)
-    top2 = -np.sort(-p, axis=-1)[:, :2]
+    top2 = -np.sort(-np.pad(p, ((0, 0), (0, 1))), axis=-1)[:, :2]  # pad: K = 1 sets (single candidate) have no runner-up
     ent = -(np.where(p > 0, p * np.log(np.clip(p, 1e-12, 1)), 0.0)).sum(-1)
     return {f"{prefix}_max": top2[:, 0], f"{prefix}_ent": ent, f"{prefix}_margin": top2[:, 0] - top2[:, 1],
             f"{prefix}_null": apply_bias(logits, K, 0.0, 0.0, 1.0)[:, -1]}

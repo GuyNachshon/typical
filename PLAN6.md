@@ -436,3 +436,22 @@ That is exactly where I'd take the project.
 | code-holes / repo-governance / INSTRUCT_JEV / DGUI / image-beans / Praveenrajus jev-bench | drop | modality/length, n=1 with null gold, doc snippets, image, re-packaged public sets already in v5 |
 
 **Execution note (2026-09-20, `data_wf_hf/` built + uploaded as `wf_hf/` on `guychuk/pcdm-data`, `scripts/jev_hf_datasets.py`).** Train 86,600 rows, all `fam_bucket=W`: cua 60,000 (skip 35.0%, fill 32,518, click 3,469, check 3,013) / systemone-lite 20,000 (of 32.4k) / jev-4b 6,600 (card says 7,500; 900 K=1 `record` rows dropped; Score `low/medium/high` → ordinal `0..2`; Jev teacher kept in `meta.teacher`, never a target). Val: cua 3,000. Eval (never trained): cua test 24,370 + demo 196; typed-decisions test 2,000 (+6,000 train held aside, `meta.family` for whole-workflow holdout); jevlogs 5,080 (block-level label flag); pagerduty 6,000 (traps flagged); tree-choice 720 (K up to 320); jev-4b adversarial 600; systemone-lite hard 5,400; Mind2Web 1,600 (choice 800 / noul 800; 28 rows soft multi-positive). 0 JevBench leaks per file. Still pending before Phase 6A: `data_wf` with rubric groups (w-workflow2) and `--family_weights` (w-sampler).
+
+## PI memo after `nc_v3_tap20` (2026-09-20, ~15:00) — queue unchanged, decision rule made explicit
+
+Freeze `nc_v3_tap20` as the Phase-6 backbone if it holds (energy-level NLI/BoolQ, Δ_q kept, abstention fixed, JevBench
+.694/1.00/.378 with no workflow training). Phase 6A now tests: *given a sound native decision architecture, does
+rubric-conditioned training solve the remaining workflow gap?* Gate: build/evaluate, don't promote. No new architecture
+idea while 6A runs.
+
+**Pass rule (three-dimensional, applied vs the matched `nc_v3_tap20` baseline):** W_heldout ≥ baseline + 8–10 pts, ΔE ≥ −3,
+ΔK ≥ −3, and rubric dependence as a *primary* metric: Δ_r = Acc(x,r,A) − Acc(x,r_shuffled,A) and rubric-flip accuracy.
+JevBench rising without Δ_r = workflow priors, not rubric execution.
+
+**Branch after 6A:** (a) W jumps, E/K hold → architecture frozen; typed Noul/Choice/Score properly, then calibration.
+(b) W up, E drops → fix sampling/mixing, not architecture. (c) W barely moves → "training distribution" falsified as the
+primary explanation; reopen how rubric/instruction representations interact with state/candidates. (d) `nc_v3_tap20`
+≈ Phase-6 model → the external datasets/generator add little; scale/instruction-following capacity moves up.
+
+**Budget:** finish committed runs; one matched Phase-6 seed only if 6A passes; typed ablations (cheap); calibration only
+after typed workflow accuracy is convincing; keep a reserve for the bottleneck 6A reveals. No 8B.
