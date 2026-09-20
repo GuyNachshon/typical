@@ -915,6 +915,14 @@ at full state length (`scripts/eval_wf.py`, first 500 rows/file, both models on 
 > held-out rubric form, not held-out text. Also unexplained: the `_wf` JevBench p50 latency is .554 s vs .077 s for the
 > baseline on the same architecture (different pod: H100 NVL + torch 2.11/cu128 vs SXM + 2.14/cu130) — to be re-measured.
 > The full-file, stratified re-evaluation of both checkpoints (§3x) supersedes every W/external number in this section;
+> Second review (forward): the E drop is not "entirely" abstention — among-K accuracy also fell (CLINC-150 acc_k
+> .867 → .822, TREC-fine .532 → .500, HWU64 .798 → .769), i.e. ~⅔ abstention / ⅓ discrimination, consistent with a
+> null-gate operating-point shift (the factored gate reads max/margin/lse of the option scores; W rows are near-
+> deterministic, so ordinary E margins now read as "uncertain") plus 2.3× fewer E steps — and the catch-all mechanism
+> predicts the wrong sign (it explains p_null → 0.000 on every JevBench item and W null-recall 1.0, not the E rise).
+> JevBench hard is a state-length split, not a plateau: items ≤ 256 tokens .39 → **.64** (n = 36), > 1,024 tokens
+> .40 → .23 (n = 40, almost all long_policy / multi_hop); mean max-p .65 → .90 and confidently-wrong (> .9) hard items
+> 8 → 20. Strictly, ΔE = −11/−10 on two sets fails the rule → PLAN6 branch **(b)** (fix mixing/null), not (a).
 > the verdict's *robust* parts are the calibration regression (Brier .27 → .54 on typed-decisions, held-out score NLL
 > 1.24 → 2.07, JevBench hard Brier .74 → .88) and the E over-abstention on CLINC/TREC (full test sets).
 

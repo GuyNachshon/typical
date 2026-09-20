@@ -40,3 +40,20 @@ capability-per-ms curve, not by parameter count).
 - Track B: Pareto point as above; no aggregate-loss selection.
 - Track C: adopt a typed head only if probability quality (NLL/Brier/ECE) or threshold utility improves at equal accuracy.
 - Every claim gets a matched baseline on identical rows; JevBench stays per-item on the public ids and unranked.
+
+## Execution notes (2026-09-20 20:45, after the two reviews)
+- $0 first: null-logit offset `b` fitted jointly with T on held-aside soft rows (typed_decisions_train + wf val) →
+  re-evaluate both checkpoints (predicted: CLINC-150 false-abstain .168 → ~.06, held-out score NLL 2.07 → ~1.3); CLINC
+  `other` probe; rubric-shuffle on the 36 short JevBench-hard items (does .64 fall to chance?). Worker `w-calib`.
+- `eval_wf` rebuilt: batched, stratified `--limit` (pairs adjacent), per-family/qtype/class breakdowns, majority
+  baselines; eval files re-written interleaved; full-file re-eval of both checkpoints → REPORT §3x supersedes §3w's
+  W/external numbers. Worker `w-evalfix`, one pod.
+- Track B runs (6): four ratios, `mix_e45_null` (`--null_aug W:0.20`), `long_e45` (`--max_state 1024` + 25% long
+  rows) — the long-state run is the capacity-vs-length test at 1.7B. Worker `w-mix`, three pods.
+- Track C arms (5) from the 6A checkpoint, 3k steps each: score K-way / ordinal-smoothed targets (τ = .7) /
+  cumulative-link head; noul 2-way / Bernoulli (reversed-label control must be exactly 0). Worker `w-typed`, one pod.
+- Track A ladder (4B / 8B / 14B, tap ≈ 71%) + zero-shot frozen-logit controls at 1.7B/4B/8B/14B + latency/memory
+  bench at every size. Worker `w-ladder`, three pods.
+- Track D DecisionMix v2: `data_wh` (levels 1–7, counterfactual rubric groups, held-out grammars/families/styles/level 7)
+  and `data_u` (ChaosNLI / UNLI / ambiguity / synthetic known distributions). Worker `w-data2`, CPU.
+- Cost guard now reads pods from /tmp/PODS_ACTIVE (workers append `<id>|<sshfile>|<waiter>`).
