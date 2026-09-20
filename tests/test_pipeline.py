@@ -6,6 +6,7 @@ tokenizer) instead of the full-size backbone.
 import argparse
 import glob
 import json
+import math
 import os
 import random
 import subprocess
@@ -25,6 +26,7 @@ import train as T
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from null_bias import fit_null_bias, apply_bias, soft_ce  # noqa: E402
+import workflow_corpus as wf  # noqa: E402
 
 
 CANDS = [f"cand{i}" for i in range(8)]
@@ -1246,6 +1248,21 @@ def test_workflow_corpus_limit_smoke(tmp_path):
     assert manifest["flip_pairs"] == len(flip) // 2
 
 
+def test_gen_long_extra_all_rows_long_split_across_families():
+    """--long_share (scripts/workflow_corpus.py gen_long_extra, PLAN7 track B long_e45 run):
+    force_long=True rows are always long (unlike gen_policy_permit(n, rng)'s ~LONG_FRAC-chance
+    default) and split between the two long-capable families in their CAPS ratio; force_long
+    also disables rubric groups (fill_to(n, single, None, rng)), so no row.meta.long is missing."""
+    rng = random.Random(0)
+    rows = wf.gen_long_extra(40, rng)
+    assert 38 <= len(rows) <= 42  # fill_to may overshoot by a couple of rows, never undershoot
+    assert all(r["meta"]["long"] for r in rows)
+    assert not any(r["meta"].get("rubric_group") for r in rows)
+    fams = {r["meta"]["family"] for r in rows}
+    assert fams == {"policy_permit", "action_select"}
+    assert wf.gen_long_extra(0, random.Random(0)) == []
+
+
 def test_multiset_expand_smoke(tmp_path):
     """scripts/multiset.py --variants 3 on 20 synthetic MCQ rows (PLAN3 E3-ms): yields
     80 rows, each ms_group of size 4 (orig + remove/add_unrel/reorder), and every row is
@@ -1597,11 +1614,111 @@ def test_bucketed_sampler_missing_bucket_asserts():
         next(T.bucketed_data_generator(examples, 8, 0, {"E": 0.5, "K": 0.5}))
 
 
+def _hard_row(bucket, cands, gold):
+    return {"state": "s", "query": "q", "candidates": list(cands),
+            "target": [1.0 if i == gold else 0.0 for i in range(len(cands))],
+            "p_null": 0.0, "task": "t", "label": gold, "meta": {"fam_bucket": bucket}}
+
+
+def test_parse_null_aug():
+    assert T.parse_null_aug(None) is None
+    assert T.parse_null_aug("") is None
+    assert T.parse_null_aug("W:0.2") == ("W", 0.2)
+
+
+def test_null_aug_fraction_and_pnull_semantics():
+    """--null_aug W:0.5 (PLAN7 track B null control): exactly round(N*FRAC) of the eligible
+    W rows get an augmented copy appended (originals untouched); the copy is target-uniform
+    over the remaining candidates with p_null=1.0/label=-1 (the softmax-null convention
+    make_row uses in scripts/workflow_corpus.py), and non-W rows are never touched."""
+    w_rows = [_hard_row("W", ["a", "b", "c"], 0) for _ in range(20)]
+    e_rows = [_hard_row("E", ["a", "b", "c"], 0) for _ in range(20)]
+    examples = w_rows + e_rows
+    out = T.apply_null_aug(examples, "W", 0.5, seed=0)
+    assert out[:len(examples)] == examples  # originals kept, byte-identical, in place
+    added = out[len(examples):]
+    assert len(added) == 10  # round(20 * 0.5), only from the W-bucket pool
+    for a in added:
+        assert a["p_null"] == 1.0 and a["label"] == -1 and a["meta"]["null_aug"] is True
+        assert a["meta"]["fam_bucket"] == "W"
+        assert a["candidates"] == ["b", "c"]  # gold "a" removed, no catch-all present
+        assert abs(sum(a["target"]) - 1.0) < 1e-9
+        assert all(abs(t - 0.5) < 1e-9 for t in a["target"])  # uniform over K=2 leftovers
+
+
+def test_null_aug_drops_catchall_and_needs_k_ge_2():
+    """Rendered catch-all options (other/not_stated/skip/none) are dropped alongside the gold
+    candidate; a row where that leaves < 2 candidates is skipped (no copy), and rows under the
+    K >= 3 floor are never eligible in the first place."""
+    keeps = _hard_row("W", ["a", "b", "c", "other"], 0)          # -> ["b", "c"] (catch-all stripped)
+    collapses = _hard_row("W", ["yes", "no", "other"], 0)        # -> ["no"] after strip -> skipped
+    too_few = _hard_row("W", ["x", "y"], 0)                      # K=2, never eligible
+    soft = dict(_hard_row("W", ["a", "b", "c"], 1), target=[0.3, 0.4, 0.3])  # not one-hot -> not "hard"
+    examples = [keeps, collapses, too_few, soft]
+    out = T.apply_null_aug(examples, "W", 1.0, seed=0)
+    added = out[len(examples):]
+    assert len(added) == 1
+    assert added[0]["candidates"] == ["b", "c"] and "other" not in added[0]["candidates"]
+    assert added[0]["p_null"] == 1.0 and added[0]["label"] == -1
+
+
+def test_max_state_reaches_native_features_via_calibrate_zscore_native(monkeypatch):
+    """--max_state (default 256, today's behaviour): calibrate_zscore_native forwards it,
+    unchanged, to native.native_features."""
+    seen = []
+
+    def fake_native_features(head, states, queries, cand_lists, max_state=256, max_suffix=512, render="letters"):
+        seen.append(max_state)
+        Kmax = max(len(c) for c in cand_lists)
+        B = len(states)
+        return (torch.zeros(B, 4), torch.zeros(B, Kmax + 1, 4), torch.ones(B, Kmax, dtype=torch.bool), 1)
+
+    monkeypatch.setattr(T, "native_features", fake_native_features)
+
+    class DummyModel:
+        render = "letters"
+        def calibrate(self, h, c):
+            pass
+
+    examples = [{"state": f"s{i}", "query": "q", "candidates": ["a", "b"]} for i in range(3)]
+    T.calibrate_zscore_native(head=None, model=DummyModel(), examples=examples, seed=0, n=3)
+    assert seen == [256]
+    seen.clear()
+    T.calibrate_zscore_native(head=None, model=DummyModel(), examples=examples, seed=0, n=3, max_state=1024)
+    assert seen == [1024]
+
+
+def test_max_state_threads_through_run_readout_and_forward_batches(monkeypatch):
+    """--max_state threads run_readout -> native.run_batch_native, and forward_batches (used
+    by eval_val_loss/fit_temperature/eval_dataset/dump_logits) threads it into run_readout."""
+    seen = []
+
+    def fake_run_batch_native(head, model, batch, examples, max_state=256, max_suffix=512, vec_cache=None):
+        seen.append(max_state)
+        return torch.zeros(len(examples), batch["cmask"].shape[1] + 1)
+
+    monkeypatch.setattr(T, "run_batch_native", fake_run_batch_native)
+    batch = {"cmask": torch.ones(2, 2, dtype=torch.bool)}
+    T.run_readout("native", backbone=None, model=None, batch=batch, examples=[{}, {}])
+    T.run_readout("native", backbone=None, model=None, batch=batch, examples=[{}, {}], max_state=77)
+    assert seen == [256, 77]
+
+    seen.clear()
+
+    class Stub:
+        def eval(self): pass
+        def train(self): pass
+
+    examples = [{"candidates": ["a", "b"], "target": [1.0, 0.0], "p_null": 0.0} for _ in range(4)]
+    T.forward_batches(backbone=Stub(), model=Stub(), cache=None, examples=examples, bs=2, readout="native", max_state=99)
+    assert seen == [99, 99]  # two batches of bs=2, each a real run_batch_native call
+
+
 # ---------------------------------------------------------------------------
 # 15. native_choice_v1 (native.py, PLAN4 sec 11-12): --readout native --nc_head {n2,n3,n2n3}
 # ---------------------------------------------------------------------------
 
-from native import NativeHead, run_batch_native, native_features, shuffle_options, _fit_chunks  # noqa: E402
+from native import NativeHead, run_batch_native, native_features, shuffle_options, _fit_chunks, _effective_render, RENDERS  # noqa: E402
 
 
 def _native_batch(head, examples, nc_head, null, vec_cache=None):
@@ -1751,6 +1868,103 @@ def test_native_kv_decide_matches_run_batch(tied_mcq_head, null):
         expected = torch.cat([probs[i, :len(c)], probs[i, -1:]])
         assert torch.allclose(dists[i], expected, atol=1e-3), (i, (dists[i] - expected).abs().max())
         assert torch.allclose(dists[i].sum(), torch.tensor(1.0), atol=1e-3)
+
+
+# ---------------------------------------------------------------------------
+# 15b. PLAN7 track C typed heads: --score_head cumlink, --noul_head bern
+# ---------------------------------------------------------------------------
+
+def test_cumlink_shape_normalizes_and_k2_is_sigmoid():
+    """_cumlink_probs: [B, Kmax] rows sum to 1 over the valid (cmask) columns only, pads zero;
+    a K=2 row's category probs are exactly the plain sigmoid P(0)=sigmoid(tau0-u),
+    P(1)=sigmoid(u-tau0) -- the "K=2 reduces to a sigmoid" case named in PLAN7 track C."""
+    torch.manual_seed(0)
+    d, B, Kmax = 8, 4, 5
+    model = NativeHead(d, nc_head="n3", score_head="cumlink")
+    h = torch.randn(B, d)
+    c3 = torch.randn(B, Kmax + 1, d)
+    cmask = torch.zeros(B, Kmax, dtype=torch.bool)
+    Ks = [2, 3, 4, 5]
+    for i, k in enumerate(Ks):
+        cmask[i, :k] = True
+    hz = (h - model.mu_h) / model.sd_h
+    p = model._cumlink_probs(hz, c3, cmask)
+    assert p.shape == (B, Kmax)
+    for i, k in enumerate(Ks):
+        assert torch.allclose(p[i, :k].sum(), torch.tensor(1.0), atol=1e-5)
+        assert torch.all(p[i, k:] == 0)
+        assert torch.all(p[i, :k] >= 0)
+
+    row = 0  # K=2
+    c3z = (c3 - model.mu_c) / model.sd_c
+    u = model.w_o(hz[row:row + 1]).squeeze(-1)
+    tau0 = model.theta0 + F.softplus(model.w_t(c3z[row:row + 1, :1])).squeeze(-1)
+    assert torch.allclose(p[row, 0], torch.sigmoid(tau0 - u).squeeze(), atol=1e-5)
+    assert torch.allclose(p[row, 1], torch.sigmoid(u - tau0).squeeze(), atol=1e-5)
+
+
+def test_cumlink_monotone_cdf():
+    """thresholds tau_j = theta0 + cumsum(softplus(...)) are strictly increasing in j (softplus
+    > 0) -> P(y<=j) = sigmoid(tau_j - u) is non-decreasing in j for fixed u (monotone CDF)."""
+    torch.manual_seed(1)
+    d, B, Kmax = 8, 3, 6
+    model = NativeHead(d, nc_head="n3", score_head="cumlink")
+    h = torch.randn(B, d)
+    c3 = torch.randn(B, Kmax + 1, d)
+    cmask = torch.ones(B, Kmax, dtype=torch.bool)
+    hz = (h - model.mu_h) / model.sd_h
+    c3z = (c3 - model.mu_c) / model.sd_c
+    u = model.w_o(hz).squeeze(-1)
+    width = F.softplus(model.w_t(c3z[:, :-1]).squeeze(-1))
+    theta = model.theta0 + torch.cumsum(width, dim=-1)
+    cdf = torch.sigmoid(theta - u.unsqueeze(-1))
+    assert torch.all(cdf[:, 1:] + 1e-6 >= cdf[:, :-1])
+
+
+def test_cumlink_end_to_end_native_batch(tied_mcq_head):
+    """--score_head cumlink through run_batch_native (real tiny backbone): finite logits, valid
+    probability distribution, ∅ still placed via the shared factored gate."""
+    torch.manual_seed(0)
+    examples = _mcq_examples(ks=(3, 4))
+    batch = collate_mcq(examples)
+    model = NativeHead(tied_mcq_head.backbone.d, nc_head="n3", null="factored", score_head="cumlink")
+    logits = run_batch_native(tied_mcq_head, model, batch, examples)
+    assert torch.isfinite(logits[:, -1]).all()
+    probs = T.probs_from_logits(logits, batch["cmask"], null="factored")
+    assert torch.allclose(probs.sum(-1), torch.ones(len(examples)), atol=1e-5)
+
+
+def test_bern_reversed_label_gives_identical_p_yes(tied_mcq_head):
+    """--noul_head bern (PLAN7 track C noul_B_bern): the suffix never renders candidates (see
+    native._render_query_only), so P(yes) must be identical whether the row's candidates are
+    ["no","yes"] or ["yes","no"] -- the reversed-label control from PLAN7 track C."""
+    torch.manual_seed(0)
+    head = tied_mcq_head
+    model = NativeHead(head.backbone.d, nc_head="n3", noul_head="bern")
+    ex_a = [
+        {"state": "s1", "query": "eligible?", "candidates": ["no", "yes"],
+         "target": [1.0, 0.0], "p_null": 0.0, "task": "t"},
+        {"state": "s2", "query": "trigger?", "candidates": ["no", "yes"],
+         "target": [0.0, 1.0], "p_null": 0.0, "task": "t"},
+    ]
+    ex_b = [dict(ex, candidates=list(reversed(ex["candidates"])), target=list(reversed(ex["target"])))
+            for ex in ex_a]
+    probs_a = torch.softmax(run_batch_native(head, model, collate_mcq(ex_a), ex_a), dim=-1)
+    probs_b = torch.softmax(run_batch_native(head, model, collate_mcq(ex_b), ex_b), dim=-1)
+    assert probs_a.shape == (2, 3)  # Kmax=2 + null
+    assert torch.allclose(probs_a.sum(-1), torch.ones(2), atol=1e-5)
+    for i in range(2):
+        ya, yb = ex_a[i]["candidates"].index("yes"), ex_b[i]["candidates"].index("yes")
+        assert torch.allclose(probs_a[i, ya], probs_b[i, yb], atol=1e-6)
+
+
+def test_bern_render_is_query_only():
+    """--noul_head bern forces the query-only render regardless of --nc_render (there is
+    nothing candidate-shaped left to render)."""
+    model = NativeHead(64, nc_head="n3", noul_head="bern", render="letters_nonull")
+    assert _effective_render(model) == "query_only"
+    text, spans = RENDERS["query_only"]("is this eligible?", ["no", "yes"])
+    assert text == "is this eligible?\n" and spans == []
 
 
 # ---------------------------------------------------------------------------

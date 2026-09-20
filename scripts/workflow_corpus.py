@@ -21,7 +21,15 @@ Eval files: wf_heldout_{noul,choice,score} (held-out families), wf_heldout_style
 style), wf_rubric_flip (held-out-family pairs (x,r1,A,y1)/(x,r2,A,y2), y1!=y2, meta.flip_pair; scored by
 metrics.rubric_flip), wf_rubric_shuffled (held-out rows with another same-label row's rubric -> Δ_r).
 
+--long_share TARGET (PLAN7 track B, long_e45 run): policy_permit/action_select rows are long (1-2.6k-token,
+multi-domain-policy states, assemble_state's `long` flag) at LONG_FRAC (8%) by default -- a small share of
+train.jsonl. --long_share raises the *combined* train.jsonl + train_long.jsonl long share to TARGET (e.g.
+0.25) by GENERATING extra always-long rows (gen_long_extra) into a separate <out>/train_long.jsonl, so
+train.jsonl itself is byte-identical to a run without the flag; point a training run's --extra_data at both
+files (e.g. --bucket_map data_wf_long=W) to train on the raised mix.
+
 uv run scripts/workflow_corpus.py [--out data_wf] [--limit N] [--seed 0] [--jevbench /tmp/jevbench/datasets/public]
+                                   [--long_share TARGET]
 """
 import argparse
 import datetime as dt
@@ -416,11 +424,14 @@ NOUL_POLICY_SPEC = dict(
     caveat="Conditions the state does not establish count as unmet.", flag="permitted")
 
 
-def gen_policy_permit(n, rng, heldout_style=False):
+def gen_policy_permit(n, rng, heldout_style=False, force_long=None):
+    """force_long (--long_share, gen_long_extra): None = today's LONG_FRAC-chance single rows,
+    interleaved with rubric groups as usual; True = every row is a long single row (used only to
+    fill data_wf/train_long.jsonl, so groups -- which never carry a `long` state -- are skipped)."""
     def single():
         dom = rng.choice(list(DOMAINS))
         case = policy_case(dom, rng, want_yes=rng.random() < 0.5)
-        long = rng.random() < LONG_FRAC
+        long = (rng.random() < LONG_FRAC) if force_long is None else force_long
         state = assemble_state(policy_text(case, rng=rng), case["facts"], case["request"], dom, rng, long)
         return [make_row("noul", "policy_permit", NOUL_POLICY_SPEC, state, ["no", "yes"], int(permitted(verdict(case))),
                          pick_style("noul", rng, heldout_style), extra_meta={"long": long})]
@@ -433,7 +444,7 @@ def gen_policy_permit(n, rng, heldout_style=False):
         if not differing(variants):
             return None
         return emit_group("noul", "policy_permit", f"{case['facts']} {case['request']}", ["no", "yes"], variants, rng, heldout_style)
-    return fill_to(n, single, group, rng)
+    return fill_to(n, single, None if force_long else group, rng)
 
 
 ACTION_VOCABS = [("allow", "deny", "review", "escalate"), ("approve", "reject", "request_info", "refer_to_manager"),
@@ -451,7 +462,8 @@ def action_spec(labels, prefix=None):
                        "Unstated conditions are unproven.", criteria=dict(zip(labels, ACTION_DESC)), prefix=prefix)
 
 
-def gen_action_select(n, rng, heldout_style=False):
+def gen_action_select(n, rng, heldout_style=False, force_long=None):
+    """force_long: see gen_policy_permit."""
     def setup():
         dom = rng.choice(list(DOMAINS))
         k = 4 if rng.random() < 0.7 else 3
@@ -461,7 +473,7 @@ def gen_action_select(n, rng, heldout_style=False):
     def single():
         dom, labels, esc = setup()
         case = policy_case(dom, rng, want_yes=rng.random() < 0.4, esc=esc)
-        long = rng.random() < LONG_FRAC
+        long = (rng.random() < LONG_FRAC) if force_long is None else force_long
         state = assemble_state(policy_text(case, rng=rng), case["facts"], case["request"], dom, rng, long)
         p_null = 1.0 if rng.random() < NULL_FRAC else 0.0
         return [make_row("choice", "action_select", action_spec(labels), state, labels, action_of(verdict(case)),
@@ -475,7 +487,22 @@ def gen_action_select(n, rng, heldout_style=False):
         if not differing(variants) or any(g >= len(labels) for _, g in variants):
             return None
         return emit_group("choice", "action_select", f"{case['facts']} {case['request']}", labels, variants, rng, heldout_style)
-    return fill_to(n, single, group, rng)
+    return fill_to(n, single, None if force_long else group, rng)
+
+
+LONG_EXTRA_SPLIT = {"policy_permit": CAPS["policy_permit"], "action_select": CAPS["action_select"]}
+
+
+def gen_long_extra(n, rng):
+    """--long_share (PLAN7 track B, long_e45 run): n extra always-long rows for data_wf/train_long.jsonl,
+    generated (not carved out of the base families) so train.jsonl is untouched. Split between the two
+    long-capable families (policy_permit, action_select) in their normal CAPS ratio.
+    ponytail: a 2-entry ratio table, not a generic per-family registry -- these are the only families
+    assemble_state's `long` flag applies to."""
+    if n <= 0:
+        return []
+    n_p = round(n * LONG_EXTRA_SPLIT["policy_permit"] / sum(LONG_EXTRA_SPLIT.values()))
+    return gen_policy_permit(n_p, rng, force_long=True) + gen_action_select(n - n_p, rng, force_long=True)
 
 
 # ============================== eligibility (held-out noul) ==============================
@@ -1204,6 +1231,11 @@ def main():
     ap.add_argument("--limit", type=int, default=0, help="cap every family at N rows (fast check)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--jevbench", default="/tmp/jevbench/datasets/public")
+    ap.add_argument("--long_share", type=float, default=None,
+                    help="target combined long-policy share of train+train_long (e.g. 0.25); unset (default) "
+                         "= today's LONG_FRAC-only share and no train_long.jsonl is written. When set, extra "
+                         "always-long rows (gen_long_extra) are generated -- never subtracted from train.jsonl "
+                         "-- to close the gap to the target, and written to <out>/train_long.jsonl")
     args = ap.parse_args()
     out = Path(args.out)
     (out / "eval").mkdir(parents=True, exist_ok=True)
@@ -1269,6 +1301,19 @@ def main():
     manifest["train_by_family"] = {f"{q}/{f}": c for (q, f), c in sorted(by.items())}
     manifest["train_p_null_rows"] = sum(1 for r in train_rows if r["p_null"] >= 1)
     manifest["train_long_rows"] = sum(1 for r in train_rows if r["meta"].get("long"))
+    if args.long_share is not None:
+        assert 0 <= args.long_share < 1, "--long_share must be in [0, 1)"
+        L, N = manifest["train_long_rows"], len(train_rows)
+        need = max(0, round((args.long_share * N - L) / (1 - args.long_share)))
+        long_rows = [r for r in gen_long_extra(need, rng) if norm_text(r["state"]) not in seen]
+        leak_check(long_rows, args.jevbench)
+        write_jsonl(out / "train_long.jsonl", long_rows)
+        combined = N + len(long_rows)
+        manifest["long_share_target"] = args.long_share
+        manifest["train_long_extra_rows"] = len(long_rows)
+        manifest["long_share_actual"] = (L + len(long_rows)) / combined if combined else 0.0
+        print(f"  train_long.jsonl: {len(long_rows)} extra long rows (base long share {L}/{N} -> "
+              f"combined {manifest['long_share_actual']:.3f}, target {args.long_share})")
     manifest["train_rubric_group_rows"] = sum(1 for r in train_rows if r["meta"].get("rubric_group"))
     manifest["flip_pairs"] = manifest["wf_rubric_flip"] // 2
     with open(out / "manifest.json", "w") as f:
