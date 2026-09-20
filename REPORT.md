@@ -898,6 +898,26 @@ set below (typed-decisions, PagerDuty, tree-choice, jevlogs, Mind2Web, cua test/
 hard). Two evaluation passes: train-time (1,500 rows/file, states truncated to 256 tokens, `results.json`) and post-hoc
 at full state length (`scripts/eval_wf.py`, first 500 rows/file, both models on the identical rows — the numbers below).
 
+> **Correction (adversarial review, 2026-09-20 20:30).** The "full-length" numbers below come from `scripts/eval_wf.py
+> --limit 500`, which takes the *first* 500 rows of each file. Several eval files are family- or label-ordered, so those
+> slices are not representative: `jevlogs_triage` rows 0–749 are all `yes` (the file is 70% `no`) — ".162 → .832" is a
+> yes-rate, not accuracy, and the representative 1,500-row train-time pass gives **.497 (chance)**; `pagerduty_trigger`'s
+> head is 250 `page` + 250 `yes` with zero negatives (train-time pass **.603**); `wf_rubric_flip`'s head is 250 eligibility
+> pairs only (1 of 3 families, K = 2), where a coin flip scores flip-rate .50 — the informative number on that slice is
+> both-correct .25 → .49; `typed_decisions_test`'s head is 1 of 4 workflows. `wf_heldout_*`, `wf_rubric_shuffled`, cua,
+> jev-4b, systemone and tree-choice heads are shuffled and representative. Consequently: the external line is **0–1 of 5
+> up, not 4 of 5** (Mind2Web .438 is +3 over always-`no`; tree-choice +4 on the 375 valid rows; typed-decisions −6 on one
+> workflow); Δ_r reweighted to the shuffled file's type mix is .244 → .305 (direction holds, magnitude smaller); the
+> held-out *choice* family (tool_select) starts at .89 — a ceiling, not rubric generalization — so "every held-out axis
+> ≥ +10" leans on noul/score/style; JevBench's 72 standard items are 36 states × 2 paraphrases, so the +4-item gain is
+> ~11 up / 7 down (McNemar p ≈ .5) and §3t's "3.8 SE" is ~2.7 SE at n_eff = 36. Held-out *content* caveat: `routing` and
+> `categorical` train on HWU64/SNIPS/MASSIVE/MTOP and AG News utterances (E-tier sources), so "held-out family" means
+> held-out rubric form, not held-out text. Also unexplained: the `_wf` JevBench p50 latency is .554 s vs .077 s for the
+> baseline on the same architecture (different pod: H100 NVL + torch 2.11/cu128 vs SXM + 2.14/cu130) — to be re-measured.
+> The full-file, stratified re-evaluation of both checkpoints (§3x) supersedes every W/external number in this section;
+> the verdict's *robust* parts are the calibration regression (Brier .27 → .54 on typed-decisions, held-out score NLL
+> 1.24 → 2.07, JevBench hard Brier .74 → .88) and the E over-abstention on CLINC/TREC (full test sets).
+
 **W — held-out workflow (same 500 rows, full length)**
 
 | | `nc_v3_tap20` | **`_wf`** | Δ | NLL |
@@ -927,7 +947,7 @@ TruthfulQA −0.9. Val NLL .347 → .384 (E sampled at .35 instead of ~.8).
 
 **Verdict against the PLAN6 rule.** W ✓ (every held-out axis ≥ +10; styles +33), rubric dependence ✓ (flip rate
 .31 → .50, Δ_r up, shuffled-rubric NLL 3× worse — it is reading the rubric, not memorising priors), K ✓ (within 3),
-external ✓ on 4 of 5 with one clean-external regression (typed-decisions). **E ✗ on two label-space sets**, and the failure
+external: see the correction above (0–1 of 5 on representative rows; pending §3x). **E ✗ on two label-space sets**, and the failure
 mode is specific: the ∅ threshold on intent/topic label spaces shifted toward abstaining (CLINC-OOS +10.5 at the same
 time), while discrimination is intact (CLINC-K .892, paired-null AUROC unchanged). The direction is not the naive one —
 only 0.9% of W rows carry a null target (1,481 of 158,606; v5 has 21.4%) — so the cause is a mixing effect to be tested
