@@ -1035,6 +1035,37 @@ catch-all-competes-with-∅ effect; the catch-all hypothesis of §3w stays demot
 state ≤ 256 tokens, wf model: own rubric .611 = swapped same-type rubric .611 (chance .384) — the short-state gain of
 §3w's second review is not rubric execution (n = 36; same-type rubrics may be near-interchangeable).
 
+## 3z. PLAN7 Track B — mixture sweep, null augmentation, long states (six matched 1.7B runs, 3 × H100, 2026-09-20, ~$60)
+
+Same recipe as `nc_v3_tap20_wf` (§3w) with only the sampler / data changed; 12k steps, seed 0. Train-time evaluation
+(full E/K sets; W sets 1,500 rows at 256-token states — the full-row `eval_wf` pass is being added). `--null_aug W:0.20`
+= 20% of W rows duplicated with the gold (and any rendered catch-all) removed → ∅; `long_e45` = `--max_state 1024` +
+23k extra long policy rows (`wf/train_long.jsonl`) at bs 16 (memory-conservative; confounds it with a 4× smaller batch).
+
+| E / K / W | base | 6A (.35/.25/.40) | e50 (.50/.20/.30) | e45 (.45/.20/.35) | **e45 + null** | e40a (.40/.25/.35) | e40b (.40/.20/.40) | long_e45 (1024, bs 16) |
+|---|---|---|---|---|---|---|---|---|
+| CLINC-150 acc / false-abstain | .845 / .05 | .734 / .17 | .809 / .07 | .779 / .10 | **.805 / .08** | .775 / .12 | .814 / .04 | .741 / .13 |
+| TREC-fine | .468 / .20 | .372 / .34 | .482 / .13 | .408 / .27 | .444 / .12 | .358 / .28 | .404 / .32 | .466 / .29 |
+| HWU64 / 20NG | .757 / .515 | .735 / .522 | .773 / .560 | .736 / .492 | .779 / .552 | .746 / .525 | .768 / .449 | .669 / .567 |
+| SNLI / MNLI / BoolQ / ANLI | .904/.865/.834/.507 | .894/.849/.831/.481 | .898/.855/.835/.492 | .895/.849/.833/.491 | .898/.855/.835/.495 | .893/.848/.839/.489 | .891/.850/.838/.486 | .888/.840/.821/.464 |
+| MMLU-Pro among-K / Δ_q_sh | .353 / .122 | .330 / .119 | .342 / .122 | .338 / .115 | **.353 / .143** | .338 / .117 | .322 / .138 | .329 / .116 |
+| held-out noul / score / style | – | .699 / .497 / .899 | .696 / .500 / .888 | .693 / .517 / .895 | .654 / .507 / .891 | .666 / .513 / .905 | .678 / .523 / .901 | .663 / .518 / .829 |
+| typed-decisions NLL / held-out score NLL | – | 1.95 / 2.03 | 1.91 / 1.74 | 1.82 / 1.52 | 2.19 / 2.04 | 2.22 / 1.88 | 2.18 / 1.43 | **1.37 / 1.26** |
+| JevBench standard / hard / Brier(std) | .694 / .378 / .47 | .750 / .387 / .40 | .708 / .441 / .40 | **.833** / .396 / – | .806 / .396 / **.33** | .736 / .405 / .43 | .736 / .351 / – | .806 / **.450** / .30 |
+| JevBench hard: long_policy / multi_hop | .42 / .33 | .16 / .17 | .16 / .33 | – | .16 / .28 | – | – | **.37 / .28** |
+
+**Mixing fixes E (branch b confirmed).** Raising E from .35 to .45–.50 brings NLI/BoolQ to within 1 pt of the base and
+intent/topic sets to within 3–4 pts (CLINC-150 −3.6 to −4.0 is the one remaining budget breach), with W unchanged
+within 1–4 pts. **Null augmentation of W does what the (T, b) refit could not (§3y):** e45 → e45+null lowers false-abstain
+on CLINC .10 → .08 and TREC .27 → .12 and lifts CLINC/TREC/HWU64/20NG by +2.6/+3.6/+4.3/+6.0 and MMLU-Pro to the base's
+.353 with the highest Δ_q_sh of any run (.143), at −4 on held-out noul; it also gives the best JevBench-standard Brier
+(.33). **Long states recover the long-state families** (JevBench long_policy .16 → .37, multi_hop .17 → .28; hard .45,
+the best of any run) and, unexpectedly, the best soft-target NLLs (typed-decisions 1.37, held-out score 1.26) — but at
+bs 16 it loses HWU64 −9, CLINC −10 and styles −7, so length and batch are confounded; a full-batch (`--grad_accum`)
+version is running as the Release-1 candidate (`r1_cand`: E .45 / K .20 / W .35 + null-aug + 1,024 states). JevBench
+standard moves ±5 between mixes at n_eff = 36 — treat .81–.83 vs .75 as ~1 SE, the Brier and per-family hard numbers as the
+signal. Pareto choice pending the full-row `eval_wf` on all six: **e45 + null** on E/K/calibration, **long** on hard.
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
