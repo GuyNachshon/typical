@@ -736,9 +736,251 @@ def build_wh(args):
         print(f"WARNING: WH train rows {len(train_rows)} < 60k target")
 
 
+# ============================================================================
+# data_u — genuine probability targets. See module docstring for why UNLI-train/UNLI-test/
+# chaos-mnli-ambiguity (fully claimed by data.py's existing "unli"/"unli_test"/"chaos_mnli") are left
+# untouched for training here.
+# ============================================================================
+NLI3 = ["entailment", "neutral", "contradiction"]
+
+
+def u_row(decision_type, task, candidates, target, query, state, *, gold_source, source_dataset,
+          requires_probability=True, extra_meta=None):
+    return make_row(decision_type, task, candidates, target.index(max(target)), query, state,
+                     gold_source=gold_source, soft_target=True, source_dataset=source_dataset, fam_bucket="U",
+                     target=target, extra_meta={"requires_probability": requires_probability, **(extra_meta or {})})
+
+
+def jsonl_rows(repo, path):
+    with open(hf_hub_download(repo, path, repo_type="dataset")) as f:
+        return [json.loads(l) for l in f if l.strip()]
+
+
+def unli_rows(records, rng):
+    out = []
+    for r in records:
+        p = float(r["label"])
+        query = query_text({"type": "noul", "instructions": f"Is this true given the state? {r['hypothesis']}",
+                            "criteria": {"true": "The hypothesis is true given the state.", "false": "The hypothesis is false given the state."}})
+        out.append(u_row("noul", "u_unli", ["true", "false"], [p, 1 - p], query, r["premise"],
+                         gold_source="human", source_dataset="Zhengping/UNLI", extra_meta={"task_family": "u_nli"}))
+    return out
+
+
+def ambient_rows(records, rng):
+    out = []
+    for r in records:
+        labels = [x.strip() for x in r["labels"].split(",") if x.strip() in NLI3]
+        if len(labels) < 2 or not (r.get("premise_ambiguous") or r.get("hypothesis_ambiguous")):
+            continue
+        target = [1.0 / len(labels) if c in labels else 0.0 for c in NLI3]
+        query = query_text({"type": "choice", "instructions": f"What is the relation of the text to: {r['hypothesis']}",
+                            "criteria": {"entailment": "the hypothesis follows from the text",
+                                        "neutral": "the hypothesis is undetermined by the text",
+                                        "contradiction": "the hypothesis contradicts the text"}})
+        out.append(u_row("choice", "u_ambient", list(NLI3), target, query, r["premise"],
+                         gold_source="human", source_dataset="metaeval/ambient", requires_probability=False,
+                         extra_meta={"task_family": "u_nli", "ambiguous_label_count": len(labels)}))
+    return out
+
+
+def chaosnli_eval_rows(records):
+    out = []
+    for r in records:
+        c = {"e": r["label_counter"].get("e", 0), "n": r["label_counter"].get("n", 0), "c": r["label_counter"].get("c", 0)}
+        total = sum(c.values()) or 1
+        target = [c["e"] / total, c["n"] / total, c["c"] / total]
+        query = query_text({"type": "choice", "instructions": f"What is the relation of the text to: {r['hypothesis']}",
+                            "criteria": {"entailment": "the hypothesis follows from the text",
+                                        "neutral": "the hypothesis is undetermined by the text",
+                                        "contradiction": "the hypothesis contradicts the text"}})
+        out.append(u_row("choice", "u_chaosnli", list(NLI3), target, query, r["premise"],
+                         gold_source="human", source_dataset="metaeval/chaos-mnli-ambiguity", requires_probability=False,
+                         extra_meta={"task_family": "u_nli", "n_annotations": total}))
+    return out
+
+
+# Each synthetic generator takes a (lo, hi) parameter range; TRAIN_RANGES vs EVAL_RANGES are disjoint so the
+# eval file probes generalisation to parameter values never seen in training (memo: "held-out parameter range").
+def partial_evidence_row(rng, prior_range):
+    n_required = rng.randint(2, 4)
+    k_revealed = rng.randint(0, n_required - 1)
+    revealed_all_true = rng.random() < 0.7
+    state = []
+    for i in range(k_revealed):
+        val = revealed_all_true or rng.random() < 0.85  # mostly true when "revealed_all_true", else mostly a mix
+        state.append(f"Condition {i + 1} of {n_required}: {'met' if val else 'not met'} (confirmed).")
+        if not val:
+            revealed_all_true = False
+    hidden = n_required - k_revealed
+    priors = [round(rng.uniform(*prior_range), 2) for _ in range(hidden)]
+    for i, p in enumerate(priors):
+        state.append(f"Condition {k_revealed + i + 1} of {n_required}: not yet checked; historically met in "
+                     f"{int(p * 100)}% of comparable cases.")
+    if not revealed_all_true:
+        p_all = 0.0
+    else:
+        p_all = 1.0
+        for p in priors:
+            p_all *= p
+    query = query_text({"type": "noul", "instructions": f"Will all {n_required} required conditions be met?",
+                        "criteria": {"true": "All conditions are met.", "false": "At least one condition is not met."}})
+    return u_row("noul", "u_partial_evidence", ["true", "false"], [p_all, 1 - p_all], query, render_state(state, rng),
+                gold_source="programmatic", source_dataset="synthetic:decisionmix_v2_u:partial_evidence",
+                extra_meta={"n_required": n_required, "k_revealed": k_revealed})
+
+
+def noisy_sensor_row(rng, tpr_range):
+    base_rate = round(rng.uniform(0.05, 0.5), 2)
+    tpr = round(rng.uniform(*tpr_range), 2)
+    fpr = round(rng.uniform(0.02, 0.2), 2)
+    reading_positive = rng.random() < 0.5
+    if reading_positive:
+        num = tpr * base_rate
+        denom = num + fpr * (1 - base_rate)
+    else:
+        num = (1 - tpr) * base_rate
+        denom = num + (1 - fpr) * (1 - base_rate)
+    p_true = num / denom if denom > 0 else base_rate
+    state = [f"Base rate of a true incident in comparable cases is {int(base_rate * 100)}%.",
+             f"The sensor has a {int(tpr * 100)}% true-positive rate and a {int(fpr * 100)}% false-positive rate.",
+             f"The sensor reading is {'positive' if reading_positive else 'negative'}."]
+    query = query_text({"type": "noul", "instructions": "Given the sensor reading and its known error rates, is the incident real?",
+                        "criteria": {"true": "The incident is real.", "false": "The incident is not real (a sensor error)."}})
+    return u_row("noul", "u_noisy_sensor", ["true", "false"], [p_true, 1 - p_true], query, render_state(state, rng),
+                gold_source="programmatic", source_dataset="synthetic:decisionmix_v2_u:noisy_sensor",
+                extra_meta={"base_rate": base_rate, "tpr": tpr, "fpr": fpr})
+
+
+def ordinal_confusion_row(rng, eps_range):
+    k = rng.choice([3, 4])
+    eps = round(rng.uniform(*eps_range), 2)
+    true_level = rng.randrange(k)
+    # confusion row: P(obs=j | true=i) -- diagonal 1-eps, remainder split over the other k-1 levels
+    off = eps / (k - 1)
+    obs = rng.choices(range(k), weights=[1 - eps if j == true_level else off for j in range(k)])[0]
+    # posterior P(true=i | obs) with a uniform prior over true levels (Bayes, since we don't reveal true_level)
+    likelihoods = [(1 - eps if i == obs else off) for i in range(k)]
+    s = sum(likelihoods)
+    posterior = [x / s for x in likelihoods]
+    names, _ = level_names(k, rng)
+    state = [f"Observed level: {names[obs]}.", f"The observation channel is correct {int((1 - eps) * 100)}% of the time "
+             f"and otherwise reports an adjacent-or-other level uniformly at random."]
+    query = query_text({"type": "score", "instructions": "What is the true level, given only the (possibly noisy) observed level?",
+                        "criteria": list(names)})
+    return u_row("score", "u_ordinal_confusion", list(names), posterior, query, render_state(state, rng),
+                gold_source="programmatic", source_dataset="synthetic:decisionmix_v2_u:ordinal_confusion",
+                extra_meta={"eps": eps, "k": k, "observed": obs})
+
+
+def conflicting_sources_row(rng, reliability_range):
+    n = rng.choice([2, 3])
+    sources = [(rng.random() < 0.5, round(rng.uniform(*reliability_range), 2)) for _ in range(n)]
+    odds = 1.0
+    for verdict, r in sources:
+        odds *= (r / (1 - r)) if verdict else ((1 - r) / r)
+    p_true = odds / (1 + odds)
+    state = [f"Source {i + 1} reports {'true' if v else 'false'} and is correct {int(r * 100)}% of the time."
+             for i, (v, r) in enumerate(sources)]
+    query = query_text({"type": "noul", "instructions": "Weighing the sources by their stated reliability, is the claim true?",
+                        "criteria": {"true": "The claim is true.", "false": "The claim is false."}})
+    return u_row("noul", "u_conflicting_sources", ["true", "false"], [p_true, 1 - p_true], query, render_state(state, rng),
+                gold_source="programmatic", source_dataset="synthetic:decisionmix_v2_u:conflicting_sources",
+                extra_meta={"n_sources": n})
+
+
+SYNTH_GENERATORS = {
+    "partial_evidence": (partial_evidence_row, (0.55, 0.95), (0.30, 0.55)),
+    "noisy_sensor": (noisy_sensor_row, (0.75, 0.97), (0.5, 0.75)),
+    "ordinal_confusion": (ordinal_confusion_row, (0.05, 0.25), (0.25, 0.45)),
+    "conflicting_sources": (conflicting_sources_row, (0.65, 0.95), (0.5, 0.65)),
+}
+
+
+def build_u(args):
+    out = Path(args.out_u)
+    (out / "eval").mkdir(parents=True, exist_ok=True)
+    rng = random.Random(args.seed)
+    n = lambda k: args.limit or k  # noqa: E731
+    manifest = {"seed": args.seed, "limit": args.limit, "sources_and_licenses": {
+        "Zhengping/UNLI": "validation split only (train/test are already consumed by data.py's unli/unli_test) -- academic use, see repo",
+        "metaeval/ambient": "AmbiEnt ambiguity sets (arXiv:2304.14399); no license field on the HF mirror -- check jjessyli/ambient upstream before redistribution",
+        "metaeval/chaos-mnli-ambiguity": "eval-only (already data.py's chaos_mnli eval); no license field on the HF mirror -- check the original ChaosNLI release upstream",
+        "synthetic:decisionmix_v2_u:*": "programmatic, generated by scripts/decisionmix_v2.py; exact closed-form posteriors",
+    }}
+
+    print("fetching UNLI validation, AmbiEnt, chaos-mnli-ambiguity (HF)...")
+    unli_val = jsonl_rows("Zhengping/UNLI", "validation.jsonl")[:n(3040)]
+    ambient_raw = jsonl_rows("metaeval/ambient", "dev.jsonl") + jsonl_rows("metaeval/ambient", "test.jsonl")
+    chaos_raw = jsonl_rows("metaeval/chaos-mnli-ambiguity", "chaos_mnli.jsonl")[:n(1599)]
+    rng.shuffle(unli_val)
+    rng.shuffle(ambient_raw)
+
+    unli_all = unli_rows(unli_val, rng)
+    ambient_all = ambient_rows(ambient_raw, rng)[:n(1200)]
+    manifest["unli_raw"], manifest["ambient_ambiguous_raw"] = len(unli_all), len(ambient_all)
+
+    unli_train, unli_eval = unli_all[: n(2200)], unli_all[n(2200):n(2200) + n(500)]
+    ambient_train, ambient_eval = ambient_all[: len(ambient_all) - n(150)], ambient_all[len(ambient_all) - n(150):]
+
+    real_train = unli_train + ambient_train
+    real_val_pool = unli_eval + ambient_eval  # held-out real-source slice: goes to eval, not val
+
+    synth_train, synth_eval = [], []
+    per_gen_train = n(7600)
+    for name, (fn, train_range, eval_range) in SYNTH_GENERATORS.items():
+        tr = [fn(rng, train_range) for _ in range(per_gen_train)]
+        ev = [fn(rng, eval_range) for _ in range(n(120))]
+        for r in tr + ev:
+            r["meta"]["source_dataset"] = f"synthetic:decisionmix_v2_u:{name}"
+        synth_train += tr
+        synth_eval += ev
+        manifest[f"synth_{name}_train"] = len(tr)
+        print(f"  synthetic {name}: {len(tr)} train, {len(ev)} held-out-range eval")
+
+    train_pool = real_train + synth_train
+    train_rows, val_rows = group_split(train_pool, min(2000, len(train_pool) // 4), rng)
+    seen = {norm_text(r["state"]) for r in train_rows}
+
+    evals = {
+        "u_chaosnli": chaosnli_eval_rows(chaos_raw),
+        "u_real_heldout": real_val_pool,
+        "u_synthetic_heldout": synth_eval,
+    }
+    all_rows = list(train_rows) + list(val_rows)
+    for name, rows in evals.items():
+        rows = [r for r in rows if norm_text(r["state"]) not in seen]
+        rng.shuffle(rows)
+        write_jsonl(out / "eval" / f"{name}.jsonl", rows)
+        manifest[name] = len(rows)
+        all_rows += rows
+        print(f"  {name}: {len(rows)} rows")
+    manifest["jevbench_states_checked"] = leak_check(all_rows, args.jevbench)
+
+    write_jsonl(out / "train.jsonl", train_rows)
+    write_jsonl(out / "val.jsonl", val_rows)
+    manifest["total_train"], manifest["total_val"] = len(train_rows), len(val_rows)
+    by_type, by_source = defaultdict(int), defaultdict(int)
+    for r in train_rows:
+        by_type[r["meta"]["decision_type"]] += 1
+        by_source[r["meta"]["source_dataset"].split(":")[0]] += 1
+    manifest["train_by_decision_type"] = dict(by_type)
+    manifest["train_by_source"] = dict(by_source)
+    manifest["train_soft_target_rows"] = sum(1 for r in train_rows if r["meta"]["soft_target"])
+    for r in train_rows:
+        assert abs(sum(r["target"]) - 1.0) < 1e-6, r
+    with open(out / "manifest.json", "w") as f:
+        json.dump(manifest, f, indent=2)
+    print(f"\nU TOTAL: {len(train_rows)} train / {len(val_rows)} val -> {out}/  "
+          f"soft-target share {manifest['train_soft_target_rows'] / max(1, len(train_rows)):.3f}")
+    if len(train_rows) < 30000 and not args.limit:
+        print(f"WARNING: U train rows {len(train_rows)} < 30k target")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out_wh", default="data_wh")
+    ap.add_argument("--out_u", default="data_u")
     ap.add_argument("--corpus", choices=["wh", "u", "both"], default="both")
     ap.add_argument("--limit", type=int, default=0, help="cap every generator at N rows (fast smoke check)")
     ap.add_argument("--seed", type=int, default=0)
@@ -747,6 +989,9 @@ def main():
     if args.corpus in ("wh", "both"):
         print("=== data_wh ===")
         build_wh(args)
+    if args.corpus in ("u", "both"):
+        print("\n=== data_u ===")
+        build_u(args)
 
 
 if __name__ == "__main__":
