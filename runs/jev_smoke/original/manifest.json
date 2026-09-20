@@ -1,0 +1,15 @@
+{
+  "adapter": "local_pcdm",
+  "cost_basis": "local_gpu_no_provider_tariff",
+  "dataset_hash": "38a458ddf4e7e228a3d66beca76fde1a9b40b3b1132673d7aae819b34a77c3d5",
+  "device": "cpu",
+  "energy_run": null,
+  "finished_utc": "2026-09-19T22:34:52.575308+00:00",
+  "max_state": 4096,
+  "mode": "energy",
+  "n_attempted": 10,
+  "n_planned": 10,
+  "requested_model": "runs/mini_emb",
+  "run_label": "smoke",
+  "started_utc": "2026-09-19T22:34:38.870324+00:00"
+}

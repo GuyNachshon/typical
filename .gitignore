@@ -19,3 +19,10 @@ runs/dump_*/
 .agents/
 .claude/skills/
 skills-lock.json
+!runs/jev_*/summary.json
+!runs/jev_*/*/
+runs/jev_*/*/raw/
+runs/jev_*/*/*
+!runs/jev_*/*/summary.json
+!runs/jev_*/*/manifest.json
+!runs/jev_*/*/results.jsonl

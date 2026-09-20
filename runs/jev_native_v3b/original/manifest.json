@@ -1,0 +1,23 @@
+{
+  "adapter": "local_pcdm",
+  "checkpoint_sha256": "a3116188cae550bf427c8fca5ed0c067e5358eaf3d1bb0ff141e564e7c071a98",
+  "cost_basis": "local_gpu_no_provider_tariff",
+  "dataset_hash": "914276022fa5f0ea70e4231f2af98e68c67b274b61bea8c440b33890401cd2f9",
+  "device": "cuda",
+  "energy_run": null,
+  "finished_utc": "2026-09-20T05:18:33.156227+00:00",
+  "gpu_name": "NVIDIA H100 80GB HBM3",
+  "harness_commit": "e105a48f8cdb7f3babb3594424f73e5d7bdc97b9",
+  "load_s": 5.203916979953647,
+  "max_state": 4096,
+  "mode": "native",
+  "n_attempted": 72,
+  "n_planned": 72,
+  "requested_model": "runs/nc_v3",
+  "reverse_labels": false,
+  "run_label": "native_v3b",
+  "started_utc": "2026-09-20T05:18:26.489350+00:00",
+  "torch_version": "2.14.0+cu130",
+  "trained_max_query": 64,
+  "trained_max_state": 256
+}
