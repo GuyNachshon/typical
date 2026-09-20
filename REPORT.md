@@ -887,6 +887,58 @@ seeds. The §3l claim — *the direct contextual readout keeps the letter interf
 removing most of its order artifacts* — is replicated. MMLU false-abstain moves ±.05–.10 between seeds for both
 readouts, so §3p/§3t's abstention numbers should be read at that resolution (the .69 → .003 change of §3t is far outside it).
 
+## 3w. PLAN6 Phase 6A — typed workflow / rubric training on the frozen backbone (`nc_v3_tap20_wf`, H100 NVL, 2026-09-20, ~$12)
+
+Hypothesis (PLAN6, PI memo 15:00): *given a sound native decision architecture (§3t), does rubric-conditioned training
+solve the remaining workflow gap?* Matched pair: `nc_v3_tap20` (v5 + kb) vs `nc_v3_tap20_wf` = same config +
+`data_wf` (72k, 12 families, 37% in rubric groups) + `data_wf_hf` (86.6k: cua-s1-forms 60k, systemone-lite 20k, jev-4b
+6.6k programmatic gold), family-balanced sampler E .35 / K .25 / W .40 (PLAN6 queue review), 12k steps. Held-out: 3
+whole workflow families (eligibility / tool_select / urgency), 3 rubric styles, the rubric-flip pairs, and every external
+set below (typed-decisions, PagerDuty, tree-choice, jevlogs, Mind2Web, cua test/demo, jev-4b adversarial, systemone
+hard). Two evaluation passes: train-time (1,500 rows/file, states truncated to 256 tokens, `results.json`) and post-hoc
+at full state length (`scripts/eval_wf.py`, first 500 rows/file, both models on the identical rows — the numbers below).
+
+**W — held-out workflow (same 500 rows, full length)**
+
+| | `nc_v3_tap20` | **`_wf`** | Δ | NLL |
+|---|---|---|---|---|
+| held-out family: choice / noul / score | .890 / .548 / .400 | **.994 / .682 / .514** | **+10.4 / +13.4 / +11.4** | .42→.02 / .83→.85 / 1.24→**2.07** |
+| held-out rubric styles | .578 | **.904** | **+32.6** | .98→.22 |
+| rubric-flip: flip rate / pair acc / both correct | .312 / .592 / – | **.504** / .736 / .488 | +.19 / +14 | |
+| Δ_r = own rubric − shuffled rubric (family mean) | .613 − .328 = .285 | .730 − .386 = **.344** | ↑ | shuffled NLL 1.5→4.6 |
+| trained-source shift splits: systemone hard / jev-4b adversarial | .458 / .652 | .888 / .940 | +43 / +29 | |
+| cua-s1-forms test (signature-disjoint) / real demo | .314 / .173 | .998 / 1.000 | +68 / +83 | |
+
+**External, never trained (same rows):** Mind2Web .254 → .438 (+18), jevlogs .162 → .832 (+67; block-level labels,
+caveated), PagerDuty .736 → .762 (+3), tree-choice .452 → .494 (+4; 125/500 flat K = 320 rows overflow the 1,024-token
+native suffix and are scored as chance — the energy front-end's job, §3m), **typed-decisions .332 → .276 (−6) with NLL
+1.40 → 2.40 and Brier .27 → .54** (soft probabilistic gold; the model became sharper, not righter).
+
+**JevBench (same 231 public ids, §3q protocol):** standard .694 → **.750** (Brier .47 → .40; ordinal 5 → 10/12,
+policy 8 → 9, adequacy 6 → 5, intent 9 → 8; +4 items ≈ 1 SE), easy 1.00 → 1.00 (Brier .02 → .001), hard .378 → .387
+(flat; **Brier .74 → .88, ECE .21 → .37** — long_policy .42 → .16, multi_hop .33 → .17 down; trap .38 → .75,
+adversarial .33 → .67, temporal .20 → .33 up).
+
+**E / K retention (full sets, train-time pass):** SNLI −1.0, MNLI −1.6, BoolQ −0.3, ANLI −2.6, HWU64 −2.2, 20NG +0.7,
+CLINC-OOS **+10.5**; but **CLINC-150 −11.2 (.845 → .734) and TREC-fine −9.6 (.468 → .372)** — both entirely from
+false-abstain (.054 → .168, .198 → .342; coverage .95 → .83, .80 → .66) while CLINC-K acc holds (.892) and
+paired-null AUROC is unchanged. K: MMLU-Pro among-K .354 → .331 (−2.3), Δ_q_sh .122 → .119 (probe), kb val +2.0,
+TruthfulQA −0.9. Val NLL .347 → .384 (E sampled at .35 instead of ~.8).
+
+**Verdict against the PLAN6 rule.** W ✓ (every held-out axis ≥ +10; styles +33), rubric dependence ✓ (flip rate
+.31 → .50, Δ_r up, shuffled-rubric NLL 3× worse — it is reading the rubric, not memorising priors), K ✓ (within 3),
+external ✓ on 4 of 5 with one clean-external regression (typed-decisions). **E ✗ on two label-space sets**, and the failure
+mode is specific: the W corpora have p_null = 0 on 95% of rows, so the head's ∅ threshold moved and the model now
+abstains on in-vocabulary CLINC/TREC items — a mixing/null-weighting defect (PI branch *b*), not lost discrimination.
+The second defect is calibration: everywhere the gold is soft or ordinal (held-out score NLL 1.24 → 2.07, typed-decisions,
+JevBench hard Brier) accuracy rose or held while probability quality fell — the workflow data is almost all hard
+labels. So the answer to the Phase-6 question is **yes for rubric execution, no for probability quality**: rubric-conditioned
+training on this backbone is what moves held-out workflow decisions (+10–33) and JevBench standard, hard stays at
+chance, and the two regressions have known, cheap causes. Architecture stays frozen (branch *a*); the next dollar goes
+to (1) a mixing fix — null-bearing rows inside W and/or E ≥ .45 — re-run as a matched seed, (2) Phase 6B typed
+primitives (Noul as Bernoulli vs 2-way Choice; Score as ordinal vs K-way Choice — the ordinal gain 5 → 10 on JevBench
+says Score is the type to test first), then (3) calibration with proper scoring on soft targets. Not: more data volume, scale.
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.

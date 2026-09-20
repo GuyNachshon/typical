@@ -1,0 +1,276 @@
+{
+ "run": "runs/nc_v3_tap20",
+ "mode": "native",
+ "max_state": 4096,
+ "limit": 500,
+ "eval": {
+  "wf_heldout_choice": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.41550213203347836,
+    "brier": 0.18320544923558088,
+    "jsd": 0.10745783899653735,
+    "acc": 0.89,
+    "acc_k": 0.9372384937238494,
+    "ece": 0.09246017643809316,
+    "sel_acc80": 0.95,
+    "conf_wrong": 0.18181818181818182,
+    "coverage": 0.942,
+    "false_abstain": 0.03556485355648536,
+    "null_recall": 0.5454545454545454,
+    "auroc_null": 0.8671548117154811,
+    "auroc_conf": 0.7902244199315329
+   }
+  },
+  "wf_heldout_noul": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.8309656510162613,
+    "brier": 0.5662586731338869,
+    "jsd": 0.22951280610460872,
+    "acc": 0.548,
+    "acc_k": 0.548,
+    "ece": 0.15832070171833038,
+    "sel_acc80": 0.565,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "wf_heldout_score": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 1.235931658931705,
+    "brier": 0.6798351197413083,
+    "jsd": 0.3380723964049855,
+    "acc": 0.4,
+    "acc_k": 0.4,
+    "ece": 0.08304153549671173,
+    "sel_acc80": 0.405,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "wf_heldout_style": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.9834014278380061,
+    "brier": 0.5496168696182546,
+    "jsd": 0.2597134400789858,
+    "acc": 0.578,
+    "acc_k": 0.6155419222903885,
+    "ece": 0.07572980326414108,
+    "sel_acc80": 0.6125,
+    "conf_wrong": 0.0,
+    "coverage": 0.9299999999999999,
+    "false_abstain": 0.06339468302658487,
+    "null_recall": 0.36363636363636365,
+    "auroc_null": 0.8224577058932887,
+    "auroc_conf": 0.753299869864287
+   }
+  },
+  "wf_rubric_flip": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.7326443853545254,
+    "brier": 0.5059227014872159,
+    "jsd": 0.21175875808268094,
+    "acc": 0.592,
+    "acc_k": 0.592,
+    "ece": 0.10828270679712296,
+    "sel_acc80": 0.605,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   },
+   "flip": {
+    "n_pairs": 250,
+    "flip_rate": 0.312,
+    "both_correct": 0.248,
+    "acc": 0.592
+   }
+  },
+  "wf_rubric_shuffled": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 1.518886162934393,
+    "brier": 0.8161650576989216,
+    "jsd": 0.35581441958120624,
+    "acc": 0.328,
+    "acc_k": 0.33,
+    "ece": 0.2511570737063885,
+    "sel_acc80": 0.3475,
+    "coverage": 0.988,
+    "false_abstain": 0.012,
+    "null_recall": "n/a"
+   }
+  },
+  "cua_s1_forms_demo": {
+   "n": 196,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 2.7886026506076127,
+    "brier": 0.9762920750412108,
+    "jsd": 0.5516315136548158,
+    "acc": 0.17346938775510204,
+    "acc_k": 0.17346938775510204,
+    "ece": 0.18938463778063958,
+    "sel_acc80": 0.21019108280254778,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "cua_s1_forms_test": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 2.25412647211522,
+    "brier": 0.8543594568916216,
+    "jsd": 0.4815980428161507,
+    "acc": 0.314,
+    "acc_k": 0.356,
+    "ece": 0.12023419658839703,
+    "sel_acc80": 0.3525,
+    "coverage": 0.8180000000000001,
+    "false_abstain": 0.182,
+    "null_recall": "n/a"
+   }
+  },
+  "jev4b_adversarial": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.7869415749772006,
+    "brier": 0.45851421132802184,
+    "jsd": 0.21646332604481888,
+    "acc": 0.652,
+    "acc_k": 0.652,
+    "ece": 0.04149679476022719,
+    "sel_acc80": 0.6975,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "jevlogs_triage": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.9056691672186458,
+    "brier": 0.6514028591212107,
+    "jsd": 0.2705320908219888,
+    "acc": 0.162,
+    "acc_k": 0.162,
+    "ece": 0.389260182917118,
+    "sel_acc80": 0.075,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "mind2web_choice": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 1.7880542859238084,
+    "brier": 0.8517092749753202,
+    "jsd": 0.4293716925558031,
+    "acc": 0.254,
+    "acc_k": 0.26,
+    "ece": 0.2596092616319656,
+    "sel_acc80": 0.2725,
+    "coverage": 0.976,
+    "false_abstain": 0.024,
+    "null_recall": "n/a"
+   }
+  },
+  "pagerduty_trigger": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.732608126654743,
+    "brier": 0.42779438047718304,
+    "jsd": 0.22053155410998926,
+    "acc": 0.736,
+    "acc_k": 0.736,
+    "ece": 0.2570060688853264,
+    "sel_acc80": 0.8275,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "systemone_lite_hard": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 1.1733060774123463,
+    "brier": 0.7061793181233246,
+    "jsd": 0.3017282292546116,
+    "acc": 0.458,
+    "acc_k": 0.496,
+    "ece": 0.17955534121394157,
+    "sel_acc80": 0.48,
+    "coverage": 0.9319999999999999,
+    "false_abstain": 0.068,
+    "null_recall": "n/a"
+   }
+  },
+  "tree_choice_cap": {
+   "n": 500,
+   "suffix_overflow": 125,
+   "raw": {
+    "nll": 2.5931406272201984,
+    "brier": 0.7499254563216371,
+    "jsd": 0.39043839566224536,
+    "acc": 0.452,
+    "acc_k": 0.6,
+    "ece": 0.19436847940690793,
+    "sel_acc80": 0.565,
+    "coverage": 0.732,
+    "false_abstain": 0.268,
+    "null_recall": "n/a"
+   }
+  },
+  "typed_decisions_test": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 1.3962234739693204,
+    "brier": 0.2712060005362515,
+    "jsd": 0.1189928841547723,
+    "acc": 0.332,
+    "acc_k": 0.332,
+    "ece": 0.171834458231926,
+    "sel_acc80": 0.345,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "typed_decisions_train": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 1.3625315678323413,
+    "brier": 0.2588918438116928,
+    "jsd": 0.11666831555190198,
+    "acc": 0.352,
+    "acc_k": 0.352,
+    "ece": 0.14872186636924745,
+    "sel_acc80": 0.3725,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  }
+ }
+}

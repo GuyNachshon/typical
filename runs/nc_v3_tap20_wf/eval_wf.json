@@ -1,0 +1,276 @@
+{
+ "run": "runs/nc_v3_tap20_wf",
+ "mode": "native",
+ "max_state": 4096,
+ "limit": 500,
+ "eval": {
+  "wf_heldout_choice": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.019871275152449026,
+    "brier": 0.010466870652060482,
+    "jsd": 0.005765777761771096,
+    "acc": 0.994,
+    "acc_k": 0.9937238493723849,
+    "ece": 0.0063112200498580615,
+    "sel_acc80": 1.0,
+    "conf_wrong": 0.0,
+    "coverage": 0.956,
+    "false_abstain": 0.0,
+    "null_recall": 1.0,
+    "auroc_null": 1.0,
+    "auroc_conf": 1.0
+   }
+  },
+  "wf_heldout_noul": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.853929875950949,
+    "brier": 0.4878031580677193,
+    "jsd": 0.17909886291906896,
+    "acc": 0.682,
+    "acc_k": 0.682,
+    "ece": 0.1986952285766601,
+    "sel_acc80": 0.715,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "wf_heldout_score": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 2.068675406193429,
+    "brier": 0.7677929317097167,
+    "jsd": 0.2869982566550366,
+    "acc": 0.514,
+    "acc_k": 0.514,
+    "ece": 0.35427253764867783,
+    "sel_acc80": 0.5725,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "wf_heldout_style": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.2222467604358654,
+    "brier": 0.1323241858578231,
+    "jsd": 0.06029804682074418,
+    "acc": 0.904,
+    "acc_k": 0.901840490797546,
+    "ece": 0.019670174241066027,
+    "sel_acc80": 0.975,
+    "conf_wrong": 0.0,
+    "coverage": 0.978,
+    "false_abstain": 0.0,
+    "null_recall": 1.0,
+    "auroc_null": 1.0,
+    "auroc_conf": 1.0
+   }
+  },
+  "wf_rubric_flip": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.7009927043024266,
+    "brier": 0.40828858133650053,
+    "jsd": 0.15320314054370474,
+    "acc": 0.736,
+    "acc_k": 0.736,
+    "ece": 0.1480658851861954,
+    "sel_acc80": 0.7825,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   },
+   "flip": {
+    "n_pairs": 250,
+    "flip_rate": 0.504,
+    "both_correct": 0.488,
+    "acc": 0.736
+   }
+  },
+  "wf_rubric_shuffled": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 4.60017100450565,
+    "brier": 1.0415848067241245,
+    "jsd": 0.3751870274955275,
+    "acc": 0.386,
+    "acc_k": 0.386,
+    "ece": 0.5058854785561562,
+    "sel_acc80": 0.395,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "cua_s1_forms_demo": {
+   "n": 196,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.00011844338656585847,
+    "brier": 3.8039107351542767e-06,
+    "jsd": 4.095999434756056e-05,
+    "acc": 1.0,
+    "acc_k": 1.0,
+    "ece": 0.00011747923432559038,
+    "sel_acc80": 1.0,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "cua_s1_forms_test": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.012289381821878892,
+    "brier": 0.004094414644142791,
+    "jsd": 0.001583947825507208,
+    "acc": 0.998,
+    "acc_k": 0.998,
+    "ece": 0.002032796382904006,
+    "sel_acc80": 1.0,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "jev4b_adversarial": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.3490933191998588,
+    "brier": 0.09980970638364663,
+    "jsd": 0.040403990439927887,
+    "acc": 0.94,
+    "acc_k": 0.94,
+    "ece": 0.04506945902109154,
+    "sel_acc80": 0.965,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "jevlogs_triage": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.3044197695283073,
+    "brier": 0.17586170974258888,
+    "jsd": 0.0972293910378737,
+    "acc": 0.832,
+    "acc_k": 0.832,
+    "ece": 0.23506193399429315,
+    "sel_acc80": 1.0,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "mind2web_choice": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 1.7049515437075962,
+    "brier": 0.7232633764663069,
+    "jsd": 0.3240744768308897,
+    "acc": 0.438,
+    "acc_k": 0.438,
+    "ece": 0.21502542391419413,
+    "sel_acc80": 0.5025,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "pagerduty_trigger": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.6816042798599857,
+    "brier": 0.3284166395830621,
+    "jsd": 0.14193714639027197,
+    "acc": 0.762,
+    "acc_k": 0.762,
+    "ece": 0.10664146476984024,
+    "sel_acc80": 0.865,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "systemone_lite_hard": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 0.2668189883849799,
+    "brier": 0.15873402095268352,
+    "jsd": 0.06530097270690566,
+    "acc": 0.888,
+    "acc_k": 0.888,
+    "ece": 0.03896239256858824,
+    "sel_acc80": 0.9625,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "tree_choice_cap": {
+   "n": 500,
+   "suffix_overflow": 125,
+   "raw": {
+    "nll": 2.243535988875024,
+    "brier": 0.6146624018620521,
+    "jsd": 0.34488693403770676,
+    "acc": 0.494,
+    "acc_k": 0.538,
+    "ece": 0.07969999838478839,
+    "sel_acc80": 0.6175,
+    "coverage": 0.872,
+    "false_abstain": 0.128,
+    "null_recall": "n/a"
+   }
+  },
+  "typed_decisions_test": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 2.4008272248719806,
+    "brier": 0.5420563405144715,
+    "jsd": 0.2209605208544786,
+    "acc": 0.276,
+    "acc_k": 0.276,
+    "ece": 0.5269120357036591,
+    "sel_acc80": 0.2925,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  },
+  "typed_decisions_train": {
+   "n": 500,
+   "suffix_overflow": 0,
+   "raw": {
+    "nll": 2.5297219974097365,
+    "brier": 0.5571985794974775,
+    "jsd": 0.2336201678966866,
+    "acc": 0.288,
+    "acc_k": 0.288,
+    "ece": 0.511909948706627,
+    "sel_acc80": 0.2875,
+    "coverage": 1.0,
+    "false_abstain": 0.0,
+    "null_recall": "n/a"
+   }
+  }
+ }
+}

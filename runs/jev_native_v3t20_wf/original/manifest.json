@@ -1,0 +1,23 @@
+{
+  "adapter": "local_pcdm",
+  "checkpoint_sha256": "a3afe6cf28be78e4eeab66c2f28da739a707d6ef695ba69009585e20f7059a98",
+  "cost_basis": "local_gpu_no_provider_tariff",
+  "dataset_hash": "914276022fa5f0ea70e4231f2af98e68c67b274b61bea8c440b33890401cd2f9",
+  "device": "cuda",
+  "energy_run": null,
+  "finished_utc": "2026-09-20T13:14:46.379710+00:00",
+  "gpu_name": "NVIDIA H100 NVL",
+  "harness_commit": "83831807458d7df424a1e53e5724f3a3ffe2cf89",
+  "load_s": 3.255378670990467,
+  "max_state": 4096,
+  "mode": "native",
+  "n_attempted": 72,
+  "n_planned": 72,
+  "requested_model": "runs/nc_v3_tap20_wf",
+  "reverse_labels": false,
+  "run_label": "native_v3t20_wf",
+  "started_utc": "2026-09-20T13:14:05.537705+00:00",
+  "torch_version": "2.11.0+cu128",
+  "trained_max_query": 64,
+  "trained_max_state": 256
+}
