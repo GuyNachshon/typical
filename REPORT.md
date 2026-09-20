@@ -928,7 +928,7 @@ TruthfulQA −0.9. Val NLL .347 → .384 (E sampled at .35 instead of ~.8).
 **Verdict against the PLAN6 rule.** W ✓ (every held-out axis ≥ +10; styles +33), rubric dependence ✓ (flip rate
 .31 → .50, Δ_r up, shuffled-rubric NLL 3× worse — it is reading the rubric, not memorising priors), K ✓ (within 3),
 external ✓ on 4 of 5 with one clean-external regression (typed-decisions). **E ✗ on two label-space sets**, and the failure
-mode is specific: the W corpora have p_null = 0 on 95% of rows, so the head's ∅ threshold moved and the model now
+mode is specific: only 0.9% of W training rows carry a null target (1,481 of 158,606; v5 has 21.4%), so 40% of every batch taught "never abstain" and the head's ∅ threshold moved and the model now
 abstains on in-vocabulary CLINC/TREC items — a mixing/null-weighting defect (PI branch *b*), not lost discrimination.
 The second defect is calibration: everywhere the gold is soft or ordinal (held-out score NLL 1.24 → 2.07, typed-decisions,
 JevBench hard Brier) accuracy rose or held while probability quality fell — the workflow data is almost all hard
