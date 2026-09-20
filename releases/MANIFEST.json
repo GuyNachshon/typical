@@ -1,0 +1,22 @@
+{
+  "release": "typical-small-preview",
+  "date": "2026-09-20",
+  "git_commit": "f905201faae8e02e01c24a6f07408e65229077e8",
+  "source_checkpoint": "nc_v3_tap20_wf",
+  "matched_baseline_checkpoint": "nc_v3_tap20",
+  "hf_repo": "guychuk/pcdm-runs",
+  "hf_paths": {
+    "typical-small-preview/best.pt": "sha256:a3afe6cf28be78e4eeab66c2f28da739a707d6ef695ba69009585e20f7059a98",
+    "typical-small-preview/results.json": null,
+    "typical-small-preview/eval_wf.json": null,
+    "typical-small-preview/probe_results.json": null,
+    "typical-small-preview/jevbench_summary.json": null,
+    "typical-small-preview/README.md": null,
+    "typical-small-preview/baseline_nc_v3_tap20/best.pt": "sha256:bf12c7d2f27ff0a6efe7f8f551012a63813660518df5bd6e2fa1753ddd1ed386",
+    "typical-small-preview/baseline_nc_v3_tap20/results.json": null,
+    "typical-small-preview/baseline_nc_v3_tap20/eval_wf.json": null,
+    "typical-small-preview/baseline_nc_v3_tap20/probe_results.json": null,
+    "typical-small-preview/baseline_nc_v3_tap20/jevbench_summary.json": null
+  },
+  "notes": "Files copied verbatim from guychuk/pcdm-runs/{nc_v3_tap20_wf,nc_v3_tap20,probe_nc_v3_tap20_wf,probe_nc_v3_tap20,jev_native_v3t20_wf,jev_native_v3t20}/ via huggingface_hub (download + create_commit); no retraining. sha256 given for the two checkpoint weight files (best.pt); the JSON/summary files are copied byte-identical to their source paths in the same repo."
+}
