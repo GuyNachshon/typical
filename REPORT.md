@@ -532,7 +532,9 @@ regression of the options-in-suffix formulation is the open problem.
 | `nc_n2` (direct head) | .198 | .121 | .139 | **.077** | **0.87** |
 | E3 `zr` (candidate-blind) | .157 | .166 | .182 | −.009 | ≈ 0 |
 
-The direct head retains 87% of the teacher's question-dependent knowledge (69% of N1's); its lower raw score is mostly
+(Under the stricter shuffled-question variant adopted in §3j: teacher .102, N1 .114, N3 .116, N2 .058, v2 .074, v3 .103 —
+same ordering, smaller ratios: N3 = 1.14× teacher, N2 = 0.57×.) The direct head N2 retains 57–87% of the teacher's
+question-dependent knowledge depending on the variant; its lower raw score is mostly
 *less candidate-prior exploitation* (choices-only .121 vs .213) — N2 is less artifact-driven, not less knowledgeable, with a
 third of N1's order bias (reorder Δp .06 vs .17). This is the first non-generative readout in the project that exposes
 question-conditioned parametric knowledge; the candidate-blind Z never did. N3 (contextual candidates) tests whether the
@@ -551,7 +553,8 @@ among-K − acc; use the latter until fixed.)
 **§16, first branch: N3 ≈ N1 → adopt direct native choice.** The mechanistic prediction held — the direct head needs
 candidate representations that carry slot identity (the option's own contextual states), not slot-agnostic semantic
 vectors; with them the non-generative readout matches the letter readout on every knowledge and unseen-label set, with a
-quarter of its IIA fragility (.13 vs .46) and better evidence retention than either N1 or N2. Established: *candidate-
+quarter of its IIA fragility (.13 vs .46; one run — v2/v3 with the same readout give .25/.21) and evidence retention
+between N1 and N2 (better on SNLI/MNLI/ANLI, worse on BoolQ .737 vs .769/.775 and HWU64 .660 vs .721). Established: *candidate-
 conditioned pretrained reasoning can be exposed directly as typed probabilities without the generative answer interface.*
 Two known defects, both in the null/calibration layer rather than the decision: (i) the native null does not transfer
 across K — abstention error .18 on MMLU-Pro (acc .133 vs among-K .314), ECE .46, P(∅|absent) .99 at K = 150 while OOS
@@ -567,6 +570,183 @@ costs evidence accuracy at 1.7B/12k steps regardless of readout (PLAN4 §15A not
 does not generalize across K** — abstains on everything at K = 150 (P(∅|absent) 1.00, Banking77-77 .012) while
 under-firing on OOS (.25): the set-statistics gate over h_D sees score distributions at K = 77–150 unlike anything in the
 kb-heavy mix; (4) set-dependent by design (IIA .38), modest order bias (Δp .06 with per-step shuffling).
+
+## 3m. PLAN5 Phase 5A — native-choice latency with state-KV reuse (`bench_native`, H100, 2026-09-20)
+
+`nc_n3` native path (state prefix cached once; per query ONE right-padded option-aware suffix, batched in chunks of 32,
+h_D + option spans pooled, scored) vs the energy path (`joint_emb_lw`) vs the query-batched log-prob baseline; per-query
+marginal ms at M = 256, real intent-label candidates.
+
+| L_s = 256 | K = 2 | 4 | 10 | 32 | 64 | 128 | 256 |
+|---|---|---|---|---|---|---|---|
+| suffix tokens | 31 | 43 | 79 | 233 | 470 | 1040 | 2320 |
+| **native** | **1.07** | 1.14 | 1.55 | 3.38 | 6.44 | 17.3 | 43.8 |
+| energy | 0.97 | 0.96 | 0.96 | 0.98 | 0.96 | 1.01 | 1.06 |
+| batched log-prob | 2.12 | 2.77 | 4.59 | 12.2 | 22.8 | 49.8 | 101.7 |
+| native / energy | 1.1× | 1.2× | 1.6× | 3.4× | 6.7× | 17× | 41× |
+
+Longer states (rerun with native chunk 8 / baseline chunk 4, so small-K native marginals are less batched than above):
+
+| | K = 2 | 4 | 10 | 32 | 64 | 128 | 256 |
+|---|---|---|---|---|---|---|---|
+| L_s = 1000: native / energy / batched | 3.7 / 1.34 / 11.9 | 3.7 / 1.33 / 13.0 | 3.8 / 1.34 / 18.6 | 4.8 / 1.36 / 38.4 | 8.2 / 1.36 / 66.9 | 18.1 / 1.43 / 128.6 | 38.7 / 1.48 / 247.5 |
+| L_s = 2000: native / energy / batched | 3.7 / 1.90 / 13.9 | 3.8 / 1.91 / 17.3 | 4.1 / 1.93 / 27.6 | 5.9 / 1.90 / 63.8 | OOM (baseline) | | |
+
+Reading (corrected after review): at fixed chunk 8 native is *flat* in L_s (3.69 ms at 1k vs 3.66 at 2k for K = 2); the
+1.07 → 3.7 ms jump from the L_s = 256 table is the chunk change (32 → 8), not the prefix. The energy path is the one that
+grows with L_s (0.97 → 1.34 → 1.90 ms). The baseline at L_s ≥ 1k runs at chunk 4 with a per-sub-batch KV copy, so its
+numbers here are inflated; the 2–3× statement holds only for the L_s = 256 run.
+
+Single-decision and small-batch latency (L_s = 256; total ms per decision incl. the state pass):
+
+| | M = 1 (one decision) | M = 32 (marginal ms) |
+|---|---|---|
+| native, K = 2 / 10 / 32 | **52 / 53 / 52** | 1.8 / 2.2 / 4.1 |
+| energy, K = 2 / 10 / 32 | 83 / 84 / 85 | 2.8 / 2.8 / 2.9 |
+| batched log-prob, K = 2 / 10 / 32 | 65 / 67 / 69 | 2.6 / 5.1 / 12.7 |
+
+At M = 1 every path is fixed-cost dominated (state pass ≈ 20–23 ms + one forward) and **native is the fastest for
+K ≤ 32 (≈ 52 ms on an H100)** — the energy path carries the embedder and its own overheads. The K-scaling above is a
+throughput statement at M = 256; a service answering one bounded decision at a time is native-first regardless of K ≤ 32.
+
+Caveats: the batched log-prob baseline deep-copies its KV cache per sub-batch (pre-existing; inflates it at large K —
+the energy-vs-native comparison is the clean one); K = 256 candidates are 226 real intent names + 30 synthetic labels;
+bench.json for this run was lost to the OOM (numbers transcribed from the log; the rerun checkpoints per row).
+
+**Operating region (corrected).** The bench's own crossover field says: at M ≥ 32 the energy path is cheaper at *every* K
+(K* = 2); native is cheaper only at M = 1, and there only because its fixed per-call overhead is lower (K* = 128 at M = 1).
+So "K* ≈ 10–32" is a chosen cost ratio (native ≤ 1.6–3.4× energy), not a measured crossover. The honest statement: native
+choice costs 10–60% more than the energy path per query up to K ≈ 10 and 3.4× at K = 32 in throughput mode, is the faster
+path for single decisions, and scales linearly in option tokens; large sets go energy → top-r → native with r set by the
+latency budget (PLAN4 §9). One suffix per query, no
+generation, no per-candidate LM call — the systems requirement of PLAN4 §15D holds; latency scales with total option tokens,
+not with K per se.
+
+## 3n. PLAN5 Phase 5B — support gate × native choice (`scripts/compose_support.py`, eval-time, $1)
+
+P(∅) = 1 − r with r = 1 − P_energy(∅) from `joint_emb_lw_v5`; P(a_j) = r · P_native(a_j | answerable) from `nc_n3`; no
+retraining; aligned per row by candidate string over the shared eval sets.
+
+| | energy | native | **composed** |
+|---|---|---|---|
+| MMLU-Pro among-K / acc / abstention error / ECE | .123 / .095 / .028 / .392 | .314 / .133 / .182 / .459 | **.314 / .222 / .092 / .204** |
+| CLINC-OOS null recall | .739 | .194 | **.786** |
+| null AUROC clinc-k / snli / squad | .961 / .980 / .975 | .803 / .964 / .992 | .961 / .980 / .975 |
+| P(∅ \| absent) K = 2 / 50 / 150 | .94 / .59 / .45 | .86 / .40 / .99 | .94 / .59 / .45 |
+| CLINC-heldout / Banking77-77 | .756 / .529 | **.916** / .497 | .794 / .483 |
+| SNLI | .910 | .863 | .863 |
+
+Reading: the composition inherits native's choice (among-K unchanged at .314) and the energy path's support signal
+(OOS, AUROC, K-sweep = energy's). MMLU abstention error halves and ECE drops .46 → .20 — but not "for free": the
+evidence-trained null still abstains on 9% of closed-book questions, and on unseen label spaces it imports the energy
+path's novelty ⇒ null confound (CLINC-heldout .916 → .794). Verdict: keep the two-expert split for support vs choice;
+the support gate needs either the v5-style label-diversity treatment or a rule that closed-book (no-evidence) questions are
+not gated by the evidence null. `compose_n3_T` (energy T = 1.22 applied to r) is within noise of the T = 1 composition.
+**With `nc_v2` (native null fixed, §3p):** composing the energy gate now *hurts* closed-book decisions (MMLU acc .282 → .216,
+ECE .037 → .185) and buys only +9 OOS recall (.699 → .791). Rule adopted: the evidence-trained support gate applies to
+evidence-grounded decisions only; closed-book abstention is the native head's own.
+
+## 3o. PLAN5 Phase 5C — evidence/knowledge fusion at score level (`scripts/fuse_scores.py`, eval-time, $0)
+
+Geometric mixture over shared candidates, s_j = s_j^E + g·s_j^N (energy null as support gate), swept over g on the
+`joint_emb_lw_v5` + `nc_n3` dumps:
+
+| g | MMLU-Pro among-K | SNLI / MNLI / ANLI / BoolQ | CLINC-150 | CLINC-heldout | Banking77-77 | OOS recall | SNLI ECE |
+|---|---|---|---|---|---|---|---|
+| 0 (= energy) | .123 | .910 / .881 / .554 / .835 | .782 | .756 | .529 | .739 | .009 |
+| 0.5 | .190 | .908 / .878 / .539 / .835 | **.802** | .784 | **.563** | .732 | .037 |
+| 1 | .224 | .902 / .866 / .527 / .822 | **.806** | .793 | **.576** | .730 | .053 |
+| 2 | .253 | .893 / .846 / .507 / .803 | .799 | **.803** | .576 | .728 | .077 |
+| native alone (`nc_n3`) | .314 | .863 / .752 / .431 / .737 | .740 | .916 | .497 | .194 | – |
+| oracle (best g per set) | .253 | .910 / .881 / .554 / .835 | .806 | .803 | .578 | .739 | .009 |
+| val-selected global g = 0.25 | .158 | .909 / .878 / .544 / .835 | .797 | .772 | .550 | .733 | .026 |
+
+Linear mixture behaves the same (g = 0.5: MMLU .230, CLINC .795, Banking77 .565, OOS .785, SNLI .904).
+
+Reading: on label-space decisions the two experts are **complementary** — at g ≈ 0.5–1 fusion beats both (CLINC-150 +2.4
+over energy / +6.6 over native; Banking77-77 +5 / +8) for ≤ 1.5 pts of NLI. On closed-book knowledge a global g caps at
+.25 vs native's .314, and on NLI any g > 0 costs. The oracle row (evidence sets at g = 0, label/knowledge sets at g ≥ 1)
+is the target for a *per-input* gate; a val-selected global g captures little because val is evidence-heavy. Caveats (review): g is selected on the eval sets and the oracle row is a per-column max over the grid — an upper bound, not a
+result; and the fused scores were not re-temperature-fitted, so probability quality degrades with g (Banking77 NLL 2.04 → 2.65,
+ChaosNLI 1.27 → 1.97, ANLI ECE .17 → .30 from g = 0 to 2) — accuracy gains only until T is refit per g. Energy rows in §3n/§3o are
+the T = 1 dump (MMLU acc .095 / ECE .392), not the T-fitted results.json (.092 / .385). Verdict for PLAN5 §4: not interference —
+complementary *accuracy* signals with a task-dependent mixing weight; a learned per-input gate g(x, q) with a refit T is the
+experiment, not a global mix.
+
+## 3p. PLAN5 Phase 5A-v2 — letter-free native choice (`nc_v2`: `<choice>` tags, per-step shuffle, perm-consistency λ = 0.1; H100, $9)
+
+| | `nc_n3` (letters) | **`nc_v2`** (tags) | goal |
+|---|---|---|---|
+| MMLU-Pro among-K / acc / abstention error / ECE | .314 / .133 / .181 / .459 | .286 / **.282** / **.004** / **.040** | keep knowledge: **failed** on Δ_q |
+| Δ_q (normal − choices-only; shuffled) | .111 (.203; .198) | **.066** (.220; .212) | 0.75× teacher vs 1.26× |
+| TruthfulQA / kb val | .461 / .580 | .477 / .538 | |
+| reorder Δp / IIA Δlog-odds | .101 / .126 | .116 / .247 | Δp < .03: **failed** |
+| SNLI / MNLI / ANLI / BoolQ / CLINC-150 / HWU64 | .863 / .752 / .431 / .737 / .740 / .660 | .863 / .756 / .441 / .727 / .749 / .663 | recover evidence: **unchanged** |
+| CLINC-heldout / Banking77-77 / 20NG / TREC-fine | .916 / .497 / .559 / .400 | .903 / .357 / .536 / .334 | |
+| CLINC-OOS / null AUROC clinc-k / P(∅\|absent) K = 150 | .204 / .803 / .99 | **.707 / .953 / .28** | (unplanned) native null fixed |
+
+Readings. (1) **The native null is fixed by the rendering**: with no letter-rendered "none of the above" line, ∅ is purely the
+head's decision over set statistics, and the K-pathology of §3l disappears (abstention error .18 → .004, OOS .20 → .71,
+AUROC .80 → .95). But the question-dependent signal drops (Δ_q .111 → .066) while option-prior exploitation rises
+(choices-only .203 → .220) — among-K hides this; only the probe shows it — for abstention this beats the support-gate composition (§3n) on closed-book questions,
+though the composition still wins on evidence-grounded nulls — and the composition keeps N3's full Δ_q. (2) Letters were **not** the cause of
+the evidence gap (unchanged) nor of the order sensitivity (Δp .10 → .12; perm-consistency at λ = 0.1 did nothing — with
+letters gone, position is the only identity signal in the suffix, so the LM's positional bias survives). (3) Large tagged
+suffixes hurt unseen label spaces at K = 77 (Banking77-77 −14). Net: `nc_v2` met none of its three goals; its null fix is real. **`nc_v3` (letters for options, no rendered ∅ line, no perm
+loss; $9) isolates the two factors:** Δ_q **.108** (≈ N3's .111; v2 .066), among-K .287, acc .273 (abstention error .014),
+ECE .069, null AUROC .940, P(∅|absent) at K = 150 .56, choices-only .178 (the least option-prior exploitation of any native
+model), OOS .435 (v2 .707), evidence .858 / .740, reorder Δp .117, Banking77-77 .317. Reading with the review's caveats: v2 vs v3 differ in rendering *and* perm-loss (0.1 vs 0), v3 vs n3 drop the ∅ line
+*and* "Answer:" — neither factor is isolated, and Δ_q .066 vs .108 is ~1.7 SE unpaired at one seed. What is supported:
+removing the rendered ∅ line removes the MMLU over-abstention (abstention error .18 → .014); tags + perm-loss cost
+.03–.04 Δ_q at one seed. What is *not* supported: "the null is fixed" — the K-pathology moved from K = 10 to K = 77:
+Banking77-77 false-abstain is .36 (v2) and .52 (v3) vs .01 for n3, and v3's K-sweep is non-monotone (K100 .09, K150 .56).
+`nc_v3` is the best native checkpoint on Δ_q + closed-book calibration, not on abstention generally.
+Order sensitivity is untouched by any rendering (Δp .10–.12). Next levers: inference-time symmetrization
+(average over 2–3 permutations; 2–3× native cost, still under the log-prob baseline), λ ≫ 0.1, and for the evidence gap the
+formulation itself (mixing ratio / evidence rows rendered without options / longer training).
+
+## 3q. JevBench (fstandhartinger/jevbench v1.2.1, public subset; 2026-09-20)
+
+Harness: 231 public decisions (72 standard / 48 easy / 111 hard; the 146 judge items and all held-out items are not
+public), typed `noul` (yes/no) / `choice` (K = 2–6) / `score` (ordinal); models return a probability distribution over the
+exact label set; native distributions only (`pcdm_jev/`, `scripts/jevbench_run.py`; adversarially reviewed, defects fixed).
+**This is a public-subset run — not a ranked entry** (the harness ranks only ≥ 95% coverage incl. judge); comparisons
+below are per-item on the identical 231 ids from the harness's own `per-task.json`.
+
+| accuracy on the same public ids | standard (72) | easy (48) | hard (111) | notes |
+|---|---|---|---|---|
+| **PCDM energy** `joint_emb_lw_v5` | .403 | .875 | .360 | Brier .75 / .20 / .84; p50 .19 s |
+| **PCDM native** `nc_n3` | .417 | .854 | .306 | Brier .70 / .20 / .84; p50 .13 s |
+| **PCDM native** `nc_v2` (letter-free, null fixed) | .472 | **.938** | .315 | Brier .64 / .18 / .77; p50 .13 s |
+| **PCDM native** `nc_v3` (letters, no ∅ line) | .472 | .812 | .297 | |
+| `nc_n3` with `noul` labels reversed (order control) | .458 | .854 | .351 | ±4 pts from label order alone |
+| open-jev-deberta-v3-large (classifier, local CPU) | .431 | 1.00 | .378 | closest transport to ours |
+| GLiNER2 / jeff (GLiFormer 400M) / Laya (ModernBERT) | .639 / .750 / .694 | 1.00 | .369 / .387 / .351 | small encoders trained on the task family |
+| open-alternative-jev (Qwen3.5-4B) | .833 | 1.00 | .568 | |
+| system-one-open (Gemma E2B LoRA) / system-one (Qwen3-8B) | .931 / – | 1.00 | .486 / .486 | |
+| SemIf (Qwen3.5-4B) / OpenJev (26B-A4B) / djev | .986 / .972 / .986 | 1.00 | .613 / .640 / .676 | |
+| Jev 1.13.0 (closed) | .986 | 1.00 | .730 | |
+
+Disclosures (per the review): probabilities are the head's softmax **conditioned on non-∅** (P(∅) dropped; mean p_null
+.20 energy / .03 native, share > .5: 14% of hard items for energy, 0% native); checkpoints trained at 256-token states /
+64-token queries and run at 4096 / 256 (68% of hard states and 33–58% of energy queries exceed training length; none
+truncated); latency is in-process on one H100, one decision at a time, model load excluded, cold label embedding included
+(energy) — the harness's ×2 + 0.15 s self-hosted adjustment would apply, and their p50 is over standard+judge; cost is
+null (no tariff); option order = harness label order (reversed-order control: standard .417 → .458, hard .306 → .351 for `nc_n3`); compose mode
+≡ native under the harness and is not reported; harness commit, checkpoint sha256 and `uv.lock` are in each run's manifest.
+
+Reading: majority/chance baselines are .311 standard / .284 easy / .336 hard — **PCDM's hard-tier numbers are at chance**,
+standard is 1.5–3 SE above chance (n = 72, SE .058), and the reversed-label swing (±4) is larger than the differences
+between our own models, so no ranking among n3/v2/v3 is supported. PCDM lands with the untrained classifiers
+(DeBERTa-large .431/.378), not with systems trained on workflow decisions (.83–.99 standard). The "task family"
+explanation is plausible but untested; live alternatives: state length (native hard .444 on the 36 states ≤ 256 tokens vs
+.240 on the 75 longer ones; energy .36 / .36), `noul` at K = 2 where native is at chance (.46–.50) while energy gets .62,
+and the ∅-conditioning (14% of energy hard items had p_null > .5 and were forced to answer). The strongest evidence *for*
+task family over size is on the leaderboard itself: a Gemma-E2B LoRA reaches .931 standard. The
+architecture side is competitive (p50 .13–.19 s raw vs .17–.24 s for the GPU entries, native distributions, K up to 6
+trivially). `nc_v2`'s better calibration lifts easy to .938 and standard to .472 with no task training. JevBench is
+therefore the target task family for Phase 6/7 (typed primitives + rubric-conditioned decision data + calibration), not a
+benchmark to tune on; the 72 MIT-licensed original items are the only public training-eligible material and are too few.
 
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 

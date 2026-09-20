@@ -33,7 +33,7 @@ large-K ±3, unseen label spaces / OOS ±5 (REPORT §3d(3)).
 In progress (do not edit, link only): `COMPARE.md` (PCDM vs TypeSafe JEV, agent `a-compare`) and data v5 in
 `data.py` (label-space-held-out training splits, worker `w-datav5`); a K-aware null-bias follow-up (`w-nullbias`).
 
-**2026-09-19 redirect:** see `PLAN4.md` (closed-set native choice, N1/N2/N3 readouts) and `REPORT.md §3j–§3k`; E3/E3-ms becomes the optional candidate-blind compilation branch. `report_native.py` = PLAN4 §15 key table. **Outcome (2026-09-20): native choice adopted — `nc_n3` matches the letter readout on knowledge (MMLU-Pro .314, Δ_q .111) without generation; see PLAN4 §21 and REPORT §3l. All pods deleted; budget ≈ $5 left.**
+**2026-09-19 redirect:** see `PLAN4.md` (closed-set native choice, N1/N2/N3 readouts) and `REPORT.md §3j–§3k`; E3/E3-ms becomes the optional candidate-blind compilation branch. `report_native.py` = PLAN4 §15 key table. `PLAN5.md` = current roadmap (freeze → native latency → native_v2 → support gate → fusion → typed primitives → calibration). `NOVELTY.md` = contribution story / what is and isn't novel. **Outcome (2026-09-20): native choice adopted — `nc_n3` matches the letter readout on knowledge (MMLU-Pro .314, Δ_q .111) without generation; see PLAN4 §21 and REPORT §3l. All pods deleted; RunPod balance $120.89 (queried 2026-09-20).**
 
 ## 2. Document map (read in this order)
 

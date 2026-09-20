@@ -115,11 +115,12 @@ def _ids(tok, texts: list[str], max_len: int, offsets: bool = False):
     return (enc["input_ids"], enc["offset_mapping"]) if offsets else enc["input_ids"]
 
 
-def _pack(tok, s_ids, x_ids, tail=()):
+def _pack(tok, s_ids, x_ids, tail=(), sink=True):
     """rows = [eos] + state + suffix + tail, right-padded -> (input_ids, attention_mask,
-    lengths); lengths includes eos/tail, so the last real position of row i is lengths[i] - 1."""
+    lengths); lengths includes eos/tail, so the last real position of row i is lengths[i] - 1.
+    sink=False drops the leading eos (native_kv_decide: the sink lives in the cached prefix)."""
     eos, pad = tok.eos_token_id, tok.pad_token_id
-    rows = [[eos] + s + x + list(tail) for s, x in zip(s_ids, x_ids)]
+    rows = [([eos] if sink else []) + s + x + list(tail) for s, x in zip(s_ids, x_ids)]
     lengths = torch.tensor([len(r) for r in rows], dtype=torch.long)
     T = max(len(r) for r in rows)
     input_ids = torch.full((len(rows), T), pad, dtype=torch.long)

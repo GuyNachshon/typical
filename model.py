@@ -532,7 +532,7 @@ def _vecs_or_embed(cache, encoder, texts, dev, render=None):
 
 @torch.inference_mode()
 def decide(backbone, model, cache, state: str, queries: list[tuple[str, list[str]]], chunk: int = 64,
-           joint: bool = False, encoder=None):
+           joint: bool = False, encoder=None, max_state: int = 256, max_query: int = 64):
     """Encode state once; process queries in chunks, expanding the state to each chunk size.
     encoder: EmbedEncoder, used in place of the backbone's frozen features for Uf/Vf/C when
     cache is a VecCache (--cand_encoder qwen3emb); falls back to embedding on the fly for
@@ -544,7 +544,7 @@ def decide(backbone, model, cache, state: str, queries: list[tuple[str, list[str
         # must KEEP the sink token (position 0) for later attention, while forward()
         # drops it from its *returned* tensors -- so we tap hidden_states ourselves and
         # drop the sink manually, mirroring forward()'s [:, 1:] slicing.
-        ids_s, am_s = backbone.tokenize([state], 256)
+        ids_s, am_s = backbone.tokenize([state], max_state)
         ids_s, am_s = ids_s.to(dev), am_s.to(dev)
         out_s = backbone.model(input_ids=ids_s, attention_mask=am_s, use_cache=True, output_hidden_states=True)
         H = backbone.top(out_s)[:, 1:].float()
@@ -558,7 +558,7 @@ def decide(backbone, model, cache, state: str, queries: list[tuple[str, list[str
         for start in range(0, len(queries), chunk):
             qs = queries[start:start + chunk]
             m = len(qs)
-            ids_q, am_q = backbone.tokenize_plain([q for q, _ in qs], 64)
+            ids_q, am_q = backbone.tokenize_plain([q for q, _ in qs], max_query)
             ids_q, am_q = ids_q.to(dev), am_q.to(dev)
             Lq = ids_q.shape[1]
 
@@ -582,7 +582,7 @@ def decide(backbone, model, cache, state: str, queries: list[tuple[str, list[str
                 out.append(torch.cat([probs[i, :K], probs[i, Kmax:Kmax + 1]]))
         return out
 
-    ids_s, am_s = backbone.tokenize([state], 256)
+    ids_s, am_s = backbone.tokenize([state], max_state)
     h_top_s, h_frozen_s, mask_s = backbone(ids_s.to(dev), am_s.to(dev))
     Uf = _vecs_or_embed(cache, encoder, [state], dev) if encoder is not None \
         else _masked_mean(h_frozen_s, mask_s)
@@ -592,7 +592,7 @@ def decide(backbone, model, cache, state: str, queries: list[tuple[str, list[str
     for start in range(0, len(queries), chunk):
         qs = queries[start:start + chunk]
         m = len(qs)
-        ids_q, am_q = backbone.tokenize([q for q, _ in qs], 64)
+        ids_q, am_q = backbone.tokenize([q for q, _ in qs], max_query)
         h_top_q, h_frozen_q, mask_q = backbone(ids_q.to(dev), am_q.to(dev))
         Vf = _vecs_or_embed(cache, encoder, [q for q, _ in qs], dev) if encoder is not None \
             else _masked_mean(h_frozen_q, mask_q)

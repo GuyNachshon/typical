@@ -1,0 +1,98 @@
+{
+  "model": "runs/smoke_native",
+  "energy_model": null,
+  "backbone": "Qwen/Qwen3-0.6B-Base",
+  "quick": true,
+  "b_chunk": 32,
+  "native": {
+    "256": {
+      "2": {
+        "state_tokens": 256,
+        "suffix_tokens": 29,
+        "nc_chunk": 32,
+        "native": [
+          {
+            "m": 1,
+            "t_state_ms": 1440.3996659966651,
+            "t_queries_ms": 1695.0206250185147,
+            "total_ms": 3135.42029101518,
+            "ratio": 1.0,
+            "marginal_ms": 1695.0206250185147
+          },
+          {
+            "m": 8,
+            "t_state_ms": 1430.2785000181757,
+            "t_queries_ms": 2817.566124984296,
+            "total_ms": 4247.844625002472,
+            "ratio": 1.3547927329471716,
+            "marginal_ms": 352.195765623037
+          }
+        ],
+        "native_peak_mem_mb": 0.475136,
+        "b_batched": [
+          {
+            "m": 1,
+            "t_state_ms": 1737.1415829984471,
+            "t_queries_ms": 2160.7727909868117,
+            "total_ms": 3897.914373985259,
+            "ratio": 1.0,
+            "marginal_ms": 2160.7727909868117
+          },
+          {
+            "m": 8,
+            "t_state_ms": 1844.1592910094187,
+            "t_queries_ms": 3842.133875004947,
+            "total_ms": 5686.293166014366,
+            "ratio": 1.4588040219571714,
+            "marginal_ms": 480.2667343756184
+          }
+        ],
+        "b_batched_peak_mem_mb": 0.475136
+      },
+      "10": {
+        "state_tokens": 256,
+        "suffix_tokens": 68,
+        "nc_chunk": 32,
+        "native": [
+          {
+            "m": 1,
+            "t_state_ms": 1639.129832998151,
+            "t_queries_ms": 1955.5268330150284,
+            "total_ms": 3594.6566660131793,
+            "ratio": 1.0,
+            "marginal_ms": 1955.5268330150284
+          },
+          {
+            "m": 8,
+            "t_state_ms": 1484.1789579950273,
+            "t_queries_ms": 4674.067832995206,
+            "total_ms": 6158.246790990233,
+            "ratio": 1.7131668927425892,
+            "marginal_ms": 584.2584791244008
+          }
+        ],
+        "native_peak_mem_mb": 0.475136,
+        "b_batched": [
+          {
+            "m": 1,
+            "t_state_ms": 2149.2832500080112,
+            "t_queries_ms": 2263.4503330045845,
+            "total_ms": 4412.733583012596,
+            "ratio": 1.0,
+            "marginal_ms": 2263.4503330045845
+          },
+          {
+            "m": 8,
+            "t_state_ms": 1714.4660000049043,
+            "t_queries_ms": 6240.379333001329,
+            "total_ms": 7954.845333006233,
+            "ratio": 1.802702380136763,
+            "marginal_ms": 780.0474166251661
+          }
+        ],
+        "b_batched_peak_mem_mb": 0.475136
+      }
+    }
+  },
+  "crossover": {}
+}

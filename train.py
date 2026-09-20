@@ -8,7 +8,7 @@ uv run train.py --name X [--backbone Qwen/Qwen3-1.7B-Base] [--lora_layers 8] [--
                  [--smoke] [--eval_only] [--dump_logits DIR]
                  [--head mlp|z1|zr|zr_set] [--z_dim 128] [--z_probes 8] [--tiny_layers 2]
                  [--cand_encoder backbone|qwen3emb|tiny]
-                 [--readout energy|mcq|native] [--nc_head n2|n3|n2n3] [--no_shuffle]
+                 [--readout energy|mcq|native] [--nc_head n2|n3|n2n3] [--nc_render letters|tags] [--perm_lambda L] [--no_shuffle]
 """
 import argparse
 import sys
@@ -29,7 +29,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from encode import Backbone, FeatureCache, pick_device
 from model import DecisionModel, decision_loss, collate, run_batch, split_joint
 from mcq import MCQHead, collate_mcq, run_batch_mcq
-from native import NativeHead, run_batch_native, native_features, shuffle_options
+from native import NativeHead, run_batch_native, native_features, shuffle_options, perm_consistency_loss
 from metrics import summarize, choice_set_effects, ksweep, counterfactual
 import data as data_mod
 
@@ -486,7 +486,7 @@ def calibrate_zscore_native(head, model, examples, seed, n=256):
         for i in range(0, len(sample), 32):
             chunk = sample[i:i + 32]
             h, C3, cmask, _ = native_features(head, [ex["state"] for ex in chunk], [ex["query"] for ex in chunk],
-                                              [ex["candidates"] for ex in chunk])
+                                              [ex["candidates"] for ex in chunk], render=model.render)
             valid = torch.cat([cmask, torch.ones_like(cmask[:, :1])], 1)
             hs.append(h); cs.append(C3[valid])
     model.calibrate(torch.cat(hs), torch.cat(cs))
@@ -701,6 +701,13 @@ def parse_args():
     p.add_argument("--nc_head", choices=["n2", "n3", "n2n3"], default="n2n3",
                     help="--readout native candidates: n2 = Qwen3-Embedding vectors, n3 = pooled option spans "
                          "from the suffix, n2n3 = both (PLAN4 sec 12)")
+    p.add_argument("--nc_render", choices=["letters", "tags", "letters_nonull"], default="letters",
+                    help="--readout native suffix: letters = mcq's 'A. opt' lines + null line + 'Answer:' (unchanged); "
+                         "tags = native_v2 (PLAN5 sec 2) letter-free '<choice>\\n opt \\n</choice>' blocks, no null line")
+    p.add_argument("--perm_lambda", type=float, default=0.0,
+                    help="--readout native: weight on native.perm_consistency_loss -- a second forward of a random 1/4 of "
+                         "the batch under a fresh option order, KL between the two candidate distributions aligned by "
+                         "identity (PLAN5 sec 2 F(pi(A)) = pi(F(A))); 0 = off (default, one forward per step)")
     p.add_argument("--no_shuffle", action="store_true",
                     help="mcq/native: keep the given option order in training (default: random order per example per step)")
     p.add_argument("--zero_shot", action="store_true", help="eval only, no checkpoint (e.g. a frozen --lora_r 0 backbone)")
@@ -759,7 +766,7 @@ def main():
         # this invocation happened to be called with -- otherwise a mismatched
         # --lora_layers/--tap_layer/--joint silently loads weights into the wrong shapes.
         ckpt = torch.load(best_path, map_location=device, weights_only=False)  # trusted, self-produced
-        for k in ("backbone", "tap_layer", "lora_layers", "lora_r", "no_hybrid", "no_cand_null", "joint", "tower_d", "tower_layers", "tower_heads", "listwise", "readout", "cand_encoder", "extra_tap", "null", "head", "z_dim", "z_probes", "tiny_layers", "nc_head"):
+        for k in ("backbone", "tap_layer", "lora_layers", "lora_r", "no_hybrid", "no_cand_null", "joint", "tower_d", "tower_layers", "tower_heads", "listwise", "readout", "cand_encoder", "extra_tap", "null", "head", "z_dim", "z_probes", "tiny_layers", "nc_head", "nc_render"):
             if k in ckpt.get("args", {}):
                 setattr(args, k, ckpt["args"][k])
 
@@ -773,7 +780,7 @@ def main():
         assert not args.joint and not args.listwise and not args.shots, "--joint/--listwise/--shots are not native options"
         backbone = MCQHead(args.backbone, lora_layers=args.lora_layers, lora_r=args.lora_r, device=device,
                            tap_layer=args.tap_layer)  # same backbone + LoRA as mcq; its lm_head is simply unused
-        model = NativeHead(backbone.backbone.d, nc_head=args.nc_head, null=args.null).to(device)
+        model = NativeHead(backbone.backbone.d, nc_head=args.nc_head, null=args.null, render=args.nc_render).to(device)
     else:
         assert not args.extra_tap or args.cand_encoder == "qwen3emb", "--extra_tap doubles the top width; candidates must come from the embedder"
         backbone = Backbone(args.backbone, lora_layers=args.lora_layers, lora_r=args.lora_r, device=device,
@@ -834,6 +841,8 @@ def main():
         next(gen)
     batches = prefetch(gen, cache, readout=args.readout, seed=args.seed,
                        shuffle=args.readout in ("mcq", "native") and not args.no_shuffle)  # collate on a background thread
+    perm_rng = random.Random(args.seed + 1)  # ponytail: not checkpointed (like the shuffle rng)
+    assert args.perm_lambda == 0 or args.readout == "native", "--perm_lambda is a native-readout option"
 
     results = None
     for step in range(start_step + 1, args.steps + 1):
@@ -851,6 +860,9 @@ def main():
                               alpha=args.distill_alpha, beta=args.distill_beta, T=args.distill_T,
                               delta_idx=batch.get("delta_idx"), delta_tgt=batch.get("delta_tgt"),
                               gamma=args.delta_gamma)
+        if args.perm_lambda > 0:
+            loss = loss + args.perm_lambda * perm_consistency_loss(
+                lambda ex, b: run_batch_native(backbone, model, b, ex, vec_cache=vec_cache), logits, examples, perm_rng)
         opt.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(all_params, 1.0)

@@ -1,6 +1,6 @@
 {
-  "T": 2.652948464431896,
-  "val_nll": 1.2642189264297485,
+  "T": 4.581597669054491,
+  "val_nll": 1.390960454940796,
   "args": {
     "name": "smoke_native",
     "backbone": "Qwen/Qwen3-0.6B-Base",
@@ -21,7 +21,7 @@
     "val_every": 10,
     "ckpt_every": 10,
     "eval_bs": 128,
-    "device": "auto",
+    "device": "cpu",
     "wandb": false,
     "hf_repo": null,
     "data": "data",
@@ -29,8 +29,8 @@
     "smoke": true,
     "eval_limit": 0,
     "tap_layer": 0,
-    "zscore": false,
-    "eval_only": true,
+    "zscore": true,
+    "eval_only": false,
     "dump_logits": null,
     "tower_d": 512,
     "tower_layers": 2,
@@ -40,11 +40,11 @@
     "extra_tap": 0,
     "init_from": null,
     "readout": "native",
-    "nc_head": "n2n3",
+    "nc_head": "n3",
     "no_shuffle": false,
     "zero_shot": false,
     "shots": 0,
-    "cand_encoder": "qwen3emb",
+    "cand_encoder": "backbone",
     "head": "mlp",
     "z_dim": 128,
     "z_probes": 8,
@@ -57,34 +57,34 @@
   "eval": {
     "smoke_eval": {
       "raw": {
-        "nll": 1.5694596031622523,
-        "brier": 0.7176352436880906,
-        "jsd": 0.3101843411674414,
+        "nll": 1.6309780861227368,
+        "brier": 0.7403280226206779,
+        "jsd": 0.3143623708182758,
         "acc": 0.09090909090909091,
         "acc_k": 0.16666666666666666,
-        "ece": 0.48921680721369654,
+        "ece": 0.5217177163470875,
         "sel_acc80": 0.1111111111111111,
         "conf_wrong": 0.0,
         "coverage": 1.0,
         "false_abstain": 0.0,
         "null_recall": 0.0,
-        "auroc_null": 0.14545454545454545,
-        "auroc_conf": 0.2181818181818182
+        "auroc_null": 0.19999999999999998,
+        "auroc_conf": 0.2727272727272727
       },
       "scaled": {
-        "nll": 1.302506410724673,
-        "brier": 0.6067120327651099,
-        "jsd": 0.28650033823762977,
+        "nll": 1.2730366401073718,
+        "brier": 0.5898496650725035,
+        "jsd": 0.2825511445678395,
         "acc": 0.09090909090909091,
         "acc_k": 0.16666666666666666,
-        "ece": 0.3248467905954881,
+        "ece": 0.3374371122230183,
         "sel_acc80": 0.1111111111111111,
         "conf_wrong": 0.0,
         "coverage": 1.0,
         "false_abstain": 0.0,
         "null_recall": 0.0,
-        "auroc_null": 0.14545454545454545,
-        "auroc_conf": 0.5454545454545455
+        "auroc_null": 0.19999999999999998,
+        "auroc_conf": 0.6727272727272727
       }
     }
   }

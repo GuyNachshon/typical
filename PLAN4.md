@@ -1118,7 +1118,7 @@ The candidate-blind \(Z(x,q)\) architecture remains an optional stronger result�
   `nc_n2` and `nc_n1` (the §16 decision needs N2 vs N1 first); `nc_n3`/`nc_n2n3` are skipped placeholders. `e3d_zr_emb` (candidate-blind
   head with the semantic embedder) is cancelled — under PLAN4 the semantic candidates are native to N2. If N2 < N1, N3 is the next
   spend; if N2 ≈ N1, N3 is optional.
-- **Outcome (2026-09-20 00:30, budget exhausted at ≈ $140 of $145):** §16 first branch. `nc_n3` (h_D × contextual option states) ≈ `nc_n1`
+- **Outcome (2026-09-20 00:30; balance at the time was actually $120.89 — the "exhausted" estimate was wrong):** §16 first branch. `nc_n3` (h_D × contextual option states) ≈ `nc_n1`
   on knowledge — MMLU-Pro among-K .314 vs .325, Δ_q .111 vs .112 (teacher .088), TruthfulQA .461 vs .465, kb val .580 vs .547,
   CLINC-heldout .916 / Banking77-77 .497 / 20NG .559 — with a quarter of N1's IIA (.13 vs .46) and better evidence retention.
   `nc_n2` (semantic candidates) retains 87% of the teacher's Δ_q but loses raw score for lack of slot identity. Native choice is

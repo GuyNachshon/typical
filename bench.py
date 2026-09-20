@@ -8,6 +8,7 @@ had to). See PLAN2.md "Baselines" / "bench.py", REVIEW.md #5 item 2.
 
 uv run bench.py --model runs/<name> [--quick] [--backbone Qwen/Qwen3-1.7B-Base] [--device auto]
 uv run bench.py --check --backbone Qwen/Qwen3-0.6B-Base  # correctness-only, no benchmark
+uv run bench.py --native --model runs/nc_n3 [--energy_model runs/joint_emb_lw]  # PLAN5 sec 1 grid -> bench.json["native"]
 """
 JOINT = False
 ENCODER = None  # EmbedEncoder when the checkpoint used --cand_encoder qwen3emb (set by load_ours)
@@ -24,6 +25,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from encode import Backbone, FeatureCache, pick_device, EmbedEncoder, VecCache, TokenCandCache, CAND_RENDER, EMBED_DIM
 from model import DecisionModel, decide
+from mcq import MCQHead
+from native import NativeHead, RENDERS, native_kv_decide, _causal_pad_mask
 from baselines import b_prompt, score_example_kv
 
 NULL_LIT = "none of the above"  # matches b_prompt's qa-family null literal
@@ -95,21 +98,23 @@ def peak_mem_mb():
     return float("nan")
 
 
-def real_candidates(k, path="data/eval/clinc_test.jsonl"):
-    """K distinct short strings: real CLINC intent names if the eval file is present, else synthetic."""
+def real_candidates(k, paths=("data/eval/clinc_test.jsonl", "data/eval/banking77_test.jsonl", "data/eval/hwu64_test.jsonl")):
+    """K distinct short strings: real intent names (CLINC, then banking77/HWU64 for K > 150) if
+    the eval files are present, synthetic "label i" for the remainder."""
     names = set()
-    try:
-        with open(path) as f:
-            for line in f:
-                names.update(json.loads(line)["candidates"])
-                if len(names) >= k:
-                    break
-    except FileNotFoundError:
-        pass
+    for path in paths:
+        try:
+            with open(path) as f:
+                for line in f:
+                    names.update(json.loads(line)["candidates"])
+                    if len(names) >= k:
+                        break
+        except FileNotFoundError:
+            pass
+        if len(names) >= k:
+            break
     names = sorted(names)
-    if len(names) < k:
-        names = [f"label {i}" for i in range(k)]
-    return names[:k]
+    return (names + [f"label {i}" for i in range(len(names), k)])[:k]
 
 
 def load_ours(run_dir, backbone_name, device):
@@ -122,6 +127,16 @@ def load_ours(run_dir, backbone_name, device):
         model = DecisionModel(d_in=backbone.d, mps_safe=(device == "mps")).to(device)
         return backbone, model
     saved = ckpt.get("args", {})
+    if saved.get("readout") == "native":
+        # native checkpoint: MCQHead (backbone + LoRA on the top lora_layers) + NativeHead; the
+        # saved z_dim is an energy-tower arg (NativeHead's projection width is fixed), ignored.
+        head = MCQHead(saved.get("backbone", backbone_name), lora_layers=saved.get("lora_layers", 8),
+                       lora_r=saved.get("lora_r", 16), device=device, tap_layer=saved.get("tap_layer", 0))
+        head.load_lora_state_dict(ckpt["lora"])
+        model = NativeHead(head.backbone.d, nc_head=saved.get("nc_head", "n2n3"), null=saved.get("null", "factored"),
+                           render=saved.get("nc_render", "letters")).to(device)
+        model.load_state_dict(ckpt["tower"])
+        return head.eval(), model.eval()
     global JOINT, ENCODER, TINY; JOINT = bool(saved.get("joint", False))  # joint-trained models need the KV-cache decide path
     TINY = saved.get("cand_encoder") == "tiny"
     if saved.get("cand_encoder") == "qwen3emb":
@@ -144,18 +159,46 @@ def load_ours(run_dir, backbone_name, device):
     return backbone, model
 
 
-def encode_state_once(backbone, state):
-    ids, am = backbone.tokenize([state], 256)
+def encode_state_once(backbone, state, max_state=256):
+    ids, am = backbone.tokenize([state], max_state)
     ids, am = ids.to(backbone.device), am.to(backbone.device)
     with torch.inference_mode():
         backbone(ids, am)
 
 
-def bench_ours(backbone, model, cache, state, cands, m, warmup, reps):
+def bench_ours(backbone, model, cache, state, cands, m, warmup, reps, max_state=256):
     queries = [(QUESTIONS[i % len(QUESTIONS)], cands) for i in range(m)]
-    t_state = timed(lambda: encode_state_once(backbone, state), warmup, reps)
-    t_queries = timed(lambda: decide(backbone, model, cache, state, queries, chunk=64, joint=JOINT, encoder=ENCODER), warmup, reps)
+    t_state = timed(lambda: encode_state_once(backbone, state, max_state), warmup, reps)
+    t_queries = timed(lambda: decide(backbone, model, cache, state, queries, chunk=64, joint=JOINT, encoder=ENCODER,
+                                     max_state=max_state), warmup, reps)
     return t_state, t_queries
+
+
+def encode_state_kv_native(head, state, max_state):
+    ids = torch.tensor([[head.backbone.tokenizer.eos_token_id]
+                        + head.backbone.tokenizer(state, add_special_tokens=False, truncation=True, max_length=max_state)["input_ids"]],
+                       device=head.device)
+    with torch.inference_mode():
+        head.backbone.model(input_ids=ids, use_cache=True)
+
+
+def bench_native(head, model, state, cands, m, warmup, reps, chunk, max_state, max_suffix):
+    """Native N3 with shared-state KV reuse (native_kv_decide). Like bench_ours, t_queries
+    re-encodes the state once per call, so marginals stay comparable across the three paths.
+    -> (t_state, t_queries, chunk actually used)."""
+    queries = [(QUESTIONS[i % len(QUESTIONS)], cands) for i in range(m)]
+    t_state = timed(lambda: encode_state_kv_native(head, state, max_state), warmup, reps)
+    while True:
+        try:
+            t_queries = timed(lambda: native_kv_decide(head, model, state, queries, chunk=chunk, max_state=max_state,
+                                                       max_suffix=max_suffix), warmup, reps)
+            return t_state, t_queries, chunk
+        except torch.cuda.OutOfMemoryError:
+            # ponytail: halve and retry rather than sizing the chunk from the KV estimate up front
+            assert chunk > 1, "OOM at nc_chunk=1"
+            torch.cuda.empty_cache()
+            chunk //= 2
+            print(f"  [native] OOM -> nc_chunk={chunk}")
 
 
 def fresh_empty_cache(backbone):
@@ -275,25 +318,6 @@ def _cache_rows(cache, lo, hi):
         layer.keys = layer.keys[lo:hi]
         layer.values = layer.values[lo:hi]
     return sub
-
-
-def _causal_pad_mask(attn2d, q_len, dtype):
-    """Explicit additive (batch,1,q_len,kv_len) mask: causal by physical slot order
-    within [past|current] (order-based, so identical across rows regardless of padding)
-    AND-ed with the real/pad mask `attn2d`.
-    ponytail: transformers' automatic 2D-attention_mask + past_key_values path silently
-    mis-handles a right-padded batch sharing one KV cache (verified empirically: this
-    explicit mask + explicit position_ids reproduces the un-batched per-row computation
-    exactly; the automatic path does not, off by ~0.3-0.8 nat per row). Building this
-    ourselves sidesteps that rather than chasing it through transformers' mask_utils."""
-    batch, kv_len = attn2d.shape
-    past_len = kv_len - q_len
-    q_idx = torch.arange(q_len, device=attn2d.device).unsqueeze(1)
-    kv_idx = torch.arange(kv_len, device=attn2d.device).unsqueeze(0)
-    causal = kv_idx <= (past_len + q_idx)  # [q_len, kv_len]
-    allowed = causal.unsqueeze(0) & attn2d.bool().unsqueeze(1)  # [batch, q_len, kv_len]
-    mask = torch.zeros(batch, 1, q_len, kv_len, dtype=dtype, device=attn2d.device)
-    return mask.masked_fill(~allowed.unsqueeze(1), torch.finfo(dtype).min)
 
 
 def score_b_fair_chunk(lm, tok, device, state_cache, state_len, qs, cands, max_seqs=512):
@@ -432,6 +456,99 @@ def flop_ish_counts(backbone, lm, tok, cands, k):
             "ratio": b_tok / ours_tok}
 
 
+def cand_cache(backbone, cands):
+    """Pre-populated candidate cache of the type the loaded energy checkpoint expects."""
+    if ENCODER:
+        cache = VecCache(device="cpu")
+        cache.add(ENCODER, cands, render=CAND_RENDER, max_len=32)
+    elif TINY:
+        cache = TokenCandCache(backbone)
+        cache.add(cands)
+    else:
+        cache = FeatureCache(device="cpu")
+        cache.add(backbone, cands, max_len=16)
+    return cache
+
+
+def sweep_m(label, Ms, run):
+    """One per-M table: run(m) -> (t_state, t_queries[, extra]). Prints the same columns as the
+    energy path's "ours" table; -> (rows, marginal_ms at M=max, peak_mem_mb)."""
+    print(f"-- {label} --")
+    print(f"{'M':>4}{'t_state(ms)':>14}{'t_queries(ms)':>16}{'total(ms)':>12}{'ratio':>8}{'marginal(ms)':>14}")
+    rows, base_total = [], None
+    reset_peak_mem()
+    for m in Ms:
+        t_state, t_q = run(m)[:2]
+        total = t_state + t_q
+        base_total = base_total or total
+        marginal = t_q / m * 1000
+        print(f"{m:>4}{t_state*1000:>14.2f}{t_q*1000:>16.2f}{total*1000:>12.2f}{total/base_total:>8.2f}{marginal:>14.3f}")
+        rows.append({"m": m, "t_state_ms": t_state * 1000, "t_queries_ms": t_q * 1000,
+                     "total_ms": total * 1000, "ratio": total / base_total, "marginal_ms": marginal})
+    mem = peak_mem_mb()
+    print(f"  peak mem: {mem:.1f} MB")
+    return rows, rows[-1]["marginal_ms"], mem
+
+
+def native_grid(args, device, tok, lm, head, nhead, energy):
+    """PLAN5 sec 1: native N3 (KV-cached state, one suffix per query) vs B_batched (vs the
+    energy path when --energy_model) over L_s x K x M; -> results dict (bench.json["native"])
+    + crossover K* per (L_s, M) = smallest K where energy marginal < native marginal."""
+    Ks = [2, 10] if args.quick else [2, 4, 10, 32, 64, 128, 256]
+    Ms = [1, 8] if args.quick else [1, 32, 256]
+    Ls = [args.state_tokens] if args.state_tokens else ([256] if args.quick else [256, 1000, 2000])
+    warmup, reps = 2, (3 if args.quick else 5)
+    max_state = max(Ls) + 16
+    render = RENDERS[nhead.render]
+    results, crossover = {}, {}
+    for L in Ls:
+        state_text, n_tok = state_with_tokens(tok, L)
+        results[str(L)] = {}
+        for k in Ks:
+            cands = real_candidates(k)
+            n_suf = len(tok(render(QUESTIONS[0], cands)[0], add_special_tokens=False)["input_ids"]) + 1
+            assert n_suf <= args.max_suffix, f"K={k}: suffix {n_suf} tokens > --max_suffix {args.max_suffix}"
+            print(f"\n=== L_s={n_tok} tok  K={k}  (suffix = {n_suf} tok incl. terminal) ===")
+            chunk_used = [args.nc_chunk]
+
+            def run_native(m):
+                t_state, t_q, chunk_used[0] = bench_native(head, nhead, state_text, cands, m, warmup, reps,
+                                                           chunk_used[0], max_state, args.max_suffix)
+                return t_state, t_q
+            native_rows, native_marg, native_mem = sweep_m(f"native (KV-cached state, nc_chunk={chunk_used[0]})", Ms, run_native)
+            bb_rows, bb_marg, bb_mem = sweep_m(
+                f"B_batched (B_fair, queries processed in chunks of {args.b_chunk})", Ms,
+                lambda m: bench_b_batched(lm, tok, device, state_text, cands, m, warmup, reps,
+                                          b_chunk=args.b_chunk, max_seqs=args.max_seqs))
+            entry = {"state_tokens": n_tok, "suffix_tokens": n_suf, "nc_chunk": chunk_used[0],
+                     "native": native_rows, "native_peak_mem_mb": native_mem,
+                     "b_batched": bb_rows, "b_batched_peak_mem_mb": bb_mem}
+            summary = f"  per-query marginal ms at M={Ms[-1]}: native={native_marg:.3f}  B_batched={bb_marg:.3f}"
+            if energy:
+                backbone, model = energy
+                cache = cand_cache(backbone, cands)
+                ours_rows, ours_marg, ours_mem = sweep_m(
+                    "ours (energy)", Ms,
+                    lambda m: bench_ours(backbone, model, cache, state_text, cands, m, warmup, reps, max_state=max_state))
+                entry.update({"ours": ours_rows, "ours_peak_mem_mb": ours_mem})
+                summary += f"  ours={ours_marg:.3f}  (native/ours = {native_marg / ours_marg:.2f}x)"
+                for nr, orow in zip(native_rows, ours_rows):
+                    if orow["marginal_ms"] < nr["marginal_ms"]:
+                        crossover.setdefault(str(L), {}).setdefault(str(nr["m"]), k)
+            print(summary)
+            results[str(L)][str(k)] = entry
+            # ponytail: checkpoint the grid after every row so an OOM in a later row keeps what was measured
+            out_dir = Path("runs") / args.name; out_dir.mkdir(parents=True, exist_ok=True)
+            json.dump({"model": args.model, "energy_model": args.energy_model, "backbone": args.backbone, "partial": True,
+                       "native": results}, open(out_dir / "bench.json", "w"), indent=2)
+    if energy:
+        print("\n=== crossover K* (smallest K with energy marginal < native marginal; '-' = native cheaper at every K) ===")
+        print(f"{'L_s':>6}" + "".join(f"{'M=' + str(m):>8}" for m in Ms))
+        for L in Ls:
+            print(f"{L:>6}" + "".join(f"{crossover.get(str(L), {}).get(str(m), '-'):>8}" for m in Ms))
+    return results, crossover
+
+
 def print_row(fmt, *vals):
     print(fmt.format(*vals))
 
@@ -452,6 +569,16 @@ def main():
                      help="cap on the candidate-pass expanded sequence batch (chunk_size*(K+1))")
     ap.add_argument("--state_tokens", type=int, default=0,
                      help="tile/truncate STATE to ~N backbone tokens (0 = use STATE as-is)")
+    ap.add_argument("--native", action="store_true",
+                     help="PLAN5 sec 1: --model is a --readout native checkpoint; bench native_kv_decide vs B_batched "
+                          "over K in {2..256} x L_s in {256,1k,2k} x M in {1,32,256} (--state_tokens N = one L_s only)")
+    ap.add_argument("--energy_model", default=None,
+                     help="--native: also run the energy path from this checkpoint and print the crossover K*")
+    ap.add_argument("--nc_chunk", type=int, default=32,
+                     help="--native: queries per suffix forward. KV/row = (L_s + suffix) tokens x 112 KB on Qwen3-1.7B "
+                          "(28 layers x 8 kv heads x 128 x K,V x bf16): L_s=2k + K=256 (~2k suffix tokens) = ~450 MB/row, "
+                          "x32 = ~14 GB, ~2x transient with the cache copy -> 32 fits 80 GB; halves itself on OOM")
+    ap.add_argument("--max_suffix", type=int, default=4096, help="--native: cap on suffix tokens (K=256 needs ~2k)")
     ap.add_argument("--cold", action="store_true",
                      help="also bench 'ours' with candidates never pre-cached (fresh cache + fresh "
                           "K-sample per timed call) -- candidate encoding runs inside the timed region, "
@@ -477,6 +604,20 @@ def main():
 
     lm = AutoModelForCausalLM.from_pretrained(args.backbone, dtype=torch.bfloat16).to(device).eval()
 
+    if args.native:
+        head, nhead = load_ours(args.model, args.backbone, device)
+        assert isinstance(nhead, NativeHead), f"--native needs a --readout native checkpoint, got {args.model}"
+        energy = load_ours(args.energy_model, args.backbone, device) if args.energy_model else None
+        if energy:
+            energy[1].eval()
+        native, crossover = native_grid(args, device, tok, lm, head, nhead, energy)
+        results = {"model": args.model, "energy_model": args.energy_model, "backbone": args.backbone,
+                   "quick": args.quick, "b_chunk": args.b_chunk, "native": native, "crossover": crossover}
+        out_dir = Path("runs") / args.name
+        out_dir.mkdir(parents=True, exist_ok=True)
+        json.dump(results, open(out_dir / "bench.json", "w"), indent=2)
+        return
+
     Ks = [4, 32] if args.quick else [4, 32, 150]
     if args.full:
         Ks = Ks + [1000]
@@ -496,15 +637,7 @@ def main():
                "state_tokens": args.state_tokens, "b_chunk": args.b_chunk, "by_k": {}}
     for k in Ks:
         cands = real_candidates(k)
-        if ENCODER:
-            cache = VecCache(device="cpu")
-            cache.add(ENCODER, cands, render=CAND_RENDER, max_len=32)
-        elif TINY:
-            cache = TokenCandCache(backbone)
-            cache.add(cands)
-        else:
-            cache = FeatureCache(device="cpu")
-            cache.add(backbone, cands, max_len=16)
+        cache = cand_cache(backbone, cands)
 
         cold_pool = real_candidates(max(k * 4, k + 20)) if args.cold else None
 

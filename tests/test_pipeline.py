@@ -1612,3 +1612,212 @@ def test_native_chunked_when_suffix_overflows(tied_mcq_head):
     logits = run_batch_native(tied_mcq_head, model, batch, examples, max_suffix=40)
     assert logits.shape == (2, 10) and torch.isfinite(logits[0]).all() and torch.isfinite(logits[1, :2]).all()
     assert torch.all(logits[1, 2:9] == torch.finfo(logits.dtype).min)
+
+
+@pytest.mark.parametrize("null", ["softmax", "factored"])
+def test_native_kv_decide_matches_run_batch(tied_mcq_head, null):
+    # PLAN5 sec 1 serving path: state KV encoded once + one right-padded suffix pass per chunk
+    # (explicit mask + position_ids) must reproduce run_batch_native's full-row probabilities --
+    # the same contract test_decide_* give the energy decide().
+    from native import native_kv_decide
+    torch.manual_seed(0)
+    head = tied_mcq_head.eval()
+    model = NativeHead(head.backbone.d, nc_head="n3", null=null).eval()
+    state = "a shared state text used for every query below"
+    queries = [(f"query number {i}", [f"option {j}" for j in range(k)]) for i, k in enumerate((2, 5, 9))]
+    examples = [{"state": state, "query": q, "candidates": c, "target": [1.0] + [0.0] * (len(c) - 1),
+                 "p_null": 0.0, "task": "smoke"} for q, c in queries]
+    batch = collate_mcq(examples)
+    with torch.inference_mode():
+        probs = torch.softmax(run_batch_native(head, model, batch, examples), dim=-1)
+    dists = native_kv_decide(head, model, state, queries, chunk=2)
+    assert len(dists) == 3
+    for i, (_, c) in enumerate(queries):
+        expected = torch.cat([probs[i, :len(c)], probs[i, -1:]])
+        assert torch.allclose(dists[i], expected, atol=1e-3), (i, (dists[i] - expected).abs().max())
+        assert torch.allclose(dists[i].sum(), torch.tensor(1.0), atol=1e-3)
+
+
+# ---------------------------------------------------------------------------
+# 16. native_v2 (PLAN5 sec 2): --nc_render tags + --perm_lambda
+# ---------------------------------------------------------------------------
+
+from native import _render_tags, perm_consistency_loss, RENDERS  # noqa: E402
+from mcq import _render  # noqa: E402
+
+
+def test_tags_render_letter_free_and_spans():
+    text, spans = _render_tags("q?", ["Paris.", "New York"])
+    assert text == "q?\n<choice>\nParis.\n</choice>\n<choice>\nNew York\n</choice>\n"
+    assert [text[a:b] for a, b in spans] == ["Paris.", "New York"] and len(spans) == 2  # no null line
+    assert "A." not in text and "Answer:" not in text and "none of the above" not in text
+    assert RENDERS["letters"]("q?", ["x"]) == _render("q?", ["x"])  # default rendering byte-identical
+
+
+def test_tags_n3_span_pooling_matches_manual_mean(tied_mcq_head):
+    head = tied_mcq_head
+    tok = head.backbone.tokenizer
+    examples = _mcq_examples(ks=(3, 2))
+    examples[0]["candidates"] = ["Paris.", "New York", "none"]
+    states, queries, cands = [ex["state"] for ex in examples], [ex["query"] for ex in examples], [ex["candidates"] for ex in examples]
+    with torch.inference_mode():
+        h, C3, cmask, _ = native_features(head, states, queries, cands, render="tags")
+        for i in range(len(examples)):
+            suffix, spans = _render_tags(queries[i], cands[i])
+            s_ids = tok(states[i], add_special_tokens=False)["input_ids"]
+            enc = tok(suffix, add_special_tokens=False, return_offsets_mapping=True)
+            ids = [tok.eos_token_id] + s_ids + enc["input_ids"] + [tok.eos_token_id]
+            H = head.backbone.model(input_ids=torch.tensor([ids])).last_hidden_state[0].float()
+            assert torch.allclose(h[i], H[-1], atol=1e-4)
+            for k, (cs, ce) in enumerate(spans):
+                pos = [1 + len(s_ids) + j for j, (ts, te) in enumerate(enc["offset_mapping"]) if te > cs and ts < ce]
+                pooled_text = tok.decode([enc["input_ids"][p - 1 - len(s_ids)] for p in pos])
+                assert suffix[cs:ce] in pooled_text and "choice" not in pooled_text  # tag tokens excluded
+                assert torch.allclose(C3[i, k], H[pos].mean(0), atol=1e-4), (i, k)
+            assert torch.all(C3[i, -1] == 0)  # no rendered null: the null is the head's
+    model = NativeHead(head.backbone.d, nc_head="n3", null="factored", render="tags")
+    batch = collate_mcq(examples)
+    logits = run_batch_native(head, model, batch, examples)
+    assert torch.isfinite(logits[:, -1]).all() and torch.isfinite(logits[0, :3]).all()
+    probs = T.probs_from_logits(logits, batch["cmask"], null="factored")
+    assert torch.allclose(probs.sum(-1), torch.ones(2), atol=1e-5)
+    # chunked fallback works under tags too
+    assert len(_fit_chunks(tok, "q", [f"option {j}" for j in range(9)], max_suffix=40, render="tags")) > 1
+
+
+def test_perm_consistency_loss_zero_iff_order_equivariant():
+    examples = _mcq_examples(ks=(4, 3, 1))
+
+    def fake(by_string):
+        def score(exs, batch):
+            Kmax = max(len(e["candidates"]) for e in exs)
+            out = torch.full((len(exs), Kmax + 1), torch.finfo(torch.float32).min)
+            for i, e in enumerate(exs):
+                cs = e["candidates"]
+                out[i, :len(cs)] = torch.tensor([float(sum(map(ord, c)) % 7) if by_string else float(j) for j, c in enumerate(cs)])
+                out[i, -1] = 0.5
+            return out
+        return score
+    for by_string, expect_zero in ((True, True), (False, False)):
+        score = fake(by_string)
+        logits = score(examples, collate_mcq(examples))
+        loss = perm_consistency_loss(score, logits, examples, random.Random(0), frac=1.0)
+        assert torch.isfinite(loss) and loss >= 0
+        assert (loss.item() < 1e-5) == expect_zero and (expect_zero or loss.item() > 1e-2), (by_string, loss.item())
+    # frac subset + shuffled inputs untouched
+    loss = perm_consistency_loss(fake(True), fake(True)(examples, None), examples, random.Random(1), frac=0.25)
+    assert loss.item() < 1e-5 and examples[0]["candidates"] == [f"option {j}" for j in range(4)]
+
+
+# ---------------------------------------------------------------------------
+# 17. scripts/compose_support.py (PLAN5 sec 3): energy support gate x native conditional choice
+# ---------------------------------------------------------------------------
+
+from compose_support import run as compose_run, compose, align  # noqa: E402
+
+
+def _write_dump(d, name, logits, target, label, K, meta):
+    d.mkdir(parents=True, exist_ok=True)
+    np.savez(d / f"{name}.npz", logits=logits, target=target, label=label, K=K)
+    json.dump(meta, open(d / f"{name}.meta.json", "w"))
+
+
+def test_compose_support_synthetic(tmp_path):
+    rng = np.random.RandomState(0)
+    ks = [2, 4, 4, 6, 3, 5]
+    le, te, Ke = _fake_dump(seed=1, n=len(ks), ks=ks)[0], None, np.array(ks)
+    Kmax = max(ks)
+    te, ye, me = np.zeros((len(ks), Kmax + 1)), np.zeros(len(ks)), []
+    ln, tn, yn, mn = np.full_like(le, np.finfo(np.float64).min), np.zeros_like(te), np.zeros(len(ks)), []
+    for i, k in enumerate(ks):
+        cands = [f"c{i}_{j}" for j in range(k)]
+        if k == 4:
+            cands[1] = cands[0]  # duplicate candidate strings must still align
+        gold = -1 if i == 3 else i % k
+        ye[i] = gold; te[i, k if gold == -1 else gold] = 1.0
+        me.append({"query": f"q{i}", "candidates": cands, "label": gold, "meta": {}})
+        perm = rng.permutation(k)
+        nat_logits = rng.randn(k)
+        ln[i, :k] = nat_logits[perm]; ln[i, -1] = rng.randn()
+        ln_orig = np.full(Kmax + 1, np.finfo(np.float64).min); ln_orig[:k] = nat_logits
+        mn.append({"query": f"q{i}", "candidates": [cands[p] for p in perm], "label": int(np.where(perm == gold)[0][0]) if gold >= 0 else -1, "meta": {}})
+        tn[i, :k] = te[i, :k][perm]; tn[i, -1] = te[i, -1]; yn[i] = mn[-1]["label"]
+    _write_dump(tmp_path / "e", "setA", le, te, ye, Ke, me)
+    _write_dump(tmp_path / "n", "setA", ln, tn, yn, Ke, mn)
+    _write_dump(tmp_path / "e", "only_e", le, te, ye, Ke, me)  # present in one dump only -> skipped
+
+    aligned = align(me, mn, ln)
+    for i, k in enumerate(ks):  # alignment undoes the native shuffle (dups: equal strings, any order is fine)
+        s_e = {c: aligned[i, j] for j, c in enumerate(me[i]["candidates"])}
+        s_n = {c: ln[i, j] for j, c in enumerate(mn[i]["candidates"])}
+        assert all(np.isclose(s_e[c], s_n[c]) or c == me[i]["candidates"][0] for c in s_e)
+    for r_from in ("energy", "energy_T", "native"):
+        p, p_e, p_n = compose(le, Ke, aligned, r_from, energy_T=1.7)
+        assert np.allclose(p.sum(-1), 1.0) and (p >= 0).all()
+        assert np.allclose(p[:, :-1].argmax(-1), p_n[:, :-1].argmax(-1))  # among-K = native's exactly
+        if r_from == "energy":
+            assert np.allclose(p[:, -1], apply_bias(le, Ke, 0, 0, 1.0)[:, -1])  # P(null) = energy null exactly
+        elif r_from == "energy_T":
+            assert np.allclose(p[:, -1], apply_bias(le, Ke, 0, 0, 1.7)[:, -1])
+        else:
+            assert np.allclose(p, p_n)  # r from native's own null reproduces native exactly
+    res = compose_run(tmp_path / "e", tmp_path / "n", quiet=True)
+    assert set(res["eval"]) == {"setA"} and "acc" in res["eval"]["setA"]["scaled"]
+    m_n = summarize(apply_bias(ln, Ke, 0, 0, 1.0), tn, yn)
+    assert np.isclose(res["eval"]["setA"]["scaled"]["acc_k"], m_n["acc_k"])  # native among-K in native's own order
+    m_e = summarize(apply_bias(le, Ke, 0, 0, 1.0), te, ye)
+    assert np.isclose(res["eval"]["setA"]["scaled"]["auroc_null"], m_e["auroc_null"])
+
+
+# ---------------------------------------------------------------------------
+# 18. scripts/fuse_scores.py (PLAN5 sec 4): "unify the two experts" -- eval-time score-level
+# fusion s_j = log P_energy(a_j|answerable) + g*log P_native(a_j|answerable) (log mode) /
+# (1-g)*P_energy + g*P_native (linear mode), null always from the energy gate.
+# ---------------------------------------------------------------------------
+
+from fuse_scores import fuse, run as fuse_run, load_dumps  # noqa: E402
+
+
+def test_fuse_scores_synthetic(tmp_path):
+    rng = np.random.RandomState(2)
+    ks = [2, 4, 4, 6, 3, 5]
+    le, Ke = _fake_dump(seed=1, n=len(ks), ks=ks)[0], np.array(ks)
+    Kmax = max(ks)
+    te, ye, me = np.zeros((len(ks), Kmax + 1)), np.zeros(len(ks)), []
+    ln, tn, yn, mn = np.full_like(le, np.finfo(np.float64).min), np.zeros_like(te), np.zeros(len(ks)), []
+    for i, k in enumerate(ks):
+        cands = [f"c{i}_{j}" for j in range(k)]
+        gold = -1 if i == 3 else i % k
+        ye[i] = gold; te[i, k if gold == -1 else gold] = 1.0
+        me.append({"query": f"q{i}", "candidates": cands, "label": gold, "meta": {}})
+        perm = rng.permutation(k)
+        nat_logits = rng.randn(k) * 5.0  # well-separated so a large g's argmax is unambiguous
+        ln[i, :k] = nat_logits[perm]; ln[i, -1] = rng.randn()
+        mn.append({"query": f"q{i}", "candidates": [cands[p] for p in perm], "label": -1, "meta": {}})
+    _write_dump(tmp_path / "e", "setA", le, te, ye, Ke, me)
+    _write_dump(tmp_path / "n", "setA", ln, tn, yn, Ke, mn)
+
+    loaded = load_dumps(tmp_path / "e", tmp_path / "n")
+    aligned = loaded["setA"][4]
+    p_energy = apply_bias(le, Ke, 0.0, 0.0, 1.0)  # "energy alone" (same as compose_support's before/energy column)
+
+    for mode in ("log", "linear"):
+        p0 = fuse(le, Ke, aligned, 0.0, mode)
+        assert np.allclose(p0.sum(-1), 1.0)
+        assert np.allclose(p0, p_energy, atol=1e-9), (mode, p0 - p_energy)  # g=0 reproduces energy exactly
+
+    p_big = fuse(le, Ke, aligned, 100.0, "log")
+    assert np.allclose(p_big.sum(-1), 1.0)
+    for i, k in enumerate(ks):
+        assert p_big[i, :k].argmax() == aligned[i, :k].argmax()  # large g -> native's argmax
+
+    by_g, val_g = fuse_run(tmp_path / "e", tmp_path / "n", g_grid=[0.0, 1.0], quiet=True)
+    assert set(by_g) == {0.0, 1.0} and val_g is None  # no "val" set in this synthetic dump
+    assert set(by_g[0.0]["eval"]) == {"setA"} and "acc" in by_g[0.0]["eval"]["setA"]["scaled"]
+
+
+def test_render_letters_nonull_has_letters_no_null_line():
+    from native import RENDERS
+    text, spans = RENDERS["letters_nonull"]("q?", ["alpha", "beta"])
+    assert "A. alpha" in text and "B. beta" in text and "none of the above" not in text and "Answer:" not in text
+    assert len(spans) == 2 and all(text[a:b] == c for (a, b), c in zip(spans, ["alpha", "beta"]))
