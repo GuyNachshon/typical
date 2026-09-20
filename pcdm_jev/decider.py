@@ -36,6 +36,30 @@ def _render_zero_shot(query: str, labels: list[str]) -> str:
     return text + "Answer:"
 
 
+def _data_shots(n: int, seed: int = 0, path: str = "data_v5/val.jsonl") -> str:
+    """PLAN7 track A: n worked examples sampled from data_v5's val split (never JevBench or
+    any W eval set), same rendering as _render_zero_shot + the gold letter, so a base model
+    picks up the "Answer: <letter>" format the way mcq.build_shots's generic-trivia prefix
+    does for --readout mcq training. Fixed seed -> byte-identical exemplars at every ladder
+    size (n<=0 -> "" so the existing shots=0 zero-shot path is unchanged). Answerable rows only
+    (p_null < .5, a clear one-hot-ish target) so every demonstration has an unambiguous gold letter."""
+    if n <= 0:
+        return ""
+    import random
+
+    with open(path) as f:
+        rows = [json.loads(line) for line in f if line.strip()]
+    pool = [r for r in rows if r.get("p_null", 0) < 0.5 and max(r["target"]) > 0.5]
+    picked = random.Random(seed).sample(pool, min(n, len(pool)))
+    blocks = []
+    for ex in picked:
+        state = ex["state"] if isinstance(ex["state"], str) else json.dumps(ex["state"], ensure_ascii=False)
+        gold = ex["target"].index(max(ex["target"]))
+        suffix = _render_zero_shot(ex["query"], ex["candidates"])
+        blocks.append(f"{state}\n{suffix} {_label(gold)}")
+    return "\n\n".join(blocks) + "\n\n"
+
+
 def query_text(question: dict) -> str:
     """instructions + criteria: `yes: .. no: ..` (noul), `0: .. 1: ..` (score), `label: desc` (choice)."""
     q, crit = question["instructions"], question.get("criteria")
@@ -65,7 +89,7 @@ def to_labels(p: torch.Tensor, labels: list[str]) -> tuple[dict, float]:
 class PCDMDecider:
     def __init__(self, run_dir: str | None = None, device: str = "auto", mode: str = "energy",
                  energy_run: str | None = None, max_state: int = 4096, max_query: int = 256,
-                 backbone: str | None = None, tap_layer: int = 0):
+                 backbone: str | None = None, tap_layer: int = 0, shots: int = 0):
         assert mode in MODES, mode
         if mode == "compose" and not energy_run:
             raise ValueError("compose needs energy_run (the support-gate checkpoint)")
@@ -76,6 +100,9 @@ class PCDMDecider:
         if mode == "mcq_zero_shot":
             self.zero = MCQHead(backbone, lora_layers=0, lora_r=0, device=self.device, tap_layer=tap_layer).eval()
             self.tok = self.zero.backbone.tokenizer
+            self.shots_prefix = _data_shots(shots, seed=0)
+            self.shots_prefix_tokens = len(self.tok(self.shots_prefix, add_special_tokens=False)["input_ids"]) \
+                if self.shots_prefix else 0
             return
         for kind, rd in {"energy": [("energy", run_dir)], "native": [("native", run_dir)],
                          "compose": [("energy", energy_run), ("native", run_dir)]}[mode]:
@@ -109,7 +136,10 @@ class PCDMDecider:
         assert len(labels) <= MAXK_DIRECT, f"mcq_zero_shot: K={len(labels)} > {MAXK_DIRECT} (not chunked)"
         tok = head.backbone.tokenizer
         suffix = _render_zero_shot(query, labels)
-        s_ids = _ids(tok, [state], self.max_state)
+        # shots_prefix is fixed text prepended to every state; widen the budget by its own token
+        # count so the real state keeps its full max_state (mirrors mcq.run_batch_mcq's --shots).
+        state = self.shots_prefix + state
+        s_ids = _ids(tok, [state], self.max_state + self.shots_prefix_tokens)
         x_ids = _ids(tok, [suffix], self.max_query)
         input_ids, attention_mask, lengths = _pack(tok, s_ids, x_ids)
         input_ids, attention_mask = input_ids.to(head.device), attention_mask.to(head.device)

@@ -45,6 +45,9 @@ def main():
     ap.add_argument("--energy_run", default=None, help="energy run dir (support gate) for --mode compose")
     ap.add_argument("--backbone", default=None, help="--mode mcq_zero_shot: frozen HF backbone, no checkpoint")
     ap.add_argument("--tap_layer", type=int, default=0, help="--mode mcq_zero_shot: layer to truncate to (0 = full depth)")
+    ap.add_argument("--shots", type=int, default=0,
+                     help="--mode mcq_zero_shot: N worked examples from data_v5/val.jsonl prepended to the "
+                          "state (fixed seed, same exemplars at every size; never from JevBench or W eval sets)")
     ap.add_argument("--name", required=True)
     ap.add_argument("--tasks", default="original,easy,hard", help="public files, comma-separated")
     ap.add_argument("--limit", type=int, default=None)
@@ -77,7 +80,7 @@ def main():
     out.mkdir(parents=True)  # exclusive, like every jevbench run dir
     adapter = LocalPCDMAdapter(endpoint=args.energy_run, model=args.model, mode=args.mode,
                                device=args.device, max_state=args.max_state,
-                               backbone=args.backbone, tap_layer=args.tap_layer)
+                               backbone=args.backbone, tap_layer=args.tap_layer, shots=args.shots)
     adapter.load()
     print(f"[jev] loaded {args.mode} in {adapter.load_s:.1f}s", flush=True)
     if args.reverse_labels:  # ponytail: swap label order at the request boundary, no Task/adapter internals touched
@@ -108,7 +111,7 @@ def main():
             tasks, results_path=d / "results.jsonl")
         manifest = {
             "run_label": args.name, "adapter": adapter.name, "requested_model": args.model or args.backbone,
-            "mode": args.mode, "backbone": args.backbone, "tap_layer": args.tap_layer,
+            "mode": args.mode, "backbone": args.backbone, "tap_layer": args.tap_layer, "shots": args.shots,
             "energy_run": args.energy_run, "device": adapter.load().device, "max_state": args.max_state,
             "reverse_labels": args.reverse_labels,
             "cost_basis": adapter.cost_basis, "dataset_hash": dataset_hash(tasks), "n_planned": len(tasks),

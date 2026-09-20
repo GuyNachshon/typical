@@ -14,7 +14,9 @@ if JEV.exists():
     sys.path.insert(0, str(JEV))
 pytestmark = pytest.mark.skipif(not JEV.exists(), reason="jevbench clone missing")
 
-from pcdm_jev.decider import query_text, to_labels  # noqa: E402
+from pcdm_jev.decider import _data_shots, query_text, to_labels  # noqa: E402
+
+DATA_V5_VAL = Path("data_v5/val.jsonl")
 
 
 def test_to_labels_drops_null_and_renormalises():
@@ -61,6 +63,28 @@ def test_compose_label_distribution_equals_native_on_fake_decider():
     native_probs, _ = make("native").decide("state", question, labels)
     for k in labels:
         assert compose_probs[k] == pytest.approx(native_probs[k])
+
+
+@pytest.mark.skipif(not DATA_V5_VAL.exists(), reason="data_v5/val.jsonl missing")
+def test_data_shots_deterministic_and_never_empty_for_zero():
+    assert _data_shots(0) == ""
+    a = _data_shots(3, seed=0)
+    b = _data_shots(3, seed=0)
+    assert a == b and a.count("Answer: ") == 3  # fixed seed -> byte-identical exemplars, one gold letter each
+    assert a != _data_shots(3, seed=1)  # a different seed picks different rows
+
+
+@pytest.mark.skipif(not DATA_V5_VAL.exists(), reason="data_v5/val.jsonl missing")
+def test_data_shots_gold_letter_matches_target_argmax():
+    import random as _random
+    with open(DATA_V5_VAL) as f:
+        rows = [json.loads(line) for line in f if line.strip()]
+    pool = [r for r in rows if r.get("p_null", 0) < 0.5 and max(r["target"]) > 0.5]
+    prefix = _data_shots(1, seed=0)
+    ex = _random.Random(0).sample(pool, 1)[0]
+    gold = ex["target"].index(max(ex["target"]))
+    letter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[gold] if gold < 26 else str(gold)
+    assert prefix.strip().endswith(f"Answer: {letter}")
 
 
 def test_query_text_keeps_rubric():
