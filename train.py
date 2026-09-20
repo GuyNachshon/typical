@@ -900,6 +900,12 @@ def parse_args():
     p.add_argument("--lora_r", type=int, default=16)
     p.add_argument("--steps", type=int, default=None)
     p.add_argument("--bs", type=int, default=None)
+    p.add_argument("--grad_accum", type=int, default=1,
+                    help="split --bs into --bs/--grad_accum micro-batches, accumulate gradients over "
+                         "them, one optimizer step per outer step -- keeps the effective batch and "
+                         "total step count identical while cutting peak activation memory (larger "
+                         "backbones / long W-family sequences at bs=64 can OOM an 80GB GPU); "
+                         "1 = off (default, unchanged behavior)")
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--lora_lr", type=float, default=1e-4)
     p.add_argument("--seed", type=int, default=0)
@@ -1113,9 +1119,10 @@ def main():
         print(f"resumed from step {start_step}")
 
     family_weights = parse_family_weights(args.family_weights)
-    gen = bucketed_data_generator(train_examples, args.bs, args.seed, family_weights) if family_weights \
-        else data_generator(train_examples, args.bs, args.seed)
-    for _ in range(start_step):
+    micro_bs = max(1, args.bs // args.grad_accum)  # --grad_accum micro-batches accumulate to one --bs step
+    gen = bucketed_data_generator(train_examples, micro_bs, args.seed, family_weights) if family_weights \
+        else data_generator(train_examples, micro_bs, args.seed)
+    for _ in range(start_step * args.grad_accum):
         next(gen)
     batches = prefetch(gen, cache, readout=args.readout, seed=args.seed,
                        shuffle=args.readout in ("mcq", "native") and not args.no_shuffle)  # collate on a background thread
@@ -1125,34 +1132,42 @@ def main():
     results = None
     for step in range(start_step + 1, args.steps + 1):
         t0 = time.time()
-        examples, batch = next(batches)
-        logits = run_readout(args.readout, backbone, model, batch, examples, joint=args.joint, vec_cache=vec_cache,
-                             shots=args.shots, max_state=args.max_state)
-        # run_batch moves state/query/C to backbone.device but leaves target/p_null/cmask/
-        # teacher/has_teacher/delta_* on the CPU tensors collate()/collate_mcq() built; move
-        # them here so loss math matches logits' device (delta_* only exist for collate()).
-        for k in ("target", "p_null", "cmask", "teacher", "has_teacher", "delta_idx", "delta_tgt"):
-            if k in batch:
-                batch[k] = batch[k].to(logits.device)
-        loss = decision_loss(logits, batch["target"], batch["p_null"], batch["cmask"],
-                              teacher=batch["teacher"], has_teacher=batch["has_teacher"],
-                              alpha=args.distill_alpha, beta=args.distill_beta, T=args.distill_T,
-                              delta_idx=batch.get("delta_idx"), delta_tgt=batch.get("delta_tgt"),
-                              gamma=args.delta_gamma)
-        if args.perm_lambda > 0:
-            loss = loss + args.perm_lambda * perm_consistency_loss(
-                lambda ex, b: run_batch_native(backbone, model, b, ex, max_state=args.max_state, vec_cache=vec_cache),
-                logits, examples, perm_rng)
         opt.zero_grad()
-        loss.backward()
+        loss_sum, n_tokens, bucket_losses = 0.0, 0, {}
+        for _ in range(args.grad_accum):  # 1 iteration, byte-identical to pre-grad_accum behavior
+            examples, batch = next(batches)
+            logits = run_readout(args.readout, backbone, model, batch, examples, joint=args.joint, vec_cache=vec_cache,
+                                 shots=args.shots, max_state=args.max_state)
+            # run_batch moves state/query/C to backbone.device but leaves target/p_null/cmask/
+            # teacher/has_teacher/delta_* on the CPU tensors collate()/collate_mcq() built; move
+            # them here so loss math matches logits' device (delta_* only exist for collate()).
+            for k in ("target", "p_null", "cmask", "teacher", "has_teacher", "delta_idx", "delta_tgt"):
+                if k in batch:
+                    batch[k] = batch[k].to(logits.device)
+            loss = decision_loss(logits, batch["target"], batch["p_null"], batch["cmask"],
+                                  teacher=batch["teacher"], has_teacher=batch["has_teacher"],
+                                  alpha=args.distill_alpha, beta=args.distill_beta, T=args.distill_T,
+                                  delta_idx=batch.get("delta_idx"), delta_tgt=batch.get("delta_tgt"),
+                                  gamma=args.delta_gamma)
+            if args.perm_lambda > 0:
+                loss = loss + args.perm_lambda * perm_consistency_loss(
+                    lambda ex, b: run_batch_native(backbone, model, b, ex, max_state=args.max_state, vec_cache=vec_cache),
+                    logits, examples, perm_rng)
+            (loss / args.grad_accum).backward()
+            loss_sum += loss.item()
+            n_tokens += batch.get("n_tokens", 0)
+            if family_weights:  # each micro-batch is single-bucket under the bucketed sampler, but
+                bucket_losses[bucket_of(examples[0])] = loss.item()  # accumulation can span buckets
+        # logits/batch/examples below are the LAST micro-batch only (per_family_loss's breakdown is a
+        # diagnostic, not the training signal -- fine as an approximation under grad_accum > 1)
         torch.nn.utils.clip_grad_norm_(all_params, 1.0)
         opt.step()
         sched.step()
         step_time = time.time() - t0
+        loss_value = loss_sum / args.grad_accum
 
-        n_tokens = batch.get("n_tokens", 0)
         log = {
-            "train/loss": loss.item(), "train/step_time": step_time,
+            "train/loss": loss_value, "train/step_time": step_time,
             "train/tokens_per_s": n_tokens / step_time if step_time > 0 else 0.0,
             "train/lr_tower": opt.param_groups[0]["lr"], "train/lr_lora": opt.param_groups[1]["lr"],
             "train/mem": device_memory(device),
@@ -1160,12 +1175,9 @@ def main():
         if step % 50 == 0:
             fam = per_family_loss(logits, batch, examples)
             log.update({f"train/family_loss/{k}": v for k, v in fam.items()})
-            bucket_note = ""
-            if family_weights:  # a batch is single-bucket under the family-balanced sampler -> free to log
-                bucket = bucket_of(examples[0])
-                log[f"train/bucket_loss/{bucket}"] = loss.item()
-                bucket_note = f"bucket {bucket} "
-            print(f"step {step} {bucket_note}loss {loss.item():.4f} step_time {step_time:.2f}s "
+            log.update({f"train/bucket_loss/{b}": v for b, v in bucket_losses.items()})
+            bucket_note = f"bucket {','.join(bucket_losses)} " if bucket_losses else ""
+            print(f"step {step} {bucket_note}loss {loss_value:.4f} step_time {step_time:.2f}s "
                   f"tok/s {log['train/tokens_per_s']:.0f} lr_tower {log['train/lr_tower']:.2e} "
                   f"lr_lora {log['train/lr_lora']:.2e}")
         if wb:
