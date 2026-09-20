@@ -125,7 +125,10 @@ def finish(decision_type, spec, candidates, gold_idx, rng, *, task, rule_depth, 
     style_name = style_name or pick_style(rng, heldout_style)
     instructions, criteria = RENDER[decision_type][style_name](spec)
     query = query_text({"type": decision_type, "instructions": instructions, "criteria": criteria})
-    state = render_state(state_sentences, rng)
+    # state_sentences is rendered ONCE per group by the caller and passed as a string across all
+    # variants (a group must share the exact same state string); a raw list is still accepted and
+    # rendered here for single-row callers.
+    state = state_sentences if isinstance(state_sentences, str) else render_state(state_sentences, rng)
     row = make_row(decision_type, task, candidates, gold_idx, query, state, rule_depth=rule_depth,
                    exception_depth=exception_depth, workflow_family=workflow_family, rubric_family=rubric_family,
                    rubric_style=style_name, catch_all_present=catch_all, extra_meta=extra_meta)
@@ -319,7 +322,7 @@ def score_case(domain, rng, heldout_style, rule_depth):
     dom = DOMAINS[domain]
     facts = sample_facts(dom, rng)
     idxs = rng.sample(range(len(dom["fields"])), 4)
-    state = fact_sentences(dom, facts)
+    state = render_state(fact_sentences(dom, facts), rng)
     unmet = sum(1 for i in idxs if not facts[i])
     first_unmet = not facts[idxs[0]]
     names, _ = level_names(4, rng)
@@ -343,7 +346,7 @@ def l1_builder(domain, rng, heldout_style=False):
     def build():
         facts = sample_facts(dom, rng)
         idxs = rng.sample(range(len(dom["fields"])), rng.randint(2, 3))
-        state = fact_sentences(dom, facts)
+        state = render_state(fact_sentences(dom, facts), rng)
         is_choice = rng.random() < CHOICE_RENDER_FRAC
         rows = []
         for i in idxs:
@@ -364,7 +367,7 @@ def l2_builder(domain, rng, heldout_style=False):
             return score_case(domain, rng, heldout_style, 2)
         facts = sample_facts(dom, rng)
         base_idxs = rng.sample(range(len(dom["fields"])), 4)
-        state = fact_sentences(dom, facts)
+        state = render_state(fact_sentences(dom, facts), rng)
         is_choice = rng.random() < CHOICE_RENDER_FRAC
         rows = []
         for _ in range(rng.randint(2, 3)):
@@ -390,7 +393,7 @@ def l3_builder(domain, rng, heldout_style=False):
         facts = sample_facts(dom, rng)
         idxs = rng.sample(range(len(dom["fields"])), 4)
         base_i = idxs[0]
-        state = fact_sentences(dom, facts)
+        state = render_state(fact_sentences(dom, facts), rng)
         is_choice = rng.random() < CHOICE_RENDER_FRAC
         rows = []
         for exc_j in idxs[1:]:
@@ -420,7 +423,7 @@ def l4_builder(domain, rng, heldout_style=False):
         default = dom["routes"][3]
         for i in rng.sample(idxs, 2):  # bias so >=2 conditions hold -> precedence order can matter
             facts[i] = True
-        state = fact_sentences(dom, facts)
+        state = render_state(fact_sentences(dom, facts), rng)
         rules = list(zip(idxs, outcomes))
         rows = []
         for _ in range(rng.randint(2, 3)):
@@ -450,7 +453,7 @@ def l5_builder(domain, rng, heldout_style=False):
         facts = sample_facts(dom, rng)
         depth = rng.randint(2, 4)
         idxs = rng.sample(range(len(dom["fields"])), depth)
-        state = fact_sentences(dom, facts)
+        state = render_state(fact_sentences(dom, facts), rng)
         is_choice = rng.random() < CHOICE_RENDER_FRAC
         rows = []
         for _ in range(rng.randint(2, 3)):
@@ -480,14 +483,17 @@ def l6_builder(domain, rng, heldout_style=False):
     def build():
         rows = base_fn(domain, rng, heldout_style)()
         # ponytail: pad the already-rendered state directly rather than threading a long= flag through
-        # every L1-L4 builder -- same effect (irrelevant-clause padding), smaller diff.
-        for r in rows:
+        # every L1-L4 builder -- same effect (irrelevant-clause padding), smaller diff. Padded ONCE (not
+        # per row) since every variant in the group must share the exact same state string.
+        if rows:
             target_chars = rng.randint(4200, 10000)  # ~1-2.5k tokens at ~4 chars/token
-            parts = [r["state"]]
+            parts = [rows[0]["state"]]
             while sum(len(p) for p in parts) < target_chars:
                 parts.append(rng.choice(DISTRACTOR_BANK))
             rng.shuffle(parts)
-            r["state"] = " ".join(parts)[:MAX_STATE_CHARS]
+            padded = " ".join(parts)[:MAX_STATE_CHARS]
+        for r in rows:
+            r["state"] = padded
             for lv in (1, 2, 3, 4):
                 r["task"] = r["task"].replace(f"_L{lv}_", "_L6_")
             r["meta"]["rule_depth"] = 6
@@ -509,8 +515,8 @@ def l7_temporal_builder(rng, heldout_style=False):
         elapsed = rng.choice([2, 6, 11, 12, 13, 22, 23, 24, 25, 26, 47, 48, 49, 70])
         deadline_h = rng.choice([12, 24, 48])
         resp_hour, resp_days = (9 + elapsed) % 24, (9 + elapsed) // 24
-        state = [f"Request submitted at 09:00 (UTC{submit_off:+d}) on day 1.",
-                 f"Response sent at {resp_hour:02d}:00 (UTC{resp_off:+d}) on day {1 + resp_days}."]
+        state = render_state([f"Request submitted at 09:00 (UTC{submit_off:+d}) on day 1.",
+                              f"Response sent at {resp_hour:02d}:00 (UTC{resp_off:+d}) on day {1 + resp_days}."], rng)
         rows = []
         for grace, tag in [(0, "strict"), (2, "grace")]:
             ok = elapsed <= deadline_h + grace
@@ -540,7 +546,7 @@ def l7_numeric_builder(rng, heldout_style=False):
         val_a = val_b * 9 / 5 + 32 if unit_a == "fahrenheit" else val_b / conv(1.0)
         val_a = round(val_a, 1)
         measured_b = conv(val_a)
-        state = [f"Measurement: {val_a} {unit_a}.", f"Policy threshold is stated in {unit_b}."]
+        state = render_state([f"Measurement: {val_a} {unit_a}.", f"Policy threshold is stated in {unit_b}."], rng)
         rows = []
         for op, tag in [(">=", "meets_or_exceeds"), (">", "strictly_exceeds")]:
             ok = measured_b >= threshold_b if op == ">=" else measured_b > threshold_b
@@ -559,8 +565,8 @@ def l7_probability_builder(rng, heldout_style=False):
         opts = [f"option_{c}" for c in "abc"[:rng.choice([2, 3])]]
         params = {o: (round(rng.uniform(0.1, 0.9), 2), rng.choice([50, 100, 200, 500]), rng.choice([10, 20, 50, 100]))
                   for o in opts}
-        state = [f"{o}: probability of success {p}, payoff on success {pay}, cost on failure {c}."
-                 for o, (p, pay, c) in params.items()]
+        state = render_state([f"{o}: probability of success {p}, payoff on success {pay}, cost on failure {c}."
+                              for o, (p, pay, c) in params.items()], rng)
         ev = {o: p * pay - (1 - p) * c for o, (p, pay, c) in params.items()}
         worst_case = {o: -c for o, (p, pay, c) in params.items()}  # worst possible outcome (failure)
         rows = []
@@ -580,7 +586,7 @@ def l7_tradeoff_builder(rng, heldout_style=False):
     def build():
         opts = [f"option_{c}" for c in "abc"[:rng.choice([2, 3])]]
         scores = {o: (rng.randint(1, 10), rng.randint(1, 10)) for o in opts}  # (quality, cost_saved), deliberately conflicting
-        state = [f"{o}: quality score {q}/10, cost-saved score {c}/10." for o, (q, c) in scores.items()]
+        state = render_state([f"{o}: quality score {q}/10, cost-saved score {c}/10." for o, (q, c) in scores.items()], rng)
         rows = []
         for wq, wc, tag in [(0.7, 0.3, "quality_weighted"), (0.3, 0.7, "cost_weighted")]:
             weighted = {o: wq * q + wc * c for o, (q, c) in scores.items()}
