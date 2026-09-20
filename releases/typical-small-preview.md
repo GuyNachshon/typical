@@ -189,3 +189,10 @@ the harness adapter and REPORT.md §3q for the exact protocol and disclosures re
 - `jevbench_summary.json` — JevBench public-subset run summary.
 - `baseline_nc_v3_tap20/` — the matched pre-workflow baseline (identical config minus `data_wf`,
   `data_wf_hf`), same five files, for the Δ comparisons above.
+
+## Errata (2026-09-20 20:50)
+The "external" and rubric-flip numbers quoted from REPORT §3w were computed on the first 500 rows of family-/label-ordered
+eval files and are not representative (jevlogs slice all `yes`, PagerDuty slice all positive, flip slice = one K = 2
+family). See the Correction block in REPORT §3w; the stratified full-file re-evaluation (§3x) supersedes them. The
+held-out workflow-family/style gains, the E over-abstention on CLINC-150/TREC-fine, the knowledge retention, and the
+calibration regression on soft/ordinal gold stand. JevBench hard by state length: ≤ 256 tokens .64, > 1,024 tokens .23.
