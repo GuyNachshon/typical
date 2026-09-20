@@ -1096,7 +1096,14 @@ run and its NLL keeps the long-state benefit, 1.32) — this is the best 1.7B ch
 tier is the worst of the sweep (.369, Brier .90, long_policy 2/19) and typed-decisions NLL is back to 1.91: the long-state
 gains of `long_e45` did not transfer at effective batch 64. The two runs differ in batch (16 vs 64) and null-aug, so the
 small batch — 4× fewer examples seen, less sharpening — is the live variable, not the 1,024-token window itself. Two
-matched follow-ups are running: `r1_bs16` (same args, bs 16) and `r1_null10` (null-aug .10). Regardless of their
+matched follow-ups are running: `r1_bs16` (same args, bs 16) and `r1_null10` (null-aug .10). **`r1_bs16`
+(same args, bs 16, i.e. 4× fewer examples) confirms it:** JevBench hard .450 (Brier **.76**, the best of any run;
+multi_hop .44, long_policy .26), typed-decisions NLL 1.39, held-out score NLL 1.63 — and E/K/W all lower (CLINC .733,
+MMLU .323, held-out noul .609, styles .825, val NLL .421). Small batch is not a recipe, it is *under-fitting*: the
+hard-tier and soft-target gains come from the model being less sharp, at the price of everything in-distribution. That
+is the cleanest evidence yet that the hard tier at 1.7B is a probability-quality problem — the same model, less
+confident, scores higher — and that the fix is an objective/calibration change (Track E on the U corpus), not data
+volume or batch size. Regardless of their
 outcome, hard-tier probability quality is now the clearest remaining defect at 1.7B and is what Phase 6B/10 (typed heads,
 calibration on the U corpus) must fix; the scaling ladder (§3ab) says whether it is also capacity.
 
