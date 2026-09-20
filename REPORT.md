@@ -1075,6 +1075,31 @@ the gold has none), the mirror image of §3y's (T, b) finding; e40b has the lowe
 .814 but the worst 20NG (.449) and MMLU (.322). No single mix dominates: **E → e50/e45+null; K → e45+null; soft
 calibration → long; hard → long.** `r1_cand` (e45 + null + 1,024 states at full batch) tests whether the union holds.
 
+## 3aa. Release-1 candidate `r1_cand` — the union of Track B's levers at full batch (H100, 2026-09-21, ~$12)
+
+`nc_v3_tap20_wf` recipe + E .45 / K .20 / W .35 + `--null_aug W:0.20` + `--max_state 1024` with the 23k long rows,
+effective batch 64 (`--grad_accum 4`), 12k steps. Train-time evaluation; JevBench per-item.
+
+| | base | 6A | e45+null | long_e45 (bs 16) | **r1_cand** |
+|---|---|---|---|---|---|
+| CLINC-150 / TREC-fine / HWU64 / 20NG | .845 / .468 / .757 / .515 | .734 / .372 / .735 / .522 | .805 / .444 / .779 / .552 | .741 / .466 / .669 / .567 | **.807 / .456 / .785 / .554** |
+| SNLI / MNLI / BoolQ / ANLI | .904/.865/.834/.507 | .894/.849/.831/.481 | .898/.855/.835/.495 | .888/.840/.821/.464 | .892/.856/.834/.489 |
+| MMLU-Pro among-K / Δ_q_sh | .353 / .122 | .330 / .119 | .353 / .143 | .329 / .116 | .347 / .130 |
+| held-out noul / score / style | – | .699 / .497 / .899 | .654 / .507 / .891 | .663 / .518 / .829 | .688 / **.548** / .901 |
+| held-out score NLL / typed-decisions NLL | – | 2.03 / 1.95 | 2.04 / 2.19 | **1.26 / 1.37** | 1.32 / 1.91 |
+| JevBench std / hard / Brier(hard) | .694 / .378 / .74 | .750 / .387 / .88 | .806 / .396 / .88 | .806 / **.450** / .79 | .764 / .369 / **.90** |
+| JevBench long_policy / multi_hop | .42 / .33 | .16 / .17 | .16 / .28 | .37 / .28 | .11 / .28 |
+
+**The union holds on E / K / W and fails on JevBench hard.** Every retention budget is met or within noise (CLINC −3.8
+is the only breach, at the edge; HWU64/20NG above base; MMLU −0.6 with Δ_q .130; held-out score .548 is the best of any
+run and its NLL keeps the long-state benefit, 1.32) — this is the best 1.7B checkpoint on our own suites. But the hard
+tier is the worst of the sweep (.369, Brier .90, long_policy 2/19) and typed-decisions NLL is back to 1.91: the long-state
+gains of `long_e45` did not transfer at effective batch 64. The two runs differ in batch (16 vs 64) and null-aug, so the
+small batch — 4× fewer examples seen, less sharpening — is the live variable, not the 1,024-token window itself. Two
+matched follow-ups are running: `r1_bs16` (same args, bs 16) and `r1_null10` (null-aug .10). Regardless of their
+outcome, hard-tier probability quality is now the clearest remaining defect at 1.7B and is what Phase 6B/10 (typed heads,
+calibration on the U corpus) must fix; the scaling ladder (§3ab) says whether it is also capacity.
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
