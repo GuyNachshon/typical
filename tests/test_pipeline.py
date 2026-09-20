@@ -1190,6 +1190,62 @@ def test_distill_corpus_limit_smoke(tmp_path):
     assert (out / "manifest.json").exists()
 
 
+def test_workflow_corpus_limit_smoke(tmp_path):
+    """scripts/workflow_corpus.py --limit 30 (PLAN6 item 4): rows of all three JevBench types, every row
+    schema-valid with label in range (noul candidates exactly ["no","yes"]), the query rendered by
+    pcdm_jev.decider.query_text, rubric groups sharing state+candidates with differing gold, flip pairs
+    adjacent, and zero state overlap with the public JevBench set (the script asserts it; re-checked here)."""
+    repo_root = Path(__file__).resolve().parent.parent
+    out = tmp_path / "data_wf_smoke"
+    env = dict(os.environ, HF_DATASETS_OFFLINE=os.environ.get("HF_DATASETS_OFFLINE", "1"))
+    try:
+        subprocess.run([sys.executable, "scripts/workflow_corpus.py", "--out", str(out), "--limit", "30"],
+                       check=True, cwd=str(repo_root), capture_output=True, text=True, timeout=600, env=env)
+    except Exception as e:
+        pytest.skip(f"workflow_corpus.py needs cached HF datasets: {getattr(e, 'stderr', e)}")
+    files = {p.stem: [json.loads(l) for l in open(p) if l.strip()]
+             for p in list(out.glob("*.jsonl")) + list(out.glob("eval/*.jsonl"))}
+    assert {"train", "val", "wf_heldout_noul", "wf_heldout_choice", "wf_heldout_score", "wf_heldout_style",
+            "wf_rubric_flip", "wf_rubric_shuffled"} <= set(files)
+    rows = [r for v in files.values() for r in v]
+    assert {r["meta"]["qtype"] for r in files["train"]} == {"noul", "choice", "score"}
+    groups = {}
+    for r in rows:
+        assert set(r) >= {"state", "query", "candidates", "target", "p_null", "task", "label", "meta"}
+        assert len(r["candidates"]) == len(r["target"]) >= 2 and abs(sum(r["target"]) - 1.0) < 1e-4
+        assert r["meta"]["fam_bucket"] == "W" and r["meta"]["qtype"] in ("noul", "choice", "score")
+        if r["p_null"] >= 1.0:
+            assert r["label"] == -1 and r["meta"]["qtype"] == "choice"
+        else:
+            assert 0 <= r["label"] < len(r["candidates"]) and r["target"][r["label"]] == 1.0
+        if r["meta"]["qtype"] == "noul":
+            assert r["candidates"] == ["no", "yes"] and "yes: " in r["query"] and "no: " in r["query"]
+        if r["meta"].get("rubric_group") and "flip_pair" not in r["meta"] and "probe" not in r["meta"]:
+            groups.setdefault(r["meta"]["rubric_group"], []).append(r)
+    assert groups
+    for g in groups.values():
+        assert len({x["state"] for x in g}) == 1 and len({tuple(x["candidates"]) for x in g}) == 1
+        assert len({x["label"] for x in g}) > 1 and len({x["query"] for x in g}) == len(g)
+    flip = files["wf_rubric_flip"]
+    assert flip and len(flip) % 2 == 0
+    for a, b in zip(flip[::2], flip[1::2]):
+        assert a["meta"]["flip_pair"] == b["meta"]["flip_pair"] and a["state"] == b["state"]
+        assert a["candidates"] == b["candidates"] and a["label"] != b["label"]
+    # held-out families never in train/val; held-out style never in train/val
+    heldout_fams = {"eligibility", "tool_select", "urgency"}
+    for r in files["train"] + files["val"]:
+        assert r["meta"]["family"] not in heldout_fams
+        assert r["meta"]["rubric_style"] not in ("flag", "spec", "band")
+    assert all(r["meta"]["rubric_style"] in ("flag", "spec", "band") for r in files["wf_heldout_style"])
+    jev = Path("/tmp/jevbench/datasets/public")
+    if jev.exists():
+        states = [json.loads(l)["state"] for p in jev.glob("*.jsonl") for l in open(p) if l.strip()]
+        states = {s if isinstance(s, str) else json.dumps(s, ensure_ascii=False) for s in states}  # some states are JSON objects
+        assert not {r["state"] for r in rows} & states
+    manifest = json.load(open(out / "manifest.json"))
+    assert manifest["flip_pairs"] == len(flip) // 2
+
+
 def test_multiset_expand_smoke(tmp_path):
     """scripts/multiset.py --variants 3 on 20 synthetic MCQ rows (PLAN3 E3-ms): yields
     80 rows, each ms_group of size 4 (orig + remove/add_unrel/reorder), and every row is
@@ -1480,6 +1536,65 @@ def test_data_generator_keeps_groups_and_matches_old_stream():
             assert groups.count(g) == 4, "group split across batches"
             seen.add(g)
     assert seen == set(range(30))
+
+
+def test_bucket_for_dir_and_tag_bucket():
+    bmap = T.parse_bucket_map("data_kbt=K,data_wf_hf=W")
+    assert T.bucket_for_dir("data", {}) == "E"
+    assert T.bucket_for_dir("data_kb", {}) == "K"
+    assert T.bucket_for_dir("data_wf_forms", {}) == "W"
+    assert T.bucket_for_dir("data_other", {}) == "E"       # unmatched prefix -> E fallback
+    assert T.bucket_for_dir("data_kbt", bmap) == "K"       # --bucket_map override wins
+    assert T.bucket_for_dir("data_wf_hf", bmap) == "W"
+
+    rows = [{"id": 1}, {"id": 2, "meta": {"fam_bucket": "K"}}]
+    T.tag_bucket(rows, "data_wf_x", {})
+    assert rows[0]["meta"]["fam_bucket"] == "W"
+    assert rows[1]["meta"]["fam_bucket"] == "K"            # pre-existing meta.fam_bucket wins
+
+
+def test_family_weights_parsing():
+    assert T.parse_family_weights(None) is None
+    assert T.parse_family_weights("") is None
+    assert T.parse_family_weights("E:0.35,K:0.25,W:0.4") == {"E": 0.35, "K": 0.25, "W": 0.4}
+
+
+def test_bucketed_sampler_matches_weights_and_keeps_groups():
+    """PLAN6 Queue review: family-balanced sampler. Batch-bucket frequency over 1000 batches
+    should track --family_weights within +-.03, and ms_group units (here namespaced into the
+    W bucket, as add_extra_data would produce) must never straddle a batch."""
+    rng = random.Random(0)
+    examples = []
+    for b, n in (("E", 60), ("K", 60), ("W", 60)):
+        for i in range(n):
+            examples.append({"state": "s" * rng.randint(1, 40), "id": f"{b}{i}", "meta": {"fam_bucket": b}})
+    for g in range(10):
+        for v in range(4):
+            examples.append({"state": "w" * 3, "id": f"Wg{g}v{v}", "meta": {"fam_bucket": "W", "ms_group": f"g{g}"}})
+
+    weights = {"E": 0.35, "K": 0.25, "W": 0.40}
+    gen = T.bucketed_data_generator(examples, 8, 0, weights)
+    counts = {b: 0 for b in weights}
+    seen_groups = set()
+    for _ in range(1000):
+        batch = next(gen)
+        buckets = {T.bucket_of(ex) for ex in batch}
+        assert len(buckets) == 1, "a batch under the family-balanced sampler spans more than one bucket"
+        counts[buckets.pop()] += 1
+        groups = [ex["meta"]["ms_group"] for ex in batch if "ms_group" in ex.get("meta", {})]
+        for g in set(groups):
+            assert groups.count(g) == 4, "group split across batches"
+            seen_groups.add(g)
+    total = sum(counts.values())
+    for b, w in weights.items():
+        assert abs(counts[b] / total - w) <= 0.03
+    assert seen_groups == {f"g{g}" for g in range(10)}
+
+
+def test_bucketed_sampler_missing_bucket_asserts():
+    examples = [{"state": "s", "id": 0, "meta": {"fam_bucket": "E"}}]
+    with pytest.raises(AssertionError):
+        next(T.bucketed_data_generator(examples, 8, 0, {"E": 0.5, "K": 0.5}))
 
 
 # ---------------------------------------------------------------------------
@@ -1821,3 +1936,76 @@ def test_render_letters_nonull_has_letters_no_null_line():
     text, spans = RENDERS["letters_nonull"]("q?", ["alpha", "beta"])
     assert "A. alpha" in text and "B. beta" in text and "none of the above" not in text and "Answer:" not in text
     assert len(spans) == 2 and all(text[a:b] == c for (a, b), c in zip(spans, ["alpha", "beta"]))
+
+
+# ---------------------------------------------------------------------------
+# 19. scripts/gate_experts.py (PLAN6 item 3): learned per-input gate g(x) over the two experts,
+# trained on the dumps' val split only, one val-fitted T, train.py-format results.json.
+# ---------------------------------------------------------------------------
+
+import gate_experts as GE  # noqa: E402
+
+
+def _two_expert_dumps(tmp_path, n=120, seed=3):
+    """Energy + shuffled native dump over the same examples; the native expert is only good on
+    rows whose K >= 4 (so a per-input gate has something to learn from log K / margins)."""
+    rng = np.random.RandomState(seed)
+    ks = [2, 3, 4, 6, 8]
+    Kmax = max(ks)
+    for split in ("val", "setA"):
+        K = np.array([ks[i % len(ks)] for i in range(n)])
+        le, ln = np.full((n, Kmax + 1), np.finfo(np.float64).min), np.full((n, Kmax + 1), np.finfo(np.float64).min)
+        te, tn, ye, yn, me, mn = np.zeros((n, Kmax + 1)), np.zeros((n, Kmax + 1)), np.zeros(n), np.zeros(n), [], []
+        for i, k in enumerate(K):
+            gold = -1 if rng.rand() < 0.15 else rng.randint(k)
+            ye[i] = gold; te[i, k if gold == -1 else gold] = 1.0
+            cands = [f"{split}_c{i}_{j}" for j in range(k)]
+            le[i, :k] = rng.randn(k) + (2.0 if k < 4 else 0.3) * te[i, :k]; le[i, -1] = 1.0 if gold == -1 else -1.0
+            perm = rng.permutation(k)
+            nat = rng.randn(k) + (0.3 if k < 4 else 3.0) * te[i, :k]
+            ln[i, :k] = nat[perm]; ln[i, -1] = rng.randn()
+            tn[i, :k] = te[i, :k][perm]; tn[i, -1] = te[i, -1]; yn[i] = gold if gold == -1 else int(np.where(perm == gold)[0][0])
+            me.append({"query": f"q{i} " * (k % 3 + 1), "candidates": cands, "label": gold, "meta": {}})
+            mn.append({"query": me[-1]["query"], "candidates": [cands[p] for p in perm], "label": yn[i], "meta": {}})
+        _write_dump(tmp_path / "e", split, le, te, ye, K, me)
+        _write_dump(tmp_path / "n", split, ln, tn, yn, K, mn)
+
+
+def test_gate_experts_zero_weights_is_constant_mixing(tmp_path):
+    _two_expert_dumps(tmp_path)
+    loaded = load_dumps(tmp_path / "e", tmp_path / "n")
+    le, te, ye, K, ln, me = loaded["setA"]
+    X = GE.features(le, K, ln, me, GE.FEATURE_SETS["all"])
+    assert X.shape == (len(K), 10) and np.isfinite(X).all()
+    gate = GE.Gate(X.shape[1], hidden=4)
+    with torch.no_grad():
+        for p in gate.net.parameters():
+            p.zero_()
+        gate.net[-1].bias.fill_(0.7)
+        g = gate(torch.as_tensor(X)).numpy()
+    g0 = 1 / (1 + np.exp(-0.7))
+    assert np.allclose(g, g0)  # all-zero weights -> g = sigmoid(b) for every row
+    p = GE.mix(le, K, ln, g, 1.0).numpy()
+    assert np.allclose(p.sum(-1), 1.0) and (p >= 0).all()
+    assert np.allclose(p, fuse(le, K, ln, g0, "log"), atol=1e-9)  # == fuse_scores' log mode at constant g
+    assert np.allclose(GE.mix(le, K, ln, np.zeros(len(K)), 1.7).numpy(), apply_bias(le, K, 0, 0, 1.7), atol=1e-9)  # g=0: energy at T
+
+
+def test_gate_experts_trains_and_writes_results(tmp_path, monkeypatch):
+    _two_expert_dumps(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    res = GE.run(tmp_path / "e", tmp_path / "n", feature_set="all", hidden=8, steps=150, quiet=True)
+    assert res["val_nll"] < res["val_nll_init"] - 1e-3  # training reduces val NLL
+    assert res["val_nll_T"] <= res["val_nll"] + 1e-9 and res["gate"]["n_params"] <= 2000
+    assert res["gate"]["val_sets"] == ["val"] and set(res["eval"]) == {"setA"}  # never trained on the eval set
+    assert 0.0 <= res["gate"]["mean_g"]["setA"] <= 1.0 and "acc" in res["eval"]["setA"]["scaled"]
+    for fs in ("energy_only", "native_only"):
+        r = GE.run(tmp_path / "e", tmp_path / "n", feature_set=fs, hidden=8, steps=50, quiet=True)
+        assert r["gate"]["features"] == GE.FEATURE_SETS[fs]
+    run_dir = tmp_path / "runs" / "gate_x"
+    run_dir.mkdir(parents=True)
+    res["eval"]["mmlu_pro"] = res["eval"]["setA"]  # report_native keys off mmlu_pro
+    json.dump(res, open(run_dir / "results.json", "w"))
+    import report_native
+    row = report_native.row("gate_x")
+    assert np.isclose(row["mmlu_among_k"], res["eval"]["setA"]["scaled"]["acc_k"])

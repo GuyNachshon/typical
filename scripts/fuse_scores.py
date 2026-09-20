@@ -96,8 +96,13 @@ def load_dumps(dump_e, dump_n):
         le, te, ye, Ke = load_npz(dump_e / f"{name}.npz")
         ln, tn, yn, Kn = load_npz(dump_n / f"{name}.npz")
         me, mn = json.load(open(dump_e / f"{name}.meta.json")), json.load(open(dump_n / f"{name}.meta.json"))
-        assert (Ke == Kn).all(), name
-        loaded[name] = (le, te, ye, Ke, align(me, mn, ln), me)
+        try:
+            assert (Ke == Kn).all(), f"{name}: K differs between dumps"
+            aligned = align(me, mn, ln)
+        except AssertionError as err:  # e.g. each dump's own "val" over different data
+            print(f"note: {name} not over the same examples in both dumps -- skipped ({err})")
+            continue
+        loaded[name] = (le, te, ye, Ke, aligned, me)
     return loaded
 
 

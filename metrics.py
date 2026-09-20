@@ -400,3 +400,29 @@ if __name__ == "__main__":
     assert cf["orig/acc"] == 1.0 and cf["orig/among_k"] == 1.0, cf
     assert cf["orig/kl_teacher"] < 1e-9, cf
     print("counterfactual self-check passed:", cf)
+
+
+def rubric_flip(probs, examples) -> dict:
+    """data_wf wf_rubric_flip* (scripts/workflow_corpus.py): rows come in pairs sharing meta.flip_pair --
+    same state, same candidates, two rubrics with different gold (y1 != y2). probs: [N, Kmax+1], null
+    last, row order == examples order; argmax is over the candidates only (JevBench conditions on non-∅).
+    flip_rate = P[argmax(x,r1,A) != argmax(x,r2,A) | y1 != y2] -- a rubric-blind model scores ~0;
+    both_correct = fraction of pairs where both rows are right; acc = plain per-row accuracy."""
+    probs = np.asarray(probs, dtype=np.float64)
+    pairs = defaultdict(list)
+    for i, ex in enumerate(examples):
+        if ex.get("meta", {}).get("flip_pair") is not None:
+            pairs[ex["meta"]["flip_pair"]].append(i)
+    flips, both, accs = [], [], []
+    for idx in pairs.values():
+        if len(idx) != 2:
+            continue
+        a, b = idx
+        if examples[a]["label"] == examples[b]["label"]:
+            continue
+        pa, pb = (int(probs[i, :len(examples[i]["candidates"])].argmax()) for i in (a, b))
+        ca, cb = pa == examples[a]["label"], pb == examples[b]["label"]
+        flips.append(float(pa != pb)); both.append(float(ca and cb)); accs += [float(ca), float(cb)]
+    return {"n_pairs": len(flips), "flip_rate": float(np.mean(flips)) if flips else float("nan"),
+            "both_correct": float(np.mean(both)) if both else float("nan"),
+            "acc": float(np.mean(accs)) if accs else float("nan")}

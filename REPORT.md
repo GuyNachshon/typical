@@ -738,8 +738,9 @@ null (no tariff); option order = harness label order (reversed-order control: st
 Reading: majority/chance baselines are .311 standard / .284 easy / .336 hard — **PCDM's hard-tier numbers are at chance**,
 standard is 1.5–3 SE above chance (n = 72, SE .058), and the reversed-label swing (±4) is larger than the differences
 between our own models, so no ranking among n3/v2/v3 is supported. PCDM lands with the untrained classifiers
-(DeBERTa-large .431/.378), not with systems trained on workflow decisions (.83–.99 standard). The "task family"
-explanation is plausible but untested; live alternatives: state length (native hard .444 on the 36 states ≤ 256 tokens vs
+(DeBERTa-large .431/.378), not with systems trained on workflow decisions (.83–.99 standard). JevBench shifts the leading hypothesis from architecture to training distribution: PCDM performs well on
+easy bounded decisions but degrades sharply on harder rubric-conditioned workflow judgments, the family Jev is explicitly
+optimized for (PLAN6). It does not *prove* the gap is task family; live alternatives: state length (native hard .444 on the 36 states ≤ 256 tokens vs
 .240 on the 75 longer ones; energy .36 / .36), `noul` at K = 2 where native is at chance (.46–.50) while energy gets .62,
 and the ∅-conditioning (14% of energy hard items had p_null > .5 and were forced to answer). The strongest evidence *for*
 task family over size is on the leaderboard itself: a Gemma-E2B LoRA reaches .931 standard. The
@@ -747,6 +748,57 @@ architecture side is competitive (p50 .13–.19 s raw vs .17–.24 s for the GPU
 trivially). `nc_v2`'s better calibration lifts easy to .938 and standard to .472 with no task training. JevBench is
 therefore the target task family for Phase 6/7 (typed primitives + rubric-conditioned decision data + calibration), not a
 benchmark to tune on; the 72 MIT-licensed original items are the only public training-eligible material and are too few.
+
+## 3r. The depth confound resolved — native N3 at tap 20 (`nc_n3_tap20`, H100, 2026-09-20, $9)
+
+The review of §3l–§3q flagged that every candidate-blind student was trained at tap 20 and every native model at 28 layers,
+so "the native formulation costs evidence" (§3l) and "candidate-blind Z cannot compile knowledge" (§3j) were confounded
+with depth. Same N3 readout, same v5 + kb mix, same steps, `--tap_layer 20`:
+
+| | energy `joint_emb_lw_v5` | native N3 @ 28 (`nc_n3`) | **native N3 @ 20** |
+|---|---|---|---|
+| SNLI / MNLI / ANLI / BoolQ | .909 / .880 / .555 / .834 | .863 / .752 / .431 / .737 | **.906 / .865 / .519 / .834** |
+| CLINC-150 / HWU64 | .784 / .818 | .740 / .660 | **.862** / .801 |
+| MMLU-Pro among-K / acc / ECE | .123 / .092 / .385 | .314 / .133 / .459 | **.363** / .133 / .592 |
+| TruthfulQA / kb val | – | .461 / .580 | .348 / .593 |
+| CLINC-heldout / 20NG / TREC-fine / Banking77-77 | .762 / .336 / .308 / .527 | .916 / .559 / .400 / .497 | **.955 / .589 / .430** / .063 |
+| CLINC-OOS / null AUROC clinc-k / snli | .735 / .961 / .980 | .204 / .803 / .964 | .639 / .840 / .979 |
+| P(∅ \| absent) K = 2 / 50 / 150 | .94 / .59 / .45 | .86 / .40 / .99 | .92 / .61 / 1.00 |
+| reorder Δp / IIA | 0 / 0 | .101 / .126 | .077 / .136 |
+| best val NLL | .371 | .430 | **.341** |
+
+**The evidence gap was depth, not the options-in-suffix formulation.** At tap 20 the native readout is at energy level on
+every evidence task (within 1–3 pts; +8 on CLINC-150) *and* keeps all of the question-dependent knowledge: Δ_q(shuffled) **.118** vs .117 for N3 @ 28 (1.16× the teacher;
+choices-only variant .100 vs .111). The raw among-K gain (.314 → .363) is mostly higher option-prior exploitation
+(choices-only .203 → .263), so read it as "same knowledge, evidence recovered", not "more knowledge". The two-regime story for accuracy (§3l, §3o) collapses into one model; what the energy path
+still owns is K-flat cost (§3m) and the null. Remaining defects are exactly the rendered-∅-line ones of §3p (abstention error
+.23 on MMLU, Banking77-77 .063, K = 150 → always abstain), which `letters_nonull` addressed in `nc_v3` — `nc_v3_tap20` is
+queued as the candidate for a single coherent PCDM v2 model. TruthfulQA fell (.461 → .348) — to be read with the seed pair.
+This also reopens §3g ("depth is not the lever"): it was not the lever for the *candidate-blind* readout; for the
+candidate-aware readout, depth is the difference between losing and keeping evidence reasoning.
+
+## 3s. Closure — candidate-blind Z at full depth (`e3b_zr_tap28`, H100, 2026-09-20, ~$9)
+
+PLAN6 asked for this as a *closure* experiment, not an improvement attempt: every candidate-blind student in §3j was tapped
+at layer 20, and §3r showed depth is decisive for the candidate-*aware* readout, so "Δ_q ≈ 0 for Z" could still have been a
+tap-20 artifact. Same `zr` head, same v5 + kbt mix, same KD (α = 1, β = 1, T = 2), same 12k steps, all 28 layers:
+
+| | `e3b_zr` @ 20 | **`e3b_zr_tap28`** | teacher |
+|---|---|---|---|
+| MMLU-Pro among-K / choices-only / shuffled-q | .157 / .166 / .182 | .147 / .177 / .156 | .310 / .222 / .208 |
+| Δ_q (choices-only) / Δ_q (shuffled, primary) | −.009 / −.026 | **−.030 / −.008** | .088 / .102 |
+| SNLI / MNLI / ANLI / BoolQ | .905 / .873 / .541 / .826 | .881 / .807 / .462 / .712 | – |
+| CLINC-150 / HWU64 / CLINC-heldout | .724 / .784 / .391 | .702 / .787 / .290 | – |
+| kbt val (agreement with teacher) | .326 | .314 | – |
+| best val NLL | .384 | .463 | – |
+
+**Closed: the candidate-blind negative is not a depth artifact.** With the full backbone the decision state still carries
+no question-dependent knowledge (Δ_q_sh −.008, within the ±.02 noise of §3j; among-K *falls* to .147), while the
+evidence tasks regress exactly as §3l/§3r predict for a last-layer tap (BoolQ −11, ANLI −8, MNLI −7). Depth therefore
+separates the two readouts cleanly: it recovers evidence for the option-conditioned suffix (§3r) and does nothing for a state
+computed before the options are known. This is the strongest form of contribution #2 in NOVELTY.md — under this
+factorization, priors and calibration distill, question-conditioned parametric knowledge does not, at any tap. No further
+candidate-blind runs are planned.
 
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 

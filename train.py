@@ -30,7 +30,7 @@ from encode import Backbone, FeatureCache, pick_device
 from model import DecisionModel, decision_loss, collate, run_batch, split_joint
 from mcq import MCQHead, collate_mcq, run_batch_mcq
 from native import NativeHead, run_batch_native, native_features, shuffle_options, perm_consistency_loss
-from metrics import summarize, choice_set_effects, ksweep, counterfactual
+from metrics import summarize, choice_set_effects, ksweep, counterfactual, rubric_flip
 import data as data_mod
 
 FAMILY = getattr(data_mod, "FAMILY", None)
@@ -183,21 +183,80 @@ def data_generator(examples, bs, seed):
                 yield b
 
 
+def bucket_for_dir(dirname, bucket_map):
+    """PLAN6 Queue review: dir -> family bucket for --family_weights. --bucket_map overrides
+    win; else data_kb*->K, data_wf*->W; anything else (including --data) falls back to E."""
+    if dirname in bucket_map:
+        return bucket_map[dirname]
+    if dirname.startswith("data_kb"):
+        return "K"
+    if dirname.startswith("data_wf"):
+        return "W"
+    return "E"
+
+
+def tag_bucket(rows, dirname, bucket_map):
+    """Stamp meta.fam_bucket on rows lacking it (rows that already carry one, e.g. from a
+    generator that assigns it per-row, are left alone)."""
+    b = bucket_for_dir(dirname, bucket_map)
+    for ex in rows:
+        ex.setdefault("meta", {}).setdefault("fam_bucket", b)
+
+
+def bucket_of(ex):
+    return ex.get("meta", {}).get("fam_bucket", "E")
+
+
+def parse_bucket_map(s):
+    return dict(kv.split("=", 1) for kv in s.split(",")) if s else {}
+
+
+def parse_family_weights(s):
+    return {k: float(v) for k, v in (kv.split(":", 1) for kv in s.split(","))} if s else None
+
+
+def bucketed_data_generator(examples, bs, seed, weights):
+    """PLAN6 Queue review: family-balanced sampler. One plain data_generator per bucket (so
+    groups and length-bucketing are exactly data_generator's, per bucket) interleaved by a
+    seeded RNG drawing from --family_weights; each yielded batch is therefore single-bucket."""
+    buckets = {}
+    for ex in examples:
+        buckets.setdefault(bucket_of(ex), []).append(ex)
+    missing = [b for b in weights if not buckets.get(b)]
+    assert not missing, f"--family_weights names bucket(s) with no rows: {missing}"
+    names = list(weights)
+    print("family-balanced sampler: " + ", ".join(f"{b}={len(buckets[b])} rows (w={weights[b]})" for b in names))
+    gens = {b: data_generator(buckets[b], bs, seed) for b in names}
+    rng = random.Random(seed)
+    ws = [weights[b] for b in names]
+    while True:
+        yield next(gens[rng.choices(names, weights=ws)[0]])
+
+
 def add_extra_data(args, train_examples, eval_sets):
     """PLAN3 E3: mix --extra_data corpora (e.g. data_kb, closed-book MCQ with teacher labels) into
     training in place; each dir's val becomes an eval set (<dir>_val) so distillation quality is
     reported separately. multiset groups (meta.ms_group) are namespaced by dir so two expanded
     corpora never pair across files."""
+    bucket_map = parse_bucket_map(args.bucket_map)
     for extra in (args.extra_data.split(",") if args.extra_data else []):
         ed = Path(extra)
-        rows = load_jsonl(ed / "train.jsonl")
+        # a dir may hold one train.jsonl/val.jsonl or split train/*.jsonl, val/*.jsonl (data_wf_hf)
+        load_split = lambda name: sum((load_jsonl(p) for p in sorted(glob.glob(str(ed / name / "*.jsonl")))), []) \
+            if (ed / name).is_dir() else load_jsonl(ed / f"{name}.jsonl") if (ed / f"{name}.jsonl").exists() else []
+        rows = load_split("train")
+        assert rows, f"{ed}: no train rows"
         for ex in rows:
             if "ms_group" in ex.get("meta", {}):
                 ex["meta"]["ms_group"] = f"{ed.name}/{ex['meta']['ms_group']}"
+        if args.family_weights:
+            tag_bucket(rows, ed.name, bucket_map)
         train_examples += rows
-        if (ed / "val.jsonl").exists():
-            eval_sets[f"{ed.name}_val"] = load_jsonl(ed / "val.jsonl")
-        eval_sets.update({Path(p).stem: load_jsonl(p) for p in sorted(glob.glob(str(ed / "eval" / "*.jsonl")))})
+        # --eval_cap: head-N (not a random sample) so adjacent rubric-flip pairs stay intact (PLAN6 §W)
+        cap = lambda rows: rows[:args.eval_cap] if args.eval_cap else rows
+        if val := load_split("val"):
+            eval_sets[f"{ed.name}_val"] = cap(val)
+        eval_sets.update({Path(p).stem: cap(load_jsonl(p)) for p in sorted(glob.glob(str(ed / "eval" / "*.jsonl")))})
 
 
 def load_run_data(args, backbone):
@@ -213,6 +272,8 @@ def load_run_data(args, backbone):
         train_examples = make_smoke_examples(64, seed=0)
         val_examples = make_smoke_examples(16, seed=1)
         eval_sets = {"smoke_eval": make_smoke_examples(16, seed=2)}
+        if args.family_weights:
+            tag_bucket(train_examples, Path(args.data).name, parse_bucket_map(args.bucket_map))
         add_extra_data(args, train_examples, eval_sets)  # e.g. a tiny multiset file for an E3-ms smoke
         cache = None
         if build_cache_:
@@ -232,6 +293,8 @@ def load_run_data(args, backbone):
         train_examples = load_jsonl(data_dir / "train.jsonl")
         val_examples = load_jsonl(data_dir / "val.jsonl")
         eval_sets = {Path(p).stem: load_jsonl(p) for p in sorted(glob.glob(str(data_dir / "eval" / "*.jsonl")))}
+        if args.family_weights:
+            tag_bucket(train_examples, data_dir.name, parse_bucket_map(args.bucket_map))
         add_extra_data(args, train_examples, eval_sets)
 
         cache = None
@@ -474,6 +537,8 @@ def run_full_eval(args, backbone, model, cache, val_examples, eval_sets, val_nll
             results["eval"][name]["ksweep"] = ksweep(probs[best_T], examples)
         elif name.startswith("mmlu_cf"):  # PLAN3 E3-cf counterfactual option-set battery (scripts/mmlu_counterfactual.py)
             results["eval"][name]["cf"] = counterfactual(probs[best_T], examples)
+        elif name.startswith("wf_rubric_flip"):  # PLAN6 rubric-group probe (scripts/workflow_corpus.py)
+            results["eval"][name]["flip"] = rubric_flip(probs[best_T], examples)
     return results
 
 
@@ -635,7 +700,7 @@ def log_eval_wandb(wb, results, step):
         for k, v in ev["raw"].items():
             if v != "n/a":
                 log[f"eval_raw/{name}/{k}"] = v
-        for extra in ("cse", "ksweep"):
+        for extra in ("cse", "ksweep", "flip"):
             for k, v in ev.get(extra, {}).items():
                 if isinstance(v, (int, float)):
                     log[f"{extra}/{name}/{k}"] = v
@@ -680,6 +745,13 @@ def parse_args():
     p.add_argument("--hf_repo", default=None)
     p.add_argument("--data", default="data")
     p.add_argument("--extra_data", default=None, help="comma-separated extra data dirs mixed into train (their val/eval become eval sets)")
+    p.add_argument("--eval_cap", type=int, default=None, help="head-N cap per --extra_data val/eval set (big external evals run post-hoc via scripts/eval_wf.py)")
+    p.add_argument("--family_weights", default=None,
+                   help="PLAN6 Queue review: e.g. 'E:0.35,K:0.25,W:0.40' -- family-balanced sampler over "
+                        "meta.fam_bucket (else --data->E, a data_kb*/data_wf* --extra_data dir->K/W); "
+                        "default None = today's uniform concatenation, byte-identical stream")
+    p.add_argument("--bucket_map", default=None,
+                   help="--family_weights only: comma-separated dirname=bucket overrides, e.g. data_kbt=K,data_wf_hf=W")
     p.add_argument("--smoke", action="store_true")
     p.add_argument("--eval_limit", type=int, default=0, help="cap each eval set (smoke runs)")
     p.add_argument("--tap_layer", type=int, default=0, help="tower memory from layer T (0 = last layer)")
@@ -836,7 +908,9 @@ def main():
         start_step, best_val = load_checkpoint(last_path, model, backbone, opt, sched, device)
         print(f"resumed from step {start_step}")
 
-    gen = data_generator(train_examples, args.bs, args.seed)
+    family_weights = parse_family_weights(args.family_weights)
+    gen = bucketed_data_generator(train_examples, args.bs, args.seed, family_weights) if family_weights \
+        else data_generator(train_examples, args.bs, args.seed)
     for _ in range(start_step):
         next(gen)
     batches = prefetch(gen, cache, readout=args.readout, seed=args.seed,
@@ -880,7 +954,12 @@ def main():
         if step % 50 == 0:
             fam = per_family_loss(logits, batch, examples)
             log.update({f"train/family_loss/{k}": v for k, v in fam.items()})
-            print(f"step {step} loss {loss.item():.4f} step_time {step_time:.2f}s "
+            bucket_note = ""
+            if family_weights:  # a batch is single-bucket under the family-balanced sampler -> free to log
+                bucket = bucket_of(examples[0])
+                log[f"train/bucket_loss/{bucket}"] = loss.item()
+                bucket_note = f"bucket {bucket} "
+            print(f"step {step} {bucket_note}loss {loss.item():.4f} step_time {step_time:.2f}s "
                   f"tok/s {log['train/tokens_per_s']:.0f} lr_tower {log['train/lr_tower']:.2e} "
                   f"lr_lora {log['train/lr_lora']:.2e}")
         if wb:
