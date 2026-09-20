@@ -800,6 +800,49 @@ computed before the options are known. This is the strongest form of contributio
 factorization, priors and calibration distill, question-conditioned parametric knowledge does not, at any tap. No further
 candidate-blind runs are planned.
 
+## 3t. One model — native N3 @ tap 20 without the rendered ∅ line (`nc_v3_tap20`, H100, 2026-09-20, ~$9)
+
+§3r recovered evidence at tap 20 but kept the rendered "none of the above" pathologies; §3p's `letters_nonull` removed the
+∅ line at 28 layers and lost evidence. This run combines them: N3, factored null, `letters_nonull`, tap 20, same v5 + kb
+mix and steps. Matched control = `nc_n3_tap20` (identical except `--nc_render letters`).
+
+| | `nc_n3_tap20` (∅ line) | **`nc_v3_tap20`** (no ∅ line) | energy `joint_emb_lw_v5` |
+|---|---|---|---|
+| SNLI / MNLI / ANLI / BoolQ | .906 / .865 / .519 / .834 | .904 / .865 / .507 / .834 | .909 / .880 / .555 / .834 |
+| CLINC-150 / HWU64 / 20NG / TREC-fine | .862 / .801 / .589 / .430 | .845 / .757 / .515 / .468 | .784 / .818 / .336 / .308 |
+| Δ_q shuffled (primary) / choices-only | .118 / .100 | **.122** / .098 | ≈0 |
+| MMLU-Pro among-K / **acc** / false-abstain | .363 / .133 / .692 | .354 / **.353** / **.003** | .123 / .092 / – |
+| MMLU-cf KL to teacher (orig) | 2.43 | **.27** | – |
+| Banking77-77 acc / false-abstain | .063 / .924 | **.579** / .135 | .527 / – |
+| CLINC-OOS acc / CLINC-K null AUROC | .639 / .840 | **.798** / **.973** | .735 / .961 |
+| K-sweep CLINC null AUROC K = 5 / 20 / 50 / 150 | .97 / .94 / .91 / 1.00† | .98 / .95 / .92 / .95 | .98 / .94 / .90 / .85 |
+| K-sweep Banking77 null AUROC K = 5 / 20 / 77 | .91 / .80 / .00† | **.90 / .83 / .69** | .85 / .75 / .66 |
+| P(∅ \| absent) K = 5 / 50 / 150 (CLINC) | .02 / .61 / 1.00 | .89 / .67 / .64 | .88 / .56 / .41 |
+| cse_* paired null AUROC (banking / clinc / hwu64) | .968 / .995 / .987 | .862 / .976 / .926 | – |
+| reorder max Δp / IIA dlo | .077 / .136 | .123 / .180 | 0 / 0 |
+| TruthfulQA MC1 | .230 | .275 | – |
+| best val NLL | .341 | .347 | .371 |
+
+† degenerate: always-abstain (K = 150 CLINC, K = 77 Banking77) or never-abstain (K = 5), see §3p/§3r.
+
+**The rendered ∅ line was the null pathology, and removing it at tap 20 costs nothing on knowledge.** With ∅ a pure head
+decision the K-sweep is monotone and smooth (no K = 5 collapse, no K = 77/150 always-abstain), null AUROC now matches or
+beats the energy path at *every* K on both sweeps, MMLU-Pro false-abstain drops from .692 to .003 (acc .133 → .353, KL to
+the teacher 2.43 → .27), and Banking77-77 goes from unusable to .579 — all with Δ_q unchanged (.122) and NLI/BoolQ at
+energy level. The costs are real but smaller: intent/topic label spaces lose 2–7 pts (HWU64 .801 → .757, 20NG .589 → .515)
+and the paired choice-set null probes lose 2–10 pts AUROC; order fragility rises (reorder .077 → .123 — still a letter
+interface). This is the single-model candidate PLAN5/PLAN6 asked for, and it is the base and the matched baseline for
+Phase 6A (§3v).
+
+**JevBench, same public 231 ids (§3q protocol and disclosures):** standard **.694** / easy **1.00** / hard .378
+(Brier .47 / .02 / .74; ECE .135 / .057 / .209), versus .472 / .812 / .297 for `nc_v3` at 28 layers and .417 / .854 / .306
+for `nc_n3`. The standard gain is 3.8 SE (n = 72, SE .058) and concentrated where the null/letter pathology had been
+eating answers: routing 2/12 → 10/12, extraction 6/12 → 12/12, policy 5/12 → 8/12 (ordinal 7 → 5, adequacy 6 → 6).
+With **no workflow training** this puts PCDM at the level of the small encoders trained on the task family (Laya .694, GLiNER2 .639)
+and above open-jev-deberta (.431); hard is still within 1 SE of chance (.378 vs .336; long_policy .21 → .42, multi_hop 0 → .33,
+temporal/probability/tradeoff flat or down). So part of the §3q "training-distribution" gap was our own null artifact;
+the remaining standard gap to the workflow-trained systems (.83–.99) and all of the hard gap are what Phase 6A tests.
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
