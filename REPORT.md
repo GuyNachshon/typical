@@ -1116,6 +1116,9 @@ base model reading next-token letter logits over the rendered options (`pcdm_jev
 | JevBench std / easy / hard | .750 / 1.00 / .387 | **.833 / 1.00 / .432** | | |
 | JevBench Brier std / hard | .40 / .88 | **.29** / .83 | | |
 | JevBench p50 latency (s, in-process H100) | .077 (base) / .554 (wf, NVL) | .089 | | |
+| `bench.py --native` L_s = 256: single decision K = 2 / 32 / 256 (ms) | 65 / 66 / 96 | 90 / 94 / 114 | | |
+| marginal ms per query, M = 32, K = 2 / 32 / 128 / 256 | 4.0 / 4.7 / 18.4 / 36.0 | 5.9 / 12.1 / 21.9 / 49.9 | | |
+| peak memory K = 2 → 256 (GB) | – | 14.5 → 18.6 | | |
 | zero-shot control: JevBench std / easy / hard | .583 / .833 / .369 | .722 / 1.00 / .414 | .375 / .354 / .360 (**broken**, see note) | .819 / 1.00 / .441 |
 | zero-shot Brier std / hard | .58 / .73 | .46 / .71 | – | .30 / **.60** |
 | best val NLL | .384 | **.332** | | |
@@ -1125,8 +1128,9 @@ the 1.7B base, TREC +14, ANLI +5, BoolQ +3), false-abstain collapses (CLINC .17 
 mixing fix, knowledge jumps (among-K .330 → .457, Δ_q .119 → **.193**, TruthfulQA +12), held-out workflow noul +14 and
 styles +2, JevBench standard .750 → .833 with the best Brier of any run (.29), hard .387 → .432. What does not move is the
 soft-target calibration (held-out score NLL 2.15) — that is a data/objective defect (all-hard-label W), not capacity, and
-is what Phase 10 is for. Cost: p50 .089 s vs .077 s per decision on the same harness (~15% slower; bench numbers to
-follow) — 4B is the first "typical-medium" candidate. **Zero-shot controls:** the frozen backbone alone climbs
+is what Phase 10 is for. Cost: single decision 90 ms vs 65 ms (1.4×), batched marginal 5.9 vs 4.0 ms per query at K = 2 and 50 vs 36 at
+K = 256 (1.4–1.5×), JevBench p50 .089 vs .077 s — roughly 1.4× the 1.7B's cost for +8 JevBench-standard, +13 MMLU
+among-K, +14 held-out noul and evidence above the 1.7B base. 4B is the first "typical-medium" candidate. **Zero-shot controls:** the frozen backbone alone climbs
 .583 → .722 → .819 (1.7B → 4B → 14B) on standard and .369 → .414 → .441 on hard, i.e. hard moves slowly with Qwen3 scale
 even without training, and the frozen 14B (Brier hard .60) is the best-calibrated model on the hard tier. Our training
 adds +11 standard / +2 hard on top of the frozen 4B. The frozen-8B control is at chance on *easy* (.354) — a bug in the
