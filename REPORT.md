@@ -1066,6 +1066,15 @@ version is running as the Release-1 candidate (`r1_cand`: E .45 / K .20 / W .35 
 standard moves ±5 between mixes at n_eff = 36 — treat .81–.83 vs .75 as ~1 SE, the Brier and per-family hard numbers as the
 signal. Pareto choice pending the full-row `eval_wf` on all six: **e45 + null** on E/K/calibration, **long** on hard.
 
+**Full-row `eval_wf` (all 63,932 rows, 4,096-token states) on the six:** held-out noul / score / style and flip
+both-correct — e50 .697/.499/.889/.575, e45 .690/.518/.894/.581, e40a .667/.511/.905/.555, e40b .679/.522/.900/.560,
+e45+null .654/.508/.892/.557, long .663/.520/.829/.542 (6A: .699/.498/.901/.565) — i.e. W is flat across mixes within
+±4 except the long run's styles (−7). typed-decisions NLL: long **1.40**, e45 1.92, e50 1.98, e40b 2.16, e40a 2.21,
+e45+null **2.44** — null augmentation buys E and MMLU at the price of soft-target NLL (the model now spends mass on ∅ where
+the gold has none), the mirror image of §3y's (T, b) finding; e40b has the lowest CLINC-150 false-abstain (.037) at
+.814 but the worst 20NG (.449) and MMLU (.322). No single mix dominates: **E → e50/e45+null; K → e45+null; soft
+calibration → long; hard → long.** `r1_cand` (e45 + null + 1,024 states at full batch) tests whether the union holds.
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
