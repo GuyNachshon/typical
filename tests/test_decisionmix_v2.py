@@ -46,6 +46,17 @@ def all_wh_rows(wh):
     return [r for k, rs in wh.items() if k != "manifest" for r in rs]
 
 
+# wh_rubric_flip/wh_rubric_shuffled are DERIVED views over heldout_pool (workflow_corpus.flip_pairs /
+# shuffled_rubric copy a source row's meta, including its rubric_group id, onto a new probe row) --
+# they intentionally duplicate/relabel rows rather than forming fresh counterfactual units, so the
+# "one group = 2-3 rows, same state+candidates" invariant is checked on the raw categories only.
+RAW_KEYS = {"train", "val", "wh_heldout_family", "wh_heldout_style", "wh_heldout_grammar", "wh_level7"}
+
+
+def raw_wh_rows(wh):
+    return [r for k, rs in wh.items() if k in RAW_KEYS for r in rs]
+
+
 def test_wh_schema(wh):
     rows = all_wh_rows(wh)
     assert rows
@@ -60,7 +71,7 @@ def test_wh_schema(wh):
 
 def test_wh_rubric_groups_share_state_and_candidates_but_not_always_gold(wh):
     by_group = defaultdict(list)
-    for r in all_wh_rows(wh):
+    for r in raw_wh_rows(wh):
         gid = r["meta"].get("rubric_group")
         if gid:
             by_group[gid].append(r)

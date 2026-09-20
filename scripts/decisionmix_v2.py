@@ -632,7 +632,7 @@ def gen_level(level, n_target, rng, domains):
         g = _apply_catch_all(g, rng)
         g = null_group(g, rng, NULL_GROUP_FRAC)
         rows += g
-    return rows[:n_target + 2]
+    return rows  # ponytail: may overshoot n_target by <= group size rather than cut a group in half
 
 
 def gen_style_holdout(level, n_target, rng, domains):
@@ -642,7 +642,7 @@ def gen_style_holdout(level, n_target, rng, domains):
         g = emit_group(LEVEL_BUILDERS[level](domain, rng, heldout_style=True))
         if g:
             rows += g
-    return rows[:n_target]
+    return rows  # ponytail: may overshoot n_target by <= group size rather than cut a group in half
 
 
 def gen_level7(n_per_subtype, rng):
