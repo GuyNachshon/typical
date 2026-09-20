@@ -1010,6 +1010,31 @@ or ordinal and is larger than the train-time pass showed. Verdict unchanged in d
 training moves *our* workflow families and the trained sources; it has not moved the general external tests, and it
 costs probability quality — PLAN6 branch (b) plus calibration, which PLAN7's tracks B/C and the (T, b) refit address.
 
+## 3y. Calibration at $0 — null-logit offset, soft-target refit, two probes (`--calib_sets`, 2026-09-20)
+
+Two eval-time knobs are now fitted jointly on a chosen calibration set: temperature T (as before) and a scalar offset
+b on logit P(∅) (identical operation for both null forms; b = 0 reproduces every earlier number bit-for-bit; T and b are
+argmax-preserving among candidates — acc_k is unchanged in every run below). Full tables: `REPORT_calib_draft.md`.
+
+| refit on typed-decisions-train + wf val | `nc_v3_tap20` | `nc_v3_tap20_wf` |
+|---|---|---|
+| fitted (T, b) | (1.04, **−1.75**) | (1.04, **+3.0**) |
+| held-out score NLL / typed-decisions NLL | – | 2.03 → **1.09** / 1.95 → **1.19** |
+| CLINC-150 false-abstain / coverage | .053 → **.022** / ↑ | coverage .83 → **.05–.09** (CLINC, TREC-fine, HWU64, 20NG) |
+
+**One global null threshold cannot serve both label-space evidence tasks and workflow/soft-target tasks.** The same
+recipe pushes b in opposite directions for the two checkpoints: for the baseline it *reduces* abstention and genuinely
+fixes CLINC-150; for the wf model the soft sets pull b to +3.0, which repairs their NLL (beating the review's ~1.3 / ≤1.4
+predictions) and collapses intent/topic coverage to 5–9%. The review's mechanism-1 prediction (refit → CLINC-150
+false-abstain ~.06 for wf) is falsified in direction. This is the memo's "avoid relying on a single global temperature"
+made concrete: calibration must be per decision type / per family (Phase 10), not a bigger single knob; the E
+over-abstention of §3w is fixed by mixing (§3z), not by b.
+
+**Probes.** (a) CLINC-150 with an appended `other` candidate: P(other) ≈ .0005, P(∅) −.017 — no generic
+catch-all-competes-with-∅ effect; the catch-all hypothesis of §3w stays demoted. (b) JevBench hard, the 36 items with
+state ≤ 256 tokens, wf model: own rubric .611 = swapped same-type rubric .611 (chance .384) — the short-state gain of
+§3w's second review is not rubric execution (n = 36; same-type rubrics may be near-interchangeable).
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
