@@ -57,3 +57,29 @@ capability-per-ms curve, not by parameter count).
 - Track D DecisionMix v2: `data_wh` (levels 1–7, counterfactual rubric groups, held-out grammars/families/styles/level 7)
   and `data_u` (ChaosNLI / UNLI / ambiguity / synthetic known distributions). Worker `w-data2`, CPU.
 - Cost guard now reads pods from /tmp/PODS_ACTIVE (workers append `<id>|<sshfile>|<waiter>`).
+
+## Track D — DecisionMix v2 build notes (2026-09-20, `scripts/decisionmix_v2.py`, `guychuk/pcdm-data` `wh/`+`u/`)
+
+**data_wh**: 60,605 train / 3,000 val / 6 eval files, 0/231 JevBench leak hits. Programmatic rule engine
+(12 domains x 6 boolean conditions); levels 1-6 -> train/val, level 7 (temporal/numeric/probability/trade-off)
+is eval-only. 100% of train rows are counterfactual rubric groups (same state+candidates, >=2 distinct golds;
+`meta.rubric_group`). Mix noul/choice/score 40/41/19 (target ~40/40/20); 9.7% true-null rows; 12% catch-all.
+Holdouts: 1 domain/level as `wh_heldout_grammar`, 3 whole domains (`wh_heldout_family`), 2 rubric styles
+(terse/audit, `wh_heldout_style`), plus `wh_level7`, `wh_rubric_flip`, `wh_rubric_shuffled` -- reusing
+workflow_corpus.py's `flip_pairs`/`shuffled_rubric`/`leak_check` unmodified.
+
+**data_u**: 31,029 train / 2,000 val / 3 eval files, 100% soft_target, 0/231 leak hits. Real sources: UNLI's
+*validation* split only (train/test already fully consumed by data.py's `unli`/`unli_test`) and metaeval/ambient's
+ambiguous rows (uniform target over listed labels, no per-annotator counts on the HF mirror). chaos-mnli-ambiguity
+is eval-only (`u_chaosnli`) since data.py's `chaos_mnli` eval already claims the whole file. Remaining 92% is 4
+synthetic generators with exact closed-form targets (partial evidence, noisy-sensor Bayes posterior, ordinal
+confusion via inverted confusion matrix, conflicting-sources log-odds), each with a held-out parameter range.
+
+**Not sourced**: `metaeval/chaos-nli` 404s (used `metaeval/chaos-mnli-ambiguity`, MNLI portion only); `nyu-mll/
+multi_nli`'s HF parquet has no per-annotator label columns (AmbiEnt covers the ambiguity requirement instead).
+Neither ambient nor chaos-mnli-ambiguity declares a license on its HF card (flagged, not asserted); UNLI is MIT.
+
+Test suite caught a real bug pre-upload: `finish()` re-shuffled state per row, so rubric-group members meant to
+share one state string diverged (order, or independently-redrawn L6 padding). Fixed to render once per group;
+both corpora regenerated after. 10/10 tests pass (`tests/test_decisionmix_v2.py`); `--limit` smoke works for
+`--corpus wh|u|both`.
