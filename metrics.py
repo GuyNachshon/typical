@@ -426,3 +426,43 @@ def rubric_flip(probs, examples) -> dict:
     return {"n_pairs": len(flips), "flip_rate": float(np.mean(flips)) if flips else float("nan"),
             "both_correct": float(np.mean(both)) if both else float("nan"),
             "acc": float(np.mean(accs)) if accs else float("nan")}
+
+
+def ordinal_metrics(probs, examples) -> dict:
+    """PLAN7 track C (score_A_kway / score_B_smooth / score_C_cumlink): ordinal MAE (|argmax
+    level - gold level|, hard prediction) and expected-score error (|E[level] - gold|, E under
+    the candidate-conditional distribution renormalised off ∅) for meta.qtype == "score" rows,
+    where candidate index == ordinal level (as rendered). probs: [N, Kmax+1], null last, row
+    order == examples order; only rows with a valid hard candidate label contribute."""
+    probs = np.asarray(probs, dtype=np.float64)
+    mae, exp_err = [], []
+    for i, ex in enumerate(examples):
+        lbl = ex.get("label")
+        if not (isinstance(lbl, int) and lbl >= 0):
+            continue
+        K = len(ex["candidates"])
+        pc = probs[i, :K]
+        total = pc.sum()
+        if total <= 0:
+            continue
+        pc = pc / total
+        mae.append(abs(int(pc.argmax()) - lbl))
+        exp_err.append(abs(float((np.arange(K) * pc).sum()) - lbl))
+    return {"ordinal_mae": float(np.mean(mae)) if mae else float("nan"),
+            "exp_score_err": float(np.mean(exp_err)) if exp_err else float("nan"),
+            "n": len(mae)}
+
+
+def noul_reversed_check(probs_a, examples_a, probs_b, examples_b) -> dict:
+    """--noul_head bern positional-invariance control (PLAN7 track C noul_B_bern): examples_b is
+    examples_a with candidate order reversed (["yes","no"] <-> ["no","yes"]); the Bernoulli head
+    reads P(yes) off h_D alone (no candidates rendered), so it must give the identical P(yes)
+    either way -- both diffs below should be ~0 for a correct implementation (the K-way Choice
+    control is expected to differ, since it does read the rendered option text)."""
+    diffs = []
+    for pa, ea, pb, eb in zip(probs_a, examples_a, probs_b, examples_b):
+        ya = next(j for j, c in enumerate(ea["candidates"]) if c.strip().lower() == "yes")
+        yb = next(j for j, c in enumerate(eb["candidates"]) if c.strip().lower() == "yes")
+        diffs.append(abs(float(pa[ya]) - float(pb[yb])))
+    return {"max_abs_diff": float(np.max(diffs)) if diffs else float("nan"),
+            "mean_abs_diff": float(np.mean(diffs)) if diffs else float("nan")}

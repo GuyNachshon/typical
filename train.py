@@ -9,6 +9,7 @@ uv run train.py --name X [--backbone Qwen/Qwen3-1.7B-Base] [--lora_layers 8] [--
                  [--head mlp|z1|zr|zr_set] [--z_dim 128] [--z_probes 8] [--tiny_layers 2]
                  [--cand_encoder backbone|qwen3emb|tiny]
                  [--readout energy|mcq|native] [--nc_head n2|n3|n2n3] [--nc_render letters|tags] [--perm_lambda L] [--no_shuffle]
+                 [--score_head choice|cumlink] [--noul_head choice|bern] [--qtype_filter choice|score|noul] [--ordinal_smooth TAU]
 """
 import argparse
 import sys
@@ -23,6 +24,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 
@@ -30,7 +32,7 @@ from encode import Backbone, FeatureCache, pick_device
 from model import DecisionModel, decision_loss, collate, run_batch, split_joint
 from mcq import MCQHead, collate_mcq, run_batch_mcq
 from native import NativeHead, run_batch_native, native_features, shuffle_options, perm_consistency_loss
-from metrics import summarize, choice_set_effects, ksweep, counterfactual, rubric_flip
+from metrics import summarize, choice_set_effects, ksweep, counterfactual, rubric_flip, ordinal_metrics, noul_reversed_check
 import data as data_mod
 
 FAMILY = getattr(data_mod, "FAMILY", None)
@@ -85,6 +87,29 @@ def apply_no_null(examples):
         ex = dict(ex)
         ex["p_null"] = 0.0
         out.append(ex)
+    return out
+
+
+def apply_qtype_filter(examples, qtype):
+    """PLAN7 track C --qtype_filter: keep only meta.qtype == qtype rows (score_A_kway etc. train
+    3k steps on score-only data_wf/data_wf_hf rows; noul arms on noul-only rows)."""
+    return [ex for ex in examples if ex.get("meta", {}).get("qtype") == qtype]
+
+
+def apply_ordinal_smooth(examples, tau):
+    """PLAN7 track C score_B_smooth: replace a score-qtype row's hard one-hot target with an
+    ordinal-smoothed distribution over its K rendered (ordered) levels -- target_j proportional
+    to exp(-|j-y|/tau), y = the gold level index (candidate order == level order). Rows that
+    aren't meta.qtype == "score", or lack a hard candidate label, pass through unchanged."""
+    out = []
+    for ex in examples:
+        lbl = ex.get("label")
+        if ex.get("meta", {}).get("qtype") != "score" or not (isinstance(lbl, int) and lbl >= 0):
+            out.append(ex)
+            continue
+        w = [math.exp(-abs(j - lbl) / tau) for j in range(len(ex["candidates"]))]
+        s = sum(w)
+        out.append(dict(ex, target=[wi / s for wi in w]))
     return out
 
 
@@ -211,6 +236,41 @@ def parse_bucket_map(s):
     return dict(kv.split("=", 1) for kv in s.split(",")) if s else {}
 
 
+NULL_AUG_CATCHALL = {"other", "not_stated", "skip", "none"}
+
+
+def parse_null_aug(s):
+    if not s:
+        return None
+    bucket, frac = s.split(":", 1)
+    return bucket, float(frac)
+
+
+def apply_null_aug(examples, bucket, frac, seed):
+    """--null_aug BUCKET:FRAC (PLAN7 track B null control): for a seeded FRAC of `bucket` rows
+    (meta.fam_bucket, see bucket_of/tag_bucket) with a hard gold label and >= 3 candidates, add an
+    augmented COPY with the gold candidate -- and any rendered catch-all option (NULL_AUG_CATCHALL)
+    -- removed, so the only correct read left is null: target uniform-zero over what remains,
+    p_null=1.0, label=-1, meta.null_aug=True. The original row is untouched (not deleted, not
+    mutated), so ms_group/rubric_group keep meaning unchanged rows they already had. A row is
+    skipped (no copy) if removing the gold + catch-alls would leave under 2 candidates."""
+    rng = random.Random(seed)
+    eligible = [ex for ex in examples if bucket_of(ex) == bucket and ex.get("p_null", 0) == 0
+                and isinstance(ex.get("label"), int) and 0 <= ex["label"] < len(ex["candidates"])
+                and abs(ex["target"][ex["label"]] - 1.0) < 1e-6 and len(ex["candidates"]) >= 3]
+    n = round(len(eligible) * frac)
+    extra = []
+    for ex in rng.sample(eligible, min(n, len(eligible))):
+        cands = [c for i, c in enumerate(ex["candidates"]) if i != ex["label"]]
+        cands = [c for c in cands if c.strip().lower() not in NULL_AUG_CATCHALL]
+        if len(cands) < 2:
+            continue
+        aug = dict(ex, candidates=cands, target=[1.0 / len(cands)] * len(cands), p_null=1.0, label=-1)
+        aug["meta"] = dict(ex.get("meta", {}), null_aug=True)
+        extra.append(aug)
+    return examples + extra
+
+
 def parse_family_weights(s):
     return {k: float(v) for k, v in (kv.split(":", 1) for kv in s.split(","))} if s else None
 
@@ -249,7 +309,7 @@ def add_extra_data(args, train_examples, eval_sets):
         for ex in rows:
             if "ms_group" in ex.get("meta", {}):
                 ex["meta"]["ms_group"] = f"{ed.name}/{ex['meta']['ms_group']}"
-        if args.family_weights:
+        if args.family_weights or args.null_aug:
             tag_bucket(rows, ed.name, bucket_map)
         train_examples += rows
         # --eval_cap: head-N (not a random sample) so adjacent rubric-flip pairs stay intact (PLAN6 §W)
@@ -272,7 +332,7 @@ def load_run_data(args, backbone):
         train_examples = make_smoke_examples(64, seed=0)
         val_examples = make_smoke_examples(16, seed=1)
         eval_sets = {"smoke_eval": make_smoke_examples(16, seed=2)}
-        if args.family_weights:
+        if args.family_weights or args.null_aug:
             tag_bucket(train_examples, Path(args.data).name, parse_bucket_map(args.bucket_map))
         add_extra_data(args, train_examples, eval_sets)  # e.g. a tiny multiset file for an E3-ms smoke
         cache = None
@@ -293,7 +353,7 @@ def load_run_data(args, backbone):
         train_examples = load_jsonl(data_dir / "train.jsonl")
         val_examples = load_jsonl(data_dir / "val.jsonl")
         eval_sets = {Path(p).stem: load_jsonl(p) for p in sorted(glob.glob(str(data_dir / "eval" / "*.jsonl")))}
-        if args.family_weights:
+        if args.family_weights or args.null_aug:
             tag_bucket(train_examples, data_dir.name, parse_bucket_map(args.bucket_map))
         add_extra_data(args, train_examples, eval_sets)
 
@@ -346,10 +406,21 @@ def load_run_data(args, backbone):
             eval_sets = {k: v[:args.eval_limit] for k, v in eval_sets.items()}
             val_examples = val_examples[:args.eval_limit]
 
+    if args.null_aug:
+        bucket, frac = parse_null_aug(args.null_aug)
+        train_examples = apply_null_aug(train_examples, bucket, frac, args.seed)
+
     if args.readout == "energy" and args.cand_encoder == "tiny":
         from encode import TokenCandCache
         cache = TokenCandCache(backbone)
         cache.add(sorted({c for exs in (train_examples, val_examples, *eval_sets.values()) for ex in exs for c in ex["candidates"]}))
+
+    if args.qtype_filter:
+        train_examples = apply_qtype_filter(train_examples, args.qtype_filter)
+        val_examples = apply_qtype_filter(val_examples, args.qtype_filter)
+        assert train_examples, f"--qtype_filter {args.qtype_filter}: no train rows"
+    if args.ordinal_smooth:
+        train_examples = apply_ordinal_smooth(train_examples, args.ordinal_smooth)
 
     if args.mix == "nlionly":
         train_examples = [ex for ex in train_examples if ex["task"] in NLI_ONLY_TASKS]
@@ -362,10 +433,19 @@ def load_run_data(args, backbone):
     return cache, train_examples, val_examples, eval_sets
 
 
-def probs_from_logits(logits, cmask, T=1.0, null="softmax"):
+def probs_from_logits(logits, cmask, T=1.0, null="softmax", b=0.0):
+    """b: additive offset on logit(P(null)) -- the eval-time null-logit-offset knob (REPORT
+    S3w calibration experiment #1). For the plain-softmax null, P(null) = sigmoid(s_null/T -
+    logsumexp(s_valid/T)), i.e. a two-outcome softmax between the null score and everything
+    else -- so adding b to the (already-tempered) null score IS adding b to logit(P(null)),
+    with no change to the relative odds among candidates. For the factored null, r is composed
+    T-invariantly (see below) from log_r/log_1mr, so the same b is added directly to
+    logit(r) = log_r - log_1mr. One offset, same operation, both null forms -- that's why a
+    single --null_offset covers either --null softmax or --null factored.
+    b=0.0 (default) reproduces the pre-offset probs_from_logits exactly."""
     null_col = torch.ones(cmask.shape[0], 1, dtype=torch.bool, device=cmask.device)
     valid = torch.cat([cmask, null_col], dim=1)
-    if null == "factored" and T != 1.0:
+    if null == "factored" and (T != 1.0 or b != 0.0):
         # factored null composes p_j = softmax(s/T) *inside* the model (DecisionModel.
         # _factored_logits) -- T can't be applied to the already-composed logits like the
         # plain-softmax null below. But r=P(null) only sees untempered s-statistics, so it's
@@ -375,28 +455,35 @@ def probs_from_logits(logits, cmask, T=1.0, null="softmax"):
         K = logits.shape[-1] - 1
         log_r = logits[:, K]
         log_1mr = torch.log1p(-log_r.exp().clamp(max=1 - 1e-7))
+        if b != 0.0:
+            logit_r = log_r - log_1mr + b
+            log_r, log_1mr = F.logsigmoid(logit_r), F.logsigmoid(-logit_r)
         adj = (logits[:, :K] - log_1mr.unsqueeze(-1)).masked_fill(~cmask, float("-inf"))
         logp = torch.log_softmax(adj / T, dim=-1)
         cand = (log_1mr.unsqueeze(-1) + logp).exp().masked_fill(~cmask, 0.0)
         return torch.cat([cand, log_r.exp().unsqueeze(-1)], dim=-1)
-    masked = logits.masked_fill(~valid, float("-inf"))
-    return torch.softmax(masked / T, dim=-1)
+    masked = logits.masked_fill(~valid, float("-inf")) / T
+    if b != 0.0:
+        masked = torch.cat([masked[:, :-1], masked[:, -1:] + b], dim=-1)
+    return torch.softmax(masked, dim=-1)
 
 
 def full_target_from(target, p_null):
     return torch.cat([(1 - p_null).unsqueeze(-1) * target, p_null.unsqueeze(-1)], dim=-1)
 
 
-def run_readout(readout, backbone, model, batch, examples, joint=False, vec_cache=None, shots=0):
-    """One forward through whichever readout is configured -> logits [B, Kmax+1]."""
+def run_readout(readout, backbone, model, batch, examples, joint=False, vec_cache=None, shots=0, max_state=256):
+    """One forward through whichever readout is configured -> logits [B, Kmax+1].
+    max_state (--max_state, native only): decision-state truncation length; 256 = today's default."""
     if readout == "mcq":
         return run_batch_mcq(backbone, batch, examples, shots=shots)
     if readout == "native":
-        return run_batch_native(backbone, model, batch, examples, vec_cache=vec_cache)
+        return run_batch_native(backbone, model, batch, examples, max_state=max_state, vec_cache=vec_cache)
     return run_batch(backbone, model, batch, joint=joint, vec_cache=vec_cache)
 
 
-def forward_batches(backbone, model, cache, examples, bs, joint=False, readout="energy", vec_cache=None, shots=0):
+def forward_batches(backbone, model, cache, examples, bs, joint=False, readout="energy", vec_cache=None, shots=0,
+                     max_state=256):
     """(logits, cmask, target, p_null, batch) per batch, no grad, single forward each."""
     model.eval(); backbone.eval()  # LoRALinear modules default to train mode (LoRA dropout active at eval otherwise)
     out = []
@@ -404,7 +491,8 @@ def forward_batches(backbone, model, cache, examples, bs, joint=False, readout="
         for i in range(0, len(examples), bs):
             ex_batch = examples[i:i + bs]
             batch = collate_mcq(ex_batch) if readout in ("mcq", "native") else collate(cache, ex_batch)
-            logits = run_readout(readout, backbone, model, batch, ex_batch, joint=joint, vec_cache=vec_cache, shots=shots)
+            logits = run_readout(readout, backbone, model, batch, ex_batch, joint=joint, vec_cache=vec_cache,
+                                 shots=shots, max_state=max_state)
             # run_batch only moves state/query/C to backbone.device internally; target/p_null/cmask
             # stay on the collate()-produced CPU tensors, so callers must move them themselves.
             dev = logits.device
@@ -413,67 +501,90 @@ def forward_batches(backbone, model, cache, examples, bs, joint=False, readout="
     return out
 
 
-def eval_val_loss(backbone, model, cache, examples, bs, joint=False, readout="energy", vec_cache=None, shots=0):
+def eval_val_loss(backbone, model, cache, examples, bs, joint=False, readout="energy", vec_cache=None, shots=0,
+                   max_state=256):
     total, n = 0.0, 0
     for logits, cmask, target, p_null, ex_batch in forward_batches(backbone, model, cache, examples, bs,
-                                                                     joint=joint, readout=readout, vec_cache=vec_cache, shots=shots):
+                                                                     joint=joint, readout=readout, vec_cache=vec_cache,
+                                                                     shots=shots, max_state=max_state):
         loss = decision_loss(logits, target, p_null, cmask)
         total += loss.item() * len(ex_batch)
         n += len(ex_batch)
     return total / max(n, 1)
 
 
-def fit_temperature(backbone, model, cache, val_examples, bs, joint=False, readout="energy", vec_cache=None, shots=0):
+def fit_temperature(backbone, model, cache, val_examples, bs, joint=False, readout="energy", vec_cache=None,
+                     shots=0, b_grid=None, max_state=256):
     # ponytail: this doesn't set model.temperature even though DecisionModel has the attribute
     # (used by null="factored"'s forward composition) -- doing so would leak into eval_dataset's
     # own forward pass right after (which wants T=1 cached logits to sweep both raw and scaled
     # metrics via probs_from_logits) and into the next training step's run_batch (which doesn't
     # go through forward_batches at all). T stays a reporting-time overlay; a deployment script
     # that wants it baked into forward() can set model.temperature = fit_temperature(...)[0] itself.
+    #
+    # b_grid (REPORT S3w calib #1): candidate null-logit-offset values to search jointly with T,
+    # minimising NLL on val_examples (or whatever calibration set the caller passes in). None
+    # (default) fixes b=0 and searches T alone over exactly the same grid as before -- so every
+    # existing caller reproduces its old (T, nll) numbers exactly; only the return arity grew.
     null_mode = getattr(model, "null", "softmax")
-    batches = forward_batches(backbone, model, cache, val_examples, bs, joint=joint, readout=readout, vec_cache=vec_cache, shots=shots)
-    best_T, best_nll = 1.0, float("inf")
+    batches = forward_batches(backbone, model, cache, val_examples, bs, joint=joint, readout=readout, vec_cache=vec_cache,
+                              shots=shots, max_state=max_state)
+    b_candidates = [0.0] if b_grid is None else list(b_grid)
+    best_T, best_b, best_nll = 1.0, 0.0, float("inf")
     for T in np.geomspace(0.1, 10, 60):
-        total, n = 0.0, 0
-        for logits, cmask, target, p_null, _ in batches:
-            probs = probs_from_logits(logits, cmask, T, null=null_mode)
-            tgt = full_target_from(target, p_null)
-            nll = -(tgt * torch.log(probs.clamp_min(1e-12))).sum(-1)
-            total += nll.sum().item()
-            n += nll.shape[0]
-        avg = total / n
-        if avg < best_nll:
-            best_nll, best_T = avg, float(T)
-    return best_T, best_nll
+        for off in b_candidates:
+            total, n = 0.0, 0
+            for logits, cmask, target, p_null, _ in batches:
+                probs = probs_from_logits(logits, cmask, T, null=null_mode, b=off)
+                tgt = full_target_from(target, p_null)
+                nll = -(tgt * torch.log(probs.clamp_min(1e-12))).sum(-1)
+                total += nll.sum().item()
+                n += nll.shape[0]
+            avg = total / n
+            if avg < best_nll:
+                best_nll, best_T, best_b = avg, float(T), float(off)
+    return best_T, best_b, best_nll
 
 
-def eval_dataset(backbone, model, cache, examples, bs, Ts=(1.0,), joint=False, readout="energy", vec_cache=None, shots=0):
+def eval_dataset(backbone, model, cache, examples, bs, Ts=(1.0,), joint=False, readout="energy", vec_cache=None,
+                  shots=0, max_state=256):
+    """Ts: iterable of T floats, or (T, offset) pairs -- bare floats default offset to 0.0.
+    probs_all is keyed by T alone (as before the offset knob existed), so every existing
+    `probs[T]` lookup keeps working unchanged.
+    # ponytail: if T itself lands exactly on 1.0 with a nonzero offset, that entry's key
+    # collides with the raw (1.0, offset=0) entry and the offset one wins (dict overwrite) --
+    # a pre-existing risk of this T-keyed design (harmless before b existed, since two b=0
+    # entries at the same T are identical); not worth a bigger key for a probability-zero grid
+    # coincidence. Give T and offset separately (not equal T) if that ever matters.
+    """
     null_mode = getattr(model, "null", "softmax")
+    Ts_pairs = [t if isinstance(t, tuple) else (t, 0.0) for t in Ts]
     n = len(examples)
     kmax = max(len(ex["candidates"]) for ex in examples)
-    probs_all = {T: np.zeros((n, kmax + 1)) for T in Ts}
+    probs_all = {T: np.zeros((n, kmax + 1)) for T, _ in Ts_pairs}
     target_all = np.zeros((n, kmax + 1))
     label_all = np.full(n, np.nan)
     idx = 0
     for logits, cmask, target, p_null, ex_batch in forward_batches(backbone, model, cache, examples, bs,
                                                                      joint=joint, readout=readout, vec_cache=vec_cache,
-                                                                     shots=shots):
+                                                                     shots=shots, max_state=max_state):
         tgt = full_target_from(target, p_null).cpu().numpy()
         k_local = target.shape[1]
-        b = len(ex_batch)
-        for T in Ts:
-            probs = probs_from_logits(logits, cmask, T, null=null_mode).cpu().numpy()
-            probs_all[T][idx:idx + b, :k_local] = probs[:, :k_local]
-            probs_all[T][idx:idx + b, -1] = probs[:, -1]
-        target_all[idx:idx + b, :k_local] = tgt[:, :k_local]
-        target_all[idx:idx + b, -1] = tgt[:, -1]
+        bsz = len(ex_batch)
+        for T, off in Ts_pairs:
+            probs = probs_from_logits(logits, cmask, T, null=null_mode, b=off).cpu().numpy()
+            probs_all[T][idx:idx + bsz, :k_local] = probs[:, :k_local]
+            probs_all[T][idx:idx + bsz, -1] = probs[:, -1]
+        target_all[idx:idx + bsz, :k_local] = tgt[:, :k_local]
+        target_all[idx:idx + bsz, -1] = tgt[:, -1]
         for j, ex in enumerate(ex_batch):
             label_all[idx + j] = ex["label"] if ex.get("label") is not None else np.nan
-        idx += b
+        idx += bsz
     return probs_all, target_all, label_all
 
 
-def dump_logits(backbone, model, cache, examples, bs, joint=False, readout="energy", vec_cache=None, shots=0):
+def dump_logits(backbone, model, cache, examples, bs, joint=False, readout="energy", vec_cache=None, shots=0,
+                 max_state=256):
     """Like eval_dataset but keeps raw (pre-softmax, pre-T) logits -- padded with finfo.min --
     plus the real candidate count K per row, for scripts/null_bias.py to fit a post-hoc
     K-aware null-bias correction (s_null' = s_null + alpha*log(K) + beta) without retraining."""
@@ -486,7 +597,7 @@ def dump_logits(backbone, model, cache, examples, bs, joint=False, readout="ener
     idx = 0
     for logits, cmask, target, p_null, ex_batch in forward_batches(backbone, model, cache, examples, bs,
                                                                      joint=joint, readout=readout, vec_cache=vec_cache,
-                                                                     shots=shots):
+                                                                     shots=shots, max_state=max_state):
         tgt = full_target_from(target, p_null).cpu().numpy()
         lg = logits.cpu().numpy()
         k_local = target.shape[1]
@@ -512,21 +623,42 @@ def dump_eval_logits(args, backbone, model, cache, val_examples, eval_sets):
     for name, examples in {"val": val_examples, **eval_sets}.items():
         logits, target, label, K = dump_logits(backbone, model, cache, examples, args.eval_bs,
                                                  joint=args.joint, readout=args.readout, vec_cache=vec_cache,
-                                                 shots=args.shots)
+                                                 shots=args.shots, max_state=args.max_state)
         np.savez(out_dir / f"{name}.npz", logits=logits, target=target, label=label, K=K)
         meta = [{k: v for k, v in ex.items() if k != "state"} for ex in examples]
         with open(out_dir / f"{name}.meta.json", "w") as f:
             json.dump(meta, f)
 
 
+def resolve_calib_examples(calib_sets_arg, val_examples, eval_sets):
+    """--calib_sets NAME[,NAME...] (REPORT S3w calib #1): concat named eval sets ("val" is an
+    alias for val_examples) into one calibration pool for the joint (T, null_offset) fit.
+    Unset (None) -> (val_examples, ["val"], None) so run_full_eval's default path is untouched:
+    None as the third element tells fit_temperature to skip the b grid (b fixed at 0)."""
+    if not calib_sets_arg:
+        return val_examples, ["val"], None
+    names = [n.strip() for n in calib_sets_arg.split(",") if n.strip()]
+    lookup = {"val": val_examples, **eval_sets}
+    missing = [n for n in names if n not in lookup]
+    assert not missing, f"--calib_sets: unknown eval set(s) {missing}; available: {sorted(lookup)}"
+    examples = sum((lookup[n] for n in names), [])
+    return examples, names, np.arange(-4.0, 4.0 + 1e-9, 0.25)
+
+
 def run_full_eval(args, backbone, model, cache, val_examples, eval_sets, val_nll):
     vec_cache = cache if args.cand_encoder == "qwen3emb" else None
-    best_T, _ = fit_temperature(backbone, model, cache, val_examples, args.eval_bs, joint=args.joint,
-                                 readout=args.readout, vec_cache=vec_cache, shots=args.shots)
-    results = {"T": best_T, "val_nll": val_nll, "args": vars(args), "eval": {}}  # args: so a run is reproducible from results.json alone
+    calib_examples, calib_names, b_grid = resolve_calib_examples(getattr(args, "calib_sets", None), val_examples, eval_sets)
+    best_T, best_b, _ = fit_temperature(backbone, model, cache, calib_examples, args.eval_bs, joint=args.joint,
+                                         readout=args.readout, vec_cache=vec_cache, shots=args.shots, b_grid=b_grid,
+                                         max_state=args.max_state)
+    # args: so a run is reproducible from results.json alone
+    results = {"T": best_T, "null_offset": best_b, "calib_sets": calib_names, "val_nll": val_nll,
+               "args": vars(args), "eval": {}}
     for name, examples in eval_sets.items():
-        probs, target, label = eval_dataset(backbone, model, cache, examples, args.eval_bs, Ts=(1.0, best_T),
-                                             joint=args.joint, readout=args.readout, vec_cache=vec_cache, shots=args.shots)
+        probs, target, label = eval_dataset(backbone, model, cache, examples, args.eval_bs,
+                                             Ts=(1.0, (best_T, best_b)),
+                                             joint=args.joint, readout=args.readout, vec_cache=vec_cache,
+                                             shots=args.shots, max_state=args.max_state)
         raw_m, scaled_m = summarize(probs[1.0], target, label), summarize(probs[best_T], target, label)
         if args.no_null:
             raw_m["auroc_null"] = scaled_m["auroc_null"] = "n/a"
@@ -539,19 +671,43 @@ def run_full_eval(args, backbone, model, cache, val_examples, eval_sets, val_nll
             results["eval"][name]["cf"] = counterfactual(probs[best_T], examples)
         elif name.startswith("wf_rubric_flip"):  # PLAN6 rubric-group probe (scripts/workflow_corpus.py)
             results["eval"][name]["flip"] = rubric_flip(probs[best_T], examples)
+
+        # PLAN7 track C: ordinal MAE / expected-score error on whichever rows of this (possibly
+        # mixed-qtype) set are meta.qtype == "score" -- content-keyed, not name-keyed, since
+        # typed_decisions_test/systemone_lite_hard/etc. mix choice/noul/score rows in one file.
+        score_idx = [j for j, ex in enumerate(examples) if ex.get("meta", {}).get("qtype") == "score"]
+        if score_idx:
+            results["eval"][name]["ordinal"] = ordinal_metrics(probs[best_T][score_idx],
+                                                                [examples[j] for j in score_idx])
+        # --noul_head bern reversed-label control: re-score this set's noul rows with candidate
+        # order reversed (["yes","no"] vs ["no","yes"]) -- P(yes) must not move, since the
+        # suffix never renders candidates at all (see native._render_query_only).
+        if args.readout == "native" and getattr(model, "noul_head", "choice") == "bern":
+            noul_idx = [j for j, ex in enumerate(examples) if ex.get("meta", {}).get("qtype") == "noul"]
+            if noul_idx:
+                noul_ex = [examples[j] for j in noul_idx]
+                rev_ex = [dict(ex, candidates=list(reversed(ex["candidates"])), target=list(reversed(ex["target"])))
+                          for ex in noul_ex]
+                rev_probs, _, _ = eval_dataset(backbone, model, cache, rev_ex, args.eval_bs, Ts=((best_T, best_b),),
+                                               joint=args.joint, readout=args.readout, vec_cache=vec_cache,
+                                               shots=args.shots, max_state=args.max_state)
+                results["eval"][name]["noul_reversed"] = noul_reversed_check(
+                    probs[best_T][noul_idx], noul_ex, rev_probs[best_T], rev_ex)
     return results
 
 
-def calibrate_zscore_native(head, model, examples, seed, n=256):
+def calibrate_zscore_native(head, model, examples, seed, n=256, max_state=256):
     """NativeHead.mu_h/sd_h from n training rows' decision states, mu_c/sd_c from their pooled
-    option spans (valid options + the null line) -- same rogue-dim reasoning as calibrate_zscore."""
+    option spans (valid options + the null line) -- same rogue-dim reasoning as calibrate_zscore.
+    max_state must match the run's --max_state so the calibration states aren't truncated
+    differently than training/eval."""
     sample = random.Random(seed).sample(examples, min(n, len(examples)))
     hs, cs = [], []
     with torch.inference_mode():
         for i in range(0, len(sample), 32):
             chunk = sample[i:i + 32]
             h, C3, cmask, _ = native_features(head, [ex["state"] for ex in chunk], [ex["query"] for ex in chunk],
-                                              [ex["candidates"] for ex in chunk], render=model.render)
+                                              [ex["candidates"] for ex in chunk], max_state=max_state, render=model.render)
             valid = torch.cat([cmask, torch.ones_like(cmask[:, :1])], 1)
             hs.append(h); cs.append(C3[valid])
     model.calibrate(torch.cat(hs), torch.cat(cs))
@@ -675,7 +831,9 @@ def fmt(v, width=8, prec=3):
 
 
 def print_table(results):
-    print(f"\nT={results['T']:.3f}  val_nll={results['val_nll']:.4f}")
+    calib_note = f"  null_offset={results['null_offset']:+.2f} (calib_sets={','.join(results['calib_sets'])})" \
+        if results.get("null_offset") else ""
+    print(f"\nT={results['T']:.3f}  val_nll={results['val_nll']:.4f}{calib_note}")
     print(f"{'set':<20}{'acc':>8}{'acc_k':>8}{'nll':>8}{'brier':>8}{'ece':>8}{'auroc_null':>12}")
     for name, ev in results["eval"].items():
         m = ev["scaled"]
@@ -746,12 +904,20 @@ def parse_args():
     p.add_argument("--data", default="data")
     p.add_argument("--extra_data", default=None, help="comma-separated extra data dirs mixed into train (their val/eval become eval sets)")
     p.add_argument("--eval_cap", type=int, default=None, help="head-N cap per --extra_data val/eval set (big external evals run post-hoc via scripts/eval_wf.py)")
+    p.add_argument("--calib_sets", default=None,
+                    help="comma-separated eval-set names (as in results.json['eval'], plus 'val') to fit T and "
+                         "the null_offset b jointly on by grid search; unset = today's behaviour (val only, b=0)")
     p.add_argument("--family_weights", default=None,
                    help="PLAN6 Queue review: e.g. 'E:0.35,K:0.25,W:0.40' -- family-balanced sampler over "
                         "meta.fam_bucket (else --data->E, a data_kb*/data_wf* --extra_data dir->K/W); "
                         "default None = today's uniform concatenation, byte-identical stream")
     p.add_argument("--bucket_map", default=None,
                    help="--family_weights only: comma-separated dirname=bucket overrides, e.g. data_kbt=K,data_wf_hf=W")
+    p.add_argument("--null_aug", default=None,
+                   help="PLAN7 track B null control: 'BUCKET:FRAC', e.g. 'W:0.20' -- for a seeded FRAC of that "
+                        "meta.fam_bucket's hard-labelled, >=3-candidate rows, add a copy with the gold candidate "
+                        "(and any rendered catch-all option -- other/not_stated/skip/none) removed so only null "
+                        "is correct (p_null=1.0, label=-1, meta.null_aug=True); the original row is kept as-is")
     p.add_argument("--smoke", action="store_true")
     p.add_argument("--eval_limit", type=int, default=0, help="cap each eval set (smoke runs)")
     p.add_argument("--tap_layer", type=int, default=0, help="tower memory from layer T (0 = last layer)")
@@ -776,6 +942,21 @@ def parse_args():
     p.add_argument("--nc_render", choices=["letters", "tags", "letters_nonull"], default="letters",
                     help="--readout native suffix: letters = mcq's 'A. opt' lines + null line + 'Answer:' (unchanged); "
                          "tags = native_v2 (PLAN5 sec 2) letter-free '<choice>\\n opt \\n</choice>' blocks, no null line")
+    p.add_argument("--score_head", choices=["choice", "cumlink"], default="choice",
+                    help="PLAN7 track C: score_C_cumlink -- cumulative-link ordinal head over the rendered "
+                         "levels instead of the K-way Choice scorer (choice = today's default, unchanged)")
+    p.add_argument("--noul_head", choices=["choice", "bern"], default="choice",
+                    help="PLAN7 track C: noul_B_bern -- Bernoulli P(yes) from h_D, no candidates rendered "
+                         "in the suffix (choice = today's 2-way Choice, unchanged)")
+    p.add_argument("--qtype_filter", choices=["choice", "score", "noul"], default=None,
+                    help="PLAN7 track C: keep only meta.qtype == X train/val rows (--data/--extra_data); "
+                         "eval sets are untouched")
+    p.add_argument("--ordinal_smooth", type=float, default=0.0,
+                    help="PLAN7 track C score_B_smooth: tau for the ordinal-smoothed train target on "
+                         "meta.qtype == 'score' rows, target_j ~ exp(-|j-y|/tau) (0 = off, today's hard target)")
+    p.add_argument("--max_state", type=int, default=256,
+                    help="--readout native: decision-state truncation length in tokens, threaded to "
+                         "run_batch_native/native_features/calibrate_zscore_native (256 = today's default)")
     p.add_argument("--perm_lambda", type=float, default=0.0,
                     help="--readout native: weight on native.perm_consistency_loss -- a second forward of a random 1/4 of "
                          "the batch under a fresh option order, KL between the two candidate distributions aligned by "
@@ -838,7 +1019,7 @@ def main():
         # this invocation happened to be called with -- otherwise a mismatched
         # --lora_layers/--tap_layer/--joint silently loads weights into the wrong shapes.
         ckpt = torch.load(best_path, map_location=device, weights_only=False)  # trusted, self-produced
-        for k in ("backbone", "tap_layer", "lora_layers", "lora_r", "no_hybrid", "no_cand_null", "joint", "tower_d", "tower_layers", "tower_heads", "listwise", "readout", "cand_encoder", "extra_tap", "null", "head", "z_dim", "z_probes", "tiny_layers", "nc_head", "nc_render"):
+        for k in ("backbone", "tap_layer", "lora_layers", "lora_r", "no_hybrid", "no_cand_null", "joint", "tower_d", "tower_layers", "tower_heads", "listwise", "readout", "cand_encoder", "extra_tap", "null", "head", "z_dim", "z_probes", "tiny_layers", "nc_head", "nc_render", "score_head", "noul_head", "max_state"):
             if k in ckpt.get("args", {}):
                 setattr(args, k, ckpt["args"][k])
 
@@ -852,7 +1033,8 @@ def main():
         assert not args.joint and not args.listwise and not args.shots, "--joint/--listwise/--shots are not native options"
         backbone = MCQHead(args.backbone, lora_layers=args.lora_layers, lora_r=args.lora_r, device=device,
                            tap_layer=args.tap_layer)  # same backbone + LoRA as mcq; its lm_head is simply unused
-        model = NativeHead(backbone.backbone.d, nc_head=args.nc_head, null=args.null, render=args.nc_render).to(device)
+        model = NativeHead(backbone.backbone.d, nc_head=args.nc_head, null=args.null, render=args.nc_render,
+                           score_head=args.score_head, noul_head=args.noul_head).to(device)
     else:
         assert not args.extra_tap or args.cand_encoder == "qwen3emb", "--extra_tap doubles the top width; candidates must come from the embedder"
         backbone = Backbone(args.backbone, lora_layers=args.lora_layers, lora_r=args.lora_r, device=device,
@@ -867,7 +1049,7 @@ def main():
     cache, train_examples, val_examples, eval_sets = load_run_data(args, backbone)
     vec_cache = cache if args.cand_encoder == "qwen3emb" else None
     if args.zscore and args.readout == "native":
-        calibrate_zscore_native(backbone, model, train_examples, args.seed)
+        calibrate_zscore_native(backbone, model, train_examples, args.seed, max_state=args.max_state)
     elif args.zscore:
         calibrate_zscore(backbone, model, train_examples, cache, args.seed, joint=args.joint, vec_cache=vec_cache)
     if args.init_from:
@@ -922,7 +1104,8 @@ def main():
     for step in range(start_step + 1, args.steps + 1):
         t0 = time.time()
         examples, batch = next(batches)
-        logits = run_readout(args.readout, backbone, model, batch, examples, joint=args.joint, vec_cache=vec_cache, shots=args.shots)
+        logits = run_readout(args.readout, backbone, model, batch, examples, joint=args.joint, vec_cache=vec_cache,
+                             shots=args.shots, max_state=args.max_state)
         # run_batch moves state/query/C to backbone.device but leaves target/p_null/cmask/
         # teacher/has_teacher/delta_* on the CPU tensors collate()/collate_mcq() built; move
         # them here so loss math matches logits' device (delta_* only exist for collate()).
@@ -936,7 +1119,8 @@ def main():
                               gamma=args.delta_gamma)
         if args.perm_lambda > 0:
             loss = loss + args.perm_lambda * perm_consistency_loss(
-                lambda ex, b: run_batch_native(backbone, model, b, ex, vec_cache=vec_cache), logits, examples, perm_rng)
+                lambda ex, b: run_batch_native(backbone, model, b, ex, max_state=args.max_state, vec_cache=vec_cache),
+                logits, examples, perm_rng)
         opt.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(all_params, 1.0)
