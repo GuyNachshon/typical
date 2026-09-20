@@ -2,7 +2,7 @@
 # Cost guard: every 10 min, check each RunPod pod; stop it if idle (no train/baselines/bench python AND GPU util < 5%)
 # for 2 consecutive checks. Log to /tmp/costguard.log. Pods: id|ssh-info-file
 set -a; source /Users/guynachshon/conductor/workspaces/typical/buffalo/.env; set +a
-PODS="llzychzkjm3uec|/tmp/podssh7 mjmw6vry97abjb|/tmp/podssh8 bahbab3l3x05lm|/tmp/podssh9"
+PODS="bahbab3l3x05lm|/tmp/podssh9"
 typeset -A idle
 while true; do
   for entry in ${=PODS}; do

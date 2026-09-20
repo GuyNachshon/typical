@@ -866,6 +866,27 @@ confidence statistics; a task id would be needed, and that is not a System-One p
 §3t's `nc_v3_tap20` at energy level on evidence, the two-expert frontier this gate was meant to exploit has mostly
 closed on its own (the remaining energy-only advantages are K-flat cost and the paired-null probes).
 
+## 3v. Seed pair for the N1-vs-N3 claim (`nc_n1_s1`, `nc_n3_s1`; H100, 2026-09-20, ~$18)
+
+§3l rested on one seed per readout. Matched seed-1 replicates (28 layers, v5 + kb, 12k steps; only `--seed 1` changed):
+
+| | N1 letters s0 / **s1** | N3 direct s0 / **s1** | teacher |
+|---|---|---|---|
+| Δ_q shuffled (primary) | .114 / **.104** | .117 / **.094** | .102 |
+| Δ_q choices-only | .112 / .093 | .111 / .070 | .088 |
+| MMLU-Pro among-K | .325 / .318 | .314 / .301 | .310 |
+| SNLI / MNLI / ANLI / BoolQ | .838 / .684 / .377 / .769 → .831 / .664 / .393 / .764 | .863 / .752 / .431 / .737 → .851 / .719 / .437 / .746 | – |
+| CLINC-150 / HWU64 | .697 / .510 → .708 / .532 | .740 / .660 → .741 / .674 | – |
+| reorder max Δp / IIA dlo | .165 / .463 → .165 / .443 | .101 / .126 → .109 / .094 | 0 / 0 |
+| MMLU false-abstain | .254 → .297 | .646 → .543 | – |
+
+Seed-to-seed spread of Δ_q_sh is ≈ .01–.02 for both readouts; N1 and N3 stay within it of each other and of the
+teacher (N1 mean .109, N3 mean .106, teacher .102). The evidence advantage of N3 over N1 (SNLI +2, MNLI +6–7, ANLI +4–5,
+CLINC +3–4, HWU64 +14–15) and its lower order fragility (reorder .10–.11 vs .165; IIA .09–.13 vs .44–.46) hold in both
+seeds. The §3l claim — *the direct contextual readout keeps the letter interface's question-dependent knowledge while
+removing most of its order artifacts* — is replicated. MMLU false-abstain moves ±.05–.10 between seeds for both
+readouts, so §3p/§3t's abstention numbers should be read at that resolution (the .69 → .003 change of §3t is far outside it).
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
