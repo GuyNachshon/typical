@@ -1291,6 +1291,34 @@ extraction 12 → 9 of 12) while JevBench hard rises (.387 → .432, Brier .88 �
 model that trades ~1 SE of JevBench-standard for it. **Decision: freeze `ts1b` as `typical-small` (Release 1 at 1.7B)**,
 with the preview kept as the reference; the 4B `tm1b` decides `typical-medium`.
 
+## 3af. Release-1 candidate at 4B — `tm1b` (H100, 2026-09-21, ~$15 + $8 lost to the routing bug)
+
+Same recipe as `ts1b` (§3ae) on Qwen3-4B-Base, tap 26/36, effective batch 64 (`--grad_accum 4`, 58 GB). Matched control =
+`ladder_4b` (§3ab: same backbone, the 6A recipe — no typed heads, no DecisionMix v2, 256-token states). Full rows.
+
+| | `ladder_4b` | **`tm1b`** | `ts1b` (1.7B) |
+|---|---|---|---|
+| CLINC-150 / TREC-fine / HWU64 / 20NG | .850 / .516 / .787 / .577 | .847 / .414 / .769 / .588 | .804 / .508 / .761 / .540 |
+| SNLI / MNLI / BoolQ / ANLI | .909 / .868 / .865 / .536 | .909 / .861 / .843 / .544 | .894 / .859 / .824 / .497 |
+| MMLU-Pro among-K / Δ_q_sh / TruthfulQA | .457 / .193 / .386 | .458 / .193 / **.408** | .343 / .127 / .257 |
+| held-out noul / score / style / flip (full rows) | .841 / .535 / .923 / .785 | .811 / .528 / .859 / .786 | .715 / .520 / .859 / .581 |
+| held-out score NLL / typed-decisions acc, NLL | 2.37 / .465, 1.88 | **1.02** / **.532, 1.18** | 1.01 / .510, 1.25 |
+| wh family / grammar / style / **level 7** / flip / shuffled | – | .874 / .893 / .891 / **.544** / .743 / .378 (NLL 3.4) | .836 / .898 / .896 / .495 / .718 / .410 |
+| u ChaosNLI / real / synthetic | – | .513 / .658 / .907 | .547 / .649 / .916 |
+| external: PagerDuty (floor .792) / jevlogs (.697) / Mind2Web (.427) / tree-choice | .790 / .487 / .559 / .713 | **.838** / .673 / .544 / .690 | .817 / .710 / .357 / .474 |
+| JevBench std / easy / hard (Brier std / hard; ECE std) | .833 / 1.00 / .432 (.29 / .83; .12) | .806 / 1.00 / .423 (.30 / .77; **.09**) | .694 / 1.00 / .432 (.40 / .79; .11) |
+| single decision ms K = 2 / 32 / 256 (same pod as `ladder_4b`) | 56 / 56 / 118 | 57 / 58 / 96 | 45 / 46 / 106 |
+
+**Read.** The Release-1 recipe on 4B keeps knowledge (MMLU .458, Δ_q .193, TruthfulQA +2), keeps NLI, halves the
+soft-target NLLs again (score 2.37 → 1.02, typed-decisions 1.88 → 1.18 with accuracy +7), is the first model above .50 on
+level-7 composition (.544), clears the PagerDuty floor (.838), and is the best-calibrated model on JevBench standard
+(ECE .086) — at unchanged latency. It gives back TREC-fine (−10, the one clear regression; K = 50 fine-grained topics),
+held-out styles (−6), noul (−3) and ~2 JevBench items on standard and 1 on hard (within n_eff = 36 noise). **Decision:
+freeze `tm1b` as `typical-medium`.** The 4B remains the knee of capability per millisecond: it beats `typical-small` by
++4–11 on evidence, +11 on MMLU among-K, +10 on held-out noul, +5 on level 7 and +11 on JevBench standard for 1.25× the
+per-decision latency. Open at 4B, same as at 1.7B: the hard tier (.42, long_policy .21, temporal/trade-off ≤ .2) and
+TREC-fine.
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
