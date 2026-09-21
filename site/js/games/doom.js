@@ -3,6 +3,12 @@
 // simple ray-marcher (fixed small steps, not full DDA) - the map is 24x16, so marching is cheap
 // and much easier to get right than a DDA/grid-traversal implementation.
 
+// Representation B (the shipped/probed one, .200 acc, chance .200) - exact string, sent
+// verbatim as the query by render-doom.js and render-realdoom.js.
+export const QUESTION =
+  "Which action applies for the player? Apply the rules in the stated precedence order; the first matching rule wins.\n" +
+  'move back: applies when health is below 30 and an enemy is visible  shoot: applies when an enemy is in the crosshair and ammo is above 0  turn left: applies when an enemy is to the left, outside the crosshair  turn right: applies when an enemy is to the right, outside the crosshair  move forward: applies when none of the above rules fire';
+
 function mulberry32(seed) {
   return function () {
     seed |= 0;

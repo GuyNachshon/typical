@@ -1,11 +1,18 @@
-// Hand-rolled SVG charts. No libraries. Monochrome, restyled for v3 ("Gallery"): ink
-// density (fill-opacity) stands in for the old thermal colour ramp, series are told apart
-// by dash pattern + marker shape rather than colour, responsive via viewBox. These charts
-// render inside the dark Ink Room, so the flat marks are paper-on-ink.
+// Hand-rolled SVG charts. No libraries. Atoms palette on black: cream marks, ash for axes/
+// dim labels, hairline cream grid rules. Series are told apart by dash pattern + marker
+// shape, never colour — champagne is reserved for a released model's primary series (see
+// FG_ACCENT / accentFor below), never used as a full-surface fill.
 const NS = 'http://www.w3.org/2000/svg';
-const DIM = '#808080'; // ash
-const RULE = 'rgba(255,255,255,0.14)';
-const FG = '#ffffff'; // paper
+const DIM = '#66635f'; // ember ash
+const RULE = 'rgba(255,247,221,0.14)';
+const FG = '#fff7dd'; // candlelight cream
+const ACCENT = '#c8ad86'; // champagne gold — released models' primary series only
+
+// A series is "accented" (champagne) only when its label names a released model (no
+// "(not released)" suffix) — everything else (unreleased points, axes, grid) stays cream/ash.
+function accentFor(label) {
+  return typeof label === 'string' && !label.includes('not released') ? ACCENT : FG;
+}
 
 const DASH = ['none', '6 3', '2 3', '9 3 2 3'];
 const SHAPES = ['circle', 'square', 'triangle', 'diamond'];
@@ -188,12 +195,13 @@ export function lineChart(container, { series, xLabel = '', yLabel = '', logX = 
 
   series.forEach((s, si) => {
     const { dash, shape } = seriesStyle(si);
+    const color = accentFor(s.label);
     const pts = s.values.map((v) => `${x(v.x)},${y(v.y)}`).join(' ');
-    const lineAttrs = { points: pts, fill: 'none', stroke: FG, 'stroke-width': 2 };
+    const lineAttrs = { points: pts, fill: 'none', stroke: color, 'stroke-width': 2 };
     if (dash !== 'none') lineAttrs['stroke-dasharray'] = dash;
     g.appendChild(svgEl('polyline', lineAttrs));
     s.values.forEach((v) => {
-      const dot = markerEl(shape, x(v.x), y(v.y), 3.5, FG);
+      const dot = markerEl(shape, x(v.x), y(v.y), 3.5, color);
       const ttl = svgEl('title');
       ttl.textContent = `${s.label}: ${fmt(v.x)}, ${fmt(v.y)}`;
       dot.appendChild(ttl);
@@ -275,16 +283,17 @@ export function ladder(container, { points, xLabel = 'latency (ms)', yLabel = 'a
     const r = 4 + 6 * norm;
     const cx = x(p.x);
     const cy = y(p.y);
+    const color = accentFor(p.label);
     const dot = p.hollow
-      ? svgEl('circle', { cx, cy, r, fill: 'none', stroke: FG, 'stroke-width': 2, 'stroke-dasharray': '3,2' })
-      : svgEl('circle', { cx, cy, r, fill: FG });
+      ? svgEl('circle', { cx, cy, r, fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-dasharray': '3,2' })
+      : svgEl('circle', { cx, cy, r, fill: color });
     const ttl = svgEl('title');
     ttl.textContent = `${p.label}: ${fmt(p.x)}, ${fmt(p.y)}`;
     dot.appendChild(ttl);
     g.appendChild(dot);
     // labels flip to the left of the dot near the right edge so they never clip
     const flip = cx > iw * 0.8;
-    g.appendChild(svgText(flip ? cx - r - 4 : cx + r + 4, cy + 3, p.label, { fill: p.hollow ? DIM : FG, 'text-anchor': flip ? 'end' : 'start' }));
+    g.appendChild(svgText(flip ? cx - r - 4 : cx + r + 4, cy + 3, p.label, { fill: p.hollow ? DIM : color, 'text-anchor': flip ? 'end' : 'start' }));
   });
   refLines.forEach((rl) => {
     g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(rl.y), y2: y(rl.y), stroke: DIM, 'stroke-dasharray': '4,3' }));

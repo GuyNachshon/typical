@@ -4,8 +4,7 @@
 // DOM weapon sprite + muzzle flash + damage vignette. This is a Doom-LIKE built for the page
 // over our own grid engine, not id's DOOM - the HUD label says so.
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js';
-import { Doom, greedyPolicy } from './doom.js';
-import { QUESTION } from '../demos/doom.js';
+import { Doom, greedyPolicy, QUESTION } from './doom.js';
 import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, replayFrame, loadJSON } from './loop.js';
 
 const TICK_MS = 300;

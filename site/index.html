@@ -3,70 +3,121 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Typical — calibrated decisions on text</title>
+<title>Typical — small open models that decide</title>
 <meta name="description" content="Typical reads a state once and answers many structured questions from it — Choice, Noul, and Score, with calibrated probabilities and an explicit abstain." />
 <link rel="stylesheet" href="style.css" />
 <link rel="stylesheet" href="exhibits.css" />
 </head>
 <body>
 
-<div class="room-index" data-room-index aria-hidden="true"></div>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="#hero">Typical</a>
+    <div class="nav-links">
+      <a href="#results">Results</a>
+      <a href="#demos">Demos</a>
+      <a href="research.html">Research</a>
+      <a href="https://huggingface.co/OzLabs" target="_blank" rel="noopener">Hugging Face →</a>
+    </div>
+  </div>
+</nav>
 
 <main>
 
   <!-- HERO -->
-  <section class="room hero room-light" id="hero" data-room="hero" data-room-label="Hero" data-theme="light">
-    <header class="site-header">
-      <svg class="logo-mark" viewBox="0 0 32 32" aria-label="Typical">
-        <circle cx="16" cy="16" r="14.5" />
-        <text x="16" y="21" text-anchor="middle">T</text>
-      </svg>
-      <a class="link-ghost" href="research.html">Research</a>
-    </header>
-
-    <div class="hero-cluster" data-reveal>
-      <p class="hero-sub serif">Calibrated decisions <em>on</em> text</p>
-      <p class="hero-stats">
-        <span>45 ms / decision &middot; H100</span>
-        <span>1.7B &middot; 4B open weights</span>
-      </p>
-      <a class="btn-pill" href="#ledger">See it decide</a>
-    </div>
-
-    <div class="hero-wordmark-wrap">
-      <h2 class="hero-wordmark" data-wordmark aria-hidden="true">Typical</h2>
-    </div>
+  <section class="hero" id="hero">
+    <div class="mark" data-mark aria-hidden="true"></div>
+    <h1 class="hero-headline">Small open models that decide. One pass over the text, a probability for every option, and an explicit &empty;.</h1>
+    <a class="ghost-link" href="#results">Results →</a>
   </section>
 
-  <!-- LEDGER STRIP -->
-  <section class="room room-chalk" id="ledger" data-room="ledger" data-room-label="Ledger" data-theme="light">
-    <div class="ledger-strip">
-      <div class="ledger-head" data-reveal>
-        <h3 class="ledger-title">Decision ledger</h3>
-        <p class="dim" style="font-size:12px;max-width:44ch;">Every entry is a real Choice / Noul / Score call.
-          Latency measured here on Apple silicon.</p>
+  <!-- RESULTS -->
+  <section class="section" id="results">
+    <div class="container">
+      <h2 class="section-title">Results</h2>
+      <p class="section-lede">Two released sizes, one recipe. The numbers that moved, and the ones that did not.</p>
+
+      <div class="stat-grid">
+        <div class="card stat-card">
+          <span class="pill">Latency</span>
+          <div class="stat-number">45 ms</div>
+          <p class="stat-caption">per decision · H100, K=2 · in-process, model load excluded</p>
+        </div>
+        <div class="card stat-card">
+          <span class="pill">JevBench</span>
+          <div class="stat-number">.694 / .806</div>
+          <p class="stat-caption">standard accuracy, small / medium · chance .311 · public subset, unranked</p>
+        </div>
+        <div class="card stat-card">
+          <span class="pill">CLINC-150</span>
+          <div class="stat-number">.804 / .847</div>
+          <p class="stat-caption">small / medium · OOS abstain recall .827</p>
+        </div>
       </div>
-      <div class="ink-ledger" id="ledger-body"></div>
-    </div>
-  </section>
 
-  <!-- PAINTING ROOM I: SNAKE -->
-  <section class="room room-flush painting-room" id="room-snake" data-room="snake" data-room-label="Snake" data-theme="light">
-    <img class="painting-bg" data-painting="0" alt="" />
-    <div class="card-notched game-card" data-pin-card>
-      <div class="game-mount" data-game="snake"></div>
-      <div class="wall-label">
-        <h3>Snake</h3>
-        <p>canvas, 2026 &middot; no lookahead, one sentence per move — the candidate set is the only guardrail.</p>
+      <div id="results-table"></div>
+
+      <div class="chart-row">
+        <div class="chart">
+          <h3 class="chart-title">Scaling ladder</h3>
+          <div id="chart-g1"></div>
+        </div>
+        <div class="chart">
+          <h3 class="chart-title">Latency vs K</h3>
+          <div id="chart-g2"></div>
+        </div>
       </div>
-      <span class="notch-label">Scroll</span>
+
+      <h3 class="chart-title">Calibration</h3>
+      <div class="reliability-row" id="chart-g4"></div>
+      <p id="g4-caption" class="chart-caption" style="margin-bottom:var(--spacing-32);"></p>
+
+      <div class="disclosure-box" id="in-training" style="margin-bottom:var(--spacing-24);"></div>
+
+      <blockquote class="disclosure-box">
+        <strong>JevBench disclosure.</strong> JevBench numbers are a public-subset run against
+        <code>fstandhartinger/jevbench</code> v1.2.1 (72 standard / 48 easy / 111 hard public ids), not a
+        submitted or ranked leaderboard entry (the leaderboard requires &ge;95% coverage including 146
+        non-public judge items). Probabilities are the head's softmax conditioned on non-&empty; (mean p_null
+        &asymp; .03). Latency is in-process on one H100, one decision at a time, model load excluded. Option
+        order is the harness's label order; a reversed-order control on a related checkpoint moved standard
+        accuracy &plusmn;4 points, larger than the differences between our own checkpoints. Chance/majority
+        baselines are .311 standard / .284 easy / .336 hard (n = 72 standard, SE &asymp; .058) &mdash; the hard
+        tier of both released models is within 1 SE of chance.
+      </blockquote>
     </div>
   </section>
 
-  <!-- INK ROOM I -->
-  <section class="room room-dark" id="ink-1" data-room="ink-1" data-room-label="Read once" data-theme="dark">
-    <h2 class="ink-room-head serif" data-reveal>Read once. Answer many.</h2>
-    <p class="ink-room-copy" data-reveal>Typical is an open family of small decision models. Give it a text
+  <!-- HOW IT WORKS -->
+  <section class="section" id="how">
+    <div class="container">
+      <h2 class="section-title">How it works</h2>
+
+      <div class="how-grid">
+        <div class="card how-card">
+          <span class="pill">Choice</span>
+          <p class="how-sentence">Pick one candidate from a set you define at runtime; returns a probability for every option.</p>
+        </div>
+        <div class="card how-card">
+          <span class="pill">Noul</span>
+          <p class="how-sentence">A yes/no read on the same state — the one query type that is exact and order-invariant.</p>
+        </div>
+        <div class="card how-card">
+          <span class="pill">Score</span>
+          <p class="how-sentence">An ordered level, 0 through N, with an expected value under the candidates.</p>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <pre>from typical import Typical
+
+m = Typical.from_pretrained("OzLabs/typical-small")
+m.choice(state, "What does the customer want?", ["refund", "replacement", "repair"])
+m.noul(state, "Is the order still under warranty?")
+m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
+      </div>
+
+      <p class="verified-copy">Typical is an open family of small decision models. Give it a text
       state and a typed question — Choice over candidates you define at runtime, Noul (yes/no), or Score
       (ordered levels) — and it returns a probability for every candidate plus an explicit &empty; in one
       forward pass: no generation, no parsing, 45 ms per decision on one H100 and a few milliseconds per
@@ -75,160 +126,135 @@
       and on hard multi-step workflow judgments it is still at chance. Weights (1.7B, 4B) and inference
       code are open on Hugging Face.</p>
 
-      <div class="vignette-grid" data-reveal>
-        <a class="vignette" href="#sql">
-          <span class="vignette-crop"><img data-vignette="0" alt="" /></span>
-          <span class="vignette-caption serif">SQL</span>
-          <svg class="hex" viewBox="0 0 12 12"><polygon points="6,0.5 11,3.25 11,8.75 6,11.5 1,8.75 1,3.25" /></svg>
-        </a>
-        <a class="vignette" href="#doc-20">
-          <span class="vignette-crop"><img data-vignette="1" alt="" /></span>
-          <span class="vignette-caption serif">One document, twenty questions</span>
-          <svg class="hex" viewBox="0 0 12 12"><polygon points="6,0.5 11,3.25 11,8.75 6,11.5 1,8.75 1,3.25" /></svg>
-        </a>
-        <a class="vignette" href="#rules">
-          <span class="vignette-crop"><img data-vignette="2" alt="" /></span>
-          <span class="vignette-caption serif">Rules are the program</span>
-          <svg class="hex" viewBox="0 0 12 12"><polygon points="6,0.5 11,3.25 11,8.75 6,11.5 1,8.75 1,3.25" /></svg>
-        </a>
-      </div>
+      <a class="ghost-link" href="research.html">Architecture and data →</a>
+    </div>
   </section>
 
-  <!-- GALLERY -->
-  <section class="room room-light" id="gallery" data-room="gallery" data-room-label="Gallery" data-theme="light">
-    <div class="gallery-grid">
-      <div class="card" id="sql">
-        <h3 class="exhibit-title">SQL over judgment</h3>
-        <p class="exhibit-label">typical(body, 'customer is angry about billing')</p>
-        <div class="exhibit-mount"><div data-demo="sql"></div></div>
+  <!-- DEMOS -->
+  <section class="section" id="demos">
+    <div class="container">
+      <h2 class="section-title">Demos</h2>
+      <p class="section-lede">Real games, real transcripts, one forward pass per decision. What works, what's partial, what fails.</p>
+
+      <h3 class="demos-subhead">Games</h3>
+      <div class="games-grid">
+        <div class="game-card">
+          <div class="game-card-head"><span class="pill">Works</span><h3>Snake</h3></div>
+          <p>Canvas, 10×10 board. No lookahead, one sentence per move — the candidate set is the only guardrail.</p>
+          <div class="game-mount" data-game="snake"></div>
+        </div>
+        <div class="game-card">
+          <div class="game-card-head"><span class="pill">Partial</span><h3>Drive</h3></div>
+          <p>Three.js toy road. The rules are in the prompt: it brakes and stops. It does not change lanes.</p>
+          <div class="game-mount" data-game="drive"></div>
+        </div>
+        <div class="game-card">
+          <div class="game-card-head"><span class="pill">Partial</span><h3>Doom</h3></div>
+          <p>Chocolate Doom, 1993 shareware, in WebAssembly. The model reads a sentence, presses a key — it mostly shoots.</p>
+          <div class="game-mount" data-game="realdoom" data-game-fallback="doom"></div>
+        </div>
       </div>
-      <div class="card" id="doc-20">
-        <h3 class="exhibit-title">One document, twenty questions</h3>
-        <p class="exhibit-label">one KV pass, twenty typed queries</p>
-        <div class="exhibit-mount"><div data-demo="doc-20"></div></div>
-      </div>
-      <div class="card" id="rules">
-        <h3 class="exhibit-title">Rules are the program</h3>
-        <p class="exhibit-label">reorder the precedence, watch the verdict move</p>
-        <div class="exhibit-mount"><div data-demo="rules"></div></div>
-      </div>
-      <div class="card" id="ads">
-        <h3 class="exhibit-title">Which brand, which category</h3>
-        <p class="exhibit-label">three typed questions, one state, one pass</p>
-        <div class="exhibit-mount"><div data-demo="ads"></div></div>
+
+      <h3 class="demos-subhead">Exhibits</h3>
+      <div class="exhibits-grid">
+
+        <div class="card exhibit-card" data-exhibit-card>
+          <span class="pill">Works</span>
+          <h3>SQL over judgment</h3>
+          <p><code>SELECT * FROM tickets WHERE typical(body, 'customer is angry about billing')</code></p>
+          <button class="ghost-link" type="button" data-exhibit-toggle>Run →</button>
+          <div class="exhibit-body" data-exhibit-body hidden><div data-demo="sql"></div></div>
+        </div>
+
+        <div class="card exhibit-card" data-exhibit-card>
+          <span class="pill">Works</span>
+          <h3>One document, twenty questions</h3>
+          <p>One KV pass over a handbook, twenty typed queries answered from the same cached state.</p>
+          <button class="ghost-link" type="button" data-exhibit-toggle>Run →</button>
+          <div class="exhibit-body" data-exhibit-body hidden><div data-demo="doc-20"></div></div>
+        </div>
+
+        <div class="card exhibit-card" data-exhibit-card>
+          <span class="pill">Works</span>
+          <h3>Rules are the program</h3>
+          <p>Same five facts. Reorder the rule precedence and the verdict moves live.</p>
+          <button class="ghost-link" type="button" data-exhibit-toggle>Run →</button>
+          <div class="exhibit-body" data-exhibit-body hidden><div data-demo="rules"></div></div>
+        </div>
+
+        <div class="card exhibit-card" data-exhibit-card>
+          <span class="pill">Works</span>
+          <h3>Ads</h3>
+          <p>One state, three typed questions, one pass: is it an ad, which brand, which category.</p>
+          <button class="ghost-link" type="button" data-exhibit-toggle>Run →</button>
+          <div class="exhibit-body" data-exhibit-body hidden><div data-demo="ads"></div></div>
+        </div>
+
+        <div class="card exhibit-card" data-exhibit-card>
+          <span class="pill">Fails</span>
+          <h3>Compaction</h3>
+          <p>A 24-call tool transcript, scored by relevance. P(keep) never crosses .5 on this pool.</p>
+          <button class="ghost-link" type="button" data-exhibit-toggle>Run →</button>
+          <div class="exhibit-body" data-exhibit-body hidden><div data-demo="compaction"></div></div>
+        </div>
+
+        <div class="card exhibit-card">
+          <h3>What does not work</h3>
+          <ul class="exhibit-list">
+            <li>Doom — mostly shoots, enemy or no enemy.</li>
+            <li>Drive — never once changes lanes.</li>
+            <li>Compaction — no usable keep/drop threshold.</li>
+            <li>Level-7 composition — temporal, units, expected value, trade-off: at chance.</li>
+          </ul>
+        </div>
+
       </div>
     </div>
   </section>
 
-  <!-- PAINTING ROOM II: DRIVE -->
-  <section class="room room-flush painting-room" id="room-drive" data-room="drive" data-room-label="Drive" data-theme="light">
-    <img class="painting-bg" data-painting="1" alt="" />
-    <div class="card-notched game-card" data-pin-card>
-      <div class="game-mount" data-game="drive"></div>
-      <div class="wall-label">
-        <h3>Drive</h3>
-        <p>toy road, 2026 &middot; the rules are in the prompt — it brakes and stops, it does not change lanes.</p>
-      </div>
-      <span class="notch-label">Scroll</span>
+  <!-- LIMITS -->
+  <section class="section" id="limits">
+    <div class="container">
+      <h2 class="section-title">What this isn't</h2>
+      <p class="section-lede">Short states, literal rules, bounded candidate sets. No arithmetic, no timezones, no
+        trade-offs, no long policies, no vision. The hard tier is at chance and over-confident; Choice is
+        order-robust, not order-invariant. Here is the list.</p>
+      <ul class="limits-register">
+        <li>We do not claim to be faster, better, or cheaper than Jev or any hosted system &mdash; we have no
+          apples-to-apples run and JevBench is unranked here.</li>
+        <li>We do not do vision, audio, real-time control, game-playing skill, or planning/lookahead.
+          Text-only, one forward pass, no search.</li>
+        <li>We are not a knowledge model or a reasoner: MMLU-Pro among-K .34 / .46; level-7 composition
+          (temporal, units, expected value, trade-off) is at chance. We do not do arithmetic, timezones, or
+          trade-offs.</li>
+        <li>We do not read long documents: trained at &le;1,024-token states; JevBench long-policy items and
+          multi-thousand-token states are out of distribution.</li>
+        <li>We do not claim "any label set, any domain" works equally well: some label sets regress against
+          their untyped control (CLINC &minus;4, TREC-fine &minus;10), and held-out rubric styles drop 4&ndash;6
+          points.</li>
+        <li>We do not claim exact order-invariance for Choice, or exact IIA. Only Noul (yes/no) is exact;
+          Choice is order-robust (mean-max &Delta;p .01&ndash;.08), and adding an irrelevant candidate can move
+          log-odds .09&ndash;.22.</li>
+        <li>We do not claim OOD calibration or hard-tier competence: both released models are at chance on the
+          JevBench hard tier (Brier .79 / .77).</li>
+        <li>We have not released training code &mdash; only <code>inference/</code> is public; a training-code
+          release may follow.</li>
+        <li>Licence: see the model card's licence section. The training mix includes sources with
+          non-commercial or undeclared licences (ANLI is CC BY-NC 4.0); only <code>inference/</code> is
+          public today.</li>
+      </ul>
     </div>
-  </section>
-
-  <!-- PAINTING ROOM III: DOOM -->
-  <section class="room room-flush painting-room" id="room-doom" data-room="doom" data-room-label="Doom" data-theme="light">
-    <img class="painting-bg" data-painting="2" alt="" />
-    <div class="card-notched game-card" data-pin-card>
-      <div class="game-mount" data-game="realdoom"></div>
-      <div class="wall-label">
-        <h3>Doom</h3>
-        <p>Doom, 1993 (shareware) &middot; Chocolate Doom in WebAssembly &middot; the model reads a sentence, presses a key &middot; it mostly shoots.</p>
-      </div>
-      <span class="notch-label">Scroll</span>
-    </div>
-  </section>
-
-  <!-- INK ROOM II: RESULTS -->
-  <section class="room room-dark" id="results" data-room="results" data-room-label="Results" data-theme="dark">
-    <h2 class="ink-room-head serif" data-reveal>Results</h2>
-    <p class="ink-room-copy" data-reveal>Two released sizes, one recipe. We report the numbers that moved
-      and the ones that did not &mdash; including the JevBench hard tier, where both models are within one
-      standard error of chance.</p>
-
-    <blockquote class="disclosure">
-      <strong>JevBench disclosure.</strong> JevBench numbers are a public-subset run against
-      <code>fstandhartinger/jevbench</code> v1.2.1 (72 standard / 48 easy / 111 hard public ids), not a
-      submitted or ranked leaderboard entry (the leaderboard requires &ge;95% coverage including 146
-      non-public judge items). Probabilities are the head's softmax conditioned on non-&empty; (mean p_null
-      &asymp; .03). Latency is in-process on one H100, one decision at a time, model load excluded. Option
-      order is the harness's label order; a reversed-order control on a related checkpoint moved standard
-      accuracy &plusmn;4 points, larger than the differences between our own checkpoints. Chance/majority
-      baselines are .311 standard / .284 easy / .336 hard (n = 72 standard, SE &asymp; .058) &mdash; the hard
-      tier of both released models is within 1 SE of chance.
-    </blockquote>
-
-    <div id="results-table"></div>
-
-    <h3 class="results-subhead">Scaling ladder</h3>
-    <div class="chart" id="chart-g1"></div>
-
-    <h3 class="results-subhead">Latency</h3>
-    <div class="chart-grid">
-      <div class="chart"><div id="chart-g2"></div></div>
-      <div class="chart"><div id="chart-g3"></div></div>
-    </div>
-
-    <h3 class="results-subhead">Calibration</h3>
-    <p class="dim">JevBench: public subset (231 ids), unranked, n = 72 standard (SE &asymp; .058); probabilities
-      conditioned on non-&empty;; hard tier at chance for both models.</p>
-    <div class="chart-grid" id="chart-g4"></div>
-    <p id="g4-caption" class="dim" style="font-size:12px;"></p>
-  </section>
-
-  <!-- OFF-DISTRIBUTION -->
-  <section class="room room-light" id="off-distribution" data-room="off-distribution" data-room-label="Limits" data-theme="light">
-    <div class="card" style="margin-bottom:48px;">
-      <h3 class="exhibit-title">What it cannot do (yet)</h3>
-      <p class="exhibit-label">agent transcript, scored line by line &mdash; P(keep) never crosses .5</p>
-      <div class="exhibit-mount"><div data-demo="compaction"></div></div>
-    </div>
-
-    <h2 class="serif" style="font-size:var(--text-heading-lg);letter-spacing:var(--tracking-heading-lg);margin-bottom:16px;" data-reveal>What this isn't</h2>
-    <p data-reveal>Short states, literal rules, bounded candidate sets. No arithmetic, no timezones, no
-      trade-offs, no long policies, no vision. The hard tier is at chance and over-confident; Choice is
-      order-robust, not order-invariant. Here is the list.</p>
-    <ul class="limits-list">
-      <li>We do not claim to be faster, better, or cheaper than Jev or any hosted system &mdash; we have no
-        apples-to-apples run and JevBench is unranked here.</li>
-      <li>We do not do vision, audio, real-time control, game-playing skill, or planning/lookahead.
-        Text-only, one forward pass, no search.</li>
-      <li>We are not a knowledge model or a reasoner: MMLU-Pro among-K .34 / .46; level-7 composition
-        (temporal, units, expected value, trade-off) is at chance. We do not do arithmetic, timezones, or
-        trade-offs.</li>
-      <li>We do not read long documents: trained at &le;1,024-token states; JevBench long-policy items and
-        multi-thousand-token states are out of distribution.</li>
-      <li>We do not claim "any label set, any domain" works equally well: some label sets regress against
-        their untyped control (CLINC &minus;4, TREC-fine &minus;10), and held-out rubric styles drop 4&ndash;6
-        points.</li>
-      <li>We do not claim exact order-invariance for Choice, or exact IIA. Only Noul (yes/no) is exact;
-        Choice is order-robust (mean-max &Delta;p .01&ndash;.08), and adding an irrelevant candidate can move
-        log-odds .09&ndash;.22.</li>
-      <li>We do not claim OOD calibration or hard-tier competence: both released models are at chance on the
-        JevBench hard tier (Brier .79 / .77).</li>
-      <li>We have not released training code &mdash; only <code>inference/</code> is public; a training-code
-        release may follow.</li>
-      <li>Licence: see the model card's licence section. The training mix includes sources with
-        non-commercial or undeclared licences (ANLI is CC BY-NC 4.0); only <code>inference/</code> is
-        public today.</li>
-    </ul>
   </section>
 
   <!-- GET STARTED -->
-  <section class="room room-bone" id="start" data-room="start" data-room-label="Start" data-theme="light">
-    <h2 class="serif" style="font-size:var(--text-heading-lg);letter-spacing:var(--tracking-heading-lg);margin-bottom:16px;" data-reveal>Six lines</h2>
-    <p data-reveal><code>pip install -r inference/requirements.txt</code>, six lines of Python, weights from
-      Hugging Face. <code>state</code> is a string or a dict; candidates are whatever you pass.</p>
-    <div class="frame">
-      <pre class="dim">pip install -r inference/requirements.txt</pre>
-      <pre>from typical import Typical
+  <section class="section" id="start">
+    <div class="container">
+      <h2 class="section-title">Get started</h2>
+      <p class="section-lede"><code>pip install -r inference/requirements.txt</code>, six lines of Python, weights from
+        Hugging Face. <code>state</code> is a string or a dict; candidates are whatever you pass.</p>
+      <div class="code-block">
+        <pre class="dim">pip install -r inference/requirements.txt</pre>
+        <pre>from typical import Typical
 
 m = Typical.from_pretrained("OzLabs/typical-small", device="auto")  # or "typical-small-preview" / "typical-medium"
 
@@ -249,22 +275,23 @@ probs, runtime = m.decide(
      "criteria": {"refund": "money back", "replacement": "a new item shipped"}},
     ["refund", "replacement"],
 )</pre>
+      </div>
     </div>
   </section>
 
 </main>
 
-<footer class="room room-chalk site-footer">
-  <div>Typical is research-grade, released open.</div>
-  <div class="links">
-    <a class="link-ghost" href="https://huggingface.co/OzLabs/typical-small">typical-small</a>
-    <a class="link-ghost" href="https://huggingface.co/OzLabs/typical-medium">typical-medium</a>
-    <a class="link-ghost" href="https://huggingface.co/OzLabs/typical-small-preview">typical-small-preview</a>
+<footer class="footer">
+  <div class="container footer-inner">
+    <div>Typical is research-grade, released open. Licence: see each model card on Hugging Face.</div>
+    <div class="footer-links">
+      <a href="https://huggingface.co/OzLabs/typical-small">typical-small</a>
+      <a href="https://huggingface.co/OzLabs/typical-medium">typical-medium</a>
+      <a href="https://huggingface.co/OzLabs/typical-small-preview">typical-small-preview</a>
+    </div>
   </div>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/ScrollTrigger.min.js"></script>
 <script type="module" src="js/shell.js"></script>
 </body>
 </html>

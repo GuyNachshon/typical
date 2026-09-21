@@ -1,8 +1,10 @@
 // Shared plumbing for the three game-card renderers (render-snake.js, render-drive.js,
-// render-doom.js): monochrome design tokens, DOM chrome (HUD/buttons/decision strip),
-// model-vs-scripted policy helpers, viewport pausing and keyboard override. Keeps the three
-// renderers from re-deriving the same mount() contract three times.
-
+// render-doom.js): design tokens (feeding the renderers' own canvas/THREE.js scenes - not
+// reskinned here, out of scope), DOM chrome (HUD/buttons/decision strip), model-vs-scripted
+// policy helpers, viewport pausing and keyboard override. Keeps the three renderers from
+// re-deriving the same mount() contract three times. Chrome styles (.gc-*) live in
+// exhibits.css, which reuses the .ex-row/.ex-bar/.ex-ghost kit for the decision strip and
+// policy/restart controls - see the "game chrome" section there.
 export const TOKENS = {
   putty: '#c4c3b6',
   ink: '#000000',
@@ -12,39 +14,9 @@ export const TOKENS = {
   paper: '#ffffff',
 };
 
-let stylesInjected = false;
-// Idempotent - safe to call from every renderer's mount(), only the first call does anything.
-function injectChromeStyles() {
-  if (stylesInjected) return;
-  stylesInjected = true;
-  const style = document.createElement('style');
-  style.id = 'gc-chrome-styles';
-  style.textContent = `
-.gc-root { position:relative; width:100%; height:100%; display:flex; flex-direction:column; background:${TOKENS.ink}; color:${TOKENS.paper}; font-family:'Inter',sans-serif; outline:none; }
-.gc-stage { position:relative; flex:1 1 auto; min-height:0; overflow:hidden; }
-.gc-stage canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
-.gc-hud { position:absolute; top:10px; left:12px; font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:${TOKENS.paper}; opacity:.85; pointer-events:none; z-index:3; }
-.gc-hud div { margin-top:2px; }
-.gc-controls { position:absolute; bottom:10px; right:10px; display:flex; gap:6px; z-index:3; }
-.gc-btn { font-family:inherit; font-size:8px; letter-spacing:.08em; text-transform:uppercase; color:${TOKENS.paper}; background:transparent; border:1px solid ${TOKENS.graphite}; border-radius:2px; padding:4px 8px; cursor:pointer; opacity:.8; }
-.gc-btn:hover { opacity:1; border-color:${TOKENS.bone}; }
-.gc-btn.gc-on { background:${TOKENS.paper}; color:${TOKENS.ink}; opacity:1; }
-.gc-foot { flex:0 0 auto; border-top:1px solid ${TOKENS.graphite}; padding:8px 12px; }
-.gc-decision { display:flex; flex-direction:column; gap:2px; margin-bottom:6px; }
-.gc-drow { display:grid; grid-template-columns:74px 1fr 30px; align-items:center; gap:6px; font-size:8px; letter-spacing:.03em; text-transform:uppercase; color:${TOKENS.bone}; }
-.gc-dtrack { height:6px; background:${TOKENS.graphite}; position:relative; }
-.gc-dbar { position:absolute; left:0; top:0; bottom:0; background:${TOKENS.paper}; }
-.gc-dnum { font-family:'Instrument Serif',Georgia,serif; font-size:11px; color:${TOKENS.paper}; text-align:right; }
-.gc-sentence { font-size:9px; line-height:1.4; color:${TOKENS.graphite}; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-.gc-root:focus .gc-stage { box-shadow: inset 0 0 0 1px ${TOKENS.bone}; }
-`;
-  document.head.appendChild(style);
-}
-
 // Builds the shared DOM inside `el`: canvas + HUD + policy/restart buttons + decision strip +
 // read sentence. Returns refs the renderer draws into every frame/tick.
 export function mountChrome(el, { label } = {}) {
-  injectChromeStyles();
   el.innerHTML = '';
   el.classList.add('gc-root');
   el.tabIndex = 0;
@@ -61,10 +33,10 @@ export function mountChrome(el, { label } = {}) {
   const controls = document.createElement('div');
   controls.className = 'gc-controls';
   const policyBtn = document.createElement('button');
-  policyBtn.className = 'gc-btn';
+  policyBtn.className = 'ex-ghost gc-btn';
   policyBtn.type = 'button';
   const restartBtn = document.createElement('button');
-  restartBtn.className = 'gc-btn';
+  restartBtn.className = 'ex-ghost gc-btn';
   restartBtn.type = 'button';
   restartBtn.textContent = 'Restart';
   controls.append(policyBtn, restartBtn);
@@ -84,25 +56,29 @@ export function mountChrome(el, { label } = {}) {
   return { root: el, stage, canvas, hud, policyBtn, restartBtn, decision, sentence };
 }
 
-// Paints the candidate · ink bar · serif numeral list + the ∅ row, and the read sentence
-// underneath. `probs` is a plain {label: p} map.
+// Paints the candidate · cream bar · tabular numeral list + the ∅ row, and the read sentence
+// underneath, reusing the .ex-row/.ex-bar kit (exhibits.css) so the decision strip matches
+// every data exhibit. `probs` is a plain {label: p} map. The highest-p row (candidate or ∅)
+// gets the champagne fill - it's the winner.
 export function paintDecision(refs, { candidates = [], probs = {}, p_null = null, sentence = '' } = {}) {
   refs.decision.innerHTML = '';
   const rows = candidates.map((c) => [c, probs[c] ?? 0]);
   if (p_null != null) rows.push(['∅ (null)', p_null]);
+  const maxP = rows.reduce((m, [, p]) => Math.max(m, p), -Infinity);
   for (const [label, p] of rows) {
     const row = document.createElement('div');
-    row.className = 'gc-drow';
+    row.className = 'ex-row';
     const name = document.createElement('span');
+    name.className = 'ex-row-text';
     name.textContent = label;
     const track = document.createElement('span');
-    track.className = 'gc-dtrack';
+    track.className = 'ex-bar';
     const bar = document.createElement('span');
-    bar.className = 'gc-dbar';
+    bar.className = 'ex-bar-fill' + (p === maxP ? ' is-winner' : '');
     bar.style.width = `${Math.max(0, Math.min(1, p)) * 100}%`;
     track.appendChild(bar);
     const num = document.createElement('span');
-    num.className = 'gc-dnum';
+    num.className = 'ex-num';
     num.textContent = p.toFixed(2);
     row.append(name, track, num);
     refs.decision.appendChild(row);

@@ -1,14 +1,9 @@
 // research.html bootstrap: mounts the data-mix (donut + corpus bars), held-out/external
-// bars, JevBench-per-family bars, and timeline charts from data/research-*.json, plus the
-// page's own reveal/room-index wiring (a small, page-scoped copy of shell.js's - this page
-// mounts no decide()-driven demos or games, so it doesn't pull in shell.js's api.js /
-// painting / ledger machinery). Charts are js/charts.js as-is: monochrome, series told
-// apart by dash/marker, never colour.
+// bars, JevBench-per-family bars, and timeline charts from data/research-*.json, plus a
+// scroll-spy on the left table of contents. No GSAP, no load animation (Atoms: "placed,
+// not kinetic") — charts are js/charts.js as-is: monochrome, series told apart by
+// dash/marker, never colour.
 import { donut, barChart, hbarFloor, timeline } from './charts.js';
-
-const REDUCED_MOTION = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-const HAS_GSAP = typeof gsap !== 'undefined';
-if (HAS_GSAP && typeof ScrollTrigger !== 'undefined') gsap.registerPlugin(ScrollTrigger);
 
 async function loadJSON(path) {
   try {
@@ -19,55 +14,6 @@ async function loadJSON(path) {
   }
   return null;
 }
-
-// ---- reveals + room index (ported from js/shell.js's wireReveals/wireRoomIndex - this
-// page has no hero cluster or wordmark, so those two shell.js concerns are skipped) ------
-
-function wireReveals() {
-  if (!HAS_GSAP || REDUCED_MOTION) return;
-  document.querySelectorAll('[data-reveal]').forEach((el) => {
-    gsap.fromTo(
-      el,
-      { opacity: 0, y: 24 },
-      { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out', scrollTrigger: { trigger: el, start: 'top 85%', once: true } }
-    );
-  });
-}
-
-function hexSVG() {
-  return '<svg class="hex" viewBox="0 0 12 12"><polygon points="6,0.5 11,3.25 11,8.75 6,11.5 1,8.75 1,3.25" /></svg>';
-}
-
-function wireRoomIndex() {
-  const host = document.querySelector('[data-room-index]');
-  const rooms = Array.from(document.querySelectorAll('.room[data-room]'));
-  if (!host || !rooms.length) return;
-  const buttons = rooms.map((room) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.title = room.dataset.roomLabel || room.dataset.room;
-    btn.innerHTML = hexSVG();
-    btn.addEventListener('click', () => room.scrollIntoView({ behavior: REDUCED_MOTION ? 'auto' : 'smooth' }));
-    host.appendChild(btn);
-    return btn;
-  });
-
-  const io = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        const i = rooms.indexOf(entry.target);
-        if (i === -1 || !entry.isIntersecting) return;
-        buttons.forEach((b) => b.querySelector('.hex').classList.remove('filled'));
-        buttons[i].querySelector('.hex').classList.add('filled');
-        document.body.classList.toggle('theme-dark', entry.target.dataset.theme === 'dark');
-      });
-    },
-    { rootMargin: '-45% 0px -45% 0px' }
-  );
-  rooms.forEach((r) => io.observe(r));
-}
-
-// ---- charts -----------------------------------------------------------------------------
 
 function sourceNote(el, text) {
   const p = document.createElement('div');
@@ -144,10 +90,33 @@ async function mountTimeline() {
   if (captionEl && d.run_count != null) captionEl.textContent = String(d.run_count);
 }
 
+// ---- table of contents: highlight the section currently in view -------------------------
+
+function wireToc() {
+  const links = Array.from(document.querySelectorAll('.toc a'));
+  if (!links.length) return;
+  const targets = links
+    .map((a) => document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1))))
+    .filter(Boolean);
+  if (!targets.length) return;
+  const io = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        const i = targets.indexOf(entry.target);
+        if (i === -1) return;
+        links.forEach((a) => a.classList.remove('active'));
+        links[i].classList.add('active');
+      });
+    },
+    { rootMargin: '-10% 0px -70% 0px' }
+  );
+  targets.forEach((t) => io.observe(t));
+}
+
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
-    wireReveals();
-    wireRoomIndex();
+    wireToc();
     mountMix();
     mountHeldout();
     mountJevFamily();

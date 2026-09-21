@@ -120,10 +120,10 @@ export async function mount(host, ctx) {
   // ---- panel 2: 6 hand-written applicants x 2 orders, one decide() call each ----
   const panel2 = el('div', 'rules-panel2');
   panel2.style.marginTop = '8px';
-  panel2.appendChild(el('h4', 'label', 'Same rubric, 6 applicants'));
+  panel2.appendChild(el('p', 'ex-subhead', 'Same rubric, 6 applicants'));
   const tableWrap = el('div', 'table-scroll');
   const table = document.createElement('table');
-  table.className = 'rules-table';
+  table.className = 'ex-table';
   const thead = document.createElement('thead');
   thead.innerHTML = '<tr><th>applicant</th><th>deny checked first</th><th>approve checked first</th></tr>';
   table.appendChild(thead);
@@ -131,7 +131,7 @@ export async function mount(host, ctx) {
   table.appendChild(tbody);
   tableWrap.appendChild(table);
   panel2.appendChild(tableWrap);
-  const panel2Caption = el('p', 'exhibit-caption', rulesDoc.caption);
+  const panel2Caption = el('p', 'ex-caption', rulesDoc.caption);
   panel2.appendChild(panel2Caption);
   wrap.appendChild(panel2);
   host.appendChild(wrap);
@@ -148,25 +148,25 @@ export async function mount(host, ctx) {
       tr.append(el('td', 'rules-applicant', '—'), el('td', 'rules-applicant', '—'));
     } else {
       const [denyFirst, approveFirst] = res.results;
-      [denyFirst, approveFirst].forEach((r) => {
+      const flipped = denyFirst.argmax !== approveFirst.argmax;
+      [denyFirst, approveFirst].forEach((r, i) => {
         const td = document.createElement('td');
-        const cell = el('div', 'rules-cell');
-        const canvas = document.createElement('canvas');
-        cell.appendChild(canvas);
-        cell.appendChild(el('span', 'rules-cell-label', r.argmax));
-        cell.appendChild(el('span', 'reg-numeral', r.probs[r.argmax].toFixed(2)));
+        const cell = el('div', 'ex-cell ex-cell--col');
+        const word = el('span', 'ex-cell-word', r.argmax);
+        word.title = r.argmax;
+        const barRow = el('span', 'ex-cell-barrow');
+        const bar = el('span', 'ex-bar ex-bar--sm');
+        const fill = el('span', 'ex-bar-fill');
+        fill.style.width = `${(r.probs[r.argmax] * 100).toFixed(1)}%`;
+        bar.appendChild(fill);
+        const num = el('span', 'ex-num', r.probs[r.argmax].toFixed(2));
+        barRow.append(bar, num);
+        cell.append(word, barRow);
+        if (i === 1 && flipped) cell.appendChild(el('span', 'ex-tag ex-tag--flip', 'FLIP'));
         td.appendChild(cell);
         tr.appendChild(td);
-        stipple(canvas, r.probs[r.argmax]);
       });
-      if (denyFirst.argmax !== approveFirst.argmax) {
-        const flipCell = tr.querySelectorAll('.rules-cell')[1];
-        flipCell?.appendChild(hexEl(true));
-      }
     }
     tbody.appendChild(tr);
   }
-
-  const readoutEl = host.closest('.screen')?.querySelector('.readout');
-  if (readoutEl) ctx.readout(readoutEl, { extra: `${flip.orders.length} recorded orders · ${rulesDoc.applicants.length} applicants` });
 }

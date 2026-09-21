@@ -44,15 +44,25 @@ function el(tag, className, text) {
   return node;
 }
 
+function row(label, p, isWinner) {
+  const r = el('div', 'ex-row');
+  r.appendChild(el('span', 'ex-row-text', label));
+  const bar = el('span', 'ex-bar');
+  const fill = el('span', 'ex-bar-fill' + (isWinner ? ' is-winner' : ''));
+  fill.style.width = `${(p * 100).toFixed(1)}%`;
+  bar.appendChild(fill);
+  r.appendChild(bar);
+  r.appendChild(el('span', 'ex-num', p.toFixed(2)));
+  return r;
+}
+
 export async function mount(el0, ctx) {
   const res = await fetch('data/demos/ads.json');
   const pool = res.ok ? await res.json() : null;
   if (!pool) {
-    el0.innerHTML = '<p class="dim">ads pool unavailable.</p>';
+    el0.innerHTML = '<p class="ex-muted">ads pool unavailable.</p>';
     return;
   }
-  const section = el0.closest('.screen');
-  const readoutEl = section?.querySelector('.readout');
   const brandNames = Object.keys(pool.brands);
   const catIds = pool.categories.map((c) => c.id);
   const brandQ = brandQuestion(pool.brands);
@@ -61,14 +71,14 @@ export async function mount(el0, ctx) {
   el0.innerHTML = '';
   el0.className = 'exhibit ads-exhibit';
 
-  const tally = el('p', 'ads-tally serif', 'scoring 40 observations…');
+  const tally = el('p', 'ads-tally', 'scoring 40 observations…');
   el0.appendChild(tally);
 
   const feed = el('div', 'ads-register');
   el0.appendChild(feed);
 
   const questions = document.createElement('details');
-  questions.className = 'ads-prompt';
+  questions.className = 'ex-details';
   const summary = el('summary', null, 'the prompt');
   const pre = el('pre', null, `is-ad:\n${AD_Q}\n\nbrand:\n${brandQ}\n\ncategory:\n${catQ}`);
   questions.append(summary, pre);
@@ -76,7 +86,7 @@ export async function mount(el0, ctx) {
 
   const caption = el(
     'p',
-    'exhibit-caption',
+    'ex-caption',
     "40 observations, 20 brands: brand .94 and category .94 with cue rules in the prompt (chance .05 / .125); is-it-an-ad .88 vs .80 always-yes. The cues are the program — without them brand drops to .75."
   );
   el0.appendChild(caption);
@@ -97,13 +107,13 @@ export async function mount(el0, ctx) {
   updateTally();
 
   for (const obs of pool.observations) {
-    const label = el('div', 'ads-label');
-    label.appendChild(el('p', 'ads-label-text', obs.text));
+    const item = el('div', 'ads-item');
+    item.appendChild(el('p', 'ads-text', obs.text));
     const decisions = el('div', 'ads-decisions');
-    label.appendChild(decisions);
+    item.appendChild(decisions);
     const gold = el('span', 'ads-gold', `gold: ${obs.isAd ? `${obs.brand} · advertisement` : 'not an advertisement'}`);
-    label.appendChild(gold);
-    feed.appendChild(label);
+    item.appendChild(gold);
+    feed.appendChild(item);
 
     const out = await ctx.decide(obs.text, [
       { type: 'choice', question: AD_Q, labels: ['advertisement', 'not_an_advertisement'] },
@@ -116,12 +126,11 @@ export async function mount(el0, ctx) {
     adTotal++;
     if (isAdPred === obs.isAd) adCorrect++;
 
-    const rows = [{ label: `IS-AD · ${adR?.argmax ?? '?'}`, p: adR?.probs?.[adR.argmax] ?? 0 }];
+    decisions.appendChild(row(`IS-AD · ${adR?.argmax ?? '?'}`, adR?.probs?.[adR.argmax] ?? 0, true));
     if (isAdPred) {
-      rows.push({ label: `BRAND · ${brandR?.argmax ?? '?'}`, p: brandR?.probs?.[brandR.argmax] ?? 0 });
-      rows.push({ label: `CATEGORY · ${catR?.argmax ?? '?'}`, p: catR?.probs?.[catR.argmax] ?? 0 });
+      decisions.appendChild(row(`BRAND · ${brandR?.argmax ?? '?'}`, brandR?.probs?.[brandR.argmax] ?? 0, true));
+      decisions.appendChild(row(`CATEGORY · ${catR?.argmax ?? '?'}`, catR?.probs?.[catR.argmax] ?? 0, true));
     }
-    ctx.inkBars(decisions, { rows });
 
     if (obs.isAd) {
       brandTotal++;
@@ -131,7 +140,6 @@ export async function mount(el0, ctx) {
     }
 
     updateTally();
-    ctx.readout(readoutEl, { ms: out?.ms, device: out?.device, extra: `${adTotal}/${pool.observations.length} scored` });
     if (ctx.mode() !== 'live') await sleep(Math.min(out?.ms ?? 15, 35));
   }
 }

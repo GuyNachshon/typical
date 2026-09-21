@@ -1,6 +1,6 @@
 /* Typical v4 "Atoms" — obsidian monolith in candlelight. Tokens verbatim from
    .context/attachments/I3LYtB/pasted_text_2026-09-22_00-05-28.txt. Static, placed, not
-   kinetic: no load/scroll animation, no shadows, no gradients, no blur. Hover states only. */
+   kinetic: surfaces are flat and hairline-bordered only. Hover states only, no load motion. */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap');
 
@@ -83,7 +83,7 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
 .container {
   max-width: var(--page-max-width);
   margin: 0 auto;
-  padding: 0 40px;
+  padding: 0 24px;
 }
 
 .section { padding: var(--section-gap) 0; }
@@ -206,7 +206,10 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
   letter-spacing: var(--tracking-heading);
   line-height: 1.13;
   color: var(--color-cream);
-  max-width: 600px;
+  /* spec is 600px; Inter (the Switzer stand-in) runs wider at this tracking, so 600px wraps
+     the brief's exact sentence to 4 lines. 700px is the measured minimum that holds it to
+     the spec's "3 lines" — see /tmp/measure3.mjs. Prioritizing the line-count over the px. */
+  max-width: 700px;
   margin: 0;
 }
 
@@ -249,7 +252,7 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
 .chart-row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-24);
+  gap: var(--spacing-16);
   margin-bottom: var(--spacing-80);
 }
 .chart-row .chart { flex: 1 1 560px; min-width: 0; }
@@ -282,6 +285,31 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
   max-width: 90ch;
 }
 .disclosure-box strong { color: var(--color-cream); font-weight: var(--weight-medium); }
+
+/* ================================================================================
+   INK BARS (js/ink.js) — hairline track, cream fill, champagne on the winner only
+   ================================================================================ */
+.ink-bars { display: flex; flex-direction: column; gap: 12px; }
+.ink-bar-row { display: grid; grid-template-columns: 1fr 3fr 44px; align-items: center; gap: 12px; }
+.ink-bar-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caption);
+  color: var(--color-cream-70);
+}
+.ink-bar-track {
+  position: relative;
+  display: block;
+  height: 6px;
+  border: 1px solid var(--color-cream-20);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.ink-bar-fill { position: absolute; inset: 0 auto 0 0; width: 0%; background: var(--color-cream); }
+.ink-bar-fill--winner { background: var(--color-champagne); }
+.ink-bar-null .ink-bar-track { border-style: dashed; }
+.ink-bar-null .ink-bar-fill { background: transparent; border-right: 1.5px solid var(--color-cream-70); }
+.ink-bar-value { font-size: 14px; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ================================================================================
    HOW IT WORKS
@@ -329,6 +357,11 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
 .game-card h3 { font-size: var(--text-body); font-weight: var(--weight-medium); margin: 0; }
 .game-card p { font-size: 12px; color: var(--color-cream-70); margin: 0; }
 .game-mount {
+  /* height, not just min-height: the renderers (js/games/render-*.js) build a height:100%
+     chrome (loop.js's mountChrome) — without a definite height here that percentage can't
+     resolve, and the stage/canvas fall back to content-based auto sizing that blows up to
+     several thousand px on some engines. Fixed height keeps the contract sound either way. */
+  height: 480px;
   min-height: 480px;
   background: var(--color-black);
   border: 1px solid var(--color-cream-20);
@@ -368,13 +401,15 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
 .footer {
   border-top: 1px solid var(--color-cream-10);
   padding: var(--spacing-40) 0;
+  font-size: var(--text-caption);
+  color: var(--color-cream-70);
+}
+.footer-inner {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: var(--spacing-16);
-  font-size: var(--text-caption);
-  color: var(--color-cream-70);
 }
 .footer-links { display: flex; gap: var(--spacing-20); flex-wrap: wrap; }
 .footer-links a { font-size: var(--text-caption); color: var(--color-cream-70); }

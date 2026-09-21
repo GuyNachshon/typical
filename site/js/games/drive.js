@@ -2,6 +2,12 @@
 // machine, no DOM, no deps - matches site/js/snake.js's shape: state()/describe()/render()/
 // candidates()/step()/selfTest().
 
+// Variant B (the shipped one, .533 acc, chance .167) - exact string, sent verbatim as the
+// query by render-drive.js.
+export const QUESTION =
+  'Which manoeuvre applies? Apply the rules in the stated precedence order; the first matching rule wins.\n' +
+  "stop: applies when a pedestrian is crossing the car's lane within 20 m  brake: applies when the traffic light ahead is red within 60 m, or when the lead vehicle is slower than the car and within 20 m and no adjacent lane is clear  change lane right: applies when the destination exit is on the right within 300 m and the right lane is clear, or when the lead vehicle is slower and within 20 m and the right lane is clear  change lane left: applies when the lead vehicle is slower and within 20 m and the left lane is clear and the right lane is not clear  accelerate: applies when the car is below the speed limit, no vehicle is within 50 m ahead, and no red light is ahead  hold speed: applies when none of the above rules fire";
+
 function mulberry32(seed) {
   return function () {
     seed |= 0;

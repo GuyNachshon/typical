@@ -1,9 +1,8 @@
-// ink.js - monochrome probability primitives. Replaces heat.js entirely: no colour, ever,
-// only ink density and serif/sans type. Three exports:
-//   inkBars(el, {rows:[{label,p}], nullP})  - museum-label list, hairline track, ink fill
+// ink.js — Atoms probability primitives. Cream fills, champagne reserved for the winner
+// (the highest-probability non-null row) only, hairline tracks. No motion library: static,
+// placed, not kinetic. Two exports:
+//   inkBars(el, {rows:[{label,p}], nullP})  - hairline track, cream fill, champagne winner
 //   stipple(canvas, p, opts)                - engraving-style dot field, density ∝ p
-//   ledger(el)                              - hero's decision register, push() to append
-const REDUCED_MOTION = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export function clamp01(v) {
   return Math.max(0, Math.min(1, v));
@@ -27,16 +26,16 @@ export function mulberry32(seed) {
 }
 
 // ---- inkBars --------------------------------------------------------------------------
-// inkBars(el, {rows, nullP}) -> {update(rows, nullP)}. Label in Inter 12px uppercase
-// tracked (CSS handles the casing/tracking), a hairline track with an ink fill sized to
-// p, value as a serif numeral right-aligned. The ∅ row (if any) renders last, outline
-// only - no fill - via .ink-bar-null in CSS.
+// inkBars(el, {rows, nullP}) -> {update(rows, nullP)}. Hairline track (cream @20%), a fill
+// sized to p — cream by default, champagne only on the winning (highest-p, non-null) row —
+// value right-aligned. The ∅ row (if any) renders last, outline only, via .ink-bar-null.
 export function inkBars(el, { rows = [], nullP = null } = {}) {
   el.classList.add('ink-bars');
   let entries = [];
 
   function build(list) {
     el.innerHTML = '';
+    const maxP = Math.max(-1, ...list.filter((r) => !r.isNull).map((r) => r.p));
     entries = list.map((r) => {
       const row = document.createElement('div');
       row.className = 'ink-bar-row' + (r.isNull ? ' ink-bar-null' : '');
@@ -46,7 +45,7 @@ export function inkBars(el, { rows = [], nullP = null } = {}) {
       const track = document.createElement('span');
       track.className = 'ink-bar-track';
       const fill = document.createElement('span');
-      fill.className = 'ink-bar-fill';
+      fill.className = 'ink-bar-fill' + (!r.isNull && r.p === maxP ? ' ink-bar-fill--winner' : '');
       track.appendChild(fill);
       const value = document.createElement('span');
       value.className = 'ink-bar-value';
@@ -56,21 +55,16 @@ export function inkBars(el, { rows = [], nullP = null } = {}) {
     });
   }
 
-  function paint(animate) {
+  function paint() {
     entries.forEach(({ fill, value, p }) => {
       value.textContent = p.toFixed(2);
-      const pct = `${(p * 100).toFixed(1)}%`;
-      if (animate && !REDUCED_MOTION && typeof gsap !== 'undefined') {
-        gsap.to(fill, { width: pct, duration: 0.5, ease: 'power2.out' });
-      } else {
-        fill.style.width = pct;
-      }
+      fill.style.width = `${(p * 100).toFixed(1)}%`;
     });
   }
 
   function update(nextRows, nextNullP) {
     build(normalizeRows(nextRows, nextNullP));
-    paint(true);
+    paint();
   }
 
   update(rows, nullP);
@@ -80,8 +74,8 @@ export function inkBars(el, { rows = [], nullP = null } = {}) {
 // ---- stipple ----------------------------------------------------------------------------
 // stipple(canvas, p, opts) -> {update(p), destroy()}. Engraving-style stipple field: a grid
 // of candidate dots, each kept with probability p (jittered off-grid so it doesn't read as
-// a screen tone), ink on transparent. devicePixelRatio-aware. Deterministic per opts.seed so
-// re-renders (resize) don't flicker to a different dot pattern for the same p.
+// a screen tone), cream on transparent by default. devicePixelRatio-aware. Deterministic per
+// opts.seed so re-renders (resize) don't flicker to a different dot pattern for the same p.
 export function stipple(canvas, p = 0, opts = {}) {
   const cell = opts.cell ?? 22;
   const seed = opts.seed ?? 1;
@@ -100,7 +94,7 @@ export function stipple(canvas, p = 0, opts = {}) {
     if (!ctx) return;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.clearRect(0, 0, rect.width, rect.height);
-    ctx.fillStyle = opts.color ?? '#000';
+    ctx.fillStyle = opts.color ?? '#fff7dd';
     const rng = mulberry32(seed); // reset each draw - same p -> same dots
     for (let y = cell / 2; y < rect.height; y += cell) {
       for (let x = cell / 2; x < rect.width; x += cell) {
@@ -129,53 +123,6 @@ export function stipple(canvas, p = 0, opts = {}) {
       if (ro) ro.disconnect();
     },
   };
-}
-
-// ---- ledger -------------------------------------------------------------------------
-// ledger(el) -> {push(entry)}. entry: {text, decision, p, ms}. Rows are prepended (newest
-// on top), revealed with a GSAP fade/rise, and the list is trimmed to the last 12 - this
-// is a register, not an infinite log.
-const LEDGER_MAX_ROWS = 12;
-
-export function ledger(el) {
-  el.classList.add('ink-ledger');
-  let idx = 0;
-
-  function push(entry) {
-    idx += 1;
-    const row = document.createElement('div');
-    row.className = 'ledger-row';
-
-    const n = document.createElement('span');
-    n.className = 'ledger-index';
-    n.textContent = String(idx).padStart(3, '0');
-
-    const state = document.createElement('span');
-    state.className = 'ledger-state';
-    state.textContent = entry.text ?? '';
-
-    const decision = document.createElement('span');
-    decision.className = 'ledger-decision';
-    decision.textContent = entry.decision ?? '';
-
-    const p = document.createElement('span');
-    p.className = 'ledger-p';
-    p.textContent = entry.p != null ? entry.p.toFixed(2) : '—';
-
-    const ms = document.createElement('span');
-    ms.className = 'ledger-ms';
-    ms.textContent = entry.ms != null ? `${entry.ms.toFixed(0)} ms` : '';
-
-    row.append(n, state, decision, p, ms);
-    el.insertBefore(row, el.firstChild);
-
-    if (!REDUCED_MOTION && typeof gsap !== 'undefined') {
-      gsap.fromTo(row, { opacity: 0, y: -6 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' });
-    }
-    while (el.children.length > LEDGER_MAX_ROWS) el.removeChild(el.lastChild);
-  }
-
-  return { push };
 }
 
 // ---- self-test (pure helpers only - no DOM needed under `node js/ink.js`) -----------------

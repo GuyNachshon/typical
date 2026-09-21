@@ -5,7 +5,7 @@
 // engine, and this card lets the same failure play out against id's actual E1M1.
 import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, loadJSON } from './loop.js';
 import { candidatesFor, describeDoom, scriptedPolicy, KEY_FOR_MOVE } from './realdoom-logic.js';
-import { QUESTION } from '../demos/doom.js';
+import { QUESTION } from './doom.js';
 
 const TICK_MS = 400;
 const WASM_TIMEOUT_MS = 10000;

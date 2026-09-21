@@ -36,7 +36,7 @@ export async function mount(el) {
     // ponytail: fallback opacity if replays.json is missing/short — still reads as a field,
     // just not a real one. Floor at .06 so no tile disappears entirely.
     const p = probs[i] ?? 0.15;
-    tile.style.opacity = Math.max(0.06, Math.min(1, p)).toFixed(3);
+    tile.style.opacity = Math.max(0.1, Math.min(1, p)).toFixed(3);
     el.appendChild(tile);
   }
 }
