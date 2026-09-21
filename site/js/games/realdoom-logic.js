@@ -16,7 +16,12 @@ export const ACTIONS = ['move forward', 'move back', 'turn left', 'turn right', 
 // Chocolate Doom key id + hold duration (ms) for each key press - press(key, ms) on
 // window.Doom (site/games/doom/index.html's harness).
 export const KEY_FOR_MOVE = {
-  'move forward': ['forward', 350],
+  // 'move forward' held longer than the others: E1M1's spawn corridor + pillar room alone are
+  // >1700 units from the nearest zombieman, and each decision is one key press - a short hold
+  // means most of a 200-decision recorded run is still walking there. 550ms covers noticeably
+  // more ground per decision without outrunning the 400ms tick interval by much (loop.js's
+  // ticker just skips a tick while the press is still held, same as it already does at 350ms).
+  'move forward': ['forward', 550],
   'move back': ['back', 350],
   'turn left': ['left', 180],
   'turn right': ['right', 180],
@@ -75,40 +80,59 @@ export function describeDoom(state) {
 // direction. That's still "the engine aims", not the model - it only decides the intent.
 // State is module-level (one page, one player) - resetNav() clears it on restart.
 let navBias = 1; // 1 = right, -1 = left; the stuck-escape direction, flips when stuck
-let navHist = []; // rolling {x, y, t} samples covering the last STUCK_MS - a corner where the
-// player alternates turnLock direction can still cover >32 units step to step (bouncing
-// between two points a wall-width apart), so "progress" is a bounding box over a time window,
-// not distance from the last sample.
+let navHist = []; // {x, y, t} samples since navWindowSince - a corner where the player
+// alternates turnLock direction can still cover >32 units step to step (bouncing between two
+// points a wall-width apart), so "progress" is a bounding box over a fixed time window, not
+// distance from the last sample.
+let navWindowSince = null; // when the current STUCK_MS window started
 let navForce = 0; // ticks left in a forced stuck-escape turn
+let navForceFwd = 0; // ticks left in the forced-forward burst that follows the turn
 let turnLock = 0; // 0 outside a wall encounter, else the direction (1/-1) picked for its whole duration
-const STUCK_MS = 6000;
+const STUCK_MS = 2500;
 const STUCK_RADIUS = 150; // bounding-box diagonal of the last STUCK_MS of positions, below this = no real progress
-const FORCE_TURN_TICKS = 5; // ~5 * KEY_FOR_MOVE['turn right'][1] (180ms) holds ~= a 90 degree turn
+// A tight pillar room (E1M1 has one) can bounce the plain wall-follow turn back and forth
+// between two spots a wall-width apart forever - the escape needs to be decisive: ~half a
+// turn (not a quarter) plus a forced walk out of the pocket, not just a re-aim in place.
+const FORCE_TURN_TICKS = 8; // ~8 * KEY_FOR_MOVE['turn right'][1] (180ms) holds ~= a 144 degree turn
+const FORCE_FWD_TICKS = 4; // ~4 * KEY_FOR_MOVE['move forward'][1] (350ms) holds - walk out of the pocket
 
 export function resetNav() {
   navBias = 1;
   navHist = [];
+  navWindowSince = null;
   navForce = 0;
+  navForceFwd = 0;
   turnLock = 0;
 }
 
 function exploreAction(state, now = Date.now()) {
+  if (navWindowSince == null) navWindowSince = now;
   navHist.push({ x: state.x, y: state.y, t: now });
-  while (navHist.length > 1 && now - navHist[0].t > STUCK_MS) navHist.shift();
-  if (navForce === 0 && now - navHist[0].t >= STUCK_MS) {
+  // Check once per fixed STUCK_MS window, not "trim to the last STUCK_MS then compare" - trimming
+  // first always leaves the oldest sample younger than STUCK_MS, so that check never fires.
+  if (navForce === 0 && navForceFwd === 0 && now - navWindowSince >= STUCK_MS) {
     const xs = navHist.map((p) => p.x);
     const ys = navHist.map((p) => p.y);
     const span = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+    navWindowSince = now;
+    navHist = [{ x: state.x, y: state.y, t: now }];
     if (span < STUCK_RADIUS) {
-      navBias = -navBias; // no real progress in 6s - force-turn the other way
-      navForce = FORCE_TURN_TICKS;
+      // A fixed alternation (always flip) can settle into an exact repeating loop around a
+      // tight obstacle (E1M1's pillar room does this) - a random side plus a randomised turn
+      // length breaks that periodicity instead of retracing the same failed escape every time.
+      navBias = Math.random() < 0.5 ? 1 : -1;
+      navForce = FORCE_TURN_TICKS + Math.floor(Math.random() * 5); // 8-12 ticks, ~144-216 degrees
       turnLock = 0; // the stuck escape overrides whatever the wall encounter had picked
-      navHist = [{ x: state.x, y: state.y, t: now }];
     }
   }
   if (navForce > 0) {
     navForce -= 1;
+    if (navForce === 0) navForceFwd = FORCE_FWD_TICKS;
     return navBias > 0 ? 'turn right' : 'turn left';
+  }
+  if (navForceFwd > 0) {
+    navForceFwd -= 1;
+    return 'move forward'; // committed - blocked_ahead resumes governing once this burst ends
   }
   if (state.blocked_ahead) {
     // Pick (and keep) one turn direction for this whole wall encounter - recomputing it every
