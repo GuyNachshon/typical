@@ -39,54 +39,70 @@ function td(text) {
   return el;
 }
 
+// Split into two narrower tables (model+JevBench, model+evidence/intent) instead of one wide
+// 15-column table: each fits 1200px on its own without a horizontal-scroll wrapper.
 function buildResultsTable(container, models, frozenDoc) {
   const frozenByTrained = new Map((frozenDoc?.rows ?? []).filter((r) => r.trained).map((r) => [r.trained, r.std]));
+  const released = models.filter((m) => m.released);
 
-  const wrap = document.createElement('div');
-  wrap.className = 'table-scroll';
-  const table = document.createElement('table');
-  table.className = 'results-table';
-  const thead = document.createElement('thead');
-  thead.innerHTML =
-    '<tr><th>model</th><th>backbone</th><th>tap</th><th>ms K=2</th><th>ms K=256</th>' +
-    '<th>JevBench std</th><th>frozen 3-shot (std)</th><th>JevBench hard</th><th>ECE std</th>' +
-    '<th>CLINC-150</th><th>SNLI</th><th>MNLI</th><th>BoolQ</th><th>PagerDuty (floor .792)</th><th>HF</th></tr>';
-  table.appendChild(thead);
-  const tbody = document.createElement('tbody');
-  models
-    .filter((m) => m.released)
-    .forEach((m) => {
+  function weightsLink(m) {
+    const a = document.createElement('a');
+    a.href = m.hf_url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.className = 'ghost-link';
+    a.textContent = 'weights →';
+    const cell = document.createElement('td');
+    cell.appendChild(a);
+    return cell;
+  }
+
+  function buildTable(heading, headers, rowFn) {
+    const col = document.createElement('div');
+    col.className = 'results-table-col';
+    col.appendChild(Object.assign(document.createElement('h3'), { className: 'chart-title', textContent: heading }));
+    const table = document.createElement('table');
+    table.className = 'results-table';
+    const thead = document.createElement('thead');
+    const trh = document.createElement('tr');
+    headers.forEach((h) => trh.appendChild(Object.assign(document.createElement('th'), { textContent: h })));
+    thead.appendChild(trh);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    released.forEach((m) => {
       const tr = document.createElement('tr');
-      tr.append(
-        td(m.id),
-        td(m.backbone),
-        td(m.tap),
-        td(String(m.latency.single_ms.k2)),
-        td(String(m.latency.single_ms.k256)),
-        tdAcc(m.jevbench.std.acc),
-        tdAcc(frozenByTrained.get(m.id)),
-        tdAcc(m.jevbench.hard.acc),
-        td(fmt3(m.jevbench.std.ece)),
-        tdAcc(m.topic_intent.clinc),
-        tdAcc(m.nlu.snli),
-        tdAcc(m.nlu.mnli),
-        tdAcc(m.nlu.boolq),
-        tdAcc(m.external.pagerduty)
-      );
-      const hfTd = document.createElement('td');
-      const a = document.createElement('a');
-      a.href = m.hf_url;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.className = 'ghost-link';
-      a.textContent = 'weights →';
-      hfTd.appendChild(a);
-      tr.appendChild(hfTd);
+      rowFn(m).forEach((cell) => tr.appendChild(cell));
       tbody.appendChild(tr);
     });
-  table.appendChild(tbody);
-  wrap.appendChild(table);
-  container.appendChild(wrap);
+    table.appendChild(tbody);
+    col.appendChild(table);
+    return col;
+  }
+
+  const row = document.createElement('div');
+  row.className = 'results-tables';
+  row.appendChild(
+    buildTable('JevBench', ['model', 'std', 'hard', 'ECE std', 'frozen 3-shot', 'ms K2→K256', 'HF'], (m) => [
+      td(m.id),
+      tdAcc(m.jevbench.std.acc),
+      tdAcc(m.jevbench.hard.acc),
+      td(fmt3(m.jevbench.std.ece)),
+      tdAcc(frozenByTrained.get(m.id)),
+      td(`${m.latency.single_ms.k2} → ${m.latency.single_ms.k256}`),
+      weightsLink(m),
+    ])
+  );
+  row.appendChild(
+    buildTable('Evidence / intent', ['model', 'CLINC-150', 'SNLI', 'MNLI', 'BoolQ', 'PagerDuty (floor .792)'], (m) => [
+      td(m.id),
+      tdAcc(m.topic_intent.clinc),
+      tdAcc(m.nlu.snli),
+      tdAcc(m.nlu.mnli),
+      tdAcc(m.nlu.boolq),
+      tdAcc(m.external.pagerduty),
+    ])
+  );
+  container.appendChild(row);
 
   const footnote = document.createElement('p');
   footnote.className = 'chart-caption';
@@ -255,6 +271,17 @@ function mountMark() {
   import('./mark.js').then((m) => m.mount(el));
 }
 
+// ---- try-it: mounted immediately (not lazy behind a Run/expand toggle) since it's the
+// first exhibit card and its own "Run →" button already gates the network/replay call -----
+
+function mountTryit(ctx) {
+  const el = document.querySelector('[data-demo="tryit"]');
+  if (!el) return;
+  import('./demos/tryit.js')
+    .then((m) => m.mount(el, ctx))
+    .catch(() => renderOffline(el, 'tryit'));
+}
+
 // ---- boot -------------------------------------------------------------------------
 
 async function boot() {
@@ -272,6 +299,7 @@ async function boot() {
 
   mountMark();
   mountResults(models, reliabilityDoc, chanceDoc, frozenDoc);
+  mountTryit(ctx);
   wireExhibits(ctx);
   mountGameScreens(ctx);
 }

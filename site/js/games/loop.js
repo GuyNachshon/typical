@@ -47,15 +47,26 @@ export function mountChrome(el, { label } = {}) {
 
   const foot = document.createElement('div');
   foot.className = 'gc-foot';
+  const hint = document.createElement('div');
+  hint.className = 'gc-hint';
+  hint.textContent = '← → ↑ ↓ to take over · the model resumes after 3 s';
   const decision = document.createElement('div');
   decision.className = 'gc-decision';
   const sentence = document.createElement('div');
   sentence.className = 'gc-sentence';
-  foot.append(decision, sentence);
+  foot.append(hint, decision, sentence);
 
   el.append(stage, foot);
 
   return { root: el, stage, canvas, hud, policyBtn, restartBtn, decision, sentence };
+}
+
+// "you vs model" HUD line — only shown once a human has taken at least one turn (a 0-0 line
+// before any keypress would just be noise). `counts` is {you, model}; `unit` is an optional
+// plural noun appended after the numbers (e.g. "kills"), omitted for a bare count.
+export function scoreboardLine(counts, unit = '') {
+  if (!counts || (counts.you === 0 && counts.model === 0)) return null;
+  return `YOU ${counts.you} · MODEL ${counts.model}${unit ? ' ' + unit : ''}`;
 }
 
 // Paints the candidate · cream bar · tabular numeral list + the ∅ row, and the read sentence
@@ -215,6 +226,10 @@ function selfTest() {
   ];
   const f0 = replayFrame(frames, 0);
   console.assert(f0.move === 'b' && f0.probs.b === 0.7, 'replayFrame maps the probs array onto candidates');
+  console.assert(scoreboardLine({ you: 0, model: 0 }) === null, 'scoreboardLine hides itself at 0-0');
+  console.assert(scoreboardLine({ you: 3, model: 2 }) === 'YOU 3 · MODEL 2', 'scoreboardLine formats a bare count');
+  console.assert(scoreboardLine({ you: 0, model: 1 }, 'kills') === 'YOU 0 · MODEL 1 kills', 'scoreboardLine appends the unit');
+
   const f2 = replayFrame(frames, 2);
   console.assert(f2.tick === 0, 'replayFrame loops back to the start past the end');
 

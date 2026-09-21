@@ -11,10 +11,13 @@ async function loadProbs() {
     if (!res.ok) return [];
     const replays = await res.json();
     const vals = [];
+    // label + argmax travel with each probability so a tile's tooltip can name the decision
+    // it came from (there's no query text in replays.json, only the candidate/probability
+    // pairs — the label is the honest, cheap thing to show).
     outer: for (const entry of Object.values(replays)) {
       for (const r of entry.results || []) {
-        for (const p of Object.values(r.probs || {})) {
-          vals.push(p);
+        for (const [label, p] of Object.entries(r.probs || {})) {
+          vals.push({ p, label, argmax: r.argmax });
           if (vals.length >= N) break outer;
         }
       }
@@ -35,9 +38,11 @@ export async function mount(el) {
     tile.className = 'mark-tile';
     // ponytail: fallback opacity if replays.json is missing/short — still reads as a field,
     // just not a real one. Floor at .06 so no tile disappears entirely.
-    const p = probs[i] ?? 0.15;
+    const entry = probs[i];
+    const p = entry?.p ?? 0.15;
     // sqrt keeps the ordering but lets small probabilities read as texture instead of black
     tile.style.opacity = (0.08 + 0.92 * Math.sqrt(Math.max(0, Math.min(1, p)))).toFixed(3);
+    if (entry) tile.title = `${entry.label} · p=${entry.p.toFixed(2)}${entry.label === entry.argmax ? ' (argmax)' : ''}`;
     el.appendChild(tile);
   }
 }

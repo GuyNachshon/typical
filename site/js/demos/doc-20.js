@@ -28,7 +28,11 @@ export async function mount(host, ctx) {
   host.innerHTML = '';
   const wrap = el('div', 'exhibit doc20-exhibit');
 
-  const handbook = el('div', 'ex-scroll', data.doc);
+  const handbook = document.createElement('details');
+  handbook.className = 'ex-details';
+  const summary = el('summary', null, 'Read the handbook');
+  const pre = el('pre', null, data.doc);
+  handbook.append(summary, pre);
   wrap.appendChild(handbook);
 
   const register = el('div', 'doc20-register');

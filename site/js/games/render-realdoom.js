@@ -3,7 +3,7 @@
 // actually work on the real game" companion to render-doom.js's own ASCII/Three.js arena:
 // demo-spec-v2.md #5 found the model says "shoot" 29/30 times regardless of state on that
 // engine, and this card lets the same failure play out against id's actual E1M1.
-import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, loadJSON } from './loop.js';
+import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, loadJSON, scoreboardLine } from './loop.js';
 import { candidatesFor, describeDoom, scriptedPolicy, KEY_FOR_MOVE } from './realdoom-logic.js';
 import { QUESTION } from './doom.js';
 
@@ -98,6 +98,7 @@ export async function mount(el, { decide, mode } = {}) {
   let shotsWithTarget = 0;
   let kills = currState.kills ?? 0;
   const human = createHumanOverride(3000);
+  let killScore = { you: 0, model: 0 }; // "you vs model" HUD line, reset on restart
 
   const foot = refs.sentence.parentElement;
   const tallyEl = document.createElement('div');
@@ -114,6 +115,7 @@ export async function mount(el, { decide, mode } = {}) {
     doom.releaseAll();
     doom.newGame(3);
     kills = 0;
+    killScore = { you: 0, model: 0 };
   }
 
   function paintHUD(state) {
@@ -123,6 +125,8 @@ export async function mount(el, { decide, mode } = {}) {
     const l2 = document.createElement('div');
     l2.textContent = `HEALTH ${state.health} · AMMO ${state.ammo} · KILLS ${state.kills ?? 0}/${state.total_kills ?? 0}`;
     refs.hud.append(l1, l2);
+    const scoreLine = scoreboardLine(killScore, 'kills');
+    if (scoreLine) refs.hud.appendChild(document.createElement('div')).textContent = scoreLine;
   }
 
   function paintTally() {
@@ -150,9 +154,10 @@ export async function mount(el, { decide, mode } = {}) {
       const sentence = describeDoom(currState);
       const offline = mode() !== 'live';
 
+      const humanTurn = human.active();
       let move;
       let decision;
-      if (human.active()) {
+      if (humanTurn) {
         move = legal.includes(human.move) ? human.move : legal[0];
         decision = { candidates: legal, probs: { [move]: 1 }, p_null: 0, sentence };
       } else if (offline || policyName === 'scripted') {
@@ -172,7 +177,12 @@ export async function mount(el, { decide, mode } = {}) {
       const killsBefore = currState.kills ?? 0;
       await applyMove(doom, move);
       const after = doom.state();
-      if ((after.kills ?? 0) > killsBefore) kills += after.kills - killsBefore;
+      if ((after.kills ?? 0) > killsBefore) {
+        const delta = after.kills - killsBefore;
+        kills += delta;
+        if (humanTurn) killScore.you += delta;
+        else killScore.model += delta;
+      }
 
       paintHUD(after);
       paintDecision(refs, lastDecision);

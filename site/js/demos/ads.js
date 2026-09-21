@@ -77,6 +77,22 @@ export async function mount(el0, ctx) {
   const feed = el('div', 'ads-register');
   el0.appendChild(feed);
 
+  const VISIBLE = 6;
+  const showMore = document.createElement('button');
+  showMore.type = 'button';
+  showMore.className = 'ex-ghost';
+  showMore.textContent = `Show all ${pool.observations.length} →`;
+  showMore.hidden = pool.observations.length <= VISIBLE;
+  el0.appendChild(showMore);
+  let expanded = false;
+  showMore.addEventListener('click', () => {
+    expanded = true;
+    showMore.hidden = true;
+    pending.forEach((item) => feed.appendChild(item));
+    pending.length = 0;
+  });
+  const pending = [];
+
   const questions = document.createElement('details');
   questions.className = 'ex-details';
   const summary = el('summary', null, 'the prompt');
@@ -106,14 +122,16 @@ export async function mount(el0, ctx) {
   }
   updateTally();
 
-  for (const obs of pool.observations) {
+  for (let idx = 0; idx < pool.observations.length; idx++) {
+    const obs = pool.observations[idx];
     const item = el('div', 'ads-item');
     item.appendChild(el('p', 'ads-text', obs.text));
     const decisions = el('div', 'ads-decisions');
     item.appendChild(decisions);
     const gold = el('span', 'ads-gold', `gold: ${obs.isAd ? `${obs.brand} · advertisement` : 'not an advertisement'}`);
     item.appendChild(gold);
-    feed.appendChild(item);
+    if (expanded || idx < VISIBLE) feed.appendChild(item);
+    else pending.push(item);
 
     const out = await ctx.decide(obs.text, [
       { type: 'choice', question: AD_Q, labels: ['advertisement', 'not_an_advertisement'] },

@@ -17,6 +17,7 @@ function sleep(ms) {
 }
 
 const CHIP_LABEL = { D: 'duplicate charge', C: 'cancelling', B: 'arrived damaged', L: 'login / password' };
+const VISIBLE_ROWS = 12;
 
 export async function mount(el, ctx) {
   const res = await fetch('data/demos/sql.json');
@@ -56,6 +57,12 @@ export async function mount(el, ctx) {
   register.className = 'sql-register';
   el.appendChild(register);
 
+  const showMore = document.createElement('button');
+  showMore.type = 'button';
+  showMore.className = 'ex-ghost';
+  showMore.textContent = `Show all ${pool.rows.length} →`;
+  el.appendChild(showMore);
+
   const caption = document.createElement('p');
   caption.className = 'ex-caption';
   caption.textContent =
@@ -78,9 +85,22 @@ export async function mount(el, ctx) {
     p.className = 'ex-num';
     p.textContent = '—';
     div.append(text, bar, p);
-    register.appendChild(div);
     return { div, fill, p };
   });
+
+  // 12 rows shown by default (no scroll box); "Show all N →" renders the rest inline.
+  let order = pool.rows.map((_, i) => i);
+  let expanded = false;
+  function renderVisible() {
+    register.innerHTML = '';
+    (expanded ? order : order.slice(0, VISIBLE_ROWS)).forEach((i) => register.appendChild(rowEls[i].div));
+    showMore.hidden = expanded || pool.rows.length <= VISIBLE_ROWS;
+  }
+  showMore.addEventListener('click', () => {
+    expanded = true;
+    renderVisible();
+  });
+  renderVisible();
 
   let running = false;
 
@@ -125,10 +145,8 @@ export async function mount(el, ctx) {
     readoutLine.textContent = `${pool.rows.length} rows · ${tp} matches · P ${prec.toFixed(2)} R ${rec.toFixed(2)} · ${(wallMs / 1000).toFixed(1)} s here`;
 
     // matches rise to the top
-    rowEls
-      .map((r, i) => ({ r, p: pool.rows[i]._p }))
-      .sort((a, b) => b.p - a.p)
-      .forEach(({ r }) => register.appendChild(r.div));
+    order = pool.rows.map((_, i) => i).sort((a, b) => (pool.rows[b]._p ?? 0) - (pool.rows[a]._p ?? 0));
+    renderVisible();
 
     running = false;
   }

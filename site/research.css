@@ -177,7 +177,6 @@
   border: 1px solid var(--color-cream-10);
   border-radius: var(--radius-card);
   background: var(--color-black);
-  overflow-x: auto;
 }
 .content pre code {
   background: none;
@@ -185,7 +184,8 @@
   padding: 0;
   font-size: 12px;
   line-height: 1.5;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 /* figure/specimen captions: a paragraph that is only an *italic* line, right after a
    code fence in research.md (e.g. "*Fig. 1. ...*") */
@@ -198,13 +198,13 @@
 
 /* ---- tables: hairline, tabular numerals ---- */
 
-.table-scroll { overflow-x: auto; margin: 0 0 20px; }
-.content table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+.table-scroll { margin: 0 0 20px; }
+.content table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 13px; font-variant-numeric: tabular-nums; }
 .content th, .content td {
   text-align: left;
   padding: 10px 16px 10px 0;
   border-bottom: 1px solid var(--color-cream-10);
-  white-space: nowrap;
+  overflow-wrap: break-word;
 }
 .content th { color: var(--color-cream); font-weight: var(--weight-medium); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
 .content td { color: var(--color-cream-70); }
