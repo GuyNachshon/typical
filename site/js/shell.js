@@ -256,6 +256,8 @@ function mountGameScreens(ctx) {
     (entries) => {
       entries.forEach((entry) => {
         if (!entry.isIntersecting) return;
+        if (entry.target.dataset.mounted) return;
+        entry.target.dataset.mounted = '1';
         io.unobserve(entry.target);
         const name = entry.target.dataset.game;
         import(`./games/render-${name}.js`)
@@ -266,6 +268,22 @@ function mountGameScreens(ctx) {
     { rootMargin: '200px' }
   );
   document.querySelectorAll('[data-game]').forEach((el) => io.observe(el));
+  // Fallback for anchor jumps (nav "Demos", #demos links): mount anything already near the viewport.
+  const sweep = () => {
+    document.querySelectorAll('[data-game]').forEach((el) => {
+      if (el.dataset.mounted) return;
+      const r = el.getBoundingClientRect();
+      if (r.bottom > -200 && r.top < innerHeight + 200) {
+        el.dataset.mounted = '1';
+        io.unobserve(el);
+        import(`./games/render-${el.dataset.game}.js`)
+          .then((m) => m.mount(el, { decide: ctx.decide, mode: ctx.mode, ctx }))
+          .catch(() => renderOffline(el, `render-${el.dataset.game}`));
+      }
+    });
+  };
+  addEventListener('hashchange', () => setTimeout(sweep, 50));
+  addEventListener('scroll', sweep, { passive: true });
 }
 
 // ---- hero mark mosaic ------------------------------------------------------------------
