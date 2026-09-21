@@ -238,3 +238,9 @@ eval files and are not representative (jevlogs slice all `yes`, PagerDuty slice 
 family). See the Correction block in REPORT §3w; the stratified full-file re-evaluation (§3x) supersedes them. The
 held-out workflow-family/style gains, the E over-abstention on CLINC-150/TREC-fine, the knowledge retention, and the
 calibration regression on soft/ordinal gold stand. JevBench hard by state length: ≤ 256 tokens .64, > 1,024 tokens .23.
+
+## Links
+
+- Public release: https://huggingface.co/OzLabs/typical-small-preview
+- Successor releases: https://huggingface.co/OzLabs/typical-small (1.7B, Release 1),
+  https://huggingface.co/OzLabs/typical-medium (4B, Release 1)

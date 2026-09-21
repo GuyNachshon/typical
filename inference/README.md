@@ -1,7 +1,7 @@
 # typical -- minimal inference package
 
-A self-contained decision head for `OzLabs/typical-small` and
-`OzLabs/typical-small-preview`. No training-repo dependencies (no `bench`/`train`/`data`/
+A self-contained decision head for `OzLabs/typical-small-preview`, `OzLabs/typical-small`, and
+`OzLabs/typical-medium`. No training-repo dependencies (no `bench`/`train`/`data`/
 `metrics`) -- just `torch`, `transformers`, `huggingface_hub`, `safetensors`, `numpy`.
 
 ## Install
@@ -18,7 +18,7 @@ no build step.)
 ```python
 from typical import Typical
 
-m = Typical.from_pretrained("OzLabs/typical-small", device="auto")  # or "typical-small-preview"
+m = Typical.from_pretrained("OzLabs/typical-small", device="auto")  # or "typical-small-preview" / "typical-medium"
 
 # K-way choice over a fixed label set -> {label: p, ...} + p_null
 m.choice(state, "What does the customer want?", ["refund", "replacement", "repair"])
