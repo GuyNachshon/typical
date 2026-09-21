@@ -2,11 +2,24 @@
 // machine, no DOM, no deps - matches site/js/snake.js's shape: state()/describe()/render()/
 // candidates()/step()/selfTest().
 
-// Variant B (the shipped one, .533 acc, chance .167) - exact string, sent verbatim as the
-// query by render-drive.js.
+// Demo-spec v3 grammar (70/70 on the probe set, chance .16): the state lists only the situations
+// that apply, phrased exactly as the rule conditions; one condition per rule; the candidate set
+// is the legality guardrail (a lane change is only offered when that lane exists and is clear).
+// RULES order = precedence order = candidate order.
+export const RULES = {
+  stop: "applies when a pedestrian is crossing the car's lane",
+  brake: 'applies when the traffic light ahead is red',
+  'change lane right': 'applies when the car must take the exit on the right',
+  accelerate: 'applies when the road ahead is clear for 50 m', // speeds up to the limit; no-op at it
+  'change lane left': 'applies when the car is closing on a slower vehicle ahead',
+  follow: 'applies when the car is closing on a slower vehicle ahead',
+  'hold speed': 'applies when none of the above rules fire',
+};
+// Rendered exactly like inference/typical/core.py::query_text (instructions + "\n" + "label: desc"
+// pairs joined by two spaces); sent verbatim as the query by render-drive.js / record_games.mjs.
 export const QUESTION =
-  'Which manoeuvre applies? Apply the rules in the stated precedence order; the first matching rule wins.\n' +
-  "stop: applies when a pedestrian is crossing the car's lane within 20 m  brake: applies when the traffic light ahead is red within 60 m, or when the lead vehicle is slower than the car and within 20 m and no adjacent lane is clear  change lane right: applies when the destination exit is on the right within 300 m and the right lane is clear, or when the lead vehicle is slower and within 20 m and the right lane is clear  change lane left: applies when the lead vehicle is slower and within 20 m and the left lane is clear and the right lane is not clear  accelerate: applies when the car is below the speed limit, no vehicle is within 50 m ahead, and no red light is ahead  hold speed: applies when none of the above rules fire";
+  'Which manoeuvre applies for driving the car? Apply the rules in the stated precedence order; the first matching rule wins.\n' +
+  Object.entries(RULES).map(([k, v]) => `${k}: ${v}`).join('  ');
 
 function mulberry32(seed) {
   return function () {
@@ -18,21 +31,26 @@ function mulberry32(seed) {
   };
 }
 
-const ACTIONS = ['hold speed', 'accelerate', 'brake', 'change lane left', 'change lane right', 'stop'];
+const ACTIONS = Object.keys(RULES);
 const LANES = 3;
-const ROAD_LENGTH = 2000; // m
-const DEST_POS = 1900; // m - exit requires lane 3
+export const ROAD_LENGTH = 1600; // m
+export const DEST_POS = 1500; // m - exit requires lane 3 (render-drive.js draws the ramp here)
 const LIGHT_SPACING = 300; // m
 const TICK_S = 0.5;
-const MAX_SPEED = 80; // km/h
+const SPEED_LIMIT = 60; // km/h - accelerate caps here
 const ACCEL = 8; // km/h per tick
 const BRAKE = 15; // km/h per tick
 const STOP_DECEL = 30; // km/h per tick
-const LANE_CHANGE_GAP = 5; // m - min clearance in target lane
-const AWARE_RANGE = 100; // m - describe()/render visibility
+const LANE_CLEAR_GAP = 15; // m - a lane is "clear" with no vehicle within this, ahead or behind
+const PED_RANGE = 20; // m - "a pedestrian is crossing the car's lane"
+const LIGHT_RANGE = 60; // m - "the traffic light ahead is red"
+const CLOSING_RANGE = 20; // m - "closing on a slower vehicle ahead": slower lead within this
+const LEAD_RANGE = 50; // m - lead vehicle reported (else "the road ahead is clear for 50 m")
+const EXIT_RANGE = 300; // m - "the car must take the exit on the right"
+const TRAFFIC_GAP = 10; // m - traffic cars wait behind anything this close, and at red lights
 const COLLISION_GAP = 3; // m - ponytail: treat "gap <= 0" as "within a car length", since a
 // 0.5s tick can step two cars past each other without ever landing on an exact 0 gap.
-const LIGHT_GREEN_TICKS = 10;
+const LIGHT_GREEN_TICKS = 20;
 const LIGHT_RED_TICKS = 10;
 
 function metersPerKmh(kmh) {
@@ -54,11 +72,16 @@ export class Drive {
       this.lights.push({ pos, state, timer });
     }
     this.traffic = [];
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 16; i++) {
+      const lane = 1 + Math.floor(this.rng() * LANES);
+      // Everyone is slower than the 60 km/h limit, so the ego catches up and has to overtake
+      // (left only, per RULES); the left lane is the fast one so it is not stuck there for good.
+      const cruise = [40, 25, 15][lane - 1] + Math.floor(this.rng() * 11);
       this.traffic.push({
-        lane: 1 + Math.floor(this.rng() * LANES),
-        position: 80 + this.rng() * (ROAD_LENGTH - 160),
-        speed: 20 + Math.floor(this.rng() * 45),
+        lane,
+        position: 60 + this.rng() * 600, // bunched in the first 660 m so the ego catches them
+        speed: cruise,
+        cruise,
       });
     }
     this.pedestrians = [];
@@ -89,18 +112,51 @@ export class Drive {
   }
 
   _laneClear(lane) {
-    return !this.traffic.some((c) => c.lane === lane && Math.abs(c.position - this.ego.position) <= LANE_CHANGE_GAP);
+    return !this.traffic.some((c) => c.lane === lane && Math.abs(c.position - this.ego.position) <= LANE_CLEAR_GAP);
   }
 
+  _lead() {
+    const e = this.ego;
+    return this.traffic
+      .filter((c) => c.lane === e.lane && c.position > e.position && c.position - e.position <= LEAD_RANGE)
+      .sort((a, b) => a.position - b.position)[0] ?? null;
+  }
+
+  // The situations describe() reports and candidates() gates on - one boolean per rule condition.
+  situations() {
+    const e = this.ego;
+    const lead = this._lead();
+    const light = this.lights.find((l) => l.pos >= e.position && l.pos - e.position <= LIGHT_RANGE);
+    const ped = this.pedestrians.find((p) => p.lane === e.lane && p.pos >= e.position && p.pos - e.position <= PED_RANGE);
+    const exitIn = DEST_POS - e.position;
+    return {
+      lead,
+      light,
+      ped,
+      exitIn,
+      red: Boolean(light && light.state === 'red'),
+      closing: Boolean(lead && lead.speed < e.speed && lead.position - e.position <= CLOSING_RANGE),
+      exitNear: exitIn > 0 && exitIn <= EXIT_RANGE,
+      mustExit: exitIn > 0 && exitIn <= EXIT_RANGE && e.lane < LANES,
+      roadClear: !lead,
+      belowLimit: e.speed < SPEED_LIMIT,
+      leftClear: e.lane > 1 && this._laneClear(e.lane - 1),
+      rightClear: e.lane < LANES && this._laneClear(e.lane + 1),
+    };
+  }
+
+  // Legality guardrail (the page states it): lane changes only into an existing clear lane, and
+  // only toward the exit once it is within EXIT_RANGE. Everything else is always offered
+  // (no-ops at 0 km/h, at the limit, or with no lead vehicle) - gating accelerate at the limit
+  // made the model (correctly) answer null on every cruise tick: mean p_null .49 vs .23.
   candidates() {
     if (this.done) return [];
-    const legal = new Set(['hold speed']);
-    if (this.ego.speed < MAX_SPEED) legal.add('accelerate');
-    if (this.ego.speed > 0) legal.add('brake');
-    if (this.ego.lane > 1 && this._laneClear(this.ego.lane - 1)) legal.add('change lane left');
-    if (this.ego.lane < LANES && this._laneClear(this.ego.lane + 1)) legal.add('change lane right');
-    if (this.ego.speed > 0) legal.add('stop');
-    return ACTIONS.filter((a) => legal.has(a));
+    const sit = this.situations();
+    return ACTIONS.filter((a) => {
+      if (a === 'change lane right') return sit.rightClear;
+      if (a === 'change lane left') return sit.leftClear && !sit.exitNear;
+      return true;
+    });
   }
 
   safeMoves() {
@@ -109,10 +165,13 @@ export class Drive {
 
   _applyAction(action) {
     const e = this.ego;
-    if (action === 'accelerate') e.speed = Math.min(MAX_SPEED, e.speed + ACCEL);
+    if (action === 'accelerate') e.speed = Math.min(SPEED_LIMIT, e.speed + ACCEL);
     else if (action === 'brake') e.speed = Math.max(0, e.speed - BRAKE);
     else if (action === 'stop') e.speed = Math.max(0, e.speed - STOP_DECEL);
-    else if (action === 'change lane left') e.lane -= 1;
+    else if (action === 'follow') {
+      const lead = this._lead();
+      if (lead) e.speed = Math.max(0, Math.min(e.speed, lead.speed));
+    } else if (action === 'change lane left') e.lane -= 1;
     else if (action === 'change lane right') e.lane += 1;
     // 'hold speed' and unrecognised/illegal actions: no-op.
   }
@@ -124,7 +183,18 @@ export class Drive {
     const lightStatesAtCrossing = this.lights.map((l) => l.state);
     const prevPos = this.ego.position;
     this.ego.position += metersPerKmh(this.ego.speed);
-    for (const car of this.traffic) car.position += metersPerKmh(car.speed);
+    // Traffic is dumb but not suicidal: a car matches whatever is within TRAFFIC_GAP ahead in its
+    // lane (the ego included) and stops at a red light, so a stopped ego is not rammed from behind.
+    // car.speed is the speed it actually moves at this tick (what describe() reports); car.cruise
+    // is its own preferred speed.
+    for (const car of this.traffic) {
+      const ahead = [...this.traffic, this.ego]
+        .filter((o) => o !== car && o.lane === car.lane && o.position > car.position && o.position - car.position <= TRAFFIC_GAP)
+        .sort((a, b) => a.position - b.position)[0];
+      const redAhead = this.lights.some((l) => l.state === 'red' && l.pos >= car.position && l.pos - car.position <= TRAFFIC_GAP);
+      car.speed = redAhead ? 0 : ahead ? Math.min(car.cruise, ahead.speed) : car.cruise;
+      car.position += metersPerKmh(car.speed);
+    }
 
     for (const l of this.lights) {
       l.timer -= 1;
@@ -167,44 +237,23 @@ export class Drive {
     return this.state();
   }
 
-  // Fact-sentence grammar: ego line, own-lane lead vehicle (or explicit "clear"), light ahead
-  // (only within AWARE_RANGE), each other lane's nearest vehicle (or "clear"), destination,
-  // then a fixed-order "Legal actions:" sentence.
+  // Situations-only grammar (demo-spec v3): the ego line, then one sentence per situation that
+  // applies, worded exactly as its rule condition, in this fixed order. Sentence order matters to
+  // the model (shuffled orders scored .89-.93 vs 1.00 on the probe set) - keep it.
   describe() {
     const e = this.ego;
-    const sentences = [`The car is in lane ${e.lane} of ${LANES} at ${e.speed} km/h.`];
-
-    const lead = this.traffic
-      .filter((c) => c.lane === e.lane && c.position > e.position)
-      .sort((a, b) => a.position - b.position)[0];
-    const leadDist = lead ? lead.position - e.position : Infinity;
-    if (lead && leadDist <= AWARE_RANGE) {
-      sentences.push(`The lead vehicle is ${Math.round(leadDist)} m ahead at ${lead.speed} km/h.`);
-    } else {
-      sentences.push('No vehicle ahead within 100 m.');
-    }
-
-    const light = this.lights
-      .filter((l) => l.pos >= e.position && l.pos - e.position <= AWARE_RANGE)
-      .sort((a, b) => a.pos - b.pos)[0];
-    if (light) sentences.push(`The traffic light ${Math.round(light.pos - e.position)} m ahead is ${light.state}.`);
-
-    for (let lane = 1; lane <= LANES; lane++) {
-      if (lane === e.lane) continue;
-      const nearest = this.traffic
-        .filter((c) => c.lane === lane && Math.abs(c.position - e.position) <= AWARE_RANGE)
-        .sort((a, b) => Math.abs(a.position - e.position) - Math.abs(b.position - e.position))[0];
-      if (!nearest) {
-        sentences.push(`Lane ${lane} is clear.`);
-      } else {
-        const dist = Math.round(Math.abs(nearest.position - e.position));
-        const bearing = nearest.position > e.position ? 'ahead' : 'behind';
-        sentences.push(`Lane ${lane} has a vehicle ${dist} m ${bearing}.`);
-      }
-    }
-
-    sentences.push(`The destination is an exit on the right in ${Math.max(0, Math.round(DEST_POS - e.position))} m.`);
-    sentences.push(`Legal actions: ${this.candidates().join(', ')}.`);
+    const sit = this.situations();
+    const sentences = [
+      `The car is in lane ${e.lane} of ${LANES} at ${e.speed} km/h, ${sit.belowLimit ? 'below' : 'at'} the speed limit of ${SPEED_LIMIT} km/h.`,
+    ];
+    if (sit.ped) sentences.push(`A pedestrian is crossing the car's lane ${Math.round(sit.ped.pos - e.position)} m ahead.`);
+    if (sit.red) sentences.push(`The traffic light ${Math.round(sit.light.pos - e.position)} m ahead is red.`);
+    if (sit.closing) sentences.push(`The car is closing on a slower vehicle ${Math.round(sit.lead.position - e.position)} m ahead.`);
+    else if (sit.lead) sentences.push(`The lead vehicle is ${Math.round(sit.lead.position - e.position)} m ahead at ${sit.lead.speed} km/h.`);
+    if (sit.mustExit) sentences.push(`The car must take the exit on the right in ${Math.round(sit.exitIn)} m.`);
+    if (sit.roadClear) sentences.push(`The road ahead is clear for ${LEAD_RANGE} m.`);
+    if (sit.leftClear) sentences.push('The lane to the left is clear.');
+    if (sit.rightClear) sentences.push('The lane to the right is clear.');
     return sentences.join(' ');
   }
 
@@ -274,33 +323,30 @@ export class Drive {
   }
 }
 
-// Scripted policy: brake for a red light or a slower lead car close ahead; steer toward the
-// exit lane (3) as the destination nears; otherwise cruise, accelerating up to 60 km/h.
+// Scripted policy = RULES applied literally, first matching offered rule wins. This is the gold
+// the model is measured against (record_games.mjs reports agreement with it).
 export function greedyPolicy(engine) {
   const legal = engine.candidates();
   if (legal.length === 0) return null;
-  const e = engine.ego;
-
-  const lightAhead = engine.lights.find((l) => l.pos >= e.position && l.pos - e.position <= 60 && l.state === 'red');
-  const lead = engine.traffic
-    .filter((c) => c.lane === e.lane && c.position > e.position && c.position - e.position <= 25)
-    .sort((a, b) => a.position - b.position)[0];
-  if ((lightAhead || (lead && lead.speed < e.speed)) && legal.includes('brake')) return 'brake';
-
-  const distToExit = DEST_POS - e.position;
-  if (distToExit > 0 && distToExit < 200 && e.lane < LANES && legal.includes('change lane right')) {
-    return 'change lane right';
-  }
-
-  if (e.speed < 60 && legal.includes('accelerate')) return 'accelerate';
-  return legal.includes('hold speed') ? 'hold speed' : legal[0];
+  const sit = engine.situations();
+  const fires = {
+    stop: Boolean(sit.ped),
+    brake: sit.red,
+    'change lane right': sit.mustExit,
+    accelerate: sit.roadClear,
+    'change lane left': sit.closing,
+    follow: sit.closing,
+    'hold speed': true,
+  };
+  return legal.find((a) => fires[a]);
 }
 
 function selfTest() {
   const d = new Drive({ seed: 4 });
   console.assert(d.ego.lane === 2 && d.ego.speed === 40, 'ego starts in lane 2 at 40 km/h');
+  console.assert(d.candidates().length >= 5 && d.candidates()[0] === 'stop', 'candidates in rule order');
   console.assert(d.lights.length > 0, 'has traffic lights');
-  console.assert(d.traffic.length === 7, 'has 7 traffic cars');
+  console.assert(d.traffic.length === 16, "has 16 traffic cars");
 
   const r = d.render();
   const rows = r.split('\n');
@@ -309,22 +355,47 @@ function selfTest() {
   console.assert(rows[1].startsWith('║') && rows[1].endsWith('║') && rows[1].includes('┆'), 'road rows use ║ edges and ┆ lane separators');
   console.assert(rows[1].length === 7 * 3 + 2 + 2, 'road row width is 3 lanes of 7 + 2 separators + 2 edges');
 
-  // constructed situation matching the spec's example shape
+  // constructed situation: closing on a slower lead, left clear, right blocked, red light ahead
   const d2 = new Drive({ seed: 1 });
   d2.ego = { lane: 2, speed: 45, position: 1000 };
   d2.traffic = [
-    { lane: 2, position: 1018, speed: 30 }, // 18 m ahead in own lane
-    { lane: 3, position: 995, speed: 40 }, // 5 m behind in lane 3
+    { lane: 2, position: 1018, speed: 30 }, // 18 m ahead in own lane, slower
+    { lane: 3, position: 995, speed: 40 }, // 5 m behind in lane 3 -> not clear
   ];
   d2.lights = [{ pos: 1060, state: 'red', timer: 5 }];
-  const desc = d2.describe();
-  console.assert(desc.startsWith('The car is in lane 2 of 3 at 45 km/h.'), 'describe starts with lane/speed sentence');
-  console.assert(desc.includes('The lead vehicle is 18 m ahead at 30 km/h.'), 'reports own-lane lead vehicle');
-  console.assert(desc.includes('The traffic light 60 m ahead is red.'), 'reports light ahead within range');
-  console.assert(desc.includes('Lane 1 is clear.'), 'reports clear lane explicitly');
-  console.assert(desc.includes('Lane 3 has a vehicle 5 m behind.'), 'reports nearest vehicle in other lane with bearing');
-  console.assert(desc.includes('The destination is an exit on the right in 900 m.'), 'reports destination distance');
-  console.assert(!d2.candidates().includes('change lane right'), 'lane change blocked by a car within 5 m');
+  d2.pedestrians = [];
+  console.assert(
+    d2.describe() ===
+      'The car is in lane 2 of 3 at 45 km/h, below the speed limit of 60 km/h. The traffic light 60 m ahead is red. The car is closing on a slower vehicle 18 m ahead. The lane to the left is clear.',
+    'describe() lists only the situations that apply, in the fixed order'
+  );
+  console.assert(!d2.candidates().includes('change lane right'), 'lane change blocked by a car within 15 m');
+  console.assert(d2.candidates().includes('change lane left'), 'clear lane offered');
+  console.assert(greedyPolicy(d2) === 'brake', 'red light outranks the lane change');
+  d2.lights = [];
+  console.assert(greedyPolicy(d2) === 'change lane left', 'closing on a slower vehicle with a clear left lane -> change lane left');
+  d2.traffic.push({ lane: 1, position: 1005, speed: 40 });
+  console.assert(greedyPolicy(d2) === 'follow', 'no clear lane -> follow');
+  d2.step('follow');
+  console.assert(d2.ego.speed === 30, 'follow matches the lead speed');
+
+  // exit + clear road + pedestrian
+  const d5 = new Drive({ seed: 1 });
+  d5.ego = { lane: 2, speed: 40, position: 1300 };
+  d5.traffic = [];
+  d5.lights = [];
+  d5.pedestrians = [];
+  console.assert(d5.describe() === 'The car is in lane 2 of 3 at 40 km/h, below the speed limit of 60 km/h. The car must take the exit on the right in 200 m. The road ahead is clear for 50 m. The lane to the left is clear. The lane to the right is clear.', 'exit sentence precedes the clear-road sentence');
+  console.assert(!d5.candidates().includes('change lane left'), 'no lane change away from the exit within 300 m');
+  console.assert(greedyPolicy(d5) === 'change lane right', 'exit outranks accelerate');
+  d5.pedestrians = [{ pos: 1312, lane: 2, ticksLeft: 3 }];
+  console.assert(d5.describe().includes("A pedestrian is crossing the car's lane 12 m ahead."), 'pedestrian sentence');
+  console.assert(greedyPolicy(d5) === 'stop', 'pedestrian outranks everything');
+  d5.ego.speed = 60;
+  d5.pedestrians = [];
+  d5.step('accelerate');
+  console.assert(d5.ego.speed === 60, 'accelerate is a no-op at the limit');
+  console.assert(QUESTION.startsWith('Which manoeuvre applies') && QUESTION.includes('\nstop: applies when') && QUESTION.includes('  hold speed: applies when none of the above rules fire'), 'QUESTION renders like query_text');
 
   // legality: no lane change off the road
   const d3 = new Drive({ seed: 1 });

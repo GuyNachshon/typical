@@ -55,10 +55,10 @@ index 9947a07..c547778 100644
  
 diff --git a/src/doom/typical_api.c b/src/doom/typical_api.c
 new file mode 100644
-index 0000000..8124ed9
+index 0000000..157b2fd
 --- /dev/null
 +++ b/src/doom/typical_api.c
-@@ -0,0 +1,136 @@
+@@ -0,0 +1,138 @@
 +// typical_api.c — JS-facing state export + input injection for the Typical site.
 +// GPL-2, same as the rest of Chocolate Doom.
 +#include <emscripten.h>
@@ -167,10 +167,12 @@ index 0000000..8124ed9
 +        mobj_t *m = near[i];
 +        // Doom angles grow counter-clockwise; flip so positive = right of crosshair.
 +        double bearing = -ANG_TO_DEG(R_PointToAngle2(mo->x, mo->y, m->x, m->y) - mo->angle);
++        // visible = line of sight (P_CheckSight, the same test monsters use to see the player), so
++        // the text state can say "in sight" honestly instead of listing monsters behind walls.
 +        p += snprintf(p, end - p,
-+            "%s{\"type\":\"%s\",\"dist\":%.0f,\"bearing\":%.1f,\"in_crosshair\":%s}",
++            "%s{\"type\":\"%s\",\"dist\":%.0f,\"bearing\":%.1f,\"in_crosshair\":%s,\"visible\":%s}",
 +            i ? "," : "", MonsterName(m->type), near_d[i], bearing,
-+            fabs(bearing) <= 8.0 ? "true" : "false");
++            fabs(bearing) <= 8.0 ? "true" : "false", P_CheckSight(mo, m) ? "true" : "false");
 +    }
 +    snprintf(p, end - p, "]}");
 +    return buf;

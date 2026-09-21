@@ -4,7 +4,7 @@
 // demo-spec-v2.md #5 found the model says "shoot" 29/30 times regardless of state on that
 // engine, and this card lets the same failure play out against id's actual E1M1.
 import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, loadJSON, scoreboardLine } from './loop.js';
-import { candidatesFor, describeDoom, scriptedPolicy, KEY_FOR_MOVE } from './realdoom-logic.js';
+import { candidatesFor, describeDoom, scriptedPolicy, resolveIntent, KEY_FOR_MOVE } from './realdoom-logic.js';
 import { QUESTION } from './doom.js';
 
 const TICK_MS = 400;
@@ -95,7 +95,8 @@ export async function mount(el, { decide, mode } = {}) {
   let currState = doom.state();
   let lastDecision = { candidates: candidatesFor(currState), probs: {}, p_null: null, sentence: describeDoom(currState) };
   let shots = 0;
-  let shotsWithTarget = 0;
+  let decisions = 0;
+  let agreed = 0;
   let kills = currState.kills ?? 0;
   const human = createHumanOverride(3000);
   let killScore = { you: 0, model: 0 }; // "you vs model" HUD line, reset on restart
@@ -111,7 +112,8 @@ export async function mount(el, { decide, mode } = {}) {
 
   function restart() {
     shots = 0;
-    shotsWithTarget = 0;
+    decisions = 0;
+    agreed = 0;
     doom.releaseAll();
     doom.newGame(3);
     kills = 0;
@@ -130,7 +132,7 @@ export async function mount(el, { decide, mode } = {}) {
   }
 
   function paintTally() {
-    tallyEl.textContent = `shots ${shots} · shots with a monster in the crosshair ${shotsWithTarget} · kills ${kills}`;
+    tallyEl.textContent = `model decisions ${decisions} · matched the rule list ${agreed} · shots ${shots} · kills ${kills}`;
   }
 
   function paintOffline() {
@@ -139,7 +141,7 @@ export async function mount(el, { decide, mode } = {}) {
       return;
     }
     const s = replayDoc?.summary;
-    const recorded = s ? ` Last recorded model run: ${s.decisions} decisions · shots ${s.shots} · shots with a target ${s.shots_with_target} · kills ${s.kills} · health end ${s.health_end}.` : '';
+    const recorded = s ? ` Last recorded model run: ${s.decisions} decisions · ${s.rule_agreement} matched the rule list · shots ${s.shots} · kills ${s.kills} · health end ${s.health_end}.` : '';
     offlineEl.textContent = `model offline — scripted policy; run the local server to let Typical play.${recorded}`;
   }
 
@@ -157,25 +159,26 @@ export async function mount(el, { decide, mode } = {}) {
       const humanTurn = human.active();
       let move;
       let decision;
+      const gold = scriptedPolicy(currState); // the rule list applied literally
       if (humanTurn) {
-        move = legal.includes(human.move) ? human.move : legal[0];
+        move = human.move; // a raw key action; resolveIntent() passes it through
         decision = { candidates: legal, probs: { [move]: 1 }, p_null: 0, sentence };
       } else if (offline || policyName === 'scripted') {
-        move = scriptedPolicy(currState, legal);
+        move = gold;
         decision = { candidates: legal, probs: { [move]: 1 }, p_null: 0, sentence };
       } else {
         const r = await modelPolicy({ decide, engine: { candidates: () => legal, describe: () => sentence }, question: QUESTION });
-        move = r?.move ?? scriptedPolicy(currState, legal);
+        move = r?.move ?? gold;
         decision = { candidates: legal, probs: r?.probs ?? {}, p_null: r?.p_null ?? null, sentence };
+        decisions += 1;
+        if (move === gold) agreed += 1;
       }
       lastDecision = decision;
 
-      if (move === 'shoot') {
-        shots += 1;
-        if (sentence.includes('in the crosshair')) shotsWithTarget += 1;
-      }
+      const action = resolveIntent(currState, move); // the engine aims
+      if (action === 'shoot') shots += 1;
       const killsBefore = currState.kills ?? 0;
-      await applyMove(doom, move);
+      await applyMove(doom, action);
       const after = doom.state();
       if ((after.kills ?? 0) > killsBefore) {
         const delta = after.kills - killsBefore;

@@ -3,15 +3,13 @@
 // windows, black-post traffic lights (lit = paper lamp), bone pedestrian capsules, an exit ramp
 // splitting off right near the destination.
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js';
-import { Drive, greedyPolicy, QUESTION } from './drive.js';
+import { Drive, greedyPolicy, QUESTION, ROAD_LENGTH, DEST_POS } from './drive.js';
 import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, replayFrame, loadJSON } from './loop.js';
 
 const TICK_MS = 400;
 // Mirrors js/games/drive.js's internal constants (not exported - small fixed numbers, not
 // worth threading through a second module for).
 const LANES = 3;
-const ROAD_LENGTH = 2000;
-const DEST_POS = 1900;
 const LANE_W = 3.2;
 
 const KEYMAP = {

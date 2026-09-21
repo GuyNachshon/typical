@@ -3,11 +3,24 @@
 // simple ray-marcher (fixed small steps, not full DDA) - the map is 24x16, so marching is cheap
 // and much easier to get right than a DDA/grid-traversal implementation.
 
-// Representation B (the shipped/probed one, .200 acc, chance .200) - exact string, sent
-// verbatim as the query by render-doom.js and render-realdoom.js.
+// Demo-spec v3 grammar (30/30 on the probe set, chance .33; the no-rules control is .60): the
+// model decides an intent from two facts (badly hurt? enemy in sight?) and the engine aims -
+// resolve() turns the intent into the key press. Letting the model aim does not work: with
+// shoot / turn left / turn right as candidates it answers "shoot" for any enemy mention
+// (turns 0/12 over five phrasings) - the text head cannot read a bearing. RULES order =
+// precedence order = candidate order.
+export const RULES = {
+  retreat: 'applies when the player is badly hurt',
+  engage: 'applies when the player has an enemy in sight',
+  explore: 'applies when the player sees no enemy',
+};
+export const INTENTS = Object.keys(RULES);
+// Rendered exactly like inference/typical/core.py::query_text; sent verbatim as the query by
+// render-doom.js, render-realdoom.js and the recorders.
 export const QUESTION =
-  "Which action applies for the player? Apply the rules in the stated precedence order; the first matching rule wins.\n" +
-  'move back: applies when health is below 30 and an enemy is visible  shoot: applies when an enemy is in the crosshair and ammo is above 0  turn left: applies when an enemy is to the left, outside the crosshair  turn right: applies when an enemy is to the right, outside the crosshair  move forward: applies when none of the above rules fire';
+  'Which action applies for the player? Apply the rules in the stated precedence order; the first matching rule wins.\n' +
+  Object.entries(RULES).map(([k, v]) => `${k}: ${v}`).join('  ');
+export const HURT_BELOW = 30; // health - "the player is badly hurt"
 
 function mulberry32(seed) {
   return function () {
@@ -152,7 +165,7 @@ export class Doom {
     };
   }
 
-  candidates() {
+  _legalActions() {
     if (this.dead) return [];
     const p = this.player;
     const { dx, dy } = HEADINGS[p.h];
@@ -161,6 +174,37 @@ export class Doom {
     if (!this._solid(p.x - dx, p.y - dy)) legal.add('move back');
     if (p.ammo > 0) legal.add('shoot');
     return ACTIONS.filter((a) => legal.has(a));
+  }
+
+  // The model's candidates are the three intents; all are always offered while alive.
+  candidates() {
+    return this.dead ? [] : [...INTENTS];
+  }
+
+  // Enemies within AWARE_RANGE, crosshair (on the shoot ray) first, then nearest first.
+  _visible() {
+    const p = this.player;
+    return this.enemies
+      .filter((e) => e.alive && chebyshev(e.x, e.y, p.x, p.y) <= AWARE_RANGE)
+      .map((e) => ({ e, dist: chebyshev(e.x, e.y, p.x, p.y), crosshair: onRay(p.x, p.y, p.h, e.x, e.y), bearing: bearingOf(p.x, p.y, p.h, e.x, e.y) }))
+      .sort((a, b) => (a.crosshair === b.crosshair ? a.dist - b.dist : a.crosshair ? -1 : 1));
+  }
+
+  // Intent -> key press (the engine aims; the page says so). Raw actions pass through so the
+  // human override keeps working.
+  resolve(move) {
+    if (!INTENTS.includes(move)) return move;
+    const legal = this._legalActions();
+    const pick = (...prefs) => prefs.find((a) => legal.includes(a)) ?? legal[0] ?? null;
+    const target = this._visible()[0];
+    if (move === 'retreat') return pick('move back', 'turn right');
+    if (move === 'engage' && target) {
+      if (target.crosshair && target.dist <= SHOOT_RANGE) return pick('shoot', 'move back');
+      if (target.bearing === 'left') return pick('turn left');
+      if (target.bearing === 'right' || target.bearing === 'behind') return pick('turn right');
+      return pick('move forward', 'turn right');
+    }
+    return pick('move forward', 'turn right'); // explore, or engage with nothing in sight
   }
 
   safeMoves() {
@@ -228,10 +272,12 @@ export class Doom {
     }
   }
 
-  step(action) {
+  step(move) {
     if (this.dead) return this.state();
     const p = this.player;
-    if (this.candidates().includes(action)) {
+    const action = this.resolve(move);
+    this.lastAction = action;
+    if (this._legalActions().includes(action)) {
       if (action === 'turn left') p.h = (p.h + 7) % 8;
       else if (action === 'turn right') p.h = (p.h + 1) % 8;
       else if (action === 'move forward' || action === 'move back') {
@@ -255,40 +301,19 @@ export class Doom {
     return this.state();
   }
 
-  // Fact-sentence grammar the text-only model reads: "Health H, ammo A." then one sentence
-  // per enemy/wall/item within AWARE_RANGE cells (nearest first), bearing relative to facing
-  // ("ahead"/"behind"/"to the left"/"to the right", or "ahead in the crosshair" only when the
-  // entity sits exactly on the shoot() ray), then a fixed-order "Legal actions:" sentence.
+  // Situations-only grammar (demo-spec v3): health/ammo, then only the situations that apply,
+  // worded exactly as the rule conditions, in this fixed order.
   describe() {
     const p = this.player;
-    const sentences = [`Health ${p.health}, ammo ${p.ammo}.`];
-
-    // Crosshair threats are the most actionable (shoot is available now), so they lead the
-    // list even if a farther enemy is technically closer; ties within a group sort by distance.
-    const enemies = this.enemies
-      .filter((e) => e.alive && chebyshev(e.x, e.y, p.x, p.y) <= AWARE_RANGE)
-      .map((e) => ({ e, dist: chebyshev(e.x, e.y, p.x, p.y), crosshair: onRay(p.x, p.y, p.h, e.x, e.y) }))
-      .sort((a, b) => (a.crosshair === b.crosshair ? a.dist - b.dist : a.crosshair ? -1 : 1));
-    enemies.forEach(({ e, dist, crosshair }, i) => {
-      const label = i === 0 ? 'An enemy' : 'Another enemy';
-      const bearing = crosshair ? 'ahead in the crosshair' : phraseBearing(bearingOf(p.x, p.y, p.h, e.x, e.y));
-      sentences.push(`${label} is ${dist} cell${dist === 1 ? '' : 's'} ${bearing}.`);
-    });
-
+    const sentences = [`The player has ${p.health} health and ${p.ammo} ammo.`];
+    if (p.health < HURT_BELOW) sentences.push('The player is badly hurt.');
+    const seen = this._visible();
+    const where = ({ dist, crosshair, bearing }) => `${dist} cell${dist === 1 ? '' : 's'} ${crosshair ? 'ahead in the crosshair' : phraseBearing(bearing)}`;
+    if (seen.length === 1) sentences.push(`The player has an enemy in sight, ${where(seen[0])}.`);
+    else if (seen.length > 1) sentences.push(`The player has ${seen.length} enemies in sight; the nearest is ${where(seen[0])}.`);
+    else sentences.push('The player sees no enemy.');
     const { dx, dy } = HEADINGS[p.h];
-    if (this._solid(p.x + dx, p.y + dy)) sentences.push('A wall is 1 cell ahead.');
-    if (this._solid(p.x - dx, p.y - dy)) sentences.push('A wall is 1 cell behind.');
-
-    const items = this.items
-      .filter((i) => !i.taken && chebyshev(i.x, i.y, p.x, p.y) <= AWARE_RANGE)
-      .map((i) => ({ i, dist: chebyshev(i.x, i.y, p.x, p.y) }))
-      .sort((a, b) => a.dist - b.dist);
-    items.forEach(({ i, dist }) => {
-      const name = i.type === 'ammo' ? 'An ammo pack' : 'A health pack';
-      sentences.push(`${name} is ${dist} cell${dist === 1 ? '' : 's'} ${phraseBearing(bearingOf(p.x, p.y, p.h, i.x, i.y))}.`);
-    });
-
-    sentences.push(`Legal actions: ${this.candidates().join(', ')}.`);
+    if (this._solid(p.x + dx, p.y + dy)) sentences.push('A wall is ahead.');
     return sentences.join(' ');
   }
 
@@ -455,63 +480,55 @@ function phraseBearing(b) {
   return `to the ${b}`;
 }
 
-// Scripted policy: shoot when an enemy is in the crosshair and ammo remains; otherwise turn
-// toward the nearest enemy in range; retreat below 30 health; otherwise advance.
+// Scripted policy = RULES applied literally (first matching rule wins) -> an intent; step()
+// resolves it to a key press. This is the gold the model is measured against.
 export function greedyPolicy(engine) {
-  const legal = engine.candidates();
-  if (legal.length === 0) return null;
-  const p = engine.player;
-  const enemies = engine.enemies.filter((e) => e.alive && chebyshev(e.x, e.y, p.x, p.y) <= AWARE_RANGE);
-  if (legal.includes('shoot') && enemies.some((e) => onRay(p.x, p.y, p.h, e.x, e.y) && chebyshev(e.x, e.y, p.x, p.y) <= SHOOT_RANGE)) {
-    return 'shoot';
-  }
-  if (p.health < 30 && legal.includes('move back')) return 'move back';
-  if (enemies.length > 0) {
-    enemies.sort((a, b) => chebyshev(a.x, a.y, p.x, p.y) - chebyshev(b.x, b.y, p.x, p.y));
-    const target = enemies[0];
-    const bearing = bearingOf(p.x, p.y, p.h, target.x, target.y);
-    if (bearing === 'left' && legal.includes('turn left')) return 'turn left';
-    if (bearing === 'right' && legal.includes('turn right')) return 'turn right';
-    if (bearing === 'behind' && legal.includes('turn right')) return 'turn right';
-    if (bearing === 'ahead' && legal.includes('move forward')) return 'move forward';
-  }
-  if (legal.includes('move forward')) return 'move forward';
-  if (legal.includes('turn right')) return 'turn right';
-  return legal[0];
+  if (engine.dead) return null;
+  if (engine.player.health < HURT_BELOW) return 'retreat';
+  return engine._visible().length ? 'engage' : 'explore';
 }
 
 function selfTest() {
   const d = new Doom({ seed: 3 });
   console.assert(d.player.health === 100 && d.player.ammo === 12, 'starts at full health/ammo');
   console.assert(d.enemies.length === 4, 'has 4 enemies');
-  console.assert(d.candidates().includes('shoot'), 'shoot is legal with ammo');
+  console.assert(d.candidates().join() === 'retreat,engage,explore', 'candidates are the three intents in rule order');
 
   const render1 = d.render();
   const lines = render1.split('\n');
   console.assert(lines.length === ROWS, 'render has ROWS lines (view and minimap share rows, ROWS === H)');
   console.assert(lines[0].length === COLS + 2 + W, 'each line is the COLS-wide view + gap + W-wide minimap row');
 
-  // constructed situation: enemy dead ahead in the crosshair
+  // constructed situation: enemy dead ahead in the crosshair, another to the left
   const d2 = new Doom({ seed: 1 });
   d2.player = { x: 5, y: 5, h: 2, health: 60, ammo: 8 }; // facing E
   d2.enemies = [
     { x: 9, y: 5, alive: true }, // 4 ahead, on ray
     { x: 5, y: 2, alive: true }, // 3 up = "to the left" when facing E
   ];
-  d2.items = [{ x: 10, y: 5, type: 'health', taken: false }];
+  d2.items = [];
   d2.grid[5][6] = '.'; // ensure open ahead
-  const desc = d2.describe();
-  console.assert(desc.startsWith('Health 60, ammo 8.'), 'describe starts with health/ammo');
-  console.assert(desc.includes('An enemy is 4 cells ahead in the crosshair.'), 'crosshair enemy phrased correctly');
-  console.assert(desc.includes('Another enemy is 3 cells to the left.'), 'second enemy uses "Another enemy" and side bearing');
-  console.assert(/Legal actions: move forward, move back, turn left, turn right, shoot\./.test(desc), 'legal actions in canonical order');
+  console.assert(d2.describe() === 'The player has 60 health and 8 ammo. The player has 2 enemies in sight; the nearest is 4 cells ahead in the crosshair.', 'crosshair enemy leads the sentence');
+  console.assert(greedyPolicy(d2) === 'engage' && d2.resolve('engage') === 'shoot', 'engage with a crosshair target -> shoot');
+  d2.enemies[0].alive = false;
+  console.assert(d2.describe() === 'The player has 60 health and 8 ammo. The player has an enemy in sight, 3 cells to the left.', 'single off-axis enemy');
+  console.assert(d2.resolve('engage') === 'turn left', 'engage with an enemy to the left -> turn left');
+  d2.player.health = 20;
+  console.assert(d2.describe().includes('The player is badly hurt.') && greedyPolicy(d2) === 'retreat', 'badly hurt -> retreat');
+  console.assert(d2.resolve('retreat') === 'move back', 'retreat -> move back when open behind');
+  d2.step('retreat');
+  console.assert(d2.lastAction === 'move back' && d2.player.x === 4, 'step() resolves the intent and records lastAction');
+  d2.step('turn right');
+  console.assert(d2.lastAction === 'turn right' && d2.player.h === 3, 'raw actions (human override) pass through');
 
-  // walled-in situation
+  // walled-in situation, nothing in sight
   const d3 = new Doom({ seed: 1 });
-  d3.player = { x: 1, y: 1, h: 6, health: 100, ammo: 0 }; // facing W, wall ahead, wall behind is open (E)
-  console.assert(!d3.candidates().includes('move forward'), 'no move forward into a wall');
-  console.assert(!d3.candidates().includes('shoot'), 'no shoot at 0 ammo');
-  console.assert(d3.describe().includes('A wall is 1 cell ahead.'), 'describe reports the wall ahead');
+  d3.player = { x: 1, y: 1, h: 6, health: 100, ammo: 0 }; // facing W, wall ahead, open behind (E)
+  d3.enemies = [];
+  console.assert(d3.describe() === 'The player has 100 health and 0 ammo. The player sees no enemy. A wall is ahead.', 'no enemy + wall');
+  console.assert(greedyPolicy(d3) === 'explore' && d3.resolve('explore') === 'turn right', 'explore turns when blocked');
+  console.assert(!d3._legalActions().includes('shoot'), 'no shoot at 0 ammo');
+  console.assert(QUESTION.includes('\nretreat: applies when the player is badly hurt  engage: '), 'QUESTION renders like query_text');
 
   // determinism: same seed, same greedy run -> identical final state
   function run(seed) {

@@ -145,12 +145,12 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
         </div>
         <div class="game-card">
           <div class="game-card-head"><span class="pill">Partial</span><h3>Drive</h3></div>
-          <p>A Three.js toy road. The driving rules are in the prompt, and each tick the model picks one action from the legal set. It brakes and stops; it has never once changed lanes.</p>
+          <p>A Three.js toy road. Each tick the road is rendered as the situations that apply (“the traffic light 40 m ahead is red”, “the car is closing on a slower vehicle 17 m ahead”), seven one-condition rules are in the prompt in precedence order, and the model picks one manoeuvre from the legal set (a lane change is only offered into a clear lane). It matched the rule list on 70/70 scripted situations (chance .16; .16 for random-among-legal; .16 with no rules) and on every tick of the recorded run: 18/18 red lights, 3 lane changes, exit taken. It cannot take a rule with an “or” in it, and it reads sentence order.</p>
           <div class="game-mount" data-game="drive"></div>
         </div>
         <div class="game-card">
           <div class="game-card-head"><span class="pill">Partial</span><h3>Doom</h3></div>
-          <p>Chocolate Doom, the 1993 shareware, running in WebAssembly. Each tick the model reads one sentence describing the scene and presses one key. It mostly shoots, enemy or no enemy.</p>
+          <p>Chocolate Doom, the 1993 shareware, running in WebAssembly. Each tick the model reads two facts (badly hurt? an enemy in line of sight?) and picks an intent — retreat, engage, explore — and the engine aims and presses the key. That split is the finding: it matches the three rules 30/30 (chance .33; .60 with no rules), but when it was asked to aim itself (shoot / turn left / turn right) it said “shoot” for any enemy mention, 0/12 turns over five phrasings. In the recorded E1M1 run its explorer never left the first rooms, so it decided “explore” 199 times and “engage” once.</p>
           <div class="game-mount" data-game="realdoom" data-game-fallback="doom"></div>
         </div>
       </div>

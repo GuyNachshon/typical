@@ -8,10 +8,8 @@
 // Usage: node scripts/record_games.mjs --game snake|doom|drive
 import fs from 'node:fs';
 import { Snake } from '../site/js/snake.js';
-import { Doom } from '../site/js/games/doom.js';
-import { Drive } from '../site/js/games/drive.js';
-import { QUESTION as DOOM_QUESTION } from '../site/js/demos/doom.js';
-import { QUESTION as DRIVE_QUESTION } from '../site/js/demos/drive.js';
+import { Doom, greedyPolicy as doomRules, QUESTION as DOOM_QUESTION } from '../site/js/games/doom.js';
+import { Drive, greedyPolicy as driveRules, QUESTION as DRIVE_QUESTION } from '../site/js/games/drive.js';
 
 const SERVER = 'http://localhost:8787';
 const SEED = 7;
@@ -41,8 +39,10 @@ async function decide(state, queries) {
 
 // Shared record loop: `legal(engine)` returns the candidate labels, `isDone(engine)` reports
 // game-over, `step` advances one tick. A single-candidate choice is forced (server.py requires
-// >=2 labels) - skip the network round trip.
-async function recordLoop({ engine, maxTicks, legal, isDone, question }) {
+// >=2 labels) - skip the network round trip. `gold(engine)`, if given, is the rule list applied
+// literally (the engines' greedyPolicy) - each frame records it, so the summary can report how
+// often the model's pick matched the stated rules (the honest number for the caption).
+async function recordLoop({ engine, maxTicks, legal, isDone, question, gold }) {
   const frames = [];
   for (let tick = 0; tick < maxTicks; tick++) {
     const candidates = legal(engine);
@@ -62,8 +62,11 @@ async function recordLoop({ engine, maxTicks, legal, isDone, question }) {
       move = candidates.reduce((best, m) => ((r.probs[m] ?? 0) > (r.probs[best] ?? 0) ? m : best), candidates[0]);
     }
 
-    frames.push({ tick, state: engine.state(), desc, candidates, probs: candidates.map((m) => probs[m] ?? 0), p_null, move, ms });
+    const frame = { tick, state: engine.state(), desc, candidates, probs: candidates.map((m) => probs[m] ?? 0), p_null, move, ms };
+    if (gold) frame.gold = gold(engine);
     engine.step(move);
+    if (engine.lastAction) frame.action = engine.lastAction; // Doom: the key press the intent resolved to
+    frames.push(frame);
     if (isDone(engine)) {
       frames.push({ tick: tick + 1, state: engine.state(), desc: engine.describe(), candidates: [], probs: [], p_null: 0, move: null, ms: 0 });
       break;
@@ -130,10 +133,11 @@ async function recordDoom() {
     legal: (e) => e.candidates(),
     isDone: (e) => e.dead,
     question: DOOM_QUESTION,
+    gold: doomRules,
   });
 
   for (const f of frames) {
-    if (f.move !== 'shoot') continue;
+    if (f.action !== 'shoot') continue;
     shots++;
     if (f.desc.includes('in the crosshair')) shotsCrosshair++;
   }
@@ -149,11 +153,13 @@ async function recordDoom() {
     kills,
     shots,
     shots_with_enemy_in_crosshair: shotsCrosshair,
+    decisions: decided.length,
+    rule_agreement: decided.filter((f) => f.move === f.gold).length,
     mean_p_null: decided.reduce((s, f) => s + f.p_null, 0) / (decided.length || 1),
     mean_ms: decided.reduce((s, f) => s + f.ms, 0) / (decided.length || 1),
   };
   fs.writeFileSync(new URL('../site/data/replays/doom.json', import.meta.url), JSON.stringify({ frames, summary }));
-  console.log(`[doom] ticks=${frames.length} kills=${kills} shots=${shots} shots_with_crosshair=${shotsCrosshair}`);
+  console.log(`[doom] ticks=${frames.length} kills=${kills} shots=${shots} shots_with_crosshair=${shotsCrosshair} rule_agreement=${summary.rule_agreement}/${summary.decisions}`);
   console.log(`[doom] mean p_null=${summary.mean_p_null.toFixed(3)} mean ms=${summary.mean_ms.toFixed(1)}`);
   console.log(`STATS_JSON ${JSON.stringify(summary)}`);
 }
@@ -168,10 +174,11 @@ async function recordDrive() {
 
   const frames = await recordLoop({
     engine,
-    maxTicks: 240,
+    maxTicks: 300,
     legal: (e) => e.candidates(),
     isDone: (e) => e.done,
     question: DRIVE_QUESTION,
+    gold: driveRules,
   });
 
   for (const f of frames) {
@@ -205,12 +212,14 @@ async function recordDrive() {
     lane_changes: laneChanges,
     collisions: last.collisions,
     arrived: last.arrived,
+    decisions: decided.length,
+    rule_agreement: decided.filter((f) => f.move === f.gold).length,
     mean_p_null: decided.reduce((s, f) => s + f.p_null, 0) / (decided.length || 1),
     mean_ms: decided.reduce((s, f) => s + f.ms, 0) / (decided.length || 1),
   };
   fs.writeFileSync(new URL('../site/data/replays/drive.json', import.meta.url), JSON.stringify({ frames, summary }));
   console.log(`[drive] ticks=${frames.length} distance=${summary.distance_m}m red_lights_run=${last.violations} lane_changes=${laneChanges} collisions=${last.collisions}`);
-  console.log(`[drive] red respected=${redRespected}/${redTotal} pedestrian stops=${pedStopped}/${pedTotal}`);
+  console.log(`[drive] red respected=${redRespected}/${redTotal} pedestrian stops=${pedStopped}/${pedTotal} rule_agreement=${summary.rule_agreement}/${summary.decisions}`);
   console.log(`[drive] mean p_null=${summary.mean_p_null.toFixed(3)} mean ms=${summary.mean_ms.toFixed(1)}`);
   console.log(`STATS_JSON ${JSON.stringify(summary)}`);
 }

@@ -194,7 +194,7 @@ export async function mount(el, { decide, mode } = {}) {
       currState = f.state;
       lastTickAt = performance.now();
       lastDecision = { candidates: f.candidates, probs: f.probs, p_null: f.p_null, sentence: f.desc };
-      applyEffects(f.move, prevState.player.health, currState.player.health);
+      applyEffects(f.action ?? f.move, prevState.player.health, currState.player.health);
       if (currState.dead) {
         pendingRestart = true;
         setTimeout(restart, 900);
@@ -214,7 +214,7 @@ export async function mount(el, { decide, mode } = {}) {
     let move;
     let decision;
     if (human.active()) {
-      move = legal.includes(human.move) ? human.move : legal[0];
+      move = human.move; // a raw key action; engine.step() passes it through resolve()
       decision = { candidates: legal, probs: { [move]: 1 }, p_null: 0, sentence: engine.describe() };
     } else if (policyName === 'scripted') {
       move = greedyPolicy(engine);
@@ -230,7 +230,7 @@ export async function mount(el, { decide, mode } = {}) {
     currState = engine.state();
     lastTickAt = performance.now();
     lastDecision = decision;
-    applyEffects(move, prevState.player.health, currState.player.health);
+    applyEffects(engine.lastAction, prevState.player.health, currState.player.health);
     if (engine.dead) {
       pendingRestart = true;
       setTimeout(restart, 900);
