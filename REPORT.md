@@ -1120,21 +1120,24 @@ base model reading next-token letter logits over the rendered options (`pcdm_jev
 
 | | 1.7B `nc_v3_tap20_wf` | **4B `ladder_4b`** | 8B | 14B |
 |---|---|---|---|---|
-| CLINC-150 / TREC-fine / HWU64 / 20NG | .734 / .372 / .735 / .522 | **.850 / .516 / .787 / .577** | .769 / .486 / .740 / .452 | |
-| SNLI / MNLI / BoolQ / ANLI | .894 / .849 / .831 / .481 | **.909 / .868 / .865 / .536** | .853 / .831 / .822 / .468 | |
-| MMLU-Pro among-K / Δ_q_sh / TruthfulQA | .330 / .119 / .267 | **.457 / .193 / .386** | .290 / .093 / .277 | |
-| held-out noul / score / style | .699 / .497 / .899 | **.841** / .533 / .919 | .681 / .543 / .882 | |
-| held-out score NLL / typed-decisions | 2.03 / .422 | 2.15 / .483 | 1.67 / .407 | |
-| JevBench std / easy / hard | .750 / 1.00 / .387 | **.833 / 1.00 / .432** | .667 / 1.00 / .396 | |
-| JevBench Brier std / hard | .40 / .88 | **.29** / .83 | .55 / .83 | |
-| JevBench p50 latency (s, in-process H100) | .077 (base) / .554 (wf, NVL) | .089 | .087 | |
-| `bench.py --native` L_s = 256: single decision K = 2 / 32 / 256 (ms) | 65 / 66 / 96 | 90 / 94 / 114 | | |
+| CLINC-150 / TREC-fine / HWU64 / 20NG | .734 / .372 / .735 / .522 | **.850 / .516** / .787 / .577 | .769 / .486 / .740 / .452 | .834 / .472 / **.792 / .668** |
+| SNLI / MNLI / BoolQ / ANLI | .894 / .849 / .831 / .481 | .909 / **.868** / .865 / .536 | .853 / .831 / .822 / .468 | **.910** / .864 / **.894 / .588** |
+| MMLU-Pro among-K / Δ_q_sh / TruthfulQA | .330 / .119 / .267 | .457 / .193 / .386 | .290 / .093 / .277 | **.514 / .246 / .472** |
+| held-out noul / score / style | .699 / .497 / .899 | .841 / .533 / .919 | .681 / .543 / .882 | **.887 / .558 / .919** |
+| held-out score NLL / typed-decisions acc | 2.03 / .422 | 2.15 / .483 | 1.67 / .407 | **2.87** / **.567** |
+| JevBench std / easy / hard | .750 / 1.00 / .387 | .833 / 1.00 / .432 | .667 / 1.00 / .396 | **.875 / 1.00 / .468** |
+| JevBench Brier std / hard | .40 / .88 | .29 / .83 | .55 / .83 | **.17** / .85 |
+| JevBench p50 latency (s, in-process H100) | .077 (base) / .554 (wf, NVL) | .089 | .087 | .070 |
+| JevBench hard: long_policy / multi_hop / trap / tradeoff | .16 / .17 / .75 / .33 | – | – | **.05** / .44 / 1.00 / .67 |
+| `bench.py --native` L_s = 256: single decision K = 2 / 32 / 256 (ms)† | 65 / 66 / 96 | 90 / 94 / 114 | 70 / 71 / 126 | 61 / 62 / 158 |
 | marginal ms per query, M = 32, K = 2 / 32 / 128 / 256 | 4.0 / 4.7 / 18.4 / 36.0 | 5.9 / 12.1 / 21.9 / 49.9 | | |
-| peak memory K = 2 → 256 (GB) | – | 14.5 → 18.6 | | |
+| peak memory K = 2 → 256 (GB) | – | 14.5 → 18.6 | 29.3 → 34.1 | 51.6 → 57.5 |
 | zero-shot control: JevBench std / easy / hard | .583 / .833 / .369 | .722 / 1.00 / .414 | .375 / .354 / .360 (**broken**, see note) | .819 / 1.00 / .441 |
 | zero-shot Brier std / hard | .58 / .73 | .46 / .71 | – | .30 / **.60** |
 | 3-shot control: JevBench std / easy / hard | .528 / 1.00 / .369 | .778 / 1.00 / .441 | .556 / .958 / .369 | |
-| best val NLL | .384 | **.332** | .411 | |
+| best val NLL | .384 | .332 | .411 | **.307** |
+
+† per-pod numbers (different hosts / torch builds); an apples-to-apples ladder on one pod follows.
 
 **4B, same recipe: everything moves at once.** Evidence goes *above* the 1.7B base (CLINC +10 over 1.7B-wf and +0.5 over
 the 1.7B base, TREC +14, ANLI +5, BoolQ +3), false-abstain collapses (CLINC .17 → .01, TREC .34 → .00) without any
@@ -1153,6 +1156,18 @@ recipe (tap 26/36) it lands *below the 1.7B* on almost everything (MMLU among-K 
 standard .667 / Brier .55, val NLL .411 vs .332 for 4B), matching its own weak frozen control. Same fraction tap, same
 LoRA depth, same lr — the 8B checkpoint is the outlier, not the recipe; a tap/lr sweep on 8B is the only way to say
 whether it is recoverable, and it is deferred until the 14B point says whether the ladder is otherwise monotone.
+
+**14B, same recipe: the ladder is monotone except at 8B.** JevBench standard .875 with **Brier .17** (leaderboard
+neighbourhood: open-alternative-jev .833, system-one-open .931), hard .468 (≈ system-one-open's .486; above every
+sub-4B entry), MMLU among-K .514 with Δ_q .246 (2.4× the teacher), TruthfulQA .472, held-out noul .887, typed-decisions
+argmax agreement .567, 20NG .668 — and JevBench p50 .070 s, i.e. *no slower per decision than the 1.7B* on the same
+harness (the KV-cached state and a short suffix dominate; the bench at K = 2 is 61 ms). What does not scale: (i) the
+long-state families — long_policy **.05** at 14B (.42 at the 1.7B base, .16 after workflow training): trained at
+256-token states, the bigger model is more confidently wrong on 1–2k-token policies, so 1,024-token training (§3z/§3aa)
+is mandatory at every size; (ii) soft-target calibration — held-out score NLL 2.87, the worst of the ladder (sharper
+model, all-hard-label W), which the ordinal-smoothed Score head (§3ac) and the U corpus address. Read together: capacity
+buys standard-tier accuracy, knowledge and in-distribution workflow decisions at roughly constant latency; the hard tier
+and probability quality are data/objective problems at every size.
 
 ## 3ac. PLAN7 Track C — typed primitives: Score (ordinal) and Noul (Bernoulli) on the native head (H100, 2026-09-21, ~$3)
 
