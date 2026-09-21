@@ -124,10 +124,14 @@ def _pack(tok, s_ids, x_ids, tail=(), sink=True):
     lengths = torch.tensor([len(r) for r in rows], dtype=torch.long)
     T = max(len(r) for r in rows)
     input_ids = torch.full((len(rows), T), pad, dtype=torch.long)
-    attention_mask = torch.zeros(len(rows), T, dtype=torch.long)
+    # bool, not long: transformers' SDPA mask prep keeps a boolean 2D padding mask on the fast
+    # (flash/mem-efficient) path; a long or float mask gets converted to a 4D additive float
+    # bias, which forces the O(B*H*L^2) "math" backend -- material at L=3072 (tl1b's --max_state,
+    # long-state OOM investigation, 2026-09-21).
+    attention_mask = torch.zeros(len(rows), T, dtype=torch.bool)
     for i, r in enumerate(rows):
         input_ids[i, :len(r)] = torch.tensor(r, dtype=torch.long)
-        attention_mask[i, :len(r)] = 1
+        attention_mask[i, :len(r)] = True
     return input_ids, attention_mask, lengths
 
 
