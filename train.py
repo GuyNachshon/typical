@@ -685,10 +685,12 @@ def run_full_eval(args, backbone, model, cache, val_examples, eval_sets, val_nll
         if score_idx:
             results["eval"][name]["ordinal"] = ordinal_metrics(probs[best_T][score_idx],
                                                                 [examples[j] for j in score_idx])
-        # --noul_head bern reversed-label control: re-score this set's noul rows with candidate
-        # order reversed (["yes","no"] vs ["no","yes"]) -- P(yes) must not move, since the
-        # suffix never renders candidates at all (see native._render_query_only).
-        if args.readout == "native" and getattr(model, "noul_head", "choice") == "bern":
+        # Reversed-label control on this set's noul rows (candidate order ["yes","no"] vs
+        # ["no","yes"]): run for BOTH noul arms, not just --noul_head bern, so the matched
+        # comparison is explicit in results.json -- bern's P(yes) is untouched (the suffix
+        # never renders candidates, see native._render_query_only), while the K-way Choice
+        # control (noul_A_2way) is expected to move, since it does read the rendered letters.
+        if args.readout == "native":
             noul_idx = [j for j, ex in enumerate(examples) if ex.get("meta", {}).get("qtype") == "noul"]
             if noul_idx:
                 noul_ex = [examples[j] for j in noul_idx]
