@@ -1134,7 +1134,7 @@ base model reading next-token letter logits over the rendered options (`pcdm_jev
 | peak memory K = 2 → 256 (GB) | – | 14.5 → 18.6 | 29.3 → 34.1 | 51.6 → 57.5 |
 | zero-shot control: JevBench std / easy / hard | .583 / .833 / .369 | .722 / 1.00 / .414 | .375 / .354 / .360 (**broken**, see note) | .819 / 1.00 / .441 |
 | zero-shot Brier std / hard | .58 / .73 | .46 / .71 | – | .30 / **.60** |
-| 3-shot control: JevBench std / easy / hard | .528 / 1.00 / .369 | .778 / 1.00 / .441 | .556 / .958 / .369 | |
+| 3-shot control: JevBench std / easy / hard | .528 / 1.00 / .369 | .778 / 1.00 / .441 | .556 / .958 / .369 | .819 / 1.00 / **.559** |
 | best val NLL | .384 | .332 | .411 | **.307** |
 
 † per-pod numbers (different hosts / torch builds); an apples-to-apples ladder on one pod follows.
@@ -1167,7 +1167,11 @@ long-state families — long_policy **.05** at 14B (.42 at the 1.7B base, .16 af
 is mandatory at every size; (ii) soft-target calibration — held-out score NLL 2.87, the worst of the ladder (sharper
 model, all-hard-label W), which the ordinal-smoothed Score head (§3ac) and the U corpus address. Read together: capacity
 buys standard-tier accuracy, knowledge and in-distribution workflow decisions at roughly constant latency; the hard tier
-and probability quality are data/objective problems at every size.
+and probability quality are data/objective problems at every size. The sharpest version of that: the *frozen* 14B with three exemplars scores **.559 on hard** (0-shot .441)
+versus .468 for our trained 14B — at 14B our current training data makes the hard tier *worse* than the base model
+with shots, while lifting standard from .819 to .875. The trained model is confidently wrong where the frozen one is
+merely uncertain (hard Brier .85 vs .60). Fixing that — long states, soft targets, the calibration objective — is the
+whole of Phase 10, and the frozen-with-shots number is its target at every size.
 
 ## 3ac. PLAN7 Track C — typed primitives: Score (ordinal) and Noul (Bernoulli) on the native head (H100, 2026-09-21, ~$3)
 
