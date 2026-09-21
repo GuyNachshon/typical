@@ -134,7 +134,8 @@ def load_ours(run_dir, backbone_name, device):
                        lora_r=saved.get("lora_r", 16), device=device, tap_layer=saved.get("tap_layer", 0))
         head.load_lora_state_dict(ckpt["lora"])
         model = NativeHead(head.backbone.d, nc_head=saved.get("nc_head", "n2n3"), null=saved.get("null", "factored"),
-                           render=saved.get("nc_render", "letters")).to(device)
+                           render=saved.get("nc_render", "letters"), score_head=saved.get("score_head", "choice"),
+                           noul_head=saved.get("noul_head", "choice")).to(device)
         model.load_state_dict(ckpt["tower"])
         return head.eval(), model.eval()
     global JOINT, ENCODER, TINY; JOINT = bool(saved.get("joint", False))  # joint-trained models need the KV-cache decide path
