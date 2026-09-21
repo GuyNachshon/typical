@@ -5,6 +5,7 @@ requires-python = ">=3.11"
 dependencies = [
     "datasets>=5.0.1",
     "datasketch>=2.0.0",
+    "gradio>=6.28.0",
     "numpy>=2.4.6",
     "peft>=0.21.0",
     "pytest>=9.1.1",
