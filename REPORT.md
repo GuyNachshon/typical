@@ -1103,7 +1103,12 @@ MMLU .323, held-out noul .609, styles .825, val NLL .421). Small batch is not a 
 hard-tier and soft-target gains come from the model being less sharp, at the price of everything in-distribution. That
 is the cleanest evidence yet that the hard tier at 1.7B is a probability-quality problem — the same model, less
 confident, scores higher — and that the fix is an objective/calibration change (Track E on the U corpus), not data
-volume or batch size. Regardless of their
+volume or batch size. **`r1_null10`** (null-aug .10 instead of .20, otherwise `r1_cand`): CLINC .813 / fa .05, TREC fa .25 → .17,
+HWU64 .788, 20NG .560, MMLU .343 (Δ_q .108), held-out noul/score/style .671/.543/.909, typed NLL 2.01, JevBench
+.764 / 1.00 / .387 (Brier std .36) — the same model within noise; the recipe is insensitive to the null-aug fraction in
+[.10, .20]. **Release-1 recipe at 1.7B is therefore fixed as `r1_cand`'s** (E .45 / K .20 / W .35, null-aug .1–.2,
+1,024-token states, effective batch 64); what changes for `typical-small` is the data (DecisionMix v2: `data_wh`,
+`data_u`), the typed heads (§3ac) and the calibration objective — not the mix. Regardless of their
 outcome, hard-tier probability quality is now the clearest remaining defect at 1.7B and is what Phase 6B/10 (typed heads,
 calibration on the U corpus) must fix; the scaling ladder (§3ab) says whether it is also capacity.
 
