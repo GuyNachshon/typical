@@ -83,3 +83,11 @@ Test suite caught a real bug pre-upload: `finish()` re-shuffled state per row, s
 share one state string diverged (order, or independently-redrawn L6 padding). Fixed to render once per group;
 both corpora regenerated after. 10/10 tests pass (`tests/test_decisionmix_v2.py`); `--limit` smoke works for
 `--corpus wh|u|both`.
+
+## Execution notes (2026-09-22)
+- Release 1 shipped publicly: OzLabs/typical-small-preview, typical-small (1.7B, `ts1b`), typical-medium (4B, `tm1b`),
+  each with the `inference/` package; local demo `demo/app.py`. `ts1` collapsed on a global Bernoulli-routing bug (fixed
+  per row, 7b9d520).
+- Long-state data bug found and fixed (§3ag); frozen controls incl. Qwen3.5-4B-Base; Qwen3.5 port (9b1ffac).
+- Running: tl1b + tl1b_nokd (14B), tm2 (Qwen3.5-4B), SemIf rendering probe. Next: decide the release family (Qwen3 vs
+  Qwen3.5 ladder), back-port the fixes to small/medium, Phase 10 calibration objective, level-7 generator work.

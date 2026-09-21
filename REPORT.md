@@ -1319,6 +1319,49 @@ freeze `tm1b` as `typical-medium`.** The 4B remains the knee of capability per m
 per-decision latency. Open at 4B, same as at 1.7B: the hard tier (.42, long_policy .21, temporal/trade-off ≤ .2) and
 TREC-fine.
 
+## 3ag. Towards `typical-large` — the long-state bug, frozen controls, and the Qwen3.5 port (2026-09-21/22; runs in flight)
+
+**A data bug behind the hard-tier collapse at scale.** `data_wf_long` (the 23k "long policy" rows added in §3z) renders
+`Case: <facts> <request>` *last*; measured state lengths are p10/p50/p90 = 1,190 / 1,845 / 2,490 tokens, and training
+right-truncates at `--max_state` — so at 1,024 (Release 1) 98.8% of those rows lost their facts, and at 256 (the ladder)
+all of them did. Every model since §3z was trained to answer long policies confidently from unreadable states, which
+is exactly the long_policy .05 of the 14B (§3ab) and .21 of `typical-medium`. Fixes (commit 2fad326): facts-first
+regeneration (`wf/train_long_v2.jsonl`, case position < 8% of the text), `--drop_truncated` (rows longer than the window
+are dropped, never cut), `--grad_ckpt`, `--best_on` (checkpoint selection on the uncertainty + curriculum val NLL),
+`--brier_lambda`, and frozen-backbone teacher labels via `scripts/teacher_label.py --zero_shot --shots 3`.
+A second bug (commit 6d0a7e3): the SDPA padding mask was built as `long`, which forces PyTorch's O(L²) math kernel — the
+cause of the 14B OOMs at 3,072-token states (and of the ladder's memory pain); `bool` fixed it.
+
+**Frozen controls (letter logits over the rendered options, 3 exemplars, same public 231 ids):**
+
+| frozen backbone | standard | easy | hard | Brier hard |
+|---|---|---|---|---|
+| Qwen3-1.7B-Base | .528 | 1.00 | .369 | .71 |
+| Qwen3-4B-Base | .778 | 1.00 | .441 | .67 |
+| Qwen3-4B (instruct) | .778 | 1.00 | .423 | .95 |
+| Qwen3-8B-Base | .556 | .958 | .369 | .74 |
+| Qwen3-14B-Base | .819 | 1.00 | .559 | .60 |
+| **Qwen3.5-4B-Base** | .764 | 1.00 | **.495** | **.60** |
+
+Instruct-tuning of Qwen3 changes nothing on this task; the Qwen3.5 generation buys +5 hard and a 4B whose hard-tier
+calibration matches the frozen 14B's, but not standard — the leaderboard's .83–.99 standard on the same checkpoint
+(SemIf, open-alternative-jev) comes from their rendering/method, which we are now replicating as a probe.
+
+**Qwen3.5 port (commit 9b1ffac).** Base checkpoints exist at 0.8B / 2B / 4B / 9B / 27B / 35B-A3B — a complete
+replacement ladder. Differences handled: the VL wrapper config (`text_config`, `.language_model` unwrapped), the hybrid
+stack (3× Gated-DeltaNet + 1× full attention; tap at 71% keeps 4 of 6 full-attention layers at 0.8B), LoRA targets
+(`in_proj_qkv/z/b/a`, `out_proj` on DeltaNet layers; q/k/v/o on attention layers; MLP everywhere), and a
+transformers-5.17 cache gap (`LinearAttentionLayer` lacks `batch_repeat_interleave`) patched in `native_kv_decide`.
+Cached-vs-full parity 1e-7; Qwen3 behaviour unchanged (153 tests); the public `inference/` package mirrors it.
+
+**In flight:** `tl1b` (Qwen3-14B, facts-first long rows, 3,072-token states, frozen-14B KD, 8k steps, best-on
+calibration val) and its matched `tl1b_nokd`; `tm2` (Release-1 recipe on Qwen3.5-4B-Base, 2,048 states); the SemIf
+rendering probe. Pass rule for `typical-large`: hard ≥ .559 or hard Brier ≤ .65, long_policy ≥ .35, CLINC-150 / MMLU
+among-K within 2 of `ladder_14b`.
+
+**Ops lessons (memory):** a pod created with `--startSSH` never reaches "ready" on this account and bills anyway (12
+stalls, ~$13); `--ports "22/tcp"` boots in 30 s. Stop = wipe without a volume. Never `set -x` across an `.env` source.
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
