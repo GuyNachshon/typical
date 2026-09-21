@@ -1,5 +1,7 @@
 # typical-small-preview
 
+**Public release: https://huggingface.co/OzLabs/typical-small-preview**
+
 Release 0 (PLAN7 Track 0): a frozen copy of checkpoint `nc_v3_tap20_wf`, uploaded verbatim to
 `guychuk/pcdm-runs` under `typical-small-preview/`. Nothing was retrained for this release — this
 is a freeze-and-document step.

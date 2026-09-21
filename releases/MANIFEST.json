@@ -6,6 +6,8 @@
   "source_checkpoint": "nc_v3_tap20_wf",
   "matched_baseline_checkpoint": "nc_v3_tap20",
   "hf_repo": "guychuk/pcdm-runs",
+  "public_repo": "OzLabs/typical-small-preview",
+  "public_url": "https://huggingface.co/OzLabs/typical-small-preview",
   "hf_paths": {
     "typical-small-preview/best.pt": "sha256:a3afe6cf28be78e4eeab66c2f28da739a707d6ef695ba69009585e20f7059a98",
     "typical-small-preview/results.json": null,
@@ -28,6 +30,9 @@
   "source_checkpoint": "ts1b",
   "parent": "typical-small-preview",
   "hf_repo": "guychuk/pcdm-runs",
+  "public_repo": "OzLabs/typical-small",
+  "public_url": "https://huggingface.co/OzLabs/typical-small",
+  "parent_public_repo": "OzLabs/typical-small-preview",
   "hf_paths": {
     "typical-small/best.pt": "sha256:f62d6e083ea80a08716d901f8409510b6a97cfe00bc65db25a37691ed555c46e",
     "typical-small/results.json": null,

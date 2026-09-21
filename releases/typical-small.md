@@ -1,5 +1,7 @@
 # typical-small
 
+**Public release: https://huggingface.co/OzLabs/typical-small**
+
 Release 1 (PLAN7 Tracks A–D): a clean retrain of the 1.7B checkpoint, `ts1b`, uploaded verbatim to
 `guychuk/pcdm-runs` under `typical-small/`. This is the frozen successor to `typical-small-preview`
 (`nc_v3_tap20_wf`) — REPORT.md §3ae's verdict, unchanged. Parent release: `typical-small-preview`.
