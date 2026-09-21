@@ -1214,6 +1214,39 @@ excluded from the Noul decision (its public set has almost no true yes/no items;
 graceful-degradation ceiling). **Adopt `--noul_head bern` for Noul.** Choice keeps the N3 readout. Both are additive
 flags on the frozen architecture; Release 1 trains with them on.
 
+## 3ad. First DecisionMix v2 run — `r1_dmv2` (r1 recipe + hard curriculum `data_wh` + uncertainty corpus `data_u`; H100, 2026-09-21, ~$12)
+
+`r1_cand` args with `data_wh` (60.6k, levels 1–7, 100% counterfactual rubric groups; level 7 and three domains, two
+styles, one grammar per level held out) and `data_u` (31k soft-target rows: UNLI-val, AmbiEnt, four closed-form
+generators) added; sampler E .40 / K .20 / W .30 (data_wf + wf_hf + long + wh) / U .10; 12k steps. Matched control =
+`r1_cand`, never trained on either corpus, scored on the identical wh/u files (full rows).
+
+| | `r1_cand` | **`r1_dmv2`** |
+|---|---|---|
+| CLINC-150 acc / false-abstain | .808 / .052 | **.821 / .033** (lowest false-abstain of any run) |
+| TREC-fine / HWU64 / 20NG / MMLU among-K (Δ_q) | .456 / .785 / .554 / .347 (.130) | .474 / .726 / .501 / .333 (.110) |
+| held-out (data_wf) noul / score / style / flip both-correct | .687 / .548 / .901 / .564 | .658 / .501 / .876 / .519 |
+| typed-decisions NLL (full file) | 2.06 | **1.71** |
+| wh held-out family / grammar / style | .481 / .507 / .491 (NLL 3.0 / 3.2 / 1.8) | **.827 / .881 / .888** (NLL .63 / .24 / .31) |
+| wh rubric-flip acc / shuffled acc (NLL) | .477 / .446 (2.2 / 2.6) | **.710** / .405 (.74 / 3.4) |
+| wh level 7 (never trained: temporal / units / EV / trade-off) | .477 (1.08) | .498 (1.26) |
+| u ChaosNLI / real held-out / synthetic held-out: acc (NLL) | .584 (1.27) / .685 (.86) / .741 (.83) | .537 (**1.00**) / .623 (**.67**) / .909 (**.67**) |
+| JevBench std / hard (Brier) | .764 / .369 (.90) | .750 / **.441 (.79)** |
+| JevBench hard: adversarial / ambiguous / multi_hop / long_policy | .33 / .57 / .28 / .11 | **.83 / .71 / .39** / .16 |
+
+**The curriculum transfers within its grammar and not beyond it; the U corpus buys calibration, not accuracy.**
+Held-out families/grammars/styles inside the rule-engine's world jump +34–37 with the rubric-flip accuracy .48 → .71,
+while level 7 — the temporal / unit / expected-value / trade-off composition the generator never trains — stays at
+~.50 for both models, as does the JevBench temporal/probability/trade-off block: what we generated is learned; what we
+did not generate is not. On the uncertainty sets the never-soft-trained control has *higher argmax accuracy* on all
+three while `r1_dmv2` has better NLL on ChaosNLI and the real held-out set (and both on synthetic) — soft targets teach
+the model to spread probability, which costs top-1 and helps likelihood; typed-decisions NLL improves 2.06 → 1.71, the
+first training-side calibration gain, and JevBench hard Brier .90 → .79 with hard .369 → .441 (adversarial .33 → .83,
+ambiguous .57 → .71 — the WH families that exist in the curriculum). The costs: the original W sets dilute 3–5 pts at a
+fixed W share now split over four corpora, MMLU −1.4, HWU64 −6. Verdict: DecisionMix v2 goes into Release 1 (with the W
+share raised back and the typed heads of §3ac on), and the generator's next job is the level-7 families, because
+nothing else in the suite moves them.
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
