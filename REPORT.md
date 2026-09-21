@@ -1115,20 +1115,21 @@ base model reading next-token letter logits over the rendered options (`pcdm_jev
 
 | | 1.7B `nc_v3_tap20_wf` | **4B `ladder_4b`** | 8B | 14B |
 |---|---|---|---|---|
-| CLINC-150 / TREC-fine / HWU64 / 20NG | .734 / .372 / .735 / .522 | **.850 / .516 / .787 / .577** | | |
-| SNLI / MNLI / BoolQ / ANLI | .894 / .849 / .831 / .481 | **.909 / .868 / .865 / .536** | | |
-| MMLU-Pro among-K / Δ_q_sh / TruthfulQA | .330 / .119 / .267 | **.457 / .193 / .386** | | |
-| held-out noul / score / style | .699 / .497 / .899 | **.841** / .533 / .919 | | |
-| held-out score NLL / typed-decisions | 2.03 / .422 | 2.15 / .483 | | |
-| JevBench std / easy / hard | .750 / 1.00 / .387 | **.833 / 1.00 / .432** | | |
-| JevBench Brier std / hard | .40 / .88 | **.29** / .83 | | |
-| JevBench p50 latency (s, in-process H100) | .077 (base) / .554 (wf, NVL) | .089 | | |
+| CLINC-150 / TREC-fine / HWU64 / 20NG | .734 / .372 / .735 / .522 | **.850 / .516 / .787 / .577** | .769 / .486 / .740 / .452 | |
+| SNLI / MNLI / BoolQ / ANLI | .894 / .849 / .831 / .481 | **.909 / .868 / .865 / .536** | .853 / .831 / .822 / .468 | |
+| MMLU-Pro among-K / Δ_q_sh / TruthfulQA | .330 / .119 / .267 | **.457 / .193 / .386** | .290 / .093 / .277 | |
+| held-out noul / score / style | .699 / .497 / .899 | **.841** / .533 / .919 | .681 / .543 / .882 | |
+| held-out score NLL / typed-decisions | 2.03 / .422 | 2.15 / .483 | 1.67 / .407 | |
+| JevBench std / easy / hard | .750 / 1.00 / .387 | **.833 / 1.00 / .432** | .667 / 1.00 / .396 | |
+| JevBench Brier std / hard | .40 / .88 | **.29** / .83 | .55 / .83 | |
+| JevBench p50 latency (s, in-process H100) | .077 (base) / .554 (wf, NVL) | .089 | .087 | |
 | `bench.py --native` L_s = 256: single decision K = 2 / 32 / 256 (ms) | 65 / 66 / 96 | 90 / 94 / 114 | | |
 | marginal ms per query, M = 32, K = 2 / 32 / 128 / 256 | 4.0 / 4.7 / 18.4 / 36.0 | 5.9 / 12.1 / 21.9 / 49.9 | | |
 | peak memory K = 2 → 256 (GB) | – | 14.5 → 18.6 | | |
 | zero-shot control: JevBench std / easy / hard | .583 / .833 / .369 | .722 / 1.00 / .414 | .375 / .354 / .360 (**broken**, see note) | .819 / 1.00 / .441 |
 | zero-shot Brier std / hard | .58 / .73 | .46 / .71 | – | .30 / **.60** |
-| best val NLL | .384 | **.332** | | |
+| 3-shot control: JevBench std / easy / hard | .528 / 1.00 / .369 | .778 / 1.00 / .441 | .556 / .958 / .369 | |
+| best val NLL | .384 | **.332** | .411 | |
 
 **4B, same recipe: everything moves at once.** Evidence goes *above* the 1.7B base (CLINC +10 over 1.7B-wf and +0.5 over
 the 1.7B base, TREC +14, ANLI +5, BoolQ +3), false-abstain collapses (CLINC .17 → .01, TREC .34 → .00) without any
@@ -1140,8 +1141,13 @@ K = 256 (1.4–1.5×), JevBench p50 .089 vs .077 s — roughly 1.4× the 1.7B's 
 among-K, +14 held-out noul and evidence above the 1.7B base. 4B is the first "typical-medium" candidate. **Zero-shot controls:** the frozen backbone alone climbs
 .583 → .722 → .819 (1.7B → 4B → 14B) on standard and .369 → .414 → .441 on hard, i.e. hard moves slowly with Qwen3 scale
 even without training, and the frozen 14B (Brier hard .60) is the best-calibrated model on the hard tier. Our training
-adds +11 standard / +2 hard on top of the frozen 4B. The frozen-8B control is at chance on *easy* (.354) — a bug in the
-untied-lm-head letter-logit path, being fixed; the trained 8B run does not use that path.
+adds +11 standard / +2 hard on top of the frozen 4B. The frozen-8B control is at chance on *easy* (.354) 0-shot because Qwen3-8B-Base's letter
+distribution after an "A. … Answer:" prompt is "always A" regardless of content (reproduced with vanilla HF code; 3 shots
+break it: easy .958, standard .556 — still below the 4B's .778). **8B trained is non-monotonic too:** with the identical
+recipe (tap 26/36) it lands *below the 1.7B* on almost everything (MMLU among-K .290, Δ_q .093, SNLI .853, JevBench
+standard .667 / Brier .55, val NLL .411 vs .332 for 4B), matching its own weak frozen control. Same fraction tap, same
+LoRA depth, same lr — the 8B checkpoint is the outlier, not the recipe; a tap/lr sweep on 8B is the only way to say
+whether it is recoverable, and it is deferred until the 14B point says whether the ladder is otherwise monotone.
 
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
