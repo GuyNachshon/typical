@@ -78,10 +78,18 @@ RENDERS = {"letters": _render, "tags": _render_tags, "letters_nonull": _render_l
            "query_only": _render_query_only}
 
 
-def _effective_render(model):
-    """--noul_head bern always renders query-only, overriding --nc_render (there's nothing
-    candidate-shaped to render); every other head uses model.render as usual."""
-    return "query_only" if getattr(model, "noul_head", "choice") == "bern" else getattr(model, "render", "letters")
+def _is_bern_row(cand_texts, meta=None):
+    """PLAN7 track C (mixed-type fix, 2026-09-21): --noul_head bern is model-level, but a real
+    training/eval batch mixes qtypes (choice/score/noul rows together) -- only a genuine 2-way
+    yes/no row should ever go through the candidate-blind Bernoulli path; every other row must
+    render its candidates and score normally, or it collapses to chance (the bug: --noul_head
+    bern forced query-only rendering AND the bern head onto every row unconditionally, so a
+    mixed run never saw choice/score candidates at all). A row is bern-eligible iff its
+    candidate set is exactly {"yes","no"} (case-insensitive), or -- when meta is available --
+    meta.qtype == "noul" and K == 2 (covers a future noul row spelled some other way)."""
+    if {c.strip().lower() for c in cand_texts} == {"yes", "no"}:
+        return True
+    return bool(meta) and meta.get("qtype") == "noul" and len(cand_texts) == 2
 
 
 def _yes_idx(cand_lists, dev):
@@ -150,15 +158,24 @@ class NativeHead(nn.Module):
         self.mu_h.copy_(h.mean(0)); self.sd_h.copy_(h.std(0).clamp_min(1e-3))
         self.mu_c.copy_(c3.mean(0)); self.sd_c.copy_(c3.std(0).clamp_min(1e-3))
 
-    def forward(self, h, cmask, c3=None, c2=None, yes_idx=None):
+    def forward(self, h, cmask, c3=None, c2=None, yes_idx=None, bern_mask=None):
         """h [B, d]; cmask [B, Kmax]; c3 [B, Kmax+1, d] (null line last); c2 [B, Kmax, d_emb].
-        yes_idx: [B] long, --noul_head bern only (see _yes_idx). -> logits [B, Kmax+1], null
-        last, pads finfo.min."""
+        yes_idx: [B] long, --noul_head bern only (see _yes_idx). bern_mask: [B] bool, --noul_head
+        bern only -- which rows actually go through the Bernoulli path (native._is_bern_row);
+        None means every row does (Track C's single-qtype batches, kept for exact backward
+        compat). Rows outside bern_mask take the normal K-way Choice path below, bit-identical
+        to --noul_head choice (PLAN7 track C mixed-type fix: --noul_head bern used to apply to
+        every row unconditionally, so a mixed choice/score/noul batch never rendered non-noul
+        candidates and collapsed to chance on them). -> logits [B, Kmax+1], null last, pads
+        finfo.min."""
         hz = (h - self.mu_h) / self.sd_h
-        if self.noul_head == "bern":
-            return self._typed_logits(self._bern_probs(hz, cmask, yes_idx), hz, c3, cmask)
         if self.score_head == "cumlink":
             return self._typed_logits(self._cumlink_probs(hz, c3, cmask), hz, c3, cmask)
+        bm = None
+        if self.noul_head == "bern":
+            bm = bern_mask if bern_mask is not None else torch.ones(h.shape[0], dtype=torch.bool, device=h.device)
+            if bm.all():
+                return self._typed_logits(self._bern_probs(hz, cmask, yes_idx), hz, c3, cmask)
 
         B = h.shape[0]
         u = self.proj_h(hz)                                                       # [B, dv]
@@ -174,8 +191,14 @@ class NativeHead(nn.Module):
         s = s.masked_fill(~cmask, torch.finfo(s.dtype).min)
         hn = torch.cat([u, vn], -1)
         if self.null == "factored":
-            return factored_null_logits(self.null_gate, s, vc, hn, cmask, self.temperature)
-        return torch.cat([s, self.score_null(hn)], dim=-1)
+            choice_logits = factored_null_logits(self.null_gate, s, vc, hn, cmask, self.temperature)
+        else:
+            choice_logits = torch.cat([s, self.score_null(hn)], dim=-1)
+
+        if bm is not None and bm.any():
+            bern_logits = self._typed_logits(self._bern_probs(hz, cmask, yes_idx), hz, c3, cmask)
+            return torch.where(bm.unsqueeze(-1), bern_logits, choice_logits)
+        return choice_logits
 
     def _bern_probs(self, hz, cmask, yes_idx):
         """PLAN7 track C --noul_head bern: P(yes) = sigmoid(w_n . h_D), no candidate text ever
@@ -247,9 +270,12 @@ def _pool_matrix(spans, offsets, base, Kmax, T, K=None):
 def native_features(head, states, queries, cand_lists, max_state=256, max_suffix=MAX_SUFFIX, render="letters"):
     """One suffix pass. -> (h_D [B, d], C3 [B, Kmax+1, d] (null line last; zero for tags), cmask
     [B, Kmax], n_tokens). Suffixes are assumed to fit max_suffix (run_batch_native chunks the
-    rest); a truncated option pools to a zero vector."""
+    rest); a truncated option pools to a zero vector. render: one RENDERS key for every row, or
+    a per-row list of keys (PLAN7 track C mixed-type fix: a --noul_head bern batch renders its
+    yes/no rows query-only and every other row normally, in the same batch)."""
     tok, dev = head.backbone.tokenizer, head.device
-    rendered = [RENDERS[render](q, c) for q, c in zip(queries, cand_lists)]
+    renders = render if isinstance(render, (list, tuple)) else [render] * len(cand_lists)
+    rendered = [RENDERS[r](q, c) for r, q, c in zip(renders, queries, cand_lists)]
     s_ids = _ids(tok, states, max_state)
     x_ids, offs = _ids(tok, [r[0] for r in rendered], max_suffix, offsets=True)
     input_ids, am, lengths = _pack(tok, s_ids, x_ids, tail=[tok.eos_token_id])
@@ -314,27 +340,37 @@ def run_batch_native(head, model, batch, examples, max_state: int = 256, max_suf
     logits = torch.full((len(examples), Kmax + 1), torch.finfo(torch.float32).min, device=dev)
     n_tokens = 0
 
-    render = _effective_render(model)
+    # PLAN7 track C mixed-type fix: render/route each row on its own -- a --noul_head bern run
+    # is not necessarily noul-only (Release-1's mix has choice/score/noul together), so only the
+    # rows that are actually 2-way yes/no go query-only + Bernoulli; everything else renders
+    # --nc_render as usual and scores through NativeHead.forward's normal K-way path.
+    base_render = getattr(model, "render", "letters")
+    is_bern = ([model.noul_head == "bern" and _is_bern_row(c, ex.get("meta")) for ex, c in zip(examples, cand_lists)]
+               if model.noul_head == "bern" else [False] * len(examples))
+    renders = ["query_only" if b else base_render for b in is_bern]
 
-    def score(sts, qs, cls):
-        h, C3, cm, n_tok = native_features(head, sts, qs, cls, max_state, max_suffix, render=render)
+    def score(sts, qs, cls, rnds, bern_flags):
+        h, C3, cm, n_tok = native_features(head, sts, qs, cls, max_state, max_suffix, render=rnds)
         C2 = _n2_vectors(head, cls, vec_cache, dev) if model.use2 else None
         yi = _yes_idx(cls, dev) if model.noul_head == "bern" else None
-        return model(h, cm, C3, C2, yes_idx=yi), n_tok
+        bm = torch.tensor(bern_flags, dtype=torch.bool, device=dev) if model.noul_head == "bern" else None
+        return model(h, cm, C3, C2, yes_idx=yi, bern_mask=bm), n_tok
 
-    n_suf = [len(x) for x in tok([RENDERS[render](q, c)[0] for q, c in zip(queries, cand_lists)],
+    n_suf = [len(x) for x in tok([RENDERS[r](q, c)[0] for r, q, c in zip(renders, queries, cand_lists)],
                                  add_special_tokens=False)["input_ids"]]
     direct_i = [i for i, n in enumerate(n_suf) if n <= max_suffix]
     if direct_i:
-        sub, n_tok = score([states[i] for i in direct_i], [queries[i] for i in direct_i], [cand_lists[i] for i in direct_i])
+        sub, n_tok = score([states[i] for i in direct_i], [queries[i] for i in direct_i], [cand_lists[i] for i in direct_i],
+                           [renders[i] for i in direct_i], [is_bern[i] for i in direct_i])
         n_tokens += n_tok
         for row, i in enumerate(direct_i):
             k = len(cand_lists[i])
             logits[i, :k] = sub[row, :k]
             logits[i, -1] = sub[row, -1]
     for i in (i for i, n in enumerate(n_suf) if n > max_suffix):
-        chunks = _fit_chunks(tok, queries[i], cand_lists[i], max_suffix, render=render)
-        row, n_tok = _score_chunked(lambda cl: score([states[i]] * len(cl), [queries[i]] * len(cl), cl),
+        chunks = _fit_chunks(tok, queries[i], cand_lists[i], max_suffix, render=renders[i])
+        row, n_tok = _score_chunked(lambda cl: score([states[i]] * len(cl), [queries[i]] * len(cl), cl,
+                                                      [renders[i]] * len(cl), [is_bern[i]] * len(cl)),
                                     cand_lists[i], chunks)
         n_tokens += n_tok
         k = len(cand_lists[i])
@@ -382,7 +418,9 @@ def native_kv_decide(head, model, state, queries, chunk: int = 32, max_state: in
     for start in range(0, len(queries), chunk):
         qs = queries[start:start + chunk]
         m = len(qs)
-        rendered = [RENDERS[_effective_render(model)](q, c) for q, c in qs]
+        is_bern = [model.noul_head == "bern" and _is_bern_row(c) for _, c in qs]
+        rendered = [RENDERS["query_only" if b else getattr(model, "render", "letters")](q, c)
+                    for b, (q, c) in zip(is_bern, qs)]
         enc = tok([r[0] for r in rendered], add_special_tokens=False, return_offsets_mapping=True)
         x_ids, offs = enc["input_ids"], enc["offset_mapping"]
         assert max(len(x) for x in x_ids) <= max_suffix, f"suffix > max_suffix={max_suffix}; raise it"
@@ -404,7 +442,8 @@ def native_kv_decide(head, model, state, queries, chunk: int = 32, max_state: in
         C3 = torch.bmm(pool.to(dev), H)
         C2 = _n2_vectors(head, [c for _, c in qs], vec_cache, dev) if model.use2 else None
         yi = _yes_idx([c for _, c in qs], dev) if model.noul_head == "bern" else None
-        probs = torch.softmax(model(h, cmask.to(dev), C3, C2, yes_idx=yi), dim=-1)
+        bm = torch.tensor(is_bern, dtype=torch.bool, device=dev) if model.noul_head == "bern" else None
+        probs = torch.softmax(model(h, cmask.to(dev), C3, C2, yes_idx=yi, bern_mask=bm), dim=-1)
         for i, (_, c) in enumerate(qs):
             out.append(torch.cat([probs[i, :len(c)], probs[i, -1:]]))
     return out

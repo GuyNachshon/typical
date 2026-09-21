@@ -1718,7 +1718,7 @@ def test_max_state_threads_through_run_readout_and_forward_batches(monkeypatch):
 # 15. native_choice_v1 (native.py, PLAN4 sec 11-12): --readout native --nc_head {n2,n3,n2n3}
 # ---------------------------------------------------------------------------
 
-from native import NativeHead, run_batch_native, native_features, shuffle_options, _fit_chunks, _effective_render, _yes_idx, RENDERS  # noqa: E402
+from native import NativeHead, run_batch_native, native_features, shuffle_options, _fit_chunks, _is_bern_row, _yes_idx, RENDERS  # noqa: E402
 
 
 def _native_batch(head, examples, nc_head, null, vec_cache=None):
@@ -1958,13 +1958,85 @@ def test_bern_reversed_label_gives_identical_p_yes(tied_mcq_head):
         assert torch.allclose(probs_a[i, ya], probs_b[i, yb], atol=1e-6)
 
 
-def test_bern_render_is_query_only():
-    """--noul_head bern forces the query-only render regardless of --nc_render (there is
-    nothing candidate-shaped left to render)."""
-    model = NativeHead(64, nc_head="n3", noul_head="bern", render="letters_nonull")
-    assert _effective_render(model) == "query_only"
+def test_is_bern_row():
+    """PLAN7 track C mixed-type fix: bern-eligible iff candidates are exactly {"yes","no"}
+    (case-insensitive), or meta.qtype == "noul" with K == 2 when meta is available."""
+    assert _is_bern_row(["no", "yes"])
+    assert _is_bern_row(["Yes", "NO"])          # case-insensitive
+    assert not _is_bern_row(["cancel", "refund", "status"])
+    assert not _is_bern_row(["a", "b"])         # 2-way but not yes/no, no meta
+    assert _is_bern_row(["a", "b"], {"qtype": "noul"})       # meta fallback
+    assert not _is_bern_row(["a", "b", "c"], {"qtype": "noul"})  # K != 2
+    assert not _is_bern_row(["a", "b"], {"qtype": "score"})
+
+
+def test_bern_render_is_query_only_for_yesno_rows_only():
+    """--noul_head bern renders query-only for a yes/no row and the normal --nc_render for
+    every other row in the same batch (PLAN7 track C mixed-type fix: it used to force
+    query-only on every row unconditionally, hiding non-noul candidates entirely)."""
     text, spans = RENDERS["query_only"]("is this eligible?", ["no", "yes"])
     assert text == "is this eligible?\n" and spans == []
+    letters_text, letters_spans = RENDERS["letters_nonull"]("pick one", ["a", "b", "c"])
+    assert "a" in letters_text and len(letters_spans) == 3
+
+
+def test_bern_mixed_batch_matches_choice_on_non_yesno_rows(tied_mcq_head):
+    """PLAN7 track C mixed-type fix (the bug this whole section exists for): in a batch mixing
+    a yes/no row with ordinary K-way rows, --noul_head bern must give the SAME logits on the
+    K-way rows as --noul_head choice (bit-identical -- same weights, same code path), and only
+    the yes/no row goes through the Bernoulli head. Before the fix, --noul_head bern rendered
+    every row query-only and force-applied the Bernoulli head to it, so the K-way rows saw no
+    candidate text at all and their logits differed from the choice control."""
+    torch.manual_seed(0)
+    head = tied_mcq_head
+    examples = [
+        {"state": "s1", "query": "eligible?", "candidates": ["no", "yes"],
+         "target": [1.0, 0.0], "p_null": 0.0, "task": "t", "meta": {"qtype": "noul"}},
+        {"state": "s2", "query": "which team?", "candidates": ["billing", "support", "logistics"],
+         "target": [0.0, 1.0, 0.0], "p_null": 0.0, "task": "t", "meta": {"qtype": "choice"}},
+        {"state": "s3", "query": "urgency?", "candidates": ["low", "medium", "high", "critical"],
+         "target": [0.0, 0.0, 1.0, 0.0], "p_null": 0.0, "task": "t", "meta": {"qtype": "score"}},
+    ]
+    batch = collate_mcq(examples)
+
+    model_bern = NativeHead(head.backbone.d, nc_head="n3", null="factored", noul_head="bern")
+    model_choice = NativeHead(head.backbone.d, nc_head="n3", null="factored", noul_head="choice")
+    model_choice.load_state_dict(model_bern.state_dict(), strict=False)  # same K-way scorer weights
+
+    logits_bern = run_batch_native(head, model_bern, batch, examples)
+    logits_choice = run_batch_native(head, model_choice, batch, examples)
+
+    Kmax = batch["cmask"].shape[1]
+    for i in (1, 2):  # the two K-way (non yes/no) rows: bit-identical to the choice control
+        k = len(examples[i]["candidates"])
+        assert torch.allclose(logits_bern[i, :k], logits_choice[i, :k], atol=1e-6), i
+        assert torch.allclose(logits_bern[i, -1], logits_choice[i, -1], atol=1e-6), i
+    # row 0 (yes/no) went through the Bernoulli head instead -- it need not match the choice
+    # control, but it must still be a normalized, finite distribution
+    probs0 = torch.softmax(logits_bern[0], dim=-1)
+    assert torch.isfinite(probs0).all() and torch.allclose(probs0.sum(), torch.tensor(1.0), atol=1e-5)
+
+
+def test_bern_reversed_label_holds_inside_a_mixed_batch(tied_mcq_head):
+    """The reversed-label invariance (PLAN7 track C) must still hold for the yes/no row when
+    it's scored alongside ordinary K-way rows, not just in an all-noul batch."""
+    torch.manual_seed(0)
+    head = tied_mcq_head
+    base = [
+        {"state": "s2", "query": "which team?", "candidates": ["billing", "support", "logistics"],
+         "target": [0.0, 1.0, 0.0], "p_null": 0.0, "task": "t"},
+        {"state": "s3", "query": "urgency?", "candidates": ["low", "medium", "high"],
+         "target": [0.0, 0.0, 1.0], "p_null": 0.0, "task": "t"},
+    ]
+    model = NativeHead(head.backbone.d, nc_head="n3", noul_head="bern")
+    ex_a = base + [{"state": "s1", "query": "eligible?", "candidates": ["no", "yes"],
+                    "target": [1.0, 0.0], "p_null": 0.0, "task": "t"}]
+    ex_b = base + [{"state": "s1", "query": "eligible?", "candidates": ["yes", "no"],
+                    "target": [0.0, 1.0], "p_null": 0.0, "task": "t"}]
+    probs_a = torch.softmax(run_batch_native(head, model, collate_mcq(ex_a), ex_a), dim=-1)
+    probs_b = torch.softmax(run_batch_native(head, model, collate_mcq(ex_b), ex_b), dim=-1)
+    ya, yb = ex_a[2]["candidates"].index("yes"), ex_b[2]["candidates"].index("yes")
+    assert torch.allclose(probs_a[2, ya], probs_b[2, yb], atol=1e-6)
 
 
 def test_bern_out_of_domain_kway_row_degrades_instead_of_crashing():
