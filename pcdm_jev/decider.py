@@ -9,6 +9,12 @@ P_native(a_j | answerable)), mcq_zero_shot (PLAN7 track A: frozen --backbone, no
 no LoRA -- next-token logits over the option letters via mcq.py's rendering, restricted to
 the option set; ∅ is never rendered, so p_null = 0). Cold path: no candidate cache, every
 label embedded on the fly.
+
+mcq_zero_shot's `prompt_style` ("ours" default vs "semif") swaps only the rendering + answer-slot
+convention; the decide() control flow, null handling and to_labels renormalisation are shared.
+"semif" mirrors github.com/TheoLeeCJ/SemIf (MIT) `src/semif_phase1/{core,direct}.py`'s `direct`
+readout: chat-template system+user JSON payload, next-token logits over bare uppercase letter
+tokens (no leading space, no rendered null, no exemplars in their `direct` mode).
 """
 import json
 import time
@@ -25,6 +31,36 @@ from native import NativeHead, native_kv_decide
 MAX_QUERY = 64  # the energy checkpoints TRAINED with 64-token queries; decide() now accepts max_query, so longer rubrics are in-context but out-of-distribution
 MAX_STATE = 256  # both model.decide and native_kv_decide default max_state=256 -- the trained length, independent of the --max_state extrapolation cap
 MODES = ("energy", "native", "compose", "mcq_zero_shot")
+PROMPT_STYLES = ("ours", "semif")
+
+# Verbatim from SemIf's src/semif_phase1/core.py (DIRECT_SYSTEM) / direct.py (LETTERS).
+SEMIF_SYSTEM = ("Apply the supplied criterion to the supplied evidence. Choose exactly one listed option. "
+                "Respond with only its uppercase letter, with no explanation or reasoning.")
+SEMIF_LETTERS = "ABCDEFGHIJKLMNOP"
+
+
+def _semif_messages(state: str, query: str, labels: list[str]) -> list[dict]:
+    """SemIf's direct_messages: system instruction + a JSON user payload {evidence, criterion,
+    options: [{letter, description}]}. `state` here is already a plain string (decide() dumps
+    non-string state to JSON text before this is called), so it lands as one JSON string value
+    rather than SemIf's original nested object -- a ponytail simplification, not a behavior gap
+    for our (already-string) states."""
+    payload = {"evidence": state, "criterion": query,
+               "options": [{"letter": SEMIF_LETTERS[i], "description": lab} for i, lab in enumerate(labels)]}
+    return [{"role": "system", "content": SEMIF_SYSTEM},
+            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}]
+
+
+def _semif_slot_ids(tok, count: int) -> list[int]:
+    """Bare uppercase letters (no leading space, unlike mcq.LETTERS' " A" convention) -- SemIf's
+    _slot_ids, with the same single-token round-trip check."""
+    ids = []
+    for letter in SEMIF_LETTERS[:count]:
+        enc = tok.encode(letter, add_special_tokens=False)
+        if len(enc) != 1 or tok.decode(enc) != letter:
+            raise ValueError(f"semif prompt_style: answer slot {letter!r} is not one exact round-trip token")
+        ids.append(enc[0])
+    return ids
 
 
 def _render_zero_shot(query: str, labels: list[str]) -> str:
@@ -89,13 +125,19 @@ def to_labels(p: torch.Tensor, labels: list[str]) -> tuple[dict, float]:
 class PCDMDecider:
     def __init__(self, run_dir: str | None = None, device: str = "auto", mode: str = "energy",
                  energy_run: str | None = None, max_state: int = 4096, max_query: int = 256,
-                 backbone: str | None = None, tap_layer: int = 0, shots: int = 0):
+                 backbone: str | None = None, tap_layer: int = 0, shots: int = 0,
+                 prompt_style: str = "ours"):
         assert mode in MODES, mode
+        assert prompt_style in PROMPT_STYLES, prompt_style
         if mode == "compose" and not energy_run:
             raise ValueError("compose needs energy_run (the support-gate checkpoint)")
         if mode == "mcq_zero_shot" and not backbone:
             raise ValueError("mcq_zero_shot needs backbone (frozen, no checkpoint)")
+        if prompt_style == "semif" and shots:
+            raise ValueError("prompt_style=semif has no exemplar mechanism (SemIf's `direct` "
+                              "readout is 0-shot only) -- run with --shots 0")
         self.device, self.mode, self.max_state, self.max_query = pick_device(device), mode, max_state, max_query
+        self.prompt_style = prompt_style
         self.energy = self.native = self.zero = None
         if mode == "mcq_zero_shot":
             self.zero = MCQHead(backbone, lora_layers=0, lora_r=0, device=self.device, tap_layer=tap_layer).eval()
@@ -150,6 +192,29 @@ class PCDMDecider:
         probs = torch.softmax(last @ w.T, dim=-1)
         return torch.cat([probs, probs.new_zeros(1)])
 
+    def _probs_zero_shot_semif(self, state, query, labels) -> torch.Tensor:
+        """[K+1] next-token logits over exactly `labels`, SemIf's `direct` readout: chat-template
+        system+user JSON prompt, bare-letter answer slots (no leading space), no rendered null
+        (p_null hardcoded 0, matching _probs_zero_shot). No --shots support (see __init__)."""
+        head = self.zero
+        assert len(labels) <= len(SEMIF_LETTERS), f"semif prompt_style: K={len(labels)} > {len(SEMIF_LETTERS)}"
+        tok = head.backbone.tokenizer
+        messages = _semif_messages(state, query, labels)
+        try:
+            prompt = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True,
+                                              enable_thinking=False)
+        except TypeError:  # template doesn't accept enable_thinking (non-Qwen3-style template)
+            prompt = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        ids = tok.encode(prompt, add_special_tokens=False)
+        slot_ids = _semif_slot_ids(tok, len(labels))
+        input_ids = torch.tensor([ids], dtype=torch.long, device=head.device)
+        attention_mask = torch.ones_like(input_ids, dtype=torch.bool)
+        out = head.backbone.model(input_ids=input_ids, attention_mask=attention_mask)
+        last = out.last_hidden_state[0, -1].float()
+        w = head.lm_head_weight.to(head.device)[torch.tensor(slot_ids, device=head.device)].float()
+        probs = torch.softmax(last @ w.T, dim=-1)
+        return torch.cat([probs, probs.new_zeros(1)])
+
     def decide(self, state, question: dict, labels: list[str]) -> tuple[dict, dict]:
         """-> (probs over exactly `labels`, runtime block)."""
         if not isinstance(state, str):
@@ -164,7 +229,8 @@ class PCDMDecider:
                 pn = self._probs("native", state, query, labels)[:-1]
                 p = torch.cat([r * pn / pn.sum(), (1.0 - r).reshape(1)])
             elif self.mode == "mcq_zero_shot":
-                p = self._probs_zero_shot(state, query, labels)
+                p = (self._probs_zero_shot_semif(state, query, labels) if self.prompt_style == "semif"
+                     else self._probs_zero_shot(state, query, labels))
             else:
                 p = self._probs(self.mode, state, query, labels)
         probs, p_null = to_labels(p, labels)  # includes the .cpu() sync -- latency below covers the real wall-clock cost
@@ -176,4 +242,7 @@ class PCDMDecider:
                        "query_tokens": n_query,
                        "query_truncated": bool(self.energy) and n_query > self.max_query,
                        "trained_max_query": MAX_QUERY, "query_beyond_train_len": bool(self.energy) and n_query > MAX_QUERY,
-                       "probability_origin": "mcq-zero-shot-softmax" if self.mode == "mcq_zero_shot" else "native-softmax"}
+                       "probability_origin": (f"mcq-zero-shot-softmax-{self.prompt_style}"
+                                               if self.mode == "mcq_zero_shot" and self.prompt_style == "semif"
+                                               else "mcq-zero-shot-softmax" if self.mode == "mcq_zero_shot"
+                                               else "native-softmax")}

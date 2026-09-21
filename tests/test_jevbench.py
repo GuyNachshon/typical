@@ -147,6 +147,35 @@ def test_mcq_zero_shot_real_backbone_two_items():
     assert res.raw["runtime"]["p_null"] == 0.0
 
 
+def test_semif_prompt_style_rejects_shots_without_loading_a_backbone():
+    """The ValueError fires before MCQHead loads any weights -- no RUN_SLOW/network needed."""
+    from pcdm_jev.decider import PCDMDecider
+    with pytest.raises(ValueError, match="0-shot only"):
+        PCDMDecider(mode="mcq_zero_shot", backbone="Qwen/Qwen3-1.7B-Base", device="cpu",
+                    prompt_style="semif", shots=3)
+
+
+@pytest.mark.skipif(not os.environ.get("RUN_SLOW"), reason="downloads/loads the real Qwen3-1.7B-Base "
+                     "backbone; set RUN_SLOW=1 to run")
+def test_mcq_zero_shot_semif_prompt_style_real_backbone():
+    """prompt_style=semif (SemIf's chat-template `direct` readout): same decide() contract as the
+    default style -- valid renormalised probs, p_null hardcoded 0 -- just a different rendering.
+    Qwen3-1.7B-Base's tokenizer may lack a chat_template; if apply_chat_template raises, that is
+    itself the diagnostic this flag exists to surface, so this test only checks the happy path."""
+    from jevbench.scoring import validate_probs
+    from jevbench.tasks import load_jsonl
+    from pcdm_jev.decider import PCDMDecider
+
+    dec = PCDMDecider(mode="mcq_zero_shot", backbone="Qwen/Qwen3-1.7B-Base", tap_layer=0, device="cpu",
+                       prompt_style="semif")
+    tasks = load_jsonl(str(JEV / "datasets/public/original.jsonl"))
+    t = next(x for x in tasks if x.question["type"] == "noul")
+    probs, rt = dec.decide(t.state, t.question, list(t.labels))
+    clean = validate_probs(probs, t.labels)
+    assert list(clean) == list(t.labels) and math.isclose(sum(clean.values()), 1.0, abs_tol=1e-6)
+    assert rt["p_null"] == 0.0 and rt["probability_origin"] == "mcq-zero-shot-softmax-semif"
+
+
 @pytest.mark.skipif(not Path("runs/mini_emb/best.pt").exists(), reason="runs/mini_emb missing")
 def test_adapter_real_mini_emb_cpu():
     from jevbench.scoring import validate_probs
