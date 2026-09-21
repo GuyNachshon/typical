@@ -1259,6 +1259,38 @@ fixed W share now split over four corpora, MMLU −1.4, HWU64 −6. Verdict: Dec
 share raised back and the typed heads of §3ac on), and the generator's next job is the level-7 families, because
 nothing else in the suite moves them.
 
+## 3ae. Release-1 candidate at 1.7B — `ts1b` (r1 mix + DecisionMix v2 + ordinal-smoothed Score + per-row Bernoulli Noul + 1,024-token states; H100, 2026-09-21, ~$12 + $10 lost to the routing bug)
+
+`ts1` collapsed to chance because `--noul_head bern` was global (every row rendered query-only and scored by the
+Bernoulli head — it had only ever been run on noul-only arms). Fixed per row (commit 7b9d520: rows whose candidates are
+exactly {yes, no} use the Bernoulli head; every other row is bit-identical to the K-way path; 140 tests) and rerun as
+`ts1b`. Family weights E .40 / K .15 / W .35 / U .10. Full-row `eval_wf` for all W/external sets; JevBench per item.
+
+| | `typical-small-preview` (§3t/§3w) | `r1_dmv2` (§3ad) | **`ts1b`** | 1.7B base |
+|---|---|---|---|---|
+| CLINC-150 / TREC-fine / HWU64 / 20NG | .734 / .372 / .735 / .522 | .820 / .474 / .726 / .501 | .804 / **.508** / .761 / .540 | .845 / .468 / .757 / .515 |
+| SNLI / MNLI / BoolQ / ANLI | .894 / .849 / .831 / .481 | .894 / .852 / .834 / .501 | .894 / .859 / .824 / .497 | .904 / .865 / .834 / .507 |
+| MMLU-Pro among-K / Δ_q_sh / false-abstain | .330 / .119 / .006 | .333 / .110 / – | .343 / .127 / .005 | .353 / .122 / .003 |
+| held-out noul / score / style / flip both-correct (full rows) | .699 / .498 / .901 / .565 | .658 / .501 / .876 / .519 | **.715** / **.520** / .859 / **.581** | – |
+| held-out score NLL / typed-decisions NLL (full rows) | 2.03 / 2.06 | 1.56 / 1.71 | **1.01 / 1.25** | – / 1.22 |
+| wh held-out family / grammar / style / level 7 / flip | – | .827 / .881 / .888 / .498 / .710 | **.836 / .898 / .896** / .495 / **.718** | – |
+| u ChaosNLI / real held-out / synthetic (acc, NLL) | – | .537 (1.00) / .623 (.67) / .909 (.67) | .547 (1.00) / **.649** (.66) / .916 (.67) | – |
+| external: PagerDuty (floor .792) / jevlogs (.697) / Mind2Web (.427) / tree-choice / typed-decisions acc | .779 / .522 / .427 / .539 / .457 | .651† / .500† / .346† / – / .421† | **.817 / .710** / .357 / .474 / **.510** | .776 / .697 / .300 / .506 / .487 |
+| JevBench std / easy / hard (Brier std / hard; ECE std) | .750 / 1.00 / .387 (.40 / .88; .15) | .750 / 1.00 / .441 (.42 / .79) | .694 / 1.00 / .432 (.40 / .79; **.11**) | .694 / 1.00 / .378 (.47 / .74) |
+| Noul reversed-label |ΔP(yes)| max | up to .55 | – | **0** (10/11 sets; .009 on one) | – |
+
+† train-time 1,500-row/256-token pass for `r1_dmv2` (not re-run at full length).
+
+**Read.** Against the frozen preview, `ts1b` keeps E and K inside budget (CLINC −4 vs the untrained base is the one
+edge; TREC/20NG above base), raises held-out noul/score/flip, halves the soft-target NLLs (score 2.03 → 1.01,
+typed-decisions 2.06 → 1.25 — at 1.7B this is the calibration the under-fit runs had, without their accuracy loss),
+beats or ties `r1_dmv2` on every curriculum and uncertainty set, is exactly order-invariant on Noul, and is the first
+1.7B model above the constant-prediction floor on PagerDuty (.817) and jevlogs (.710, marginal). It gives back held-out
+styles (−4), Mind2Web (below floor again), tree-choice (−6), and JevBench standard (.750 → .694, ~1 SE at n_eff = 36;
+extraction 12 → 9 of 12) while JevBench hard rises (.387 → .432, Brier .88 → .79). Net: a broader, far better-calibrated
+model that trades ~1 SE of JevBench-standard for it. **Decision: freeze `ts1b` as `typical-small` (Release 1 at 1.7B)**,
+with the preview kept as the reference; the 4B `tm1b` decides `typical-medium`.
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
