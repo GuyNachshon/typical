@@ -262,6 +262,22 @@ def _pool_matrix(spans, offsets, base, Kmax, T, K=None):
     return pool / pool.sum(-1, keepdim=True).clamp_min(1.0)
 
 
+def _cache_batch_repeat_interleave(cache, repeats: int):
+    """cache.batch_repeat_interleave(repeats), generalised to Qwen3.5's hybrid cache -- see
+    native.py's copy for the long form (its Gated-DeltaNet linear-attention layers have no
+    batch_repeat_interleave of their own; Qwen3's cache is unaffected, every layer hits the
+    first branch)."""
+    for layer in cache.layers:
+        if hasattr(layer, "batch_repeat_interleave"):
+            layer.batch_repeat_interleave(repeats)
+            continue
+        for i in range(getattr(layer, "number_of_states", 1)):
+            if layer.is_conv_states_initialized[i]:
+                layer.conv_states[i] = layer.conv_states[i].repeat_interleave(repeats, dim=0)
+            if layer.is_recurrent_states_initialized[i]:
+                layer.recurrent_states[i] = layer.recurrent_states[i].repeat_interleave(repeats, dim=0)
+
+
 def _causal_pad_mask(attn2d, q_len, dtype):
     """Explicit additive (batch,1,q_len,kv_len) mask -- transformers' automatic 2D-mask +
     past_key_values path mis-handles a right-padded batch sharing one KV cache; this
@@ -315,7 +331,7 @@ def native_kv_decide(head, model, state, queries, chunk: int = 32, max_state: in
             cmask[i, :len(c)] = True
 
         cache = copy.deepcopy(state_cache)
-        cache.batch_repeat_interleave(m)
+        _cache_batch_repeat_interleave(cache, m)
         attn = torch.cat([torch.ones(m, Ls, dtype=torch.long), am], dim=1).to(dev)
         position_ids = (torch.arange(T) + Ls).expand(m, -1).to(dev)
         H = lm(input_ids=input_ids.to(dev), attention_mask=_causal_pad_mask(attn, T, lm.dtype),

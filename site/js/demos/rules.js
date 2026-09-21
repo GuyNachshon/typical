@@ -3,8 +3,6 @@
 // question prefix, the two recorded orders) lives in data/presets.json's "flip" - already
 // loaded by shell.js into ctx.presets, read from there rather than duplicated here.
 // data/demos/rules.json only adds the 6 hand-written applicants for the second panel.
-import { stipple } from '../ink.js';
-
 const OUTCOME_ORDER = ['deny', 'approve', 'approve_with_conditions', 'refer_to_underwriter'];
 
 function el(tag, className, text) {
@@ -12,18 +10,6 @@ function el(tag, className, text) {
   if (className) node.className = className;
   if (text != null) node.textContent = text;
   return node;
-}
-
-const SVG_NS = 'http://www.w3.org/2000/svg';
-
-function hexEl(filled) {
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('class', 'hex reg-hex' + (filled ? ' filled' : ''));
-  svg.setAttribute('viewBox', '0 0 12 12');
-  const poly = document.createElementNS(SVG_NS, 'polygon');
-  poly.setAttribute('points', '6,0.5 11,3.25 11,8.75 6,11.5 1,8.75 1,3.25');
-  svg.appendChild(poly);
-  return svg;
 }
 
 // query_text's choice-branch rendering, ported (see inference/typical/core.py::query_text) -
@@ -56,21 +42,21 @@ export async function mount(host, ctx) {
   if (host.getBoundingClientRect().width > 480) panel1.style.gridTemplateColumns = '1fr 1fr';
 
   const left = el('div');
-  left.appendChild(el('h4', 'label', 'The facts (fixed)'));
+  left.appendChild(el('p', 'ex-subhead', 'The facts (fixed)'));
   const factsList = el('ol', 'rules-facts');
   flip.state.split(/(?<=\.)\s+/).forEach((sentence) => factsList.appendChild(el('li', null, sentence)));
   left.appendChild(factsList);
 
-  left.appendChild(el('h4', 'label', 'The rules (reorder them)'));
+  left.appendChild(el('p', 'ex-subhead', 'The rules (reorder them)'));
   const ruleList = el('div', 'rules-order');
   left.appendChild(ruleList);
-  const staticNote = el('p', 'exhibit-caption');
+  const staticNote = el('p', 'ex-caption');
   left.appendChild(staticNote);
 
   const right = el('div');
   const bars = el('div', 'rules-live-bars');
   right.appendChild(bars);
-  const readoutLine = el('p', 'exhibit-readout');
+  const readoutLine = el('p', 'ex-readout');
   right.appendChild(readoutLine);
   const field = ctx.inkBars(bars, { rows: [] });
 
@@ -84,15 +70,17 @@ export async function mount(host, ctx) {
     order.forEach((label, i) => {
       const row = el('div', 'rules-order-row');
       const text = el('span', 'rules-order-text', `${i + 1}. ${label}: ${flip.rules[label]}`);
-      const up = el('button', 'ghost-btn', '↑');
-      const down = el('button', 'ghost-btn', '↓');
+      const btns = el('span', 'rules-order-btns');
+      const up = el('button', 'ex-ghost', '↑');
+      const down = el('button', 'ex-ghost', '↓');
       up.type = 'button';
       down.type = 'button';
       up.disabled = i === 0;
       down.disabled = i === order.length - 1;
       up.addEventListener('click', () => move(i, i - 1));
       down.addEventListener('click', () => move(i, i + 1));
-      row.append(text, up, down);
+      btns.append(up, down);
+      row.append(text, btns);
       ruleList.appendChild(row);
     });
   }

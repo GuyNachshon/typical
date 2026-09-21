@@ -101,7 +101,8 @@ MODELS = [
         "jevbench": jevbench("runs/jev_native_tm1b/summary.json"),
         "latency": {"single_ms": {"k2": 56, "k32": 56, "k256": 118},
                     "marginal_ms_m32": {"k2": 3.3, "k32": 6.1, "k256": 50.6},
-                    "peak_gb": {"k2": 14.6, "k256": 18.6}},
+                    "peak_gb": {"k2": 14.6, "k256": 18.6},
+                    "bench": "runs/bench_tm1b/bench.json"},  # measured on the released checkpoint; card numbers match
         "mmlu_pro_among_k": 0.458,
         "nlu": {"snli": 0.909, "mnli": 0.861, "boolq": 0.843, "anli": 0.544},
         "topic_intent": {"clinc": 0.847, "trec": 0.414, "hwu": 0.769, "ng20": 0.588},
@@ -205,6 +206,26 @@ CHANCE = {
     "source": "releases/typical-small.md#jevbench-disclosure (identical text in typical-medium.md)",
 }
 (OUT / "chance.json").write_text(json.dumps(CHANCE, indent=2))
+
+# ---------------------------------------------------------------------------
+# frozen.json -- frozen-backbone controls on the same 231 public JevBench ids
+# (letter logits over rendered options, 3 exemplars). Transcribed from REPORT §3ag (2026-09-22).
+# ---------------------------------------------------------------------------
+FROZEN = {
+    "protocol": "frozen backbone, letter logits over the rendered options, 3 exemplars, same 231 public ids",
+    "source": "gpu-runpod-full-experiment:REPORT.md#§3ag-frozen-controls",
+    "rows": [
+        {"backbone": "Qwen3-1.7B-Base", "std": 0.528, "easy": 1.00, "hard": 0.369, "brier_hard": 0.71, "trained": "typical-small"},
+        {"backbone": "Qwen3-4B-Base", "std": 0.778, "easy": 1.00, "hard": 0.441, "brier_hard": 0.67, "trained": "typical-medium"},
+        {"backbone": "Qwen3-4B (instruct)", "std": 0.778, "easy": 1.00, "hard": 0.423, "brier_hard": 0.95, "trained": None},
+        {"backbone": "Qwen3-8B-Base", "std": 0.556, "easy": 0.958, "hard": 0.369, "brier_hard": 0.74, "trained": None},
+        {"backbone": "Qwen3-14B-Base", "std": 0.819, "easy": 1.00, "hard": 0.559, "brier_hard": 0.60, "trained": "typical-14b-ladder"},
+        {"backbone": "Qwen3.5-4B-Base", "std": 0.764, "easy": 1.00, "hard": 0.495, "brier_hard": 0.60, "trained": None},
+    ],
+    "in_flight": "typical-large (Qwen3-14B, facts-first long rows, 3,072-token states, frozen-14B distillation) and tm2 (Qwen3.5-4B); pass rule: hard >= .559 or hard Brier <= .65, long_policy >= .35 (REPORT §3ag)",
+    "long_state_bug": "data_wf_long rendered the case facts last and training right-truncated at max_state, so 98.8% of long-policy rows lost their facts at 1,024 tokens; fixed by facts-first regeneration + --drop_truncated (REPORT §3ag, commit 2fad326)",
+}
+(OUT / "frozen.json").write_text(json.dumps(FROZEN, indent=2))
 
 # ---------------------------------------------------------------------------
 print(f"{'file':<20}{'top-level keys'}")

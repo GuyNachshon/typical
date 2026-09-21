@@ -1,0 +1,552 @@
+{
+  "T": 0.9617248711152964,
+  "val_nll": 5.144888623108695,
+  "eval": {
+    "anli_test": {
+      "raw": {
+        "nll": 1.278249688072081,
+        "brier": 0.7605106347025085,
+        "jsd": 0.32836944153598474,
+        "acc": 0.376,
+        "acc_k": 0.376,
+        "ece": 0.19985604682937946,
+        "sel_acc80": 0.38375,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": 1.293852340369172,
+        "brier": 0.7665293963899603,
+        "jsd": 0.329406347409163,
+        "acc": 0.376,
+        "acc_k": 0.376,
+        "ece": 0.20718335538201443,
+        "sel_acc80": 0.385,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "banking77_k": {
+      "raw": {
+        "nll": "n/a",
+        "brier": "n/a",
+        "jsd": "n/a",
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": "n/a",
+        "brier": "n/a",
+        "jsd": "n/a",
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "banking77_test": {
+      "raw": {
+        "nll": "n/a",
+        "brier": "n/a",
+        "jsd": "n/a",
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": "n/a",
+        "brier": "n/a",
+        "jsd": "n/a",
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "boolq_val": {
+      "raw": {
+        "nll": 0.6691930608646082,
+        "brier": 0.4755340627598529,
+        "jsd": 0.2053803399428848,
+        "acc": 0.598,
+        "acc_k": 0.598,
+        "ece": 0.021734497752114078,
+        "sel_acc80": 0.62625,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": 0.6696610524066783,
+        "brier": 0.47582308038087817,
+        "jsd": 0.20520675479579628,
+        "acc": 0.598,
+        "acc_k": 0.598,
+        "ece": 0.025160721972674417,
+        "sel_acc80": 0.62625,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "chaos_mnli": {
+      "raw": {
+        "nll": 1.4588634602309216,
+        "brier": 0.29859615513624205,
+        "jsd": 0.11693910170632031,
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": 1.4918071293839832,
+        "brier": 0.3050234409440069,
+        "jsd": 0.11944910061256246,
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "clinc_heldout": {
+      "raw": {
+        "nll": "n/a",
+        "brier": "n/a",
+        "jsd": "n/a",
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": "n/a",
+        "brier": "n/a",
+        "jsd": "n/a",
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "clinc_k": {
+      "raw": {
+        "nll": 17.351123464588,
+        "brier": 1.0140824643988113,
+        "jsd": 0.5286109930413636,
+        "acc": 0.2508361204013378,
+        "acc_k": 0.5244755244755245,
+        "ece": 0.26543552099106166,
+        "sel_acc80": 0.3,
+        "conf_wrong": 0.10256410256410256,
+        "auroc_null": "n/a",
+        "auroc_conf": 0.6127398242782859
+      },
+      "scaled": {
+        "nll": 17.351040373946812,
+        "brier": 1.0163412965817622,
+        "jsd": 0.5274467359832518,
+        "acc": 0.2508361204013378,
+        "acc_k": 0.5244755244755245,
+        "ece": 0.27423086018792403,
+        "sel_acc80": 0.3,
+        "conf_wrong": 0.10256410256410256,
+        "auroc_null": "n/a",
+        "auroc_conf": 0.6149363457055765
+      }
+    },
+    "clinc_oos": {
+      "raw": {
+        "nll": 27.631021115928547,
+        "brier": 1.0200279514515198,
+        "jsd": 0.6931471792284706,
+        "acc": 0.0,
+        "acc_k": "n/a",
+        "ece": 0.05955321062467452,
+        "sel_acc80": 0.0,
+        "conf_wrong": 0.0,
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": 27.631021115928547,
+        "brier": 1.0214663145076233,
+        "jsd": 0.693147179236446,
+        "acc": 0.0,
+        "acc_k": "n/a",
+        "ece": 0.06350281888074376,
+        "sel_acc80": 0.0,
+        "conf_wrong": 0.0,
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "clinc_test": {
+      "raw": {
+        "nll": 7.474915465909359,
+        "brier": 0.828826024230164,
+        "jsd": 0.5449331115897407,
+        "acc": 0.3933333333333333,
+        "acc_k": 0.3933333333333333,
+        "ece": 0.2166030617247946,
+        "sel_acc80": 0.45416666666666666,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": 7.446911590075592,
+        "brier": 0.8208506374062948,
+        "jsd": 0.53869596693871,
+        "acc": 0.3933333333333333,
+        "acc_k": 0.3933333333333333,
+        "ece": 0.2063715224771651,
+        "sel_acc80": 0.45416666666666666,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "hwu64_test": {
+      "raw": {
+        "nll": 1.7970019032762996,
+        "brier": 0.547043943360043,
+        "jsd": 0.3435939685976556,
+        "acc": 0.6233333333333333,
+        "acc_k": 0.6233333333333333,
+        "ece": 0.16607413678851166,
+        "sel_acc80": 0.7125,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": 1.7770920899728853,
+        "brier": 0.5397713007144848,
+        "jsd": 0.3362248842441363,
+        "acc": 0.6233333333333333,
+        "acc_k": 0.6233333333333333,
+        "ece": 0.1484003670642734,
+        "sel_acc80": 0.7125,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "mnli_val": {
+      "raw": {
+        "nll": 0.6336984882985109,
+        "brier": 0.3518723821208951,
+        "jsd": 0.15831684937565788,
+        "acc": 0.768,
+        "acc_k": 0.768,
+        "ece": 0.05198576757774034,
+        "sel_acc80": 0.82,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": 0.638550078668645,
+        "brier": 0.35238462063851944,
+        "jsd": 0.15714595063439601,
+        "acc": 0.768,
+        "acc_k": 0.768,
+        "ece": 0.05184662212198694,
+        "sel_acc80": 0.82,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "ng20_test": {
+      "raw": {
+        "nll": "n/a",
+        "brier": "n/a",
+        "jsd": "n/a",
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": "n/a",
+        "brier": "n/a",
+        "jsd": "n/a",
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "snli_null": {
+      "raw": {
+        "nll": 14.719276948637654,
+        "brier": 1.0601980428404867,
+        "jsd": 0.4003745024540697,
+        "acc": 0.419,
+        "acc_k": 0.8877118644067796,
+        "ece": 0.4826027814012437,
+        "sel_acc80": 0.43,
+        "conf_wrong": 0.696969696969697,
+        "auroc_null": "n/a",
+        "auroc_conf": 0.5139597778633795
+      },
+      "scaled": {
+        "nll": 14.71982535170931,
+        "brier": 1.0636061099065295,
+        "jsd": 0.40002825735204667,
+        "acc": 0.419,
+        "acc_k": 0.8877118644067796,
+        "ece": 0.48672164926299766,
+        "sel_acc80": 0.43,
+        "conf_wrong": 0.7064393939393939,
+        "auroc_null": "n/a",
+        "auroc_conf": 0.5139597778633795
+      }
+    },
+    "snli_test": {
+      "raw": {
+        "nll": 0.42313661727734964,
+        "brier": 0.23037069188903914,
+        "jsd": 0.11251318869360645,
+        "acc": 0.855,
+        "acc_k": 0.855,
+        "ece": 0.04003464991880962,
+        "sel_acc80": 0.915,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": 0.4226924616898081,
+        "brier": 0.2293734732514402,
+        "jsd": 0.11094519951112392,
+        "acc": 0.855,
+        "acc_k": 0.855,
+        "ece": 0.03592874883399844,
+        "sel_acc80": 0.91625,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "snli_test_paraphrase": {
+      "raw": {
+        "nll": 0.4114416540943204,
+        "brier": 0.23408323936888917,
+        "jsd": 0.11315097152919387,
+        "acc": 0.841,
+        "acc_k": 0.841,
+        "ece": 0.03675297962614887,
+        "sel_acc80": 0.9025,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": 0.41039531626536196,
+        "brier": 0.2333789613247881,
+        "jsd": 0.11164234282706724,
+        "acc": 0.841,
+        "acc_k": 0.841,
+        "ece": 0.03045063763379119,
+        "sel_acc80": 0.90125,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "snli_test_qpara": {
+      "raw": {
+        "nll": 0.43042262427430944,
+        "brier": 0.2322222032283705,
+        "jsd": 0.11202695543242064,
+        "acc": 0.851,
+        "acc_k": 0.851,
+        "ece": 0.03941448508805275,
+        "sel_acc80": 0.9075,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": 0.4306234764642753,
+        "brier": 0.23137768136448783,
+        "jsd": 0.11047526592385686,
+        "acc": 0.851,
+        "acc_k": 0.851,
+        "ece": 0.03213291468064551,
+        "sel_acc80": 0.90875,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "snli_test_soft": {
+      "raw": {
+        "nll": 0.6342853416066948,
+        "brier": 0.15597178381006488,
+        "jsd": 0.08363372812983522,
+        "acc": 0.857,
+        "acc_k": 0.857,
+        "ece": 0.04052265924775903,
+        "sel_acc80": 0.915,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": 0.6423831166451822,
+        "brier": 0.15633130767079148,
+        "jsd": 0.08306136801384305,
+        "acc": 0.857,
+        "acc_k": 0.857,
+        "ece": 0.03477655536734304,
+        "sel_acc80": 0.91625,
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "squad_null": {
+      "raw": {
+        "nll": "n/a",
+        "brier": "n/a",
+        "jsd": "n/a",
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": "n/a",
+        "brier": "n/a",
+        "jsd": "n/a",
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "trec_coarse": {
+      "raw": {
+        "nll": "n/a",
+        "brier": "n/a",
+        "jsd": "n/a",
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": "n/a",
+        "brier": "n/a",
+        "jsd": "n/a",
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "trec_fine": {
+      "raw": {
+        "nll": "n/a",
+        "brier": "n/a",
+        "jsd": "n/a",
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      },
+      "scaled": {
+        "nll": "n/a",
+        "brier": "n/a",
+        "jsd": "n/a",
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": "n/a",
+        "auroc_conf": "n/a"
+      }
+    },
+    "unli_test": {
+      "raw": {
+        "nll": 0.5918953420697262,
+        "brier": 0.17392385208515157,
+        "jsd": 0.06276283781044271,
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": 0.9032889017676036,
+        "auroc_conf": 0.9032889017676036
+      },
+      "scaled": {
+        "nll": 0.5942212180451852,
+        "brier": 0.1749116296731515,
+        "jsd": 0.06277469419972358,
+        "acc": "n/a",
+        "acc_k": "n/a",
+        "ece": "n/a",
+        "sel_acc80": "n/a",
+        "conf_wrong": "n/a",
+        "auroc_null": 0.9032889017676036,
+        "auroc_conf": 0.9032889017676036
+      }
+    }
+  }
+}

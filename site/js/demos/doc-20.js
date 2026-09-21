@@ -12,18 +12,6 @@ function el(tag, className, text) {
   return node;
 }
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
-
-function hexEl(filled) {
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('class', 'hex reg-hex' + (filled ? ' filled' : ''));
-  svg.setAttribute('viewBox', '0 0 12 12');
-  const poly = document.createElementNS(SVG_NS, 'polygon');
-  poly.setAttribute('points', '6,0.5 11,3.25 11,8.75 6,11.5 1,8.75 1,3.25');
-  svg.appendChild(poly);
-  return svg;
-}
-
 function isHit(question, result) {
   return result.argmax === question.gold;
 }
@@ -40,33 +28,32 @@ export async function mount(host, ctx) {
   host.innerHTML = '';
   const wrap = el('div', 'exhibit doc20-exhibit');
 
-  const handbook = el('div', 'doc20-handbook', data.doc);
+  const handbook = el('div', 'ex-scroll', data.doc);
   wrap.appendChild(handbook);
 
-  const register = el('div', 'register doc20-register');
+  const register = el('div', 'doc20-register');
   wrap.appendChild(register);
 
-  const timing = el('div', 'doc20-timing');
-  const onePass = el('div', 'timing-pair');
-  const oneAt = el('div', 'timing-pair');
+  const timing = el('div', 'ex-stat-row');
+  const onePass = el('div', 'ex-stat');
+  const oneAt = el('div', 'ex-stat');
   timing.append(onePass, oneAt);
   wrap.appendChild(timing);
 
-  const caption = el('p', 'exhibit-caption');
+  const caption = el('p', 'ex-caption');
   wrap.appendChild(caption);
 
   host.appendChild(wrap);
 
   const rows = data.questions.map((question) => {
-    const row = el('div', 'reg-row');
-    row.appendChild(el('p', 'doc20-q', question.display));
-    const aLine = el('div', 'doc20-a-line');
+    const row = el('div', 'ex-row');
+    const q = el('span', 'doc20-q ex-row-text', question.display);
     const a = el('span', 'doc20-a', '');
-    const p = el('span', 'doc20-p', '');
-    aLine.append(a, p);
-    row.appendChild(aLine);
+    const mark = el('span', 'doc20-mark', '·');
+    const p = el('span', 'ex-num', '');
+    row.append(q, a, mark, p);
     register.appendChild(row);
-    return { row, a, p };
+    return { row, mark, a, p };
   });
 
   const allQueries = data.questions.map((question) => ({ type: question.type, question: question.query, labels: question.labels }));
@@ -86,20 +73,17 @@ export async function mount(host, ctx) {
     const hit = isHit(question, result);
     if (hit) correct += 1;
     const p = result.probs[result.argmax] ?? 0;
-    t.a.before(hexEl(hit));
+    t.mark.className = 'doc20-mark ' + (hit ? 'hit' : 'miss');
     t.a.textContent = result.argmax;
     t.p.textContent = p.toFixed(2);
   });
 
-  function timingPair(target, seconds, label) {
+  function statPair(target, seconds, label) {
     target.innerHTML = '';
-    target.append(el('span', 'timing-numeral serif', `${seconds.toFixed(1)} s`), el('span', 'timing-label', label));
+    target.append(el('span', 'ex-stat-num', `${seconds.toFixed(1)} s`), el('span', 'ex-stat-label', label));
   }
-  timingPair(onePass, full.ms / 1000, 'one pass, here');
-  if (single) timingPair(oneAt, (single.ms * data.questions.length) / 1000, 'one at a time');
+  statPair(onePass, full.ms / 1000, 'one pass, here');
+  if (single) statPair(oneAt, (single.ms * data.questions.length) / 1000, 'one at a time');
 
   caption.textContent = `${correct}/20 here: lookups and yes/no answers mostly land, ordered levels mostly don't — every miss is a number compared against a threshold in the text.`;
-
-  const readoutEl = host.closest('.screen')?.querySelector('.readout');
-  if (readoutEl) ctx.readout(readoutEl, { ms: full.ms, extra: `${correct}/20` });
 }

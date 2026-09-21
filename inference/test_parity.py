@@ -114,6 +114,48 @@ def test_typical_noul_via_choice_path_on_preview():
     print(f"[parity] preview noul() via K-way choice path OK over {len(NOUL_ITEMS)} items")
 
 
+QWEN35_NAME = "Qwen/Qwen3.5-0.8B-Base"
+QWEN35_CACHED = os.path.expanduser("~/.cache/huggingface/hub/models--Qwen--Qwen3.5-0.8B-Base")
+
+
+@pytest.mark.skipif(not os.path.isdir(QWEN35_CACHED), reason=f"{QWEN35_NAME} not cached locally")
+def test_typical_from_pretrained_loads_qwen35_checkpoint(tmp_path, monkeypatch):
+    """No trained Qwen3.5 checkpoint exists yet (see the porting task report) -- this proves
+    Typical.from_pretrained would load one anyway: it rebuilds backbone+head purely from
+    ckpt["args"] (backbone id, tap_layer, lora_r/lora_layers, nc_head/nc_render/null/noul_head
+    -- see core.py's docstring), never hardcoding a Qwen3 backbone name. A synthetic checkpoint
+    built from a real (tiny-tap, for speed) Qwen3.5-0.8B-Base backbone + NativeHead stands in
+    for the real thing; hf_hub_download is monkeypatched to return it so from_pretrained's own
+    code path runs unmodified, same as it would against a real Hub repo."""
+    import torch
+
+    from encode import Backbone as TrainBackbone
+    from native import NativeHead as TrainNativeHead
+
+    args = {"backbone": QWEN35_NAME, "readout": "native", "tap_layer": 8, "lora_layers": 2,
+            "lora_r": 4, "nc_head": "n3", "nc_render": "letters_nonull", "null": "factored",
+            "noul_head": "choice", "score_head": "choice"}
+    bb = TrainBackbone(args["backbone"], lora_layers=args["lora_layers"], lora_r=args["lora_r"],
+                       device="cpu", tap_layer=args["tap_layer"])
+    model = TrainNativeHead(bb.d, nc_head=args["nc_head"], null=args["null"], render=args["nc_render"],
+                            score_head=args["score_head"], noul_head=args["noul_head"])
+    ckpt_path = tmp_path / "best.pt"
+    torch.save({"tower": model.state_dict(), "lora": bb.lora_state_dict(), "args": args}, ckpt_path)
+
+    import typical.core as core_mod
+    from typical import Typical
+    monkeypatch.setattr(core_mod, "hf_hub_download", lambda *a, **k: str(ckpt_path))
+
+    mine = Typical.from_pretrained("fake/does-not-exist", device="cpu")
+    assert mine.head.backbone.model.config.hidden_size == bb.d
+    probs, runtime = mine.decide(
+        "A customer reports their package arrived damaged and wants a replacement.",
+        {"type": "noul", "instructions": "Should this be escalated?",
+         "criteria": {"true": "Yes", "false": "No"}}, ["no", "yes"])
+    assert abs(sum(probs.values()) - 1.0) < 1e-4  # to_labels renormalises over labels
+    assert 0.0 <= runtime["p_null"] <= 1.0
+
+
 if __name__ == "__main__":
     if not os.environ.get("RUN_SLOW"):
         os.environ["RUN_SLOW"] = "1"

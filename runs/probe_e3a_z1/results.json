@@ -1,0 +1,116 @@
+{
+  "T": 0.9617248711152964,
+  "val_nll": 0.4535018815994263,
+  "args": {
+    "name": "probe_e3a_z1",
+    "backbone": "Qwen/Qwen3-1.7B-Base",
+    "lora_layers": 8,
+    "lora_r": 16,
+    "steps": 12000,
+    "bs": 64,
+    "lr": 0.0003,
+    "lora_lr": 0.0001,
+    "seed": 0,
+    "no_hybrid": false,
+    "no_cand_null": false,
+    "no_null": false,
+    "null": "softmax",
+    "hard_only": false,
+    "mix": "full",
+    "eval_every": 4000,
+    "val_every": 1000,
+    "ckpt_every": 2000,
+    "eval_bs": 128,
+    "device": "auto",
+    "wandb": false,
+    "hf_repo": null,
+    "data": "data_probe",
+    "extra_data": null,
+    "smoke": false,
+    "eval_limit": 0,
+    "tap_layer": 20,
+    "zscore": false,
+    "eval_only": true,
+    "dump_logits": null,
+    "tower_d": 512,
+    "tower_layers": 0,
+    "tower_heads": 8,
+    "joint": true,
+    "listwise": false,
+    "extra_tap": 0,
+    "init_from": null,
+    "readout": "energy",
+    "zero_shot": false,
+    "shots": 0,
+    "cand_encoder": "tiny",
+    "head": "z1",
+    "z_dim": 128,
+    "z_probes": 8,
+    "tiny_layers": 2,
+    "distill_alpha": 1.0,
+    "distill_beta": 0.0,
+    "distill_T": 2.0
+  },
+  "eval": {
+    "mmlu_choicesonly": {
+      "raw": {
+        "nll": 2.2183406817939777,
+        "brier": 0.885347352880025,
+        "jsd": 0.5117382951517929,
+        "acc": 0.18083333333333335,
+        "acc_k": 0.18083333333333335,
+        "ece": 0.05816123920803269,
+        "sel_acc80": 0.18854166666666666
+      },
+      "scaled": {
+        "nll": 2.2177334592007636,
+        "brier": 0.8853712553282719,
+        "jsd": 0.5115476982812718,
+        "acc": 0.18083333333333335,
+        "acc_k": 0.18083333333333335,
+        "ece": 0.059129962517569475,
+        "sel_acc80": 0.18854166666666666
+      }
+    },
+    "mmlu_pro": {
+      "raw": {
+        "nll": 2.2463295158790313,
+        "brier": 0.8907518124572187,
+        "jsd": 0.511116668528223,
+        "acc": 0.17083333333333334,
+        "acc_k": 0.17083333333333334,
+        "ece": 0.04614463749031225,
+        "sel_acc80": 0.17604166666666668
+      },
+      "scaled": {
+        "nll": 2.2486213573017864,
+        "brier": 0.8913487366111925,
+        "jsd": 0.510956649524639,
+        "acc": 0.17083333333333334,
+        "acc_k": 0.17083333333333334,
+        "ece": 0.046101478977749744,
+        "sel_acc80": 0.175
+      }
+    },
+    "mmlu_shuffledq": {
+      "raw": {
+        "nll": 2.249632545106589,
+        "brier": 0.8900336538635084,
+        "jsd": 0.5128325548622567,
+        "acc": 0.1475,
+        "acc_k": 0.1475,
+        "ece": 0.03219445442780853,
+        "sel_acc80": 0.153125
+      },
+      "scaled": {
+        "nll": 2.2509025220832264,
+        "brier": 0.8904655188265304,
+        "jsd": 0.5126451989331096,
+        "acc": 0.1475,
+        "acc_k": 0.1475,
+        "ece": 0.0328342493250966,
+        "sel_acc80": 0.153125
+      }
+    }
+  }
+}

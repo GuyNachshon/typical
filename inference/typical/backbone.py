@@ -12,7 +12,12 @@ import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoTokenizer
 
-_LORA_MODULES = ("q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj")
+# Qwen3: q/k/v/o_proj (self_attn) + gate/up/down_proj (mlp). Qwen3.5 hybrid stack adds
+# in_proj_{qkv,z,b,a}/out_proj for its Gated-DeltaNet linear-attention layers (linear_attn,
+# no self_attn) -- listed here too since hasattr() gates each name per parent module, so this
+# tuple is a superset that's a no-op for any module lacking a given name (Qwen3 untouched).
+_LORA_MODULES = ("q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj",
+                  "in_proj_qkv", "in_proj_z", "in_proj_b", "in_proj_a", "out_proj")
 _printed_device = False
 
 
@@ -64,7 +69,12 @@ class Backbone(nn.Module):
         self.tokenizer = AutoTokenizer.from_pretrained(name, padding_side="right")
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.model = AutoModel.from_pretrained(name, dtype=torch.bfloat16, attn_implementation="sdpa")
+        model = AutoModel.from_pretrained(name, dtype=torch.bfloat16, attn_implementation="sdpa")
+        # Qwen3.5 family: AutoModel resolves to the VL wrapper (.visual + .language_model) even for
+        # a text-only checkpoint -- see encode.py's Backbone for the long form. Take the text trunk.
+        if hasattr(model, "language_model") and hasattr(model, "visual"):
+            model = model.language_model
+        self.model = model
         self.model.requires_grad_(False)
         self.d = self.model.config.hidden_size
         n_layers = self.model.config.num_hidden_layers
@@ -74,9 +84,16 @@ class Backbone(nn.Module):
             self.model.layers = self.model.layers[:tap_layer]
             self.model.config.num_hidden_layers = tap_layer
             n_layers = tap_layer
+        self.info = {"n_layers": n_layers,
+                     "layer_types": list(getattr(self.model.config, "layer_types", None)
+                                          or ["full_attention"] * n_layers)[:n_layers]}
         if lora_r > 0:
             for layer in self.model.layers[-lora_layers:]:
-                for parent in (layer.self_attn, layer.mlp):
+                # Qwen3.5 linear_attention layers have linear_attn (Gated DeltaNet) instead of
+                # self_attn; mlp is present on every layer either way -- see encode.py's Backbone.
+                parents = [p for p in (getattr(layer, "self_attn", None), getattr(layer, "linear_attn", None),
+                                        getattr(layer, "mlp", None)) if p is not None]
+                for parent in parents:
                     for mod_name in _LORA_MODULES:
                         if hasattr(parent, mod_name):
                             setattr(parent, mod_name,

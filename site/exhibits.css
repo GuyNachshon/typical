@@ -1,246 +1,293 @@
-/* Typical v3 exhibits — SQL, DOC-20, RULES, ADS, COMPACTION reskinned onto the Gallery
-   system (style.css). No colour, no gradients, no shadows, no <select>/<input> chrome.
-   Probability is ink density only: ink bars (js/ink.js inkBars/stipple) and serif numerals.
-   Shared primitives below are reused across all five exhibits — one register/bar/hex
-   vocabulary, not five bespoke ones. */
+/* Typical v4 "Atoms" — exhibits.css: the single stylesheet for every demo module
+   (js/demos/{sql,doc-20,rules,ads,compaction}.js) and the shared game chrome
+   (js/games/loop.js). Self-contained: does not read style.css's custom properties, since
+   style.css is being rebuilt on the Atoms system in parallel — link this after style.css.
 
-.exhibit { display: flex; flex-direction: column; gap: 16px; }
-.exhibit, .exhibit * { text-wrap: pretty; }
+   Tokens verbatim from the Atoms style reference: obsidian #000 canvas, candlelight cream
+   #fff7dd text, champagne #c8ad86 accent (tags/emphasis/winner ONLY), ember ash #66635f
+   muted. Hairline borders at 20-30% cream. 4px radius on cards/buttons, 100px on pills.
+   Inter 400/500 at 10/12/14px. No shadows, no gradients, no glow, no load animation —
+   placed, not kinetic. No <select>/<input> chrome anywhere in here: conditions and
+   examples are ghost text links, at most one bordered "Run →" button per exhibit. */
 
-/* ---- chalk strip: one-line specimen (SQL query, etc.) ---- */
-.chalk-strip {
-  background: var(--color-chalk);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--color-ink);
-  overflow-x: auto;
-  white-space: nowrap;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap');
+
+:root {
+  --ex-black: #000000;
+  --ex-cream: #fff7dd;
+  --ex-champagne: #c8ad86;
+  --ex-ash: #66635f;
+  --ex-border: rgba(255, 247, 221, 0.22);
+  --ex-border-strong: rgba(255, 247, 221, 0.3);
+  --ex-cream-60: rgba(255, 247, 221, 0.6);
+  --ex-cream-70: rgba(255, 247, 221, 0.7);
+  --ex-track: rgba(255, 247, 221, 0.2);
+  --ex-font: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
-.chalk-strip .cond { font-weight: var(--weight-medium); }
 
-/* ---- ghost chip row (condition/question toggles) ---- */
-.chip-row { display: flex; flex-wrap: wrap; gap: 4px 20px; }
-.chip-ghost {
+/* ================================================================================
+   card shell — every exhibit and every game lives in one of these
+   ================================================================================ */
+.ex-card {
+  background: var(--ex-black);
+  border: 1px solid var(--ex-border);
+  border-radius: 4px;
+  padding: 20px;
+  box-sizing: border-box;
+}
+.ex-card--game { padding: 0; overflow: hidden; }
+
+/* ================================================================================
+   shared kit
+   ================================================================================ */
+.exhibit { display: flex; flex-direction: column; gap: 12px; font-family: var(--ex-font); color: var(--ex-cream); }
+.exhibit, .exhibit * { box-sizing: border-box; text-wrap: pretty; }
+
+/* hairline-separated row: label/text left, controls right */
+.ex-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ex-border);
+  font-size: 12px;
+  color: var(--ex-cream);
+}
+.ex-row:last-child { border-bottom: none; }
+.ex-row-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* tabular numeral */
+.ex-num { font-variant-numeric: tabular-nums; font-size: 14px; color: var(--ex-cream); text-align: right; flex: none; min-width: 32px; }
+
+/* pill tag — champagne outline, champagne text, 10px/500 */
+.ex-tag {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--ex-champagne);
+  border-radius: 100px;
+  padding: 3px 10px;
+  font-family: var(--ex-font);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18px;
+  text-transform: uppercase;
+  color: var(--ex-champagne);
+  background: none;
+  flex: none;
+}
+
+/* 2px track, cream fill; .is-winner swaps the fill to champagne */
+.ex-bar { position: relative; display: block; width: 72px; height: 2px; background: var(--ex-track); flex: none; }
+.ex-bar-fill { position: absolute; inset: 0 auto 0 0; width: 0%; background: var(--ex-cream); }
+.ex-bar-fill.is-winner { background: var(--ex-champagne); }
+.ex-bar--grow { flex: 1 1 auto; width: auto; min-width: 40px; }
+
+.ex-muted { color: var(--ex-cream-60); }
+.ex-dim { color: var(--ex-cream-70); }
+.ex-gold { color: var(--ex-champagne); }
+
+/* ghost text link — no box chrome, hover/active state shifts to champagne */
+.ex-ghost {
+  font-family: var(--ex-font);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ex-cream);
   background: none;
   border: none;
   padding: 0;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--color-graphite);
+  margin: 0;
   cursor: pointer;
   text-decoration: none;
-  border-bottom: 1px solid transparent;
 }
-.chip-ghost:hover { text-decoration: underline; }
-.chip-ghost[aria-pressed="true"] { color: var(--color-ink); font-weight: var(--weight-medium); }
+.ex-ghost:hover, .ex-ghost[aria-pressed='true'] { color: var(--ex-champagne); }
+.ex-ghost:disabled { color: var(--ex-ash); cursor: default; }
 
-/* ---- ghost icon button (rule reorder ↑/↓) ---- */
-.ghost-btn {
+.ex-chip-row { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+
+/* the one bordered button an exhibit is allowed — "Run →" */
+.ex-btn {
+  font-family: var(--ex-font);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ex-cream);
   background: none;
-  border: none;
-  padding: 2px 4px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--color-ink);
+  border: 1px solid var(--ex-border-strong);
+  border-radius: 4px;
+  padding: 6px 14px;
   cursor: pointer;
+  align-self: flex-start;
 }
-.ghost-btn:hover { text-decoration: underline; }
-.ghost-btn:disabled { color: var(--color-vellum); cursor: default; text-decoration: none; }
+.ex-btn:hover { border-color: var(--ex-champagne); color: var(--ex-champagne); }
+.ex-btn:disabled { color: var(--ex-ash); border-color: var(--ex-border); cursor: default; }
 
-/* ---- readout line ---- */
-.exhibit-readout {
-  font-family: var(--font-sans);
+/* line of running commentary under a register */
+.ex-readout { font-family: var(--ex-font); font-size: 12px; color: var(--ex-cream-70); margin: 0; }
+.ex-caption { font-family: var(--ex-font); font-size: 12px; color: var(--ex-cream-60); margin: 0; }
+
+/* details/summary "the prompt" ghost disclosure */
+.ex-details summary { font-family: var(--ex-font); font-size: 12px; color: var(--ex-cream-70); cursor: pointer; }
+.ex-details summary:hover { color: var(--ex-champagne); }
+.ex-details pre {
+  font-family: var(--ex-font);
+  font-size: 11px;
+  color: var(--ex-cream-70);
+  white-space: pre-wrap;
+  margin: 8px 0 0;
+}
+
+/* register scroll box (DOC-20 handbook) */
+.ex-scroll {
+  border: 1px solid var(--ex-border);
+  border-radius: 4px;
+  height: 200px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  font-family: var(--ex-font);
   font-size: 12px;
-  font-weight: var(--weight-medium);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-graphite);
-  margin: 0;
+  color: var(--ex-cream-70);
+  white-space: pre-wrap;
+  line-height: 1.5;
 }
 
-/* ---- register: hairline-separated rows, the base list type for all five exhibits ---- */
-.register { display: flex; flex-direction: column; }
-.reg-row {
-  display: grid;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 0;
-  border-bottom: 1px solid var(--color-vellum);
-  border-top: 1px solid transparent;
-}
-.register .reg-row:last-child { border-bottom: none; }
-.reg-row.scanning { border-top-color: var(--color-ink); }
+/* big numeral pair (DOC-20 timing) */
+.ex-stat-row { display: flex; gap: 32px; }
+.ex-stat { display: flex; flex-direction: column; gap: 2px; }
+.ex-stat-num { font-family: var(--ex-font); font-weight: 400; font-size: 44px; letter-spacing: -1.85px; line-height: 1.13; color: var(--ex-cream); }
+.ex-stat-label { font-family: var(--ex-font); font-size: 10px; letter-spacing: 0.18px; text-transform: uppercase; color: var(--ex-cream-60); }
 
-.reg-text {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--color-graphite);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ---- mini ink bar: 2px track, ink fill, width ∝ p (register rows) ---- */
-.reg-bar { position: relative; display: block; width: 72px; height: 2px; background: var(--color-vellum); flex: none; }
-.reg-bar-fill { position: absolute; inset: 0 auto 0 0; width: 0%; background: var(--color-ink); }
-.reg-numeral { font-family: var(--font-serif); font-size: 16px; text-align: right; flex: none; min-width: 34px; }
-
-/* ---- hexagon gold mark: filled = correct/keep, outline = wrong/drop ---- */
-.reg-hex { width: 12px; height: 12px; flex: none; }
-
-/* ---- caption (verbatim exhibit text) ---- */
-.exhibit-caption { font-size: 12px; color: var(--color-graphite); margin: 0; }
+/* hairline table (RULES 6x2 outcomes) */
+.ex-table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+.ex-table th, .ex-table td { border: 1px solid var(--ex-border); padding: 8px 10px; text-align: left; vertical-align: middle; }
+.ex-table th { font-family: var(--ex-font); font-size: 10px; font-weight: 500; letter-spacing: 0.18px; text-transform: uppercase; color: var(--ex-cream-60); }
+.ex-table td { font-family: var(--ex-font); font-size: 12px; color: var(--ex-cream); }
+.ex-cell { display: flex; align-items: center; gap: 8px; }
+.ex-cell-word { font-family: var(--ex-font); font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
 
 /* ================================================================================
    SQL
    ================================================================================ */
-.sql-register .reg-row { grid-template-columns: 1fr 72px 34px; }
+.sql-query { font-size: 12px; color: var(--ex-cream-70); margin: 0; overflow-x: auto; white-space: nowrap; }
+.sql-query .cond { color: var(--ex-champagne); }
+.sql-register { display: flex; flex-direction: column; max-height: 360px; overflow-y: auto; }
+.sql-register .ex-row { gap: 12px; }
 
 /* ================================================================================
    DOC-20
    ================================================================================ */
-.doc20-handbook {
-  background: var(--color-chalk);
-  border-radius: var(--radius-sm);
-  height: 240px;
-  overflow-y: auto;
-  padding: 12px 14px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  color: var(--color-graphite);
-  white-space: pre-wrap;
-  line-height: 1.6;
-}
-.doc20-register {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0 24px;
-}
-@media (min-width: 520px) {
-  .doc20-register { grid-template-columns: 1fr 1fr; }
-}
-.doc20-register .reg-row {
-  grid-template-columns: 1fr;
-  grid-template-rows: auto auto;
-  gap: 4px;
-  align-items: start;
-}
-.doc20-q { font-family: var(--font-sans); font-size: 12px; color: var(--color-ink); }
-.doc20-a-line { display: flex; align-items: center; gap: 8px; }
-.doc20-a {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: var(--weight-medium);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-graphite);
-}
-.doc20-p { font-family: var(--font-serif); font-size: 16px; margin-left: auto; }
-.doc20-timing { display: flex; gap: 40px; }
-.timing-pair { display: flex; flex-direction: column; gap: 2px; }
-.timing-numeral { font-family: var(--font-serif); font-size: 34px; line-height: 1; }
-.timing-label {
-  font-family: var(--font-sans);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-graphite);
-}
+.doc20-register { display: flex; flex-direction: column; }
+.doc20-q { font-size: 12px; color: var(--ex-cream-70); }
+.doc20-mark { font-size: 12px; flex: none; width: 10px; text-align: center; }
+.doc20-mark.hit { color: var(--ex-cream); }
+.doc20-mark.miss { color: var(--ex-ash); }
+.doc20-a { font-size: 12px; font-weight: 500; color: var(--ex-cream); flex: none; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
 
 /* ================================================================================
    RULES
    ================================================================================ */
-.rules-facts { list-style: none; padding: 0; margin: 0; counter-reset: fact; }
+.rules-facts { list-style: none; padding: 0; margin: 0; counter-reset: fact; display: flex; flex-direction: column; }
 .rules-facts li {
   counter-increment: fact;
-  font-family: var(--font-sans);
   font-size: 12px;
-  color: var(--color-graphite);
-  padding: 7px 0;
-  border-bottom: 1px solid var(--color-vellum);
+  color: var(--ex-cream-70);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ex-border);
 }
-.rules-facts li::before { content: counter(fact) '. '; color: var(--color-ink); }
 .rules-facts li:last-child { border-bottom: none; }
+.rules-facts li::before { content: counter(fact) '. '; color: var(--ex-cream); }
 
-.rules-order-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 0;
-  border-bottom: 1px solid var(--color-vellum);
-}
+.rules-order-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--ex-border); }
 .rules-order-row:last-child { border-bottom: none; }
-.rules-order-text { flex: 1; font-family: var(--font-sans); font-size: 12px; }
+.rules-order-text { flex: 1 1 auto; font-size: 12px; color: var(--ex-cream); }
+.rules-order-btns { display: flex; gap: 8px; flex: none; }
+.rules-order-btns .ex-ghost { font-size: 12px; }
 
-.rules-live-bars { margin: 8px 0; }
-
-.rules-table { border-collapse: collapse; width: 100%; table-layout: fixed; }
-.rules-table th, .rules-table td { border: 1px solid var(--color-vellum); padding: 0; text-align: left; }
-.rules-table th {
-  font-family: var(--font-sans);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-graphite);
-  padding: 6px 10px;
-  border-top: none;
-}
-.rules-cell {
-  position: relative;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-}
-.rules-cell canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.rules-cell-label {
-  position: relative;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: var(--weight-medium);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.rules-cell .reg-hex { position: relative; }
-.rules-applicant { font-family: var(--font-sans); font-size: 12px; padding: 8px 10px; }
+.rules-applicant { font-size: 12px; color: var(--ex-cream); }
+.ex-tag--flip { margin-left: 8px; }
 
 /* ================================================================================
    ADS
    ================================================================================ */
-.ads-register { display: flex; flex-direction: column; gap: 20px; }
-.ads-label { padding-bottom: 16px; border-bottom: 1px solid var(--color-vellum); }
-.ads-label:last-child { border-bottom: none; }
-.ads-label-text { font-family: var(--font-sans); font-size: 15px; margin: 0 0 10px; }
-.ads-decisions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
-.ads-gold { font-family: var(--font-sans); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-graphite); }
-.ads-tally { font-family: var(--font-serif); font-size: 20px; }
-.ads-prompt summary { font-family: var(--font-sans); font-size: 12px; color: var(--color-graphite); cursor: pointer; }
-.ads-prompt pre { font-family: var(--font-sans); font-size: 11px; color: var(--color-graphite); white-space: pre-wrap; margin: 10px 0 0; }
+.ads-tally { font-size: 14px; color: var(--ex-cream); margin: 0; }
+.ads-register { display: flex; flex-direction: column; }
+.ads-item { padding: 14px 0; border-bottom: 1px solid var(--ex-border); }
+.ads-item:last-child { border-bottom: none; }
+.ads-text { font-size: 14px; color: var(--ex-cream); margin: 0 0 8px; }
+.ads-decisions { display: flex; flex-direction: column; }
+.ads-gold { font-size: 10px; color: var(--ex-ash); margin-top: 6px; display: block; }
 
 /* ================================================================================
    COMPACTION
    ================================================================================ */
-.compaction-register .reg-row { grid-template-columns: 26px 1fr 130px 16px; }
-.compaction-index { font-family: var(--font-serif); font-size: 16px; color: var(--color-graphite); }
-.compaction-call {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.compaction-register { display: flex; flex-direction: column; max-height: 400px; overflow-y: auto; }
+.compaction-index { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--ex-cream-60); flex: none; min-width: 20px; }
+.compaction-call { font-size: 12px; color: var(--ex-cream); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compaction-mark { font-size: 10px; font-weight: 500; letter-spacing: 0.18px; text-transform: uppercase; flex: none; min-width: 34px; text-align: right; }
+.compaction-mark.keep { color: var(--ex-ash); }
+.compaction-mark.drop { color: var(--ex-ash); }
 
 /* ================================================================================
-   containment: let cards grow tall, no internal scrollbars except the doc-20 handbook
+   game chrome (js/games/loop.js) — HUD, policy/restart ghost links, decision strip
    ================================================================================ */
-.exhibit-mount { min-height: 0; max-height: none; overflow: visible; }
+.gc-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--ex-black);
+  color: var(--ex-cream);
+  font-family: var(--ex-font);
+  outline: none;
+}
+.gc-stage { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.gc-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.gc-hud {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18px;
+  text-transform: uppercase;
+  color: var(--ex-cream-70);
+  pointer-events: none;
+  z-index: 3;
+}
+.gc-hud div { margin-top: 2px; }
+.gc-controls { position: absolute; bottom: 10px; right: 10px; display: flex; gap: 14px; z-index: 3; }
+.gc-btn {
+  font-family: var(--ex-font);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18px;
+  text-transform: uppercase;
+  color: var(--ex-cream-70);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.gc-btn:hover { color: var(--ex-champagne); }
+.gc-btn.gc-on { color: var(--ex-champagne); }
+.gc-foot { flex: 0 0 auto; border-top: 1px solid var(--ex-border); padding: 10px 12px; }
+.gc-decision { display: flex; flex-direction: column; margin-bottom: 6px; }
+.gc-drow { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--ex-border); font-size: 12px; color: var(--ex-cream); }
+.gc-drow:last-child { border-bottom: none; }
+.gc-dlabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gc-dtrack { position: relative; display: block; width: 72px; height: 2px; background: var(--ex-track); flex: none; }
+.gc-dbar { position: absolute; inset: 0 auto 0 0; width: 0%; background: var(--ex-cream); }
+.gc-dbar.is-winner { background: var(--ex-champagne); }
+.gc-dnum { font-variant-numeric: tabular-nums; font-size: 14px; color: var(--ex-cream); text-align: right; flex: none; min-width: 32px; }
+.gc-sentence {
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--ex-cream-60);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.gc-root:focus .gc-stage { outline: 1px solid var(--ex-border-strong); outline-offset: -1px; }
 
-/* style.css's .gallery-grid uses CSS grid default align-items:stretch, which - now that
-   exhibits size to their real content instead of a clamped 420px box - stretches every
-   card in a row to match its tallest sibling (e.g. the short RULES card inheriting ADS's
-   full height as empty space). Cards should size to their own content. */
-.gallery-grid { align-items: start; }
+/* dev-harness grid only — not part of the page */
+.exhibits-dev-grid { display: grid; grid-template-columns: repeat(3, 370px); gap: 24px; }

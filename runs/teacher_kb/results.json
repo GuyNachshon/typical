@@ -1,0 +1,96 @@
+{
+  "T": 1.1242100350620867,
+  "val_nll": 0.9608710666808713,
+  "args": {
+    "name": "teacher_kb",
+    "backbone": "Qwen/Qwen3-1.7B-Base",
+    "lora_layers": 8,
+    "lora_r": 16,
+    "steps": 4000,
+    "bs": 64,
+    "lr": 0.0003,
+    "lora_lr": 0.0001,
+    "seed": 0,
+    "no_hybrid": false,
+    "no_cand_null": false,
+    "no_null": false,
+    "null": "softmax",
+    "hard_only": false,
+    "mix": "full",
+    "eval_every": 4000,
+    "val_every": 1000,
+    "ckpt_every": 2000,
+    "eval_bs": 128,
+    "device": "auto",
+    "wandb": true,
+    "hf_repo": "guychuk/pcdm-runs",
+    "data": "data_kb",
+    "extra_data": null,
+    "smoke": false,
+    "eval_limit": 0,
+    "tap_layer": 0,
+    "zscore": false,
+    "eval_only": false,
+    "dump_logits": null,
+    "tower_d": 512,
+    "tower_layers": 2,
+    "tower_heads": 8,
+    "joint": false,
+    "listwise": false,
+    "extra_tap": 0,
+    "init_from": "runs/mcq_lora/best.pt",
+    "readout": "mcq",
+    "zero_shot": false,
+    "shots": 0,
+    "cand_encoder": "backbone",
+    "head": "mlp",
+    "z_dim": 128,
+    "z_probes": 8,
+    "tiny_layers": 2,
+    "distill_alpha": 1.0,
+    "distill_beta": 0.0,
+    "distill_T": 2.0
+  },
+  "eval": {
+    "mmlu_pro": {
+      "raw": {
+        "nll": 2.2967820464714843,
+        "brier": 0.8452429291840249,
+        "jsd": 0.4445953406182541,
+        "acc": 0.2941666666666667,
+        "acc_k": 0.31,
+        "ece": 0.12928381194670996,
+        "sel_acc80": 0.3416666666666667
+      },
+      "scaled": {
+        "nll": 2.2262005250513757,
+        "brier": 0.8356228971431026,
+        "jsd": 0.4472643508425218,
+        "acc": 0.2941666666666667,
+        "acc_k": 0.31,
+        "ece": 0.09979800758883357,
+        "sel_acc80": 0.33958333333333335
+      }
+    },
+    "truthfulqa_mc1": {
+      "raw": {
+        "nll": 3.2109843342756337,
+        "brier": 1.0022084138443568,
+        "jsd": 0.4289657539823721,
+        "acc": 0.32068543451652387,
+        "acc_k": 0.42472460220318237,
+        "ece": 0.3267964316917312,
+        "sel_acc80": 0.3394495412844037
+      },
+      "scaled": {
+        "nll": 2.9587220950305104,
+        "brier": 0.9884254328698904,
+        "jsd": 0.4286723797805005,
+        "acc": 0.32068543451652387,
+        "acc_k": 0.42472460220318237,
+        "ece": 0.3017014688567111,
+        "sel_acc80": 0.3409785932721712
+      }
+    }
+  }
+}
