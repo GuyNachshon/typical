@@ -67,19 +67,76 @@ export function describeDoom(state) {
   return sentences.join(' ');
 }
 
+// explore navigator: forward + wall-follow, plus a stuck-timer escape. Pure wall-following
+// (fixed turn preference) loops around whichever room it starts in almost indefinitely on
+// E1M1 - state.monsters carries dist/bearing for the nearest thinkers map-wide even when
+// they're behind walls (P_CheckSight/visible is what's withheld from the model's sentence,
+// not from the engine), so a wall-hit turns toward the nearest one's side instead of a fixed
+// direction. That's still "the engine aims", not the model - it only decides the intent.
+// State is module-level (one page, one player) - resetNav() clears it on restart.
+let navBias = 1; // 1 = right, -1 = left; the stuck-escape direction, flips when stuck
+let navHist = []; // rolling {x, y, t} samples covering the last STUCK_MS - a corner where the
+// player alternates turnLock direction can still cover >32 units step to step (bouncing
+// between two points a wall-width apart), so "progress" is a bounding box over a time window,
+// not distance from the last sample.
+let navForce = 0; // ticks left in a forced stuck-escape turn
+let turnLock = 0; // 0 outside a wall encounter, else the direction (1/-1) picked for its whole duration
+const STUCK_MS = 6000;
+const STUCK_RADIUS = 150; // bounding-box diagonal of the last STUCK_MS of positions, below this = no real progress
+const FORCE_TURN_TICKS = 5; // ~5 * KEY_FOR_MOVE['turn right'][1] (180ms) holds ~= a 90 degree turn
+
+export function resetNav() {
+  navBias = 1;
+  navHist = [];
+  navForce = 0;
+  turnLock = 0;
+}
+
+function exploreAction(state, now = Date.now()) {
+  navHist.push({ x: state.x, y: state.y, t: now });
+  while (navHist.length > 1 && now - navHist[0].t > STUCK_MS) navHist.shift();
+  if (navForce === 0 && now - navHist[0].t >= STUCK_MS) {
+    const xs = navHist.map((p) => p.x);
+    const ys = navHist.map((p) => p.y);
+    const span = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+    if (span < STUCK_RADIUS) {
+      navBias = -navBias; // no real progress in 6s - force-turn the other way
+      navForce = FORCE_TURN_TICKS;
+      turnLock = 0; // the stuck escape overrides whatever the wall encounter had picked
+      navHist = [{ x: state.x, y: state.y, t: now }];
+    }
+  }
+  if (navForce > 0) {
+    navForce -= 1;
+    return navBias > 0 ? 'turn right' : 'turn left';
+  }
+  if (state.blocked_ahead) {
+    // Pick (and keep) one turn direction for this whole wall encounter - recomputing it every
+    // tick from the target's bearing oscillates left/right forever right at a corner, where the
+    // bearing sign flips as the player's own angle changes.
+    if (turnLock === 0) {
+      const nearest = (state.monsters ?? []).reduce((best, m) => (best == null || m.dist < best.dist ? m : best), null);
+      turnLock = nearest ? (((nearest.bearing ?? 0) >= 0) ? 1 : -1) : navBias;
+    }
+    return turnLock > 0 ? 'turn right' : 'turn left';
+  }
+  turnLock = 0;
+  return 'move forward';
+}
+
 // Intent -> key press (the engine aims; the page says so). Raw actions pass through for the
 // human override.
 export function resolveIntent(state, move) {
   if (!INTENTS.includes(move)) return move;
-  const forward = state.blocked_ahead ? 'turn right' : 'move forward';
   if (move === 'retreat') return 'move back';
   const target = inSight(state)[0];
   if (move === 'engage' && target) {
     const b = target.bearing ?? 0;
-    if (target.in_crosshair || Math.abs(b) <= CROSSHAIR_DEG) return (state.ammo ?? 0) > 0 ? 'shoot' : forward;
+    if (target.in_crosshair || Math.abs(b) <= CROSSHAIR_DEG) return (state.ammo ?? 0) > 0 ? 'shoot' : 'move forward';
     return b < 0 ? 'turn left' : 'turn right';
   }
-  return forward;
+  if (move === 'explore') return exploreAction(state);
+  return state.blocked_ahead ? 'turn right' : 'move forward';
 }
 
 // Scripted policy = RULES applied literally (never calls the model) -> an intent.

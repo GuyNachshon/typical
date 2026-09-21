@@ -4,7 +4,7 @@
 // demo-spec-v2.md #5 found the model says "shoot" 29/30 times regardless of state on that
 // engine, and this card lets the same failure play out against id's actual E1M1.
 import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, loadJSON, scoreboardLine } from './loop.js';
-import { candidatesFor, describeDoom, scriptedPolicy, resolveIntent, KEY_FOR_MOVE } from './realdoom-logic.js';
+import { candidatesFor, describeDoom, scriptedPolicy, resolveIntent, resetNav, KEY_FOR_MOVE } from './realdoom-logic.js';
 import { QUESTION } from './doom.js';
 
 const TICK_MS = 400;
@@ -114,6 +114,7 @@ export async function mount(el, { decide, mode } = {}) {
     shots = 0;
     decisions = 0;
     agreed = 0;
+    resetNav();
     doom.releaseAll();
     doom.newGame(3);
     kills = 0;

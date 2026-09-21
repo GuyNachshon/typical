@@ -32,6 +32,8 @@ export function mountChrome(el, { label } = {}) {
   hud.className = 'gc-hud';
   hud.textContent = label ?? '';
 
+  stage.append(hud);
+
   const controls = document.createElement('div');
   controls.className = 'gc-controls';
   const policyBtn = document.createElement('button');
@@ -43,18 +45,21 @@ export function mountChrome(el, { label } = {}) {
   restartBtn.textContent = 'Restart';
   controls.append(policyBtn, restartBtn);
 
-  stage.append(hud, controls);
-
   const foot = document.createElement('div');
   foot.className = 'gc-foot';
+  // hint + MODEL/RESTART share one row below the canvas, not overlaid on it - the overlay used
+  // to sit on top of the canvas and could cover an engine's own status bar (DOOM's HUD).
+  const footTop = document.createElement('div');
+  footTop.className = 'gc-foot-top';
   const hint = document.createElement('div');
   hint.className = 'gc-hint';
   hint.textContent = '← → ↑ ↓ to take over · the model resumes after 3 s';
+  footTop.append(hint, controls);
   const decision = document.createElement('div');
   decision.className = 'gc-decision';
   const sentence = document.createElement('div');
   sentence.className = 'gc-sentence';
-  foot.append(hint, decision, sentence);
+  foot.append(footTop, decision, sentence);
 
   el.append(stage, foot);
 

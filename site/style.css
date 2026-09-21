@@ -88,9 +88,10 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
 
 .section { padding: var(--section-gap) 0; }
 .section-title {
-  font-size: 26px;
+  font-size: var(--text-heading);
   font-weight: var(--weight-regular);
-  letter-spacing: -0.4px;
+  letter-spacing: var(--tracking-heading);
+  line-height: 1.13;
   margin: 0 0 var(--spacing-8);
 }
 .section-lede {
@@ -130,6 +131,8 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
   text-transform: uppercase;
   color: var(--color-champagne);
 }
+/* live/static indicator (js/api.js fills the text) - static reads muted, live keeps the accent */
+.pill.mode-static { border-color: var(--color-cream-20); color: var(--color-cream-70); }
 
 /* ---- card ---- */
 .card {
@@ -175,7 +178,7 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
   color: var(--color-cream);
   white-space: nowrap;
 }
-.nav-links a:hover { color: var(--color-champagne); }
+.nav-links a:hover, .nav-links a[aria-current] { color: var(--color-champagne); }
 
 /* ================================================================================
    HERO
@@ -197,6 +200,13 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
   gap: 3px;
   width: min(300px, 42vw);
   aspect-ratio: 1;
+}
+.mark-caption {
+  /* .hero's flex gap (32px) is too far from the mark for a caption - pull it back in */
+  margin: -24px 0 0;
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-caption);
+  color: var(--color-cream-70);
 }
 .mark-tile {
   background: var(--color-champagne);
@@ -334,6 +344,8 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
   margin-bottom: var(--spacing-32);
 }
 .code-block pre { margin: 0; color: var(--color-cream); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.code-block pre a { color: var(--color-champagne); border-bottom: 1px solid var(--color-cream-20); }
+.code-block pre a:hover { color: var(--color-cream); border-color: var(--color-cream); }
 .code-block .dim { color: var(--color-cream-70); margin: 0 0 var(--spacing-8); }
 
 .verified-copy { font-size: var(--text-body); max-width: 720px; margin: 0 0 var(--spacing-24); }
@@ -379,28 +391,21 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
      pushes the whole card past its column instead of being clipped/wrapped by it. */
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--spacing-24);
+  /* dense: an expanded card bumped to the next row (below) backfills the row it left behind
+     with the next card instead of leaving a hole there. */
+  grid-auto-flow: dense;
 }
 .exhibit-card { display: flex; flex-direction: column; gap: var(--spacing-8); align-items: flex-start; min-width: 0; }
 .exhibit-card, .exhibit-card > * { max-width: 100%; }
+/* an open exhibit takes the full row so its content (e.g. the Rules 6-applicant table) has
+   room, instead of being squeezed into a 1/3-width column and clipped. */
+.exhibit-card:has(.exhibit-body:not([hidden])) { grid-column: 1 / -1; }
 .exhibit-card h3 { font-size: var(--text-body); font-weight: var(--weight-medium); margin: 0; }
 .exhibit-card p { font-size: 12px; color: var(--color-cream-70); margin: 0; }
 .exhibit-body { width: 100%; margin-top: var(--spacing-16); }
 .exhibit-body[hidden] { display: none; }
 .exhibit-list { margin: 0; padding-left: 16px; font-size: 12px; color: var(--color-cream-70); }
 .exhibit-list li { margin-bottom: 4px; }
-
-/* ================================================================================
-   LIMITS
-   ================================================================================ */
-.limits-register { display: flex; flex-direction: column; }
-.limits-register li {
-  list-style: none;
-  font-size: var(--text-body);
-  padding: var(--spacing-16) 0;
-  border-bottom: 1px solid var(--color-cream-10);
-  max-width: 90ch;
-}
-.limits-register { padding: 0; margin: 0; }
 
 /* ================================================================================
    GET STARTED / footer
@@ -426,6 +431,10 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
    demo module containment — internals reskinned by another track; we only own the box
    ================================================================================ */
 [data-demo], [data-game] { width: 100%; overflow: hidden; }
+/* Rules' 6-applicant table needs to be able to wrap instead of clip - the card now expands to
+   the full grid row (above) so there's room; this just stops the generic containment rule from
+   pre-clipping it anyway. */
+[data-demo="rules"] { overflow: visible; }
 .demo-offline { font-size: 12px; color: var(--color-cream-70); padding: 24px; text-align: center; }
 
 /* ================================================================================
@@ -438,9 +447,34 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
   .nav-links a { font-size: 11px; }
   :root { --nav-h: 96px; }
   .hero-headline { font-size: 32px; }
+  .section-title { font-size: 32px; letter-spacing: -1.2px; }
   .stat-grid, .how-grid, .games-grid, .exhibits-grid, .reliability-row { grid-template-columns: minmax(0, 1fr); }
   .chart-row .chart { flex-basis: 100%; }
   .results-table-col { flex-basis: 100%; }
+}
+
+/* results tables at <=600px: one hairline block per model (label/value rows) instead of a
+   7-column table that breaks digits. td::before reads the data-label shell.js stamped on each
+   cell. */
+@media (max-width: 600px) {
+  .results-table thead { display: none; }
+  .results-table, .results-table tbody, .results-table tr, .results-table td { display: block; width: 100%; }
+  .results-table tr { padding: var(--spacing-8) 0; border-bottom: 1px solid var(--color-cream-10); }
+  .results-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--spacing-16);
+    padding: 3px 0;
+    border-bottom: none;
+  }
+  .results-table td::before {
+    content: attr(data-label);
+    color: var(--color-champagne);
+    font-size: var(--text-caption);
+    letter-spacing: var(--tracking-caption);
+    text-transform: uppercase;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

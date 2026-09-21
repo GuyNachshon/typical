@@ -19,37 +19,35 @@ decision state, with nothing generated.
  state tokens (≤1,024 tok)
                                │
                                ▼
- ┌──────────────────────────────────────────────────────────────────────┐
- │ frozen Qwen3 trunk, truncated at the tap layer               │
- │   typical-small (1.7B): layer 20 / 28                        │
- │   typical-medium (4B):  layer 26 / 36           (≈71% depth) │
- │ LoRA r16 on the top 8 kept layers, rest frozen               │
- └──────────────────────────────────────────────│───────────────────────────────────┘
+ ┌─────────────────────────────────────────────────────┐
+ │ frozen Qwen3 trunk, truncated at the tap layer      │
+ │   typical-small (1.7B): layer 20 / 28               │
+ │   typical-medium (4B):  layer 26 / 36  (≈71% depth) │
+ │ LoRA r16 on the top 8 kept layers, rest frozen      │
+ └─────────────────────────────────────────────────────┘
                                │
                                │   KV cache — the state is computed once, reused per query
                                │
                                │   per query: a short rendered suffix is appended to the cache
                                │   "<question>  <letters_nonull candidates>"
                                ▼
- ┌───────────────────────────────────────────────────────────────────┐
+ ┌───────────────────────────────────────────────────────────────┐
  │ contextual readout (nc_head = n3)                             │
  │ terminal decision state h_D + per-candidate contextual states │
- └───────────────────────────────────────────────────────────────────┘
+ └───────────────────────────────────────────────────────────────┘
                                │
-         ┌────────────────────│─────────────────────────────────┐
-         ▼                     ▼                         ▼
-  ┌───────────┐      ┌────────────────┐      ┌─────────────────┐
-  │ Choice     │      │ Noul            │      │ Score            │
-  │ softmax    │      │ Bernoulli       │      │ K-way softmax,   │
-  │ over K     │      │ P(yes)=σ(w·h_D) │      │ ordinal-smoothed │
-  │ candidates │      │ query-only      │      │ targets (τ=0.7), │
-  │ + factored │      │ suffix, no      │      │ reports E[index] │
-  │ ∅ (a head  │      │ rendered        │      │ + factored ∅     │
-  │ decision,  │      │ candidates —    │      │                  │
-  │ not a      │      │ exactly order-  │      │                  │
-  │ rendered   │      │ invariant by    │      │                  │
-  │ line)      │      │ construction    │      │                  │
-  └───────────┘      └────────────────┘      └─────────────────┘
+                   ┌────────────────────────────│───────────────────────────┐
+                   ▼                            ▼                           ▼
+         ┌───────────────────┐      ┌──────────────────────┐      ┌──────────────────┐
+         │ Choice            │      │ Noul                 │      │ Score            │
+         │ softmax over K    │      │ Bernoulli            │      │ K-way softmax,   │
+         │ candidates        │      │ P(yes)=σ(w·h_D)      │      │ ordinal-smoothed │
+         │ + factored ∅      │      │ query-only suffix,   │      │ targets (τ=0.7), │
+         │ (a head decision, │      │ no rendered          │      │ reports E[index] │
+         │ not a rendered    │      │ candidates — exactly │      │ + factored ∅     │
+         │ line)             │      │ order-invariant      │      │                  │
+         │                   │      │ by construction      │      │                  │
+         └───────────────────┘      └──────────────────────┘      └──────────────────┘
 ```
 
 *Fig. 1. Typical forward pass, state to probabilities.*
@@ -189,7 +187,7 @@ conditioned on non-∅; hard tier at chance for both models.
 ```chart timeline
 ```
 
-The line is not monotone. The .750 → .694 drop at the typical-small step is a real trade
+The JevBench line dips before it climbs. The .750 → .694 drop at the typical-small step is a real trade
 ([§3ae](https://huggingface.co/OzLabs/typical-small)): DecisionMix v2 and the typed heads raise
 held-out noul/score/flip and clear the PagerDuty floor for both models (.817 / .838 vs .792), at the
 cost of about 1 SE of JevBench standard. jevlogs (research-licensed, caveated) is marginal for small
@@ -220,7 +218,7 @@ conditioned on non-∅; hard tier at chance for both models.
    cleared by both released models (.817 / .838 vs .792). jevlogs (research-licensed, caveated) is
    marginal for small (.710 vs .697) and below floor for medium (.673). (REPORT §3w, §3x)
 
-4. **Mixing is a first-class variable.** E .45–.50 restores evidence. ∅-augmented W rows fix
+4. **The bucket mix (E/K/W/U) moves accuracy as much as an architecture change.** E .45–.50 restores evidence. ∅-augmented W rows fix
    abstention and MMLU, which no single eval-time null threshold can do for E and W at once. The
    exact W fraction in [.1, .2] does not matter once null augmentation is on.
    (REPORT §3y, §3z, §3aa)
@@ -240,8 +238,8 @@ conditioned on non-∅; hard tier at chance for both models.
    Held-out families/grammars +34–37, rubric-flip .48 → .71, JevBench adversarial .33 → .83
    (intermediate checkpoints r1_cand → r1_dmv2, §3ad, not released; released models' wh_heldout,
    charted below: typical-small .836/.898/.896, typical-medium .874/.893/.891). Level-7 composition (temporal, unit, expected-value, trade-off) sits at ~.50,
-   chance, for every checkpoint on the ladder. The U corpus buys likelihood, not top-1 accuracy.
-   (REPORT §3ad)
+   chance, for every checkpoint on the ladder. The U corpus improves likelihood without improving
+   top-1 accuracy. (REPORT §3ad)
 
 8. **The same recipe at 1.7B → 4B → 14B lifts standard-tier accuracy, knowledge, and
    in-distribution workflow decisions monotonically at roughly constant latency.** JevBench
@@ -250,8 +248,8 @@ conditioned on non-∅; hard tier at chance for both models.
    recipe at every size, none released; typical-small/typical-medium use a later recipe and score
    .694 / .806). 8B is a checkpoint outlier in both frozen and trained form.
    Long-state families and soft-target calibration do not scale: the frozen 14B with three shots
-   beats the trained 14B on the hard tier (.559 vs. .468), so the hard tier is a data/objective
-   problem at every size, not a capacity one. (REPORT §3ab)
+   beats the trained 14B on the hard tier (.559 vs. .468). The hard tier's failure comes from data
+   and objective at every size we tested, and model capacity does not fix it. (REPORT §3ab)
 
 ### Held-out curriculum vs. external, never-trained sets
 
@@ -400,12 +398,17 @@ which declare no license on their HF cards.
 
 ## Reproduce
 
+The public inference package ships inside the model repos on Hugging Face; there is no separate
+GitHub repo yet.
+
 ```bash
-pip install -r inference/requirements.txt
+pip install huggingface_hub
+hf download OzLabs/typical-small --include "inference/*" --local-dir typical
+pip install -r typical/inference/requirements.txt
 ```
 
 ```python
-from typical import Typical  # inference/typical/, downloaded alongside your code
+from typical import Typical  # typical/inference/typical/, from the hf download above
 
 m = Typical.from_pretrained("OzLabs/typical-small", device="auto")
 
@@ -419,8 +422,9 @@ m.noul(state, "Is the order still under warranty?")
 m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])
 ```
 
-Inference code is public under `inference/`; training code release to follow. The commands below are
-verbatim from the release cards.
+Inference code is public under
+[`inference/`](https://huggingface.co/OzLabs/typical-small/tree/main/inference); training code
+release to follow. The commands below are verbatim from the release cards.
 
 ### Held-out workflow / external eval reproduction
 

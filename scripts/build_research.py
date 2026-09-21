@@ -37,13 +37,16 @@ TEMPLATE = """<!doctype html>
 </head>
 <body>
 
-<nav class="research-nav">
-  <a class="research-nav-word" href="index.html">Typical</a>
-  <div class="research-nav-links">
-    <a href="index.html#results">Results</a>
-    <a href="index.html#demos">Demos</a>
-    <a href="research.html" aria-current="page">Research</a>
-    <a href="https://huggingface.co/OzLabs" target="_blank" rel="noopener">Hugging Face &rarr;</a>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="index.html">Typical</a>
+    <div class="nav-links">
+      <a href="index.html#results">Results</a>
+      <a href="index.html#demos">Demos</a>
+      <a href="research.html" aria-current="page">Research</a>
+      <a href="https://huggingface.co/OzLabs/typical-small/tree/main/inference" target="_blank" rel="noopener">Code &rarr;</a>
+      <a href="https://huggingface.co/OzLabs" target="_blank" rel="noopener">Hugging Face &rarr;</a>
+    </div>
   </div>
 </nav>
 

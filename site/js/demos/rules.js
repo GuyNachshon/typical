@@ -37,9 +37,11 @@ export async function mount(host, ctx) {
   const wrap = el('div', 'exhibit rules-exhibit');
 
   // ---- panel 1: facts, reorderable rules, live outcome ----
+  // Two columns above 480px, one below - a CSS media query (exhibits.css), not a one-time width
+  // measurement here: the old inline-style version measured host width once at mount and never
+  // updated on resize, so a card mounted wide and then resized narrow (e.g. expanded at a wide
+  // viewport, then the window/device shrinks) kept a stale 2-column grid and overflowed.
   const panel1 = el('div', 'rules-panel1');
-  panel1.style.cssText = 'display:grid;grid-template-columns:1fr;gap:24px;';
-  if (host.getBoundingClientRect().width > 480) panel1.style.gridTemplateColumns = '1fr 1fr';
 
   const left = el('div');
   left.appendChild(el('p', 'ex-subhead', 'The facts (fixed)'));

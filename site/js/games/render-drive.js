@@ -12,6 +12,13 @@ const TICK_MS = 400;
 const LANES = 3;
 const LANE_W = 3.2;
 
+// Follow camera: shallower than straight-down (CAM_HEIGHT small next to CAM_BACK+CAM_AHEAD) so
+// more road depth fits in the same ortho frustum (see resize()'s viewSize comment) - lane
+// dashes and traffic still read fine at this angle, see resize().
+const CAM_HEIGHT = 5;
+const CAM_BACK = 10; // m behind the ego the camera sits
+const CAM_AHEAD = 8; // m ahead of the ego the camera looks at (frustum centre)
+
 const KEYMAP = {
   ArrowLeft: 'change lane left', ArrowRight: 'change lane right',
   ArrowUp: 'accelerate', ArrowDown: 'brake', ' ': 'stop',
@@ -269,7 +276,13 @@ export async function mount(el, { decide, mode } = {}) {
     const h = Math.max(1, rect.height);
     renderer.setSize(w, h, false);
     const aspect = w / h;
-    const viewSize = 24;
+    // viewSize picked so the 9.6m-wide road fills ~60% of the card width at the card's live
+    // aspect (~1.18): 9.6 / (0.6 * 1.18) ~= 13.6. Paired with CAM_HEIGHT/CAM_BACK/CAM_AHEAD
+    // below (a shallower camera than a pure top-down one) so ~55m ahead/~15m behind still fit
+    // in that same vertical frustum - full ortho math ties width and depth to one viewSize, so
+    // 60% width and 120m/30m depth (the original ask) don't both fit without the camera going
+    // near-horizontal, which makes tall props (light posts, cars) float off their true depth.
+    const viewSize = 5;
     camera.left = (-viewSize * aspect) / 2;
     camera.right = (viewSize * aspect) / 2;
     camera.top = viewSize / 2;
@@ -288,8 +301,8 @@ export async function mount(el, { decide, mode } = {}) {
     const egoZ = lerp(pe.position, ce.position, t);
     egoMesh.position.set(egoX, 0, egoZ);
 
-    camera.position.set(egoX, 20, egoZ - 15);
-    camera.lookAt(egoX, 0, egoZ + 6);
+    camera.position.set(egoX, CAM_HEIGHT, egoZ - CAM_BACK);
+    camera.lookAt(egoX, 0, egoZ + CAM_AHEAD);
 
     const traffic = ensurePool(trafficPool, buildTrafficCar, currState.traffic.length);
     currState.traffic.forEach((car, i) => {

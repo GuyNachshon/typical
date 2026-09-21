@@ -10,13 +10,16 @@
 </head>
 <body>
 
-<nav class="research-nav">
-  <a class="research-nav-word" href="index.html">Typical</a>
-  <div class="research-nav-links">
-    <a href="index.html#results">Results</a>
-    <a href="index.html#demos">Demos</a>
-    <a href="research.html" aria-current="page">Research</a>
-    <a href="https://huggingface.co/OzLabs" target="_blank" rel="noopener">Hugging Face &rarr;</a>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="wordmark" href="index.html">Typical</a>
+    <div class="nav-links">
+      <a href="index.html#results">Results</a>
+      <a href="index.html#demos">Demos</a>
+      <a href="research.html" aria-current="page">Research</a>
+      <a href="https://huggingface.co/OzLabs/typical-small/tree/main/inference" target="_blank" rel="noopener">Code &rarr;</a>
+      <a href="https://huggingface.co/OzLabs" target="_blank" rel="noopener">Hugging Face &rarr;</a>
+    </div>
   </div>
 </nav>
 
@@ -55,37 +58,35 @@ decision state, with nothing generated.</p>
 <pre><code class="language-text"> state tokens (≤1,024 tok)
                                │
                                ▼
- ┌──────────────────────────────────────────────────────────────────────┐
- │ frozen Qwen3 trunk, truncated at the tap layer               │
- │   typical-small (1.7B): layer 20 / 28                        │
- │   typical-medium (4B):  layer 26 / 36           (≈71% depth) │
- │ LoRA r16 on the top 8 kept layers, rest frozen               │
- └──────────────────────────────────────────────│───────────────────────────────────┘
+ ┌─────────────────────────────────────────────────────┐
+ │ frozen Qwen3 trunk, truncated at the tap layer      │
+ │   typical-small (1.7B): layer 20 / 28               │
+ │   typical-medium (4B):  layer 26 / 36  (≈71% depth) │
+ │ LoRA r16 on the top 8 kept layers, rest frozen      │
+ └─────────────────────────────────────────────────────┘
                                │
                                │   KV cache — the state is computed once, reused per query
                                │
                                │   per query: a short rendered suffix is appended to the cache
                                │   &quot;&lt;question&gt;  &lt;letters_nonull candidates&gt;&quot;
                                ▼
- ┌───────────────────────────────────────────────────────────────────┐
+ ┌───────────────────────────────────────────────────────────────┐
  │ contextual readout (nc_head = n3)                             │
  │ terminal decision state h_D + per-candidate contextual states │
- └───────────────────────────────────────────────────────────────────┘
+ └───────────────────────────────────────────────────────────────┘
                                │
-         ┌────────────────────│─────────────────────────────────┐
-         ▼                     ▼                         ▼
-  ┌───────────┐      ┌────────────────┐      ┌─────────────────┐
-  │ Choice     │      │ Noul            │      │ Score            │
-  │ softmax    │      │ Bernoulli       │      │ K-way softmax,   │
-  │ over K     │      │ P(yes)=σ(w·h_D) │      │ ordinal-smoothed │
-  │ candidates │      │ query-only      │      │ targets (τ=0.7), │
-  │ + factored │      │ suffix, no      │      │ reports E[index] │
-  │ ∅ (a head  │      │ rendered        │      │ + factored ∅     │
-  │ decision,  │      │ candidates —    │      │                  │
-  │ not a      │      │ exactly order-  │      │                  │
-  │ rendered   │      │ invariant by    │      │                  │
-  │ line)      │      │ construction    │      │                  │
-  └───────────┘      └────────────────┘      └─────────────────┘
+                   ┌────────────────────────────│───────────────────────────┐
+                   ▼                            ▼                           ▼
+         ┌───────────────────┐      ┌──────────────────────┐      ┌──────────────────┐
+         │ Choice            │      │ Noul                 │      │ Score            │
+         │ softmax over K    │      │ Bernoulli            │      │ K-way softmax,   │
+         │ candidates        │      │ P(yes)=σ(w·h_D)      │      │ ordinal-smoothed │
+         │ + factored ∅      │      │ query-only suffix,   │      │ targets (τ=0.7), │
+         │ (a head decision, │      │ no rendered          │      │ reports E[index] │
+         │ not a rendered    │      │ candidates — exactly │      │ + factored ∅     │
+         │ line)             │      │ order-invariant      │      │                  │
+         │                   │      │ by construction      │      │                  │
+         └───────────────────┘      └──────────────────────┘      └──────────────────┘
 </code></pre>
 <p><em>Fig. 1. Typical forward pass, state to probabilities.</em></p>
 <h3 id="a-why-mid-depth-not-the-last-layer">a) Why mid-depth, not the last layer</h3>
@@ -192,7 +193,7 @@ probe/jev/bench/zero-shot/smoke/dump/leak/kb-audit, so baselines and ablations a
 conditioned on non-∅; hard tier at chance for both models.</p>
 <div class="chart chart-wide" id="chart-timeline" data-chart="timeline"></div>
 
-<p>The line is not monotone. The .750 → .694 drop at the typical-small step is a real trade
+<p>The JevBench line dips before it climbs. The .750 → .694 drop at the typical-small step is a real trade
 (<a href="https://huggingface.co/OzLabs/typical-small">§3ae</a>): DecisionMix v2 and the typed heads raise
 held-out noul/score/flip and clear the PagerDuty floor for both models (.817 / .838 vs .792), at the
 cost of about 1 SE of JevBench standard. jevlogs (research-licensed, caveated) is marginal for small
@@ -224,7 +225,7 @@ conditioned on non-∅; hard tier at chance for both models.</p>
    marginal for small (.710 vs .697) and below floor for medium (.673). (REPORT §3w, §3x)</p>
 </li>
 <li>
-<p><strong>Mixing is a first-class variable.</strong> E .45–.50 restores evidence. ∅-augmented W rows fix
+<p><strong>The bucket mix (E/K/W/U) moves accuracy as much as an architecture change.</strong> E .45–.50 restores evidence. ∅-augmented W rows fix
    abstention and MMLU, which no single eval-time null threshold can do for E and W at once. The
    exact W fraction in [.1, .2] does not matter once null augmentation is on.
    (REPORT §3y, §3z, §3aa)</p>
@@ -247,8 +248,8 @@ conditioned on non-∅; hard tier at chance for both models.</p>
    Held-out families/grammars +34–37, rubric-flip .48 → .71, JevBench adversarial .33 → .83
    (intermediate checkpoints r1_cand → r1_dmv2, §3ad, not released; released models' wh_heldout,
    charted below: typical-small .836/.898/.896, typical-medium .874/.893/.891). Level-7 composition (temporal, unit, expected-value, trade-off) sits at ~.50,
-   chance, for every checkpoint on the ladder. The U corpus buys likelihood, not top-1 accuracy.
-   (REPORT §3ad)</p>
+   chance, for every checkpoint on the ladder. The U corpus improves likelihood without improving
+   top-1 accuracy. (REPORT §3ad)</p>
 </li>
 <li>
 <p><strong>The same recipe at 1.7B → 4B → 14B lifts standard-tier accuracy, knowledge, and
@@ -258,8 +259,8 @@ conditioned on non-∅; hard tier at chance for both models.</p>
    recipe at every size, none released; typical-small/typical-medium use a later recipe and score
    .694 / .806). 8B is a checkpoint outlier in both frozen and trained form.
    Long-state families and soft-target calibration do not scale: the frozen 14B with three shots
-   beats the trained 14B on the hard tier (.559 vs. .468), so the hard tier is a data/objective
-   problem at every size, not a capacity one. (REPORT §3ab)</p>
+   beats the trained 14B on the hard tier (.559 vs. .468). The hard tier's failure comes from data
+   and objective at every size we tested, and model capacity does not fix it. (REPORT §3ab)</p>
 </li>
 </ol>
 <h3 id="held-out-curriculum-vs-external-never-trained-sets">Held-out curriculum vs. external, never-trained sets</h3>
@@ -430,9 +431,13 @@ licenses: <code>facebook/anli</code> (CC BY-NC 4.0, loaded for train_r1–r3), w
 flagged as a non-commercial blocker, and <code>metaeval/ambient</code> and <code>metaeval/chaos-mnli-ambiguity</code>,
 which declare no license on their HF cards.</p>
 <h2 id="reproduce">Reproduce</h2>
-<pre><code class="language-bash">pip install -r inference/requirements.txt
+<p>The public inference package ships inside the model repos on Hugging Face; there is no separate
+GitHub repo yet.</p>
+<pre><code class="language-bash">pip install huggingface_hub
+hf download OzLabs/typical-small --include &quot;inference/*&quot; --local-dir typical
+pip install -r typical/inference/requirements.txt
 </code></pre>
-<pre><code class="language-python">from typical import Typical  # inference/typical/, downloaded alongside your code
+<pre><code class="language-python">from typical import Typical  # typical/inference/typical/, from the hf download above
 
 m = Typical.from_pretrained(&quot;OzLabs/typical-small&quot;, device=&quot;auto&quot;)
 
@@ -445,8 +450,9 @@ m.noul(state, &quot;Is the order still under warranty?&quot;)
 # Ordinal levels -&gt; {level: p, ...} + p_null + expected (E[index])
 m.score(state, &quot;How urgent is this ticket?&quot;, [&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;])
 </code></pre>
-<p>Inference code is public under <code>inference/</code>; training code release to follow. The commands below are
-verbatim from the release cards.</p>
+<p>Inference code is public under
+<a href="https://huggingface.co/OzLabs/typical-small/tree/main/inference"><code>inference/</code></a>; training code
+release to follow. The commands below are verbatim from the release cards.</p>
 <h3 id="held-out-workflow-external-eval-reproduction">Held-out workflow / external eval reproduction</h3>
 <p>Post-hoc, full state length; requires the private training repo.</p>
 <pre><code class="language-bash">uv run --no-sync python scripts/eval_wf.py --run runs/ts1b --mode native \

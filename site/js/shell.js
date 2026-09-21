@@ -71,7 +71,12 @@ function buildResultsTable(container, models, frozenDoc) {
     const tbody = document.createElement('tbody');
     released.forEach((m) => {
       const tr = document.createElement('tr');
-      rowFn(m).forEach((cell) => tr.appendChild(cell));
+      // data-label backs the ≤600px stacked layout (results-table td::before in style.css) —
+      // each cell carries its own column header so a narrow screen can drop the table grid.
+      rowFn(m).forEach((cell, i) => {
+        cell.dataset.label = headers[i];
+        tr.appendChild(cell);
+      });
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -107,7 +112,7 @@ function buildResultsTable(container, models, frozenDoc) {
   const footnote = document.createElement('p');
   footnote.className = 'chart-caption';
   footnote.textContent =
-    'JevBench easy is 1.000 for every model and is omitted. typical-small-preview → typical-small is .750 → .694 on JevBench standard (~1 SE, n_eff = 36), traded for typed heads and calibration (held-out score NLL 2.03 → 1.01).';
+    'JevBench easy is 1.000 for every model and is omitted. typical-small-preview → typical-small is .750 → .694 on JevBench standard (about 1 SE at n = 72, SE ≈ .058), traded for typed heads and calibration (held-out score NLL 2.03 → 1.01).';
   container.appendChild(footnote);
 
   if (frozenByTrained.size) {

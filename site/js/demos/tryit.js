@@ -50,18 +50,28 @@ export async function mount(host, ctx) {
   const stateInput = document.createElement('textarea');
   stateInput.className = 'tryit-input tryit-textarea';
   stateInput.rows = 4;
-  // grows to fit its content instead of scrolling internally — textareas get a UA-default
-  // overflow:auto, which becomes a real scrollbar the moment a prefilled example wraps past
-  // 4 rows (the loan-rubric example does).
+
+  const questionInput = document.createElement('textarea');
+  questionInput.className = 'tryit-input tryit-textarea';
+  questionInput.rows = 1;
+
+  // Both grow to fit their content instead of scrolling internally — textareas get a
+  // UA-default overflow:auto, which becomes a real scrollbar the moment a prefilled example
+  // wraps past its row count (the loan-rubric example does, on both fields).
+  function autosizeOne(ta) {
+    ta.style.height = 'auto';
+    ta.style.height = `${ta.scrollHeight}px`;
+  }
   function autosize() {
-    stateInput.style.height = 'auto';
-    stateInput.style.height = `${stateInput.scrollHeight}px`;
+    autosizeOne(stateInput);
+    autosizeOne(questionInput);
   }
   stateInput.addEventListener('input', autosize);
-
-  const questionInput = document.createElement('input');
-  questionInput.type = 'text';
-  questionInput.className = 'tryit-input';
+  questionInput.addEventListener('input', autosize);
+  // Re-run once the real font has loaded (scrollHeight measured against the fallback font
+  // otherwise) and on resize (reflow can change how many lines the text wraps to).
+  if (typeof document !== 'undefined' && document.fonts?.ready) document.fonts.ready.then(autosize);
+  window.addEventListener('resize', autosize);
 
   const optionsInput = document.createElement('input');
   optionsInput.type = 'text';

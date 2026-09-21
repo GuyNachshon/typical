@@ -17,6 +17,7 @@
       <a href="#results">Results</a>
       <a href="#demos">Demos</a>
       <a href="research.html">Research</a>
+      <a href="https://huggingface.co/OzLabs/typical-small/tree/main/inference" target="_blank" rel="noopener">Code →</a>
       <a href="https://huggingface.co/OzLabs" target="_blank" rel="noopener">Hugging Face →</a>
     </div>
   </div>
@@ -27,6 +28,7 @@
   <!-- HERO -->
   <section class="hero" id="hero">
     <div class="mark" data-mark aria-hidden="true"></div>
+    <p class="mark-caption">144 real probabilities from the demos below — hover a tile</p>
     <h1 class="hero-headline">Small open models that decide. One pass over the text, a probability for every option, and an explicit &empty;.</h1>
     <a class="ghost-link" href="#results">Results →</a>
   </section>
@@ -35,7 +37,7 @@
   <section class="section" id="results">
     <div class="container">
       <h2 class="section-title">Results</h2>
-      <p class="section-lede">Two released sizes, one recipe. We report the numbers that moved and the ones that did not, including the JevBench hard tier, where both models are within one standard error of chance.</p>
+      <p class="section-lede">We report the numbers that moved and the ones that did not, including the JevBench hard tier, where both models are within one standard error of chance.</p>
 
       <div class="stat-grid">
         <div class="card stat-card">
@@ -120,8 +122,8 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
       <p class="verified-copy">Typical is an open family of small decision models. Give it a text
       state and a typed question (Choice over candidates you define at runtime, Noul for yes/no, Score for
       ordered levels) and it returns a probability for every candidate plus an explicit &empty; in one
-      forward pass: no generation, no parsing, 45 ms per decision on one H100 and a few milliseconds per
-      extra question on the same state. It is not an LLM replacement or a knowledge model. It decides from
+      forward pass: no generation, no parsing.</p>
+      <p class="verified-copy">It is not an LLM replacement or a knowledge model. It decides from
       the text you give it (&le;1k tokens); it does not plan, compute, or reason over long documents, and
       on hard multi-step workflow judgments it is still at chance. Weights (1.7B, 4B) and inference code
       are open on Hugging Face.</p>
@@ -134,7 +136,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
   <section class="section" id="demos">
     <div class="container">
       <h2 class="section-title">Demos</h2>
-      <p class="section-lede">Every demo runs the public <code>inference/typical</code> package, the same code behind the numbers above, one forward pass per decision. Live mode calls a local model server and shows its own measured latency and device; static mode replays recorded outputs. The tags say what works, what is partial, and what fails.</p>
+      <p class="section-lede">Every demo runs the public <code>inference/typical</code> package, the same code behind the numbers above, one forward pass per decision. Live mode calls a local model server and shows its own measured latency and device; static mode replays recorded outputs. <span data-mode-pill class="pill"></span></p>
 
       <h3 class="demos-subhead">Games</h3>
       <div class="games-grid">
@@ -150,7 +152,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
         </div>
         <div class="game-card">
           <div class="game-card-head"><span class="pill">Partial</span><h3>Doom</h3></div>
-          <p>Chocolate Doom, the 1993 shareware, running in WebAssembly. Each tick the model reads two facts (badly hurt? an enemy in line of sight?) and picks an intent — retreat, engage, explore — and the engine aims and presses the key. That split is the finding: it matches the three rules 30/30 (chance .33; .60 with no rules), but when it was asked to aim itself (shoot / turn left / turn right) it said “shoot” for any enemy mention, 0/12 turns over five phrasings. In the recorded E1M1 run its explorer never left the first rooms, so it decided “explore” 199 times and “engage” once.</p>
+          <p>Chocolate Doom, the 1993 shareware, running in WebAssembly. Each tick the model reads two facts (badly hurt? an enemy in line of sight?) and picks an intent — retreat, engage, explore — and the engine aims and presses the key. It matches the three rules 30/30 (chance .33; .60 with no rules), but when it was asked to aim itself (shoot / turn left / turn right) it said “shoot” for any enemy mention, 0/12 turns over five phrasings. In the recorded E1M1 run its explorer never left the first rooms, so it decided “explore” 199 times and “engage” once.</p>
           <div class="game-mount" data-game="realdoom" data-game-fallback="doom"></div>
         </div>
       </div>
@@ -224,33 +226,11 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
   <section class="section" id="limits">
     <div class="container">
       <h2 class="section-title">What this isn't</h2>
-      <p class="section-lede">Short states, literal rules, bounded candidate sets. No arithmetic, no timezones, no
-        trade-offs, no long policies, no vision. The hard tier is at chance and over-confident, and Choice is
-        order-robust rather than order-invariant.</p>
-      <ul class="limits-register">
-        <li>We do not claim to be faster, better, or cheaper than Jev or any hosted system: we have no
-          apples-to-apples run, and JevBench is unranked here.</li>
-        <li>We do not do vision, audio, real-time control, game-playing skill, or planning/lookahead.
-          Text-only, one forward pass, no search.</li>
-        <li>We are not a knowledge model or a reasoner: MMLU-Pro among-K .34 / .46; level-7 composition
-          (temporal, units, expected value, trade-off) is at chance. We do not do arithmetic, timezones, or
-          trade-offs.</li>
-        <li>We do not read long documents: trained at &le;1,024-token states; JevBench long-policy items and
-          multi-thousand-token states are out of distribution.</li>
-        <li>We do not claim "any label set, any domain" works equally well: CLINC is &minus;4 against the
-          untrained base, TREC-fine is &minus;10 (medium) against its untyped control, and held-out rubric styles
-          drop 4&ndash;6 points.</li>
-        <li>We do not claim exact order-invariance for Choice, or exact IIA. Only Noul (yes/no) is exact;
-          Choice is order-robust (mean-max &Delta;p .01&ndash;.08), and adding an irrelevant candidate can move
-          log-odds .09&ndash;.22.</li>
-        <li>We do not claim OOD calibration or hard-tier competence: both released models are at chance on the
-          JevBench hard tier (Brier .79 / .77).</li>
-        <li>We have not released training code. Only <code>inference/</code> is public; training code release
-          to follow.</li>
-        <li>Licence: see the model card's licence section. The training mix includes sources with
-          non-commercial or undeclared licences (ANLI is CC BY-NC 4.0); only <code>inference/</code> is
-          public today.</li>
-      </ul>
+      <p class="section-lede">Typical works from short states and literal rules over bounded candidate sets: no
+        long documents, no vision, no arithmetic. The JevBench hard tier sits at chance and is over-confident
+        there. Choice is order-robust, not order-invariant — reordering candidates can shift a probability by
+        a few points.</p>
+      <a class="ghost-link" href="research.html#limitations">Full limitations →</a>
     </div>
   </section>
 
@@ -258,11 +238,14 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
   <section class="section" id="start">
     <div class="container">
       <h2 class="section-title">Get started</h2>
-      <p class="section-lede"><code>pip install -r inference/requirements.txt</code>, six lines of Python, weights from
-        Hugging Face. <code>state</code> is a string or a dict; candidates are whatever you pass.</p>
+      <p class="section-lede">The public inference package ships inside the model repos on Hugging Face, not a
+        separate GitHub repo. <code>hf download</code> the <code>inference/</code> folder, install its requirements,
+        then six lines of Python. <code>state</code> is a string or a dict; candidates are whatever you pass.</p>
       <div class="code-block">
-        <pre class="dim">pip install -r inference/requirements.txt</pre>
-        <pre>from typical import Typical
+        <pre class="dim">pip install huggingface_hub
+hf download OzLabs/typical-small --include "inference/*" --local-dir typical
+pip install -r typical/inference/requirements.txt</pre>
+        <pre>from typical import Typical  # <a href="https://huggingface.co/OzLabs/typical-small/tree/main/inference">inference/</a>, from the hf download above
 
 m = Typical.from_pretrained("OzLabs/typical-small", device="auto")  # or "typical-small-preview" / "typical-medium"
 
@@ -291,7 +274,7 @@ probs, runtime = m.decide(
 
 <footer class="footer">
   <div class="container footer-inner">
-    <div>Research-grade, released open. Licence: see each model card on Hugging Face.</div>
+    <div>Weights and inference code on Hugging Face. Training code to follow.</div>
     <div class="footer-links">
       <a href="https://huggingface.co/OzLabs/typical-small">typical-small</a>
       <a href="https://huggingface.co/OzLabs/typical-medium">typical-medium</a>

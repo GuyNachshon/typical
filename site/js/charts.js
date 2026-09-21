@@ -47,7 +47,7 @@ function svgEl(tag, attrs = {}) {
 }
 
 function svgText(x, y, str, attrs = {}) {
-  const t = svgEl('text', { x, y, fill: FG, 'font-size': 11, ...attrs });
+  const t = svgEl('text', { x, y, fill: FG, 'font-size': 12, ...attrs });
   t.textContent = str;
   return t;
 }
@@ -249,7 +249,7 @@ export function reliability(container, { bins, ece, title = 'Reliability' }) {
     ttl.textContent = `[${b.lo.toFixed(2)}–${b.hi.toFixed(2)}] n=${b.n} acc=${b.accuracy.toFixed(3)} conf=${b.mean_confidence.toFixed(3)}`;
     rect.appendChild(ttl);
     g.appendChild(rect);
-    if (b.n > 0) g.appendChild(svgText(i * slot + slot / 2, by - 4, `n=${b.n}`, { fill: DIM, 'text-anchor': 'middle', 'font-size': 9 }));
+    if (b.n > 0) g.appendChild(svgText(i * slot + slot / 2, by - 4, `n=${b.n}`, { fill: DIM, 'text-anchor': 'middle', 'font-size': 10 }));
   });
 
   axisPair(g, iw, ih);
@@ -508,7 +508,7 @@ export function timeline(container, { lineage, bugs = [], verdicts = [], title =
   if (bugs.length) {
     const bugLabel = document.createElement('div');
     bugLabel.className = 'timeline-legend-label';
-    bugLabel.textContent = 'bugs found (red ticks above)';
+    bugLabel.textContent = 'bugs found (square ticks above)';
     container.appendChild(bugLabel);
     const bugLeg = document.createElement('ol');
     bugLeg.className = 'timeline-legend timeline-legend-bugs';
