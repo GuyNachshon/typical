@@ -1137,7 +1137,19 @@ base model reading next-token letter logits over the rendered options (`pcdm_jev
 | 3-shot control: JevBench std / easy / hard | .528 / 1.00 / .369 | .778 / 1.00 / .441 | .556 / .958 / .369 | .819 / 1.00 / **.559** |
 | best val NLL | .384 | .332 | .411 | **.307** |
 
-† per-pod numbers (different hosts / torch builds); an apples-to-apples ladder on one pod follows.
+† per-pod numbers (different hosts / torch builds). **Apples-to-apples on one pod, same torch build** (`apples_*`):
+
+| one pod, L_s = 256 | 1.7B | 4B | 14B |
+|---|---|---|---|
+| single decision, K = 2 / 32 / 256 (ms) | 45 / 46 / 106 | 56 / 56 / 118 | 60 / 62 / 157 |
+| marginal per query, M = 32, K = 2 / 32 / 256 (ms) | 2.7 / 3.7 / 28.0 | 3.3 / 6.1 / 50.6 | 3.9 / 11.7 / 109.7 |
+| peak memory, K = 2 → 256 (GB) | 6.4 → 9.3 | 14.6 → 18.6 | 51.6 → 57.5 |
+
+Monotone in size at every K. A single decision costs 45 → 56 → 60 ms (1.7B → 4B → 14B): the KV-cached state and a
+short suffix dominate, so an 8× larger model is 1.3× slower per decision. Batched marginal cost scales more steeply with
+size *and* K (2.7 → 3.9 ms at K = 2; 28 → 110 ms at K = 256) — at high K the energy front-end (§3m) matters more for
+big models, not less. Capability per millisecond (JevBench standard / single-decision ms): 1.7B .750/45, 4B .833/56,
+14B .875/60 — the 4B is the knee.
 
 **4B, same recipe: everything moves at once.** Evidence goes *above* the 1.7B base (CLINC +10 over 1.7B-wf and +0.5 over
 the 1.7B base, TREC +14, ANLI +5, BoolQ +3), false-abstain collapses (CLINC .17 → .01, TREC .34 → .00) without any
