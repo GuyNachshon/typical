@@ -419,6 +419,12 @@ def load_run_data(args, backbone):
         train_examples = apply_qtype_filter(train_examples, args.qtype_filter)
         val_examples = apply_qtype_filter(val_examples, args.qtype_filter)
         assert train_examples, f"--qtype_filter {args.qtype_filter}: no train rows"
+        # eval_sets: filter mixed-qtype files down to this arm's rows too (PLAN7 track C's own
+        # eval-set list, e.g. "typed_decisions_test (filter score / noul rows)") -- required, not
+        # just for a matched comparison: --score_head cumlink / --noul_head bern structurally
+        # can't score a row of the wrong qtype (no letters/candidates to fall back on). Sets left
+        # with zero matching rows (e.g. cua_s1_forms under qtype_filter=score) are dropped.
+        eval_sets = {k: f for k, v in eval_sets.items() if (f := apply_qtype_filter(v, args.qtype_filter))}
     if args.ordinal_smooth:
         train_examples = apply_ordinal_smooth(train_examples, args.ordinal_smooth)
 
