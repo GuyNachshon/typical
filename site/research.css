@@ -1,0 +1,225 @@
+/* research.html only. Additive to style.css - reuses .room, .serif, .label, .dim, .card,
+   .disclosure, .results-table, .table-scroll, .chart, .chart-grid, .chart-title,
+   .chart-caption, .chart-legend, .limits-list, .frame, .link-ghost, .logo-mark,
+   .site-header, .room-index, .hex, .ink-room-head, .ink-room-copy, .results-subhead
+   from style.css as-is; only the roles style.css doesn't cover live here. No colour,
+   gradients, or shadows - flat ink/paper/putty/bone/chalk/graphite only. */
+
+main section[id] { scroll-margin-top: 24px; }
+
+/* ---- title room: "Research" cropped at the edge like the index wordmark ---- */
+
+.title-room { padding-top: 168px; padding-bottom: 64px; }
+
+.title-wrap { overflow: hidden; line-height: 0; margin-bottom: 32px; }
+
+.research-title {
+  font-family: var(--font-serif);
+  font-weight: var(--weight-regular);
+  font-size: clamp(120px, 20vw, 260px);
+  line-height: var(--leading-display);
+  letter-spacing: var(--tracking-display);
+  margin: 0;
+  white-space: nowrap;
+  padding-left: clamp(24px, 4vw, 48px);
+}
+
+.standfirst {
+  font-size: var(--text-subheading);
+  line-height: var(--leading-subheading);
+  letter-spacing: var(--tracking-subheading);
+  max-width: 56ch;
+  margin: 0 0 16px;
+}
+
+.citation-caption {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-graphite);
+  max-width: 72ch;
+  margin: 0;
+}
+
+/* ---- room eyebrow (museum placard number + section name) ---- */
+
+.room-eyebrow { margin: 0 0 24px; color: var(--color-graphite); }
+.room-dark .room-eyebrow { color: rgba(255, 255, 255, 0.55); }
+
+.room-title {
+  font-family: var(--font-serif);
+  font-size: var(--text-heading-lg);
+  letter-spacing: var(--tracking-heading-lg);
+  line-height: var(--leading-heading-lg);
+  margin: 0 0 16px;
+}
+
+/* ---- split: visual + copy, alternating sides (editorial rhythm) ---- */
+
+.split { display: grid; gap: 40px; align-items: start; }
+.split > * { min-width: 0; }
+.split-copy h2 { margin-bottom: 12px; font-size: var(--text-heading); letter-spacing: var(--tracking-heading); }
+@media (min-width: 900px) {
+  .split { grid-template-columns: 1.05fr 1fr; gap: 56px; }
+  .split-flip .split-visual { order: 2; }
+  .split-flip .split-copy { order: 1; }
+}
+
+/* ---- plate: a bone/chalk/ink card that mounts one artifact (diagram, args,
+   chart) under a small museum-label caption ---- */
+
+.plate { background: var(--color-bone); border-radius: var(--radius-lg); padding: var(--card-padding); }
+.plate-chalk { background: var(--color-chalk); }
+.plate-dark { background: var(--color-ink); color: var(--color-paper); }
+.plate-label {
+  display: block;
+  margin-top: 16px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-graphite);
+}
+.chart-full { margin-top: 40px; }
+
+.diagram {
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre;
+  font-family: 'SFMono-Regular', ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.args-block {
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.7;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- editorial: architecture's 2-column magazine flow ---- */
+
+.editorial { columns: 1; margin-top: 56px; }
+@media (min-width: 760px) { .editorial { columns: 2; column-gap: 48px; } }
+.editorial .subsection { break-inside: avoid; margin-bottom: 32px; }
+
+.subsection h3 {
+  font-size: var(--text-subheading);
+  letter-spacing: var(--tracking-subheading);
+  margin-bottom: 8px;
+}
+.subsection p { font-size: var(--text-body-sm); }
+
+/* ---- subsection-grid: side-by-side subsections (pipeline, data, reproduce) ---- */
+
+.subsection-grid { display: grid; gap: 32px; margin-top: 48px; }
+.subsection-grid > .subsection { min-width: 0; }
+@media (min-width: 760px) {
+  .subsection-grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .subsection-grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1040px) {
+  .subsection-grid-3 { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ---- data / findings charts: stacked full-width, large ---- */
+
+.chart-stack { display: flex; flex-direction: column; gap: 40px; margin-top: 40px; }
+.chart-wide { min-width: 0; }
+.chart-donut { max-width: min(640px, 100%); margin: 0 auto; }
+
+/* ---- donut legend (charts.js donut() emits this markup) ---- */
+
+.donut-legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 14px; justify-content: center; }
+.donut-key { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; }
+.donut-key i { width: 11px; height: 11px; display: inline-block; border-radius: 1px; }
+
+/* ---- timeline legend (charts.js timeline() emits this markup) ---- */
+
+.timeline-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 6px 32px;
+  margin: 16px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+}
+.timeline-legend li { padding-left: 4px; }
+.timeline-legend b { font-weight: 600; }
+.timeline-legend-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 20px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.chart-source { font-size: 11px; color: var(--color-graphite); margin-top: 8px; }
+.plate-dark .chart-source { color: rgba(255, 255, 255, 0.5); }
+
+/* ---- findings: numbered plates ---- */
+
+.finding-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  margin: 40px 0;
+}
+@media (min-width: 700px) { .finding-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1100px) { .finding-grid { grid-template-columns: repeat(4, 1fr); } }
+
+.finding-plate {
+  background: var(--color-ink);
+  padding: 24px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  text-align: left;
+}
+.finding-plate .n { font-size: 34px; line-height: 1; }
+.finding-plate .claim { font-family: var(--font-sans); font-size: 15px; line-height: 1.4; color: var(--color-paper); }
+.finding-plate .detail { font-family: var(--font-sans); font-size: 12px; line-height: 1.5; color: rgba(255, 255, 255, 0.6); }
+.finding-plate .ref { font-family: var(--font-sans); font-size: 11px; color: rgba(255, 255, 255, 0.4); }
+
+/* ---- limitations: plain register, hairline rows, no bullets ---- */
+
+.limits-register {
+  list-style: none;
+  margin: 32px 0 0;
+  padding: 0;
+  max-width: none;
+}
+.limits-register li {
+  font-size: var(--text-body-sm);
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-vellum);
+}
+.limits-register li:first-child { border-top: 1px solid var(--color-vellum); }
+@media (min-width: 900px) {
+  .limits-register { display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 48px; row-gap: 0; }
+}
+
+/* ---- D1 compact line, kept exactly at its three call sites (timeline,
+   findings intro, reproduce context) ---- */
+
+.disclosure-compact {
+  border-left: 2px solid var(--color-ink);
+  padding-left: 16px;
+  margin: 16px 0 0;
+  font-size: 12px;
+  color: var(--color-graphite);
+  max-width: 72ch;
+}
+.room-dark .disclosure-compact { border-left-color: var(--color-paper); color: rgba(255, 255, 255, 0.65); }
+
+/* ---- responsive ---- */
+
+@media (max-width: 720px) {
+  .room-index { display: none; }
+  .research-title { font-size: clamp(72px, 26vw, 140px); }
+}

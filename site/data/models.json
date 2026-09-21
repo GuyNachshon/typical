@@ -1,0 +1,303 @@
+[
+  {
+    "id": "typical-small-preview",
+    "backbone": "Qwen3-1.7B-Base",
+    "params": "1.7B",
+    "tap": "20/28",
+    "released": true,
+    "hf_url": "https://huggingface.co/OzLabs/typical-small-preview",
+    "jevbench": {
+      "std": {
+        "acc": 0.75,
+        "brier": 0.40276924379203316,
+        "ece": 0.150803044024441,
+        "n": 72
+      },
+      "easy": {
+        "acc": 1.0,
+        "brier": 0.000741052543754835,
+        "ece": 0.006602810074885651,
+        "n": 48
+      },
+      "hard": {
+        "acc": 0.38738738738738737,
+        "brier": 0.8756417814236204,
+        "ece": 0.37200241878226,
+        "n": 111
+      }
+    },
+    "latency": {
+      "single_ms": {
+        "k2": 45,
+        "k32": 46,
+        "k256": 106
+      },
+      "marginal_ms_m32": {
+        "k2": 2.7,
+        "k32": 3.7,
+        "k256": 28.0
+      },
+      "peak_gb": {
+        "k2": 6.4,
+        "k256": 9.3
+      },
+      "note": "borrows typical-small's ladder -- same 1.7B recipe shape"
+    },
+    "mmlu_pro_among_k": 0.33,
+    "nlu": {
+      "snli": 0.894,
+      "mnli": 0.849,
+      "boolq": 0.831,
+      "anli": 0.481
+    },
+    "topic_intent": {
+      "clinc": 0.734,
+      "trec": 0.372,
+      "hwu": 0.735,
+      "ng20": 0.522
+    },
+    "external": {
+      "pagerduty": 0.779,
+      "jevlogs": 0.522,
+      "mind2web": 0.427
+    },
+    "held_out": {
+      "noul": 0.699,
+      "score": 0.498,
+      "flip_both_correct": 0.565
+    },
+    "sources": {
+      "jevbench": "runs/jev_native_v3t20_wf/summary.json",
+      "latency": "releases/typical-small.md#latency",
+      "mmlu_pro_among_k": "releases/typical-small.md#\u00a73ae-table",
+      "nlu": "releases/typical-small.md#\u00a73ae-table",
+      "topic_intent": "releases/typical-small.md#\u00a73ae-table",
+      "external": "releases/typical-small.md#\u00a73ae-table",
+      "held_out": "releases/typical-small.md#\u00a73ae-table"
+    }
+  },
+  {
+    "id": "typical-small",
+    "backbone": "Qwen3-1.7B-Base",
+    "params": "1.7B",
+    "tap": "20/28",
+    "released": true,
+    "hf_url": "https://huggingface.co/OzLabs/typical-small",
+    "jevbench": {
+      "std": {
+        "acc": 0.6944444444444444,
+        "brier": 0.39750463081241993,
+        "ece": 0.11412504853473769,
+        "n": 72
+      },
+      "easy": {
+        "acc": 1.0,
+        "brier": 0.0047407252593300855,
+        "ece": 0.016207356005907027,
+        "n": 48
+      },
+      "hard": {
+        "acc": 0.43243243243243246,
+        "brier": 0.7909445007358973,
+        "ece": 0.25632501856700796,
+        "n": 111
+      }
+    },
+    "latency": {
+      "single_ms": {
+        "k2": 45,
+        "k32": 46,
+        "k256": 106
+      },
+      "marginal_ms_m32": {
+        "k2": 2.7,
+        "k32": 3.7,
+        "k256": 28.0
+      },
+      "peak_gb": {
+        "k2": 6.4,
+        "k256": 9.3
+      }
+    },
+    "mmlu_pro_among_k": 0.343,
+    "nlu": {
+      "snli": 0.894,
+      "mnli": 0.859,
+      "boolq": 0.824,
+      "anli": 0.497
+    },
+    "topic_intent": {
+      "clinc": 0.804,
+      "trec": 0.508,
+      "hwu": 0.761,
+      "ng20": 0.54
+    },
+    "external": {
+      "pagerduty": 0.817,
+      "jevlogs": 0.71,
+      "mind2web": 0.357
+    },
+    "held_out": {
+      "noul": 0.715,
+      "score": 0.52,
+      "flip_both_correct": 0.581
+    },
+    "sources": {
+      "jevbench": "runs/jev_native_ts1b/summary.json",
+      "latency": "releases/typical-small.md#latency",
+      "mmlu_pro_among_k": "releases/typical-small.md#\u00a73ae-table",
+      "nlu": "releases/typical-small.md#\u00a73ae-table",
+      "topic_intent": "releases/typical-small.md#\u00a73ae-table",
+      "external": "releases/typical-small.md#\u00a73ae-table",
+      "held_out": "releases/typical-small.md#\u00a73ae-table"
+    }
+  },
+  {
+    "id": "typical-medium",
+    "backbone": "Qwen3-4B-Base",
+    "params": "4B",
+    "tap": "26/36",
+    "released": true,
+    "hf_url": "https://huggingface.co/OzLabs/typical-medium",
+    "jevbench": {
+      "std": {
+        "acc": 0.8055555555555556,
+        "brier": 0.29652247410236326,
+        "ece": 0.08584584999415612,
+        "n": 72
+      },
+      "easy": {
+        "acc": 1.0,
+        "brier": 0.011964783954900882,
+        "ece": 0.020954714467128106,
+        "n": 48
+      },
+      "hard": {
+        "acc": 0.42342342342342343,
+        "brier": 0.7731682475813886,
+        "ece": 0.2818109610596219,
+        "n": 111
+      }
+    },
+    "latency": {
+      "single_ms": {
+        "k2": 56,
+        "k32": 56,
+        "k256": 118
+      },
+      "marginal_ms_m32": {
+        "k2": 3.3,
+        "k32": 6.1,
+        "k256": 50.6
+      },
+      "peak_gb": {
+        "k2": 14.6,
+        "k256": 18.6
+      }
+    },
+    "mmlu_pro_among_k": 0.458,
+    "nlu": {
+      "snli": 0.909,
+      "mnli": 0.861,
+      "boolq": 0.843,
+      "anli": 0.544
+    },
+    "topic_intent": {
+      "clinc": 0.847,
+      "trec": 0.414,
+      "hwu": 0.769,
+      "ng20": 0.588
+    },
+    "external": {
+      "pagerduty": 0.838,
+      "jevlogs": 0.673,
+      "mind2web": 0.544
+    },
+    "held_out": {
+      "noul": 0.811,
+      "score": 0.528,
+      "flip_both_correct": 0.786
+    },
+    "sources": {
+      "jevbench": "runs/jev_native_tm1b/summary.json",
+      "latency": "releases/typical-medium.md#latency",
+      "mmlu_pro_among_k": "releases/typical-medium.md#\u00a73af-table",
+      "nlu": "releases/typical-medium.md#\u00a73af-table",
+      "topic_intent": "releases/typical-medium.md#\u00a73af-table",
+      "external": "releases/typical-medium.md#\u00a73af-table",
+      "held_out": "releases/typical-medium.md#\u00a73af-table"
+    }
+  },
+  {
+    "id": "typical-14b-ladder",
+    "backbone": "Qwen3-14B-Base",
+    "params": "14B",
+    "tap": "28/40",
+    "released": false,
+    "hf_url": null,
+    "jevbench": {
+      "std": {
+        "acc": 0.875,
+        "brier": 0.17328450018092195,
+        "ece": 0.06269621062609886,
+        "n": 72
+      },
+      "easy": {
+        "acc": 1.0,
+        "brier": 3.45922132774932e-07,
+        "ece": 0.00012271727124846254,
+        "n": 48
+      },
+      "hard": {
+        "acc": 0.46846846846846846,
+        "brier": 0.8489469919457218,
+        "ece": 0.3777795289013837,
+        "n": 111
+      }
+    },
+    "latency": {
+      "single_ms": {
+        "k2": 60,
+        "k32": 62,
+        "k256": 157
+      },
+      "marginal_ms_m32": {
+        "k2": 3.9,
+        "k32": 11.7,
+        "k256": 109.7
+      },
+      "peak_gb": {
+        "k2": 51.6,
+        "k256": 57.5
+      }
+    },
+    "mmlu_pro_among_k": 0.514,
+    "nlu": {
+      "snli": 0.91,
+      "mnli": 0.864,
+      "boolq": 0.894,
+      "anli": 0.588
+    },
+    "topic_intent": {
+      "clinc": 0.834,
+      "trec": 0.472,
+      "hwu": 0.792,
+      "ng20": 0.668
+    },
+    "external": null,
+    "held_out": {
+      "noul": 0.887,
+      "score": 0.558,
+      "flip_both_correct": null
+    },
+    "sources": {
+      "jevbench": "runs/jev_native_ladder_14b/summary.json",
+      "latency": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-apples-to-apples-table",
+      "mmlu_pro_among_k": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table",
+      "nlu": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table",
+      "topic_intent": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table",
+      "held_out": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table"
+    },
+    "note": "scaling-ladder point (PLAN7 Track A), not a public release -- no HF repo, no PagerDuty/jevlogs/Mind2Web/flip numbers in the source table"
+  }
+]

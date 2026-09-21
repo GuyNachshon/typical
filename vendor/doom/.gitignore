@@ -1,0 +1,4 @@
+# ponytail: only the patch, build script and verify script are worth keeping; the clone is reproducible.
+doom-wasm/
+doom1.wad
+build.log

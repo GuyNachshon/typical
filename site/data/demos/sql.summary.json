@@ -1,0 +1,46 @@
+{
+  "conditions": {
+    "D": {
+      "condition": "the customer mentions a duplicate charge",
+      "n": 129,
+      "positives": 16,
+      "matches": 17,
+      "precision": 0.941,
+      "recall": 1.0,
+      "accuracy": 0.992,
+      "mean_ms": 74.5
+    },
+    "C": {
+      "condition": "the request is about cancelling",
+      "n": 129,
+      "positives": 18,
+      "matches": 18,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0,
+      "mean_ms": 64.5
+    },
+    "B": {
+      "condition": "the item arrived damaged",
+      "n": 129,
+      "positives": 15,
+      "matches": 15,
+      "precision": 1.0,
+      "recall": 1.0,
+      "accuracy": 1.0,
+      "mean_ms": 64.1
+    },
+    "L": {
+      "condition": "the customer cannot log in or needs a password reset",
+      "n": 129,
+      "positives": 16,
+      "matches": 11,
+      "precision": 1.0,
+      "recall": 0.688,
+      "accuracy": 0.961,
+      "mean_ms": 63.7
+    }
+  },
+  "n_rows": 129,
+  "wall_s_all_conditions": 50.0
+}

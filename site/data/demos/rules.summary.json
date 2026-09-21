@@ -1,0 +1,42 @@
+{
+  "n": 6,
+  "flips": 3,
+  "rows": [
+    {
+      "id": "a1-low-credit-verified",
+      "deny_first": "deny",
+      "approve_first": "approve",
+      "ms": 555.8695829822682
+    },
+    {
+      "id": "a2-low-credit-verified-collateral",
+      "deny_first": "deny",
+      "approve_first": "approve",
+      "ms": 193.90908296918496
+    },
+    {
+      "id": "a3-good-credit-verified",
+      "deny_first": "approve",
+      "approve_first": "approve",
+      "ms": 465.3432499617338
+    },
+    {
+      "id": "a4-midcredit-unverified",
+      "deny_first": "deny",
+      "approve_first": "deny",
+      "ms": 209.58016702206805
+    },
+    {
+      "id": "a5-okcredit-unverified-collateral",
+      "deny_first": "approve",
+      "approve_first": "deny",
+      "ms": 512.8962910384871
+    },
+    {
+      "id": "a6-okcredit-unverified-defaults",
+      "deny_first": "deny",
+      "approve_first": "deny",
+      "ms": 198.55745800305158
+    }
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "lineage": [
+    {
+      "date": "2026-09-18",
+      "label": "energy (joint_emb_lw_v5)",
+      "std": 0.403,
+      "source": "REPORT.md \u00a73q table"
+    },
+    {
+      "date": "2026-09-19",
+      "label": "native n3, 28L",
+      "std": 0.417,
+      "source": "REPORT.md \u00a73q table"
+    },
+    {
+      "date": "2026-09-20",
+      "label": "native v2, letter-free",
+      "std": 0.472,
+      "source": "REPORT.md \u00a73q table"
+    },
+    {
+      "date": "2026-09-20",
+      "label": "v3_tap20, no \u2205 line",
+      "std": 0.694,
+      "source": "REPORT.md \u00a73t"
+    },
+    {
+      "date": "2026-09-20",
+      "label": "+ workflow (typical-small-preview)",
+      "std": 0.75,
+      "source": "REPORT.md \u00a73w; releases/typical-small-preview.md"
+    },
+    {
+      "date": "2026-09-21",
+      "label": "typical-small",
+      "std": 0.694,
+      "source": "REPORT.md \u00a73ae (ts1b, +DecisionMix v2 +typed heads)"
+    },
+    {
+      "date": "2026-09-21",
+      "label": "typical-medium",
+      "std": 0.806,
+      "source": "REPORT.md \u00a73af (tm1b, 4B)"
+    },
+    {
+      "date": "2026-09-21",
+      "label": "14B ladder (unreleased)",
+      "std": 0.875,
+      "source": "REPORT.md \u00a73ab"
+    }
+  ],
+  "bugs": [
+    {
+      "date": "2026-09-16",
+      "label": "attention-sink token (position 0 content-independent)",
+      "source": "REPORT.md \u00a72.1"
+    },
+    {
+      "date": "2026-09-16",
+      "label": "fixed classifier in disguise (3 label strings memorised)",
+      "source": "REPORT.md \u00a72.2"
+    },
+    {
+      "date": "2026-09-16",
+      "label": "state-only null leaks its base rate",
+      "source": "REPORT.md \u00a72.3"
+    },
+    {
+      "date": "2026-09-17",
+      "label": "last-layer tap = hypothesis-only model (the big one)",
+      "source": "REPORT.md \u00a72.4"
+    },
+    {
+      "date": "2026-09-17",
+      "label": "rogue dimensions dominate token norm",
+      "source": "REPORT.md \u00a72.5"
+    },
+    {
+      "date": "2026-09-17",
+      "label": "null over-fires on unfamiliar wordings (data bug)",
+      "source": "REPORT.md \u00a72.6"
+    },
+    {
+      "date": "2026-09-17",
+      "label": "LoRA dropout active at eval",
+      "source": "REPORT.md \u00a72.7"
+    },
+    {
+      "date": "2026-09-17",
+      "label": "the cross-encoder is not the \"expensive joint\" alternative",
+      "source": "REPORT.md \u00a72.8"
+    },
+    {
+      "date": "2026-09-21",
+      "label": "global (not per-row) Bernoulli routing collapsed ts1 to chance",
+      "source": "REPORT.md \u00a73ae"
+    }
+  ],
+  "verdicts": [
+    {
+      "date": "2026-09-19",
+      "label": "candidate-blind states carry priors, not question-dependent knowledge",
+      "source": "REPORT.md \u00a73j"
+    },
+    {
+      "date": "2026-09-20",
+      "label": "depth confound resolved: tap 20, not 28, keeps evidence",
+      "source": "REPORT.md \u00a73r"
+    },
+    {
+      "date": "2026-09-20",
+      "label": "candidate-blind negative closed at full depth too",
+      "source": "REPORT.md \u00a73s"
+    },
+    {
+      "date": "2026-09-20",
+      "label": "rendered \u2205 line was the null pathology, not the options-in-suffix formulation",
+      "source": "REPORT.md \u00a73t"
+    },
+    {
+      "date": "2026-09-20",
+      "label": "rubric-conditioned workflow data teaches the decision shapes it contains",
+      "source": "REPORT.md \u00a73w"
+    },
+    {
+      "date": "2026-09-21",
+      "label": "ordinal-smoothed Score + Bernoulli Noul adopted",
+      "source": "REPORT.md \u00a73ac"
+    },
+    {
+      "date": "2026-09-21",
+      "label": "DecisionMix v2: curriculum transfers within its grammar, not beyond it",
+      "source": "REPORT.md \u00a73ad"
+    },
+    {
+      "date": "2026-09-21",
+      "label": "typical-small / typical-medium frozen",
+      "source": "REPORT.md \u00a73ae, \u00a73af"
+    }
+  ],
+  "run_count": 88,
+  "run_count_source": "git ls-tree --name-only gpu-runpod-full-experiment:runs | grep -v -E '^(probe_|jev_|bench_|zs_|smoke|dump_|leak_|kb_)' | grep -v '\\.json$' | wc -l -- this worktree only checks out a subset of runs/, so the count is read from the source branch's tree, not the local directory"
+}

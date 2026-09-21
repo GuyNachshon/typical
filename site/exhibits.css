@@ -1,0 +1,246 @@
+/* Typical v3 exhibits — SQL, DOC-20, RULES, ADS, COMPACTION reskinned onto the Gallery
+   system (style.css). No colour, no gradients, no shadows, no <select>/<input> chrome.
+   Probability is ink density only: ink bars (js/ink.js inkBars/stipple) and serif numerals.
+   Shared primitives below are reused across all five exhibits — one register/bar/hex
+   vocabulary, not five bespoke ones. */
+
+.exhibit { display: flex; flex-direction: column; gap: 16px; }
+.exhibit, .exhibit * { text-wrap: pretty; }
+
+/* ---- chalk strip: one-line specimen (SQL query, etc.) ---- */
+.chalk-strip {
+  background: var(--color-chalk);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-ink);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.chalk-strip .cond { font-weight: var(--weight-medium); }
+
+/* ---- ghost chip row (condition/question toggles) ---- */
+.chip-row { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+.chip-ghost {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-graphite);
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.chip-ghost:hover { text-decoration: underline; }
+.chip-ghost[aria-pressed="true"] { color: var(--color-ink); font-weight: var(--weight-medium); }
+
+/* ---- ghost icon button (rule reorder ↑/↓) ---- */
+.ghost-btn {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.ghost-btn:hover { text-decoration: underline; }
+.ghost-btn:disabled { color: var(--color-vellum); cursor: default; text-decoration: none; }
+
+/* ---- readout line ---- */
+.exhibit-readout {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-graphite);
+  margin: 0;
+}
+
+/* ---- register: hairline-separated rows, the base list type for all five exhibits ---- */
+.register { display: flex; flex-direction: column; }
+.reg-row {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--color-vellum);
+  border-top: 1px solid transparent;
+}
+.register .reg-row:last-child { border-bottom: none; }
+.reg-row.scanning { border-top-color: var(--color-ink); }
+
+.reg-text {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-graphite);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- mini ink bar: 2px track, ink fill, width ∝ p (register rows) ---- */
+.reg-bar { position: relative; display: block; width: 72px; height: 2px; background: var(--color-vellum); flex: none; }
+.reg-bar-fill { position: absolute; inset: 0 auto 0 0; width: 0%; background: var(--color-ink); }
+.reg-numeral { font-family: var(--font-serif); font-size: 16px; text-align: right; flex: none; min-width: 34px; }
+
+/* ---- hexagon gold mark: filled = correct/keep, outline = wrong/drop ---- */
+.reg-hex { width: 12px; height: 12px; flex: none; }
+
+/* ---- caption (verbatim exhibit text) ---- */
+.exhibit-caption { font-size: 12px; color: var(--color-graphite); margin: 0; }
+
+/* ================================================================================
+   SQL
+   ================================================================================ */
+.sql-register .reg-row { grid-template-columns: 1fr 72px 34px; }
+
+/* ================================================================================
+   DOC-20
+   ================================================================================ */
+.doc20-handbook {
+  background: var(--color-chalk);
+  border-radius: var(--radius-sm);
+  height: 240px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-graphite);
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+.doc20-register {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 24px;
+}
+@media (min-width: 520px) {
+  .doc20-register { grid-template-columns: 1fr 1fr; }
+}
+.doc20-register .reg-row {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto;
+  gap: 4px;
+  align-items: start;
+}
+.doc20-q { font-family: var(--font-sans); font-size: 12px; color: var(--color-ink); }
+.doc20-a-line { display: flex; align-items: center; gap: 8px; }
+.doc20-a {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-graphite);
+}
+.doc20-p { font-family: var(--font-serif); font-size: 16px; margin-left: auto; }
+.doc20-timing { display: flex; gap: 40px; }
+.timing-pair { display: flex; flex-direction: column; gap: 2px; }
+.timing-numeral { font-family: var(--font-serif); font-size: 34px; line-height: 1; }
+.timing-label {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-graphite);
+}
+
+/* ================================================================================
+   RULES
+   ================================================================================ */
+.rules-facts { list-style: none; padding: 0; margin: 0; counter-reset: fact; }
+.rules-facts li {
+  counter-increment: fact;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-graphite);
+  padding: 7px 0;
+  border-bottom: 1px solid var(--color-vellum);
+}
+.rules-facts li::before { content: counter(fact) '. '; color: var(--color-ink); }
+.rules-facts li:last-child { border-bottom: none; }
+
+.rules-order-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--color-vellum);
+}
+.rules-order-row:last-child { border-bottom: none; }
+.rules-order-text { flex: 1; font-family: var(--font-sans); font-size: 12px; }
+
+.rules-live-bars { margin: 8px 0; }
+
+.rules-table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+.rules-table th, .rules-table td { border: 1px solid var(--color-vellum); padding: 0; text-align: left; }
+.rules-table th {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-graphite);
+  padding: 6px 10px;
+  border-top: none;
+}
+.rules-cell {
+  position: relative;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+}
+.rules-cell canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.rules-cell-label {
+  position: relative;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.rules-cell .reg-hex { position: relative; }
+.rules-applicant { font-family: var(--font-sans); font-size: 12px; padding: 8px 10px; }
+
+/* ================================================================================
+   ADS
+   ================================================================================ */
+.ads-register { display: flex; flex-direction: column; gap: 20px; }
+.ads-label { padding-bottom: 16px; border-bottom: 1px solid var(--color-vellum); }
+.ads-label:last-child { border-bottom: none; }
+.ads-label-text { font-family: var(--font-sans); font-size: 15px; margin: 0 0 10px; }
+.ads-decisions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.ads-gold { font-family: var(--font-sans); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-graphite); }
+.ads-tally { font-family: var(--font-serif); font-size: 20px; }
+.ads-prompt summary { font-family: var(--font-sans); font-size: 12px; color: var(--color-graphite); cursor: pointer; }
+.ads-prompt pre { font-family: var(--font-sans); font-size: 11px; color: var(--color-graphite); white-space: pre-wrap; margin: 10px 0 0; }
+
+/* ================================================================================
+   COMPACTION
+   ================================================================================ */
+.compaction-register .reg-row { grid-template-columns: 26px 1fr 130px 16px; }
+.compaction-index { font-family: var(--font-serif); font-size: 16px; color: var(--color-graphite); }
+.compaction-call {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ================================================================================
+   containment: let cards grow tall, no internal scrollbars except the doc-20 handbook
+   ================================================================================ */
+.exhibit-mount { min-height: 0; max-height: none; overflow: visible; }
+
+/* style.css's .gallery-grid uses CSS grid default align-items:stretch, which - now that
+   exhibits size to their real content instead of a clamped 420px box - stretches every
+   card in a row to match its tallest sibling (e.g. the short RULES card inheriting ADS's
+   full height as empty space). Cards should size to their own content. */
+.gallery-grid { align-items: start; }

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DOOM (Chocolate Doom / WASM) — Typical harness</title>
+<style>
+  body { background:#111; color:#ddd; font:12px/1.4 ui-monospace, monospace; margin:0; padding:12px; }
+  canvas { display:block; width:640px; height:400px; background:#000; }
+  pre { white-space:pre-wrap; max-width:640px; }
+</style>
+</head>
+<body>
+<canvas id="canvas" width="640" height="400" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+<pre id="state">booting…</pre>
+<script>
+// Chocolate Doom key codes (src/doomkeys.h) for the default bindings (src/m_controls.c).
+const KEYS = {
+  forward: 0xad, back: 0xaf, left: 0xac, right: 0xae,
+  strafeleft: 44, straferight: 46,
+  fire: 0x80 + 0x1d, use: 32, run: 0x80 + 0x36,
+  enter: 13, escape: 27, y: 121, n: 110,
+  '1': 49, '2': 50, '3': 51, '4': 52, '5': 53, '6': 54, '7': 55,
+};
+const held = {};
+window.Doom = {
+  KEYS,
+  ready: false,
+  state() {
+    if (!Doom.ready) return { in_level: false, booting: true };
+    return JSON.parse(Module.UTF8ToString(Module._typical_state_json()));
+  },
+  key(key, down) {
+    const code = typeof key === 'number' ? key : KEYS[key];
+    if (code == null) throw new Error('unknown key ' + key);
+    Module._typical_input(code, down ? 1 : 0);
+    held[code] = !!down;
+  },
+  // Hold a key for ms, then release. Resolves after release.
+  press(key, ms = 100) {
+    Doom.key(key, true);
+    return new Promise(r => setTimeout(() => { Doom.key(key, false); r(); }, ms));
+  },
+  // skill 1..5 as in the menu; loads E1M1 on the next game tic.
+  newGame(skill = 3) { Module._typical_new_game(skill - 1); },
+  releaseAll() { for (const c in held) if (held[c]) Doom.key(+c, false); },
+};
+
+var Module = {
+  // -nosound mutes everything; E1M1 is started from JS via typical_new_game once the title loop is up.
+  arguments: ['-iwad', 'doom1.wad', '-window', '-nogui', '-nosound', '-nomusic', '-nomouse'],
+  preRun: [() => { Module.FS.createPreloadedFile('', 'doom1.wad', 'doom1.wad', true, true); }],
+  onRuntimeInitialized() {
+    Doom.ready = true;
+    // Give the title loop a second to come up, then start E1M1 (skill 3 = hurt me plenty).
+    setTimeout(() => Doom.newGame(3), 1500);
+  },
+  canvas: document.getElementById('canvas'),
+  print: t => console.log(t),
+  printErr: t => console.error(t),
+};
+setInterval(() => {
+  try { document.getElementById('state').textContent = JSON.stringify(Doom.state(), null, 1); }
+  catch (e) { document.getElementById('state').textContent = String(e); }
+}, 250);
+</script>
+<script src="websockets-doom.js"></script>
+</body>
+</html>

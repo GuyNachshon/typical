@@ -1,0 +1,52 @@
+{
+  "family_weights": [
+    {
+      "key": "E",
+      "label": "E -- evidence (NLI/BoolQ/SQuAD-style)",
+      "weight": 0.4
+    },
+    {
+      "key": "K",
+      "label": "K -- knowledge (MCQ distillation)",
+      "weight": 0.15
+    },
+    {
+      "key": "W",
+      "label": "W -- workflow (rubric-conditioned)",
+      "weight": 0.35
+    },
+    {
+      "key": "U",
+      "label": "U -- uncertainty (soft-target)",
+      "weight": 0.1
+    }
+  ],
+  "corpus_rows": [
+    {
+      "key": "kb",
+      "label": "data_kb (K)",
+      "rows": 147446
+    },
+    {
+      "key": "wf",
+      "label": "data_wf (W)",
+      "rows": 72000
+    },
+    {
+      "key": "wf_hf",
+      "label": "data_wf_hf (W)",
+      "rows": 86600
+    },
+    {
+      "key": "wh",
+      "label": "data_wh (W, DecisionMix v2)",
+      "rows": 60605
+    },
+    {
+      "key": "u",
+      "label": "data_u (U)",
+      "rows": 31029
+    }
+  ],
+  "source": "releases/typical-small.md Training args (family_weights) + Data section"
+}

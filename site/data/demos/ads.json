@@ -1,0 +1,320 @@
+{
+  "brands": {
+    "Nike": {
+      "category": "apparel and footwear",
+      "cue": "swoosh logo, 'Just Do It', athletic shoes and sportswear"
+    },
+    "Adidas": {
+      "category": "apparel and footwear",
+      "cue": "three stripes, 'Impossible Is Nothing', sneakers and football kit"
+    },
+    "Patagonia": {
+      "category": "apparel and footwear",
+      "cue": "outdoor jackets and fleece, environmental activism, repair-not-replace"
+    },
+    "Lululemon": {
+      "category": "apparel and footwear",
+      "cue": "yoga leggings, 'Align' pants, athleisure"
+    },
+    "Apple": {
+      "category": "consumer electronics",
+      "cue": "iPhone, Mac, 'Think different', minimalist product shots"
+    },
+    "Samsung": {
+      "category": "consumer electronics",
+      "cue": "Galaxy phones, foldable screens, QLED TVs"
+    },
+    "Coca-Cola": {
+      "category": "food and beverage",
+      "cue": "red can, polar bears, 'Open Happiness', 'Taste the Feeling'"
+    },
+    "McDonald's": {
+      "category": "food and beverage",
+      "cue": "golden arches, 'I'm lovin' it', Big Mac, McFlurry"
+    },
+    "Starbucks": {
+      "category": "food and beverage",
+      "cue": "green siren logo, Pumpkin Spice Latte, Frappuccino"
+    },
+    "Red Bull": {
+      "category": "food and beverage",
+      "cue": "'gives you wings', energy drink, extreme sports stunts"
+    },
+    "Tesla": {
+      "category": "automotive",
+      "cue": "Model 3, Model Y, Autopilot, Supercharger, electric cars"
+    },
+    "Toyota": {
+      "category": "automotive",
+      "cue": "Corolla, Camry, Prius hybrid, 'Let's Go Places'"
+    },
+    "IKEA": {
+      "category": "home and furniture",
+      "cue": "flat-pack furniture, BILLY bookcase, Swedish meatballs, blue-and-yellow store"
+    },
+    "Spotify": {
+      "category": "media and apps",
+      "cue": "music streaming, Wrapped, playlists, green circle logo"
+    },
+    "Netflix": {
+      "category": "media and apps",
+      "cue": "streaming series, 'Tudum', red N logo, binge-watching"
+    },
+    "Duolingo": {
+      "category": "media and apps",
+      "cue": "green owl, language lessons, streak reminders"
+    },
+    "Airbnb": {
+      "category": "travel and retail",
+      "cue": "'Belong Anywhere', stays and experiences, hosts"
+    },
+    "Amazon": {
+      "category": "travel and retail",
+      "cue": "Prime, Prime Day, one-day delivery, smile arrow logo"
+    },
+    "Peloton": {
+      "category": "fitness and personal care",
+      "cue": "connected bike and treadmill, live classes, instructors"
+    },
+    "Old Spice": {
+      "category": "fitness and personal care",
+      "cue": "deodorant and body wash, 'the man your man could smell like'"
+    }
+  },
+  "categories": [
+    {
+      "id": "apparel and footwear",
+      "desc": "clothing, shoes, sportswear"
+    },
+    {
+      "id": "consumer electronics",
+      "desc": "phones, computers, TVs"
+    },
+    {
+      "id": "food and beverage",
+      "desc": "drinks, snacks, restaurants, coffee"
+    },
+    {
+      "id": "automotive",
+      "desc": "cars and vehicles"
+    },
+    {
+      "id": "home and furniture",
+      "desc": "furniture and home goods"
+    },
+    {
+      "id": "media and apps",
+      "desc": "streaming, music, language or other apps"
+    },
+    {
+      "id": "travel and retail",
+      "desc": "lodging, marketplaces, online shopping"
+    },
+    {
+      "id": "fitness and personal care",
+      "desc": "exercise equipment, grooming, deodorant"
+    }
+  ],
+  "observations": [
+    {
+      "text": "Just Do It. The new Pegasus 41 is here. Run your run.",
+      "brand": "Nike",
+      "isAd": true
+    },
+    {
+      "text": "Billboard: a single white swoosh on black, no words. Below it, a runner mid-stride at dawn.",
+      "brand": "Nike",
+      "isAd": true
+    },
+    {
+      "text": "Impossible Is Nothing. Meet the Predator Elite. Three stripes, one goal.",
+      "brand": "Adidas",
+      "isAd": true
+    },
+    {
+      "text": "Instagram caption: three stripes on the pitch, three points on the table. #adidasfootball",
+      "brand": "Adidas",
+      "isAd": true
+    },
+    {
+      "text": "Don't buy this jacket unless you need it. If you do, we'll repair it for life. Worn Wear.",
+      "brand": "Patagonia",
+      "isAd": true
+    },
+    {
+      "text": "The Align pant, now in 12 new colours. Buttery soft. Made for the mat and everything after.",
+      "brand": "Lululemon",
+      "isAd": true
+    },
+    {
+      "text": "iPhone 17 Pro. Titanium. Shot on iPhone. Available Friday.",
+      "brand": "Apple",
+      "isAd": true
+    },
+    {
+      "text": "TV spot: a single laptop on a white table rotates slowly; the only text is 'Think different.'",
+      "brand": "Apple",
+      "isAd": true
+    },
+    {
+      "text": "Galaxy Z Fold7. Unfold your world. Pre-order now and get free Galaxy Buds.",
+      "brand": "Samsung",
+      "isAd": true
+    },
+    {
+      "text": "Open Happiness. Ice-cold, in the classic red can. Share a Coke with Sam.",
+      "brand": "Coca-Cola",
+      "isAd": true
+    },
+    {
+      "text": "Creative: two polar bears clinking glass bottles of cola under the northern lights.",
+      "brand": "Coca-Cola",
+      "isAd": true
+    },
+    {
+      "text": "ba da ba ba ba, I'm lovin' it. Two Big Macs for $6 this week only.",
+      "brand": "McDonald's",
+      "isAd": true
+    },
+    {
+      "text": "Billboard: golden arches at night with the words 'Open late.' No other copy.",
+      "brand": "McDonald's",
+      "isAd": true
+    },
+    {
+      "text": "The Pumpkin Spice Latte is back. Order ahead in the app and skip the line.",
+      "brand": "Starbucks",
+      "isAd": true
+    },
+    {
+      "text": "Creative: a green siren logo on a white cup, steam rising, 'Your fall ritual.'",
+      "brand": "Starbucks",
+      "isAd": true
+    },
+    {
+      "text": "Red Bull gives you wings. Watch the cliff-diving finals live this Saturday.",
+      "brand": "Red Bull",
+      "isAd": true
+    },
+    {
+      "text": "Model Y, now from $37,990. Zero emissions. Supercharging included for 12 months.",
+      "brand": "Tesla",
+      "isAd": true
+    },
+    {
+      "text": "Let's Go Places. The 2026 Corolla Hybrid, 50 mpg combined. Now at your local dealer.",
+      "brand": "Toyota",
+      "isAd": true
+    },
+    {
+      "text": "BILLY bookcase, $59. Flat-pack it, build it, fill it. Meatballs in the restaurant while you decide.",
+      "brand": "IKEA",
+      "isAd": true
+    },
+    {
+      "text": "Creative: a tiny blue-and-yellow store bag holds an entire living room; tagline 'It fits.'",
+      "brand": "IKEA",
+      "isAd": true
+    },
+    {
+      "text": "Your 2026 Wrapped is ready. See your top songs. Premium is $0 for 3 months.",
+      "brand": "Spotify",
+      "isAd": true
+    },
+    {
+      "text": "Tudum. The final season drops October 3. Only on the service with the red N.",
+      "brand": "Netflix",
+      "isAd": true
+    },
+    {
+      "text": "Instagram caption: the owl noticed you missed your lesson. 5 minutes a day keeps the streak alive.",
+      "brand": "Duolingo",
+      "isAd": true
+    },
+    {
+      "text": "Belong Anywhere. Book a treehouse, a lighthouse, or a room in someone's home this weekend.",
+      "brand": "Airbnb",
+      "isAd": true
+    },
+    {
+      "text": "Prime Day starts Tuesday. Two days of deals, one-day delivery, and the smile arrow on every box.",
+      "brand": "Amazon",
+      "isAd": true
+    },
+    {
+      "text": "The Bike+ with auto-resistance. Live classes every hour. Your instructor is waiting.",
+      "brand": "Peloton",
+      "isAd": true
+    },
+    {
+      "text": "Look at your man, now back to me. Sadly, he isn't me. But he could smell like me. Body wash, on sale.",
+      "brand": "Old Spice",
+      "isAd": true
+    },
+    {
+      "text": "Creative: a runner ties her laces; close-up on a swoosh; text 'Your only competition is yesterday.'",
+      "brand": "Nike",
+      "isAd": true
+    },
+    {
+      "text": "Creative: a red can sweats on a picnic table; text 'Taste the Feeling.'",
+      "brand": "Coca-Cola",
+      "isAd": true
+    },
+    {
+      "text": "A green owl in a party hat: 'Your 100-day streak is one lesson away.'",
+      "brand": "Duolingo",
+      "isAd": true
+    },
+    {
+      "text": "Creative: a treadmill in a sunlit apartment, an instructor on screen shouting encouragement. 'Bring the studio home.'",
+      "brand": "Peloton",
+      "isAd": true
+    },
+    {
+      "text": "Creative: a foldable phone opens like a book to show two apps side by side. 'Two screens. One device.'",
+      "brand": "Samsung",
+      "isAd": true
+    },
+    {
+      "text": "Reuters: Tesla recalls 120,000 vehicles over a seatbelt warning defect, regulator says.",
+      "brand": null,
+      "isAd": false
+    },
+    {
+      "text": "Tweet: the rain finally stopped in Portland, going for a walk before it starts again.",
+      "brand": null,
+      "isAd": false
+    },
+    {
+      "text": "Recipe: whisk two eggs with a pinch of salt, fold in chives, cook on low heat for three minutes.",
+      "brand": null,
+      "isAd": false
+    },
+    {
+      "text": "Support ticket: my Spotify app crashes every time I open the search tab on Android.",
+      "brand": null,
+      "isAd": false
+    },
+    {
+      "text": "Public notice: wildfire smoke advisory in effect until Thursday; limit outdoor exercise.",
+      "brand": null,
+      "isAd": false
+    },
+    {
+      "text": "Job posting: senior data engineer, remote, Python and dbt required, salary range posted.",
+      "brand": null,
+      "isAd": false
+    },
+    {
+      "text": "Abstract: we study the effect of caffeine on reaction time in 40 adults over two weeks.",
+      "brand": null,
+      "isAd": false
+    },
+    {
+      "text": "Text from a friend: running late, order me whatever you're having at the coffee place.",
+      "brand": null,
+      "isAd": false
+    }
+  ]
+}
