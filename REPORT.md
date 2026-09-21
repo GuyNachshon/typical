@@ -1285,10 +1285,47 @@ nothing else in the suite moves them.
   `zs_mcq_8B`, `bench_fair`, `joint_v2` (data v4 control, no tower), `joint_lw` (listwise), `joint_emb` (embedding-model
   candidates — the $0 probe showed the candidate encoder is the unseen-label bottleneck).
 
-## 6. What's next (not done)
+## 6. Where the project stands (2026-09-21) and what is next
 
-Label-space-held-out training splits (the §3d fix for false null on unseen vocabularies). Cross-encoder distillation into the joint model (+1–3, literature), a second joint seed, 8B prompted baseline with a proper
-null protocol instead of a literal string, the `Score` type, uncertainty-shaping losses (§12) and the workflow-level H5.
+**Established (each with a matched control and, where it mattered, a seed or a full-row re-evaluation):**
+1. Candidate-blind decision states carry priors and calibration, not question-conditioned knowledge — at tap 20 and
+   at full depth (§3j, §3s). Candidate-aware suffix computation does; a direct contextual readout keeps all of it with a
+   quarter of the letter interface's order fragility (§3l, §3v).
+2. The evidence-vs-knowledge trade-off was two artifacts: depth (last-layer features) and the rendered "none of the
+   above" line. Removing both gives one model, `nc_v3_tap20` (§3r, §3t): evidence at energy level, Δ_q kept, null
+   monotone in K, JevBench .694 with no workflow training. Two-expert machinery (fusion, support gate, learned gate) is
+   unnecessary (§3n–§3o, §3u).
+3. Rubric-conditioned workflow data teaches the decision shapes it contains — held-out rubric styles +34, held-out
+   families +9–14, rubric-flip both-correct .43 → .57 — and not the general external abstraction (jevlogs / PagerDuty /
+   Mind2Web at floor for K-way Choice; §3w–§3x). It costs probability quality on soft and ordinal gold.
+4. Mixing is a first-class variable: E .45–.50 restores evidence; ∅-augmented W rows fix abstention and MMLU where an
+   eval-time null offset cannot (one global threshold cannot serve E and W; §3y–§3z); the fraction in [.1, .2] does not
+   matter (§3aa). The 1.7B Release-1 mix is fixed.
+5. Small batch = under-fitting = better hard-tier and soft-target numbers at the cost of everything in-distribution: the
+   1.7B hard tier is a probability-quality problem, not a data-volume one (§3aa).
+6. Typed primitives: ordinal-smoothed Score targets fix Score calibration with zero decision changes; a Bernoulli Noul
+   head is exactly order-invariant, cheaper, and the first thing to beat an untouched external floor by a margin
+   (PagerDuty .602 → .886; §3ac).
+7. DecisionMix v2: the hard curriculum transfers within its rule grammar (+34–37, flip .48 → .71, JevBench adversarial
+   .33 → .83) and not beyond it (level-7 composition ~.50 for every model); the U corpus buys likelihood, not top-1
+   (§3ad).
+8. Scale, same recipe: 1.7B → 4B → 14B lifts standard-tier accuracy, knowledge and in-distribution workflow decisions
+   monotonically (JevBench .750 → .833 → .875, MMLU among-K .330 → .457 → .514, held-out noul .70 → .84 → .89) at
+   45 → 56 → 60 ms per decision; 8B (Qwen3-8B-Base) is a checkpoint outlier in both frozen and trained form. Long
+   states and soft calibration do not scale — the frozen 14B with three shots beats our trained 14B on hard (.559 vs
+   .468) — so the hard tier is a data/objective problem at every size (§3ab).
+
+**Release lineage.** `typical-small-preview` (frozen `nc_v3_tap20_wf`, §3t/§3w, errata in the card) → `ts1` / `tm1`
+(1.7B / 4B, r1 mix + DecisionMix v2 + typed heads + 1,024-token states; running) → `typical-small` / `typical-medium`.
+
+**Next, in order.** (1) Read `ts1`/`tm1` against `r1_dmv2` and `ladder_4b` with the same pass rule; freeze whichever
+passes as Release 1. (2) Phase 10 calibration objective on the U corpus (log + λ·Brier + ordinal; per-type / per-tier
+reporting; no global T) — the target is the frozen-with-shots hard number at each size. (3) Generator work on level-7
+families (temporal / units / expected value / trade-off), the one axis nothing else in the suite moved. (4) Cumulative-
+link Score head with more steps (open, not rejected). (5) 8B tap/lr sweep only if a product need for that size appears.
+(6) Large-K path benchmarks (energy → top-r → native; memo Phase 12) — the batched marginal cost at K = 256 grows 4×
+from 1.7B to 14B, so this matters more with scale. Closed and not reopened: candidate-blind Z, further readout
+variants, confidence-only routing, null functional forms, depth sweeps.
 
 ## 7. Decision log (why things were done)
 
