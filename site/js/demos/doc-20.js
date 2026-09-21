@@ -21,7 +21,7 @@ export async function mount(host, ctx) {
     .then((res) => (res.ok ? res.json() : null))
     .catch(() => null);
   if (!data) {
-    host.textContent = 'doc-20 offline — data/demos/doc20.json missing';
+    host.textContent = 'doc-20 offline: data/demos/doc20.json missing';
     return;
   }
 
@@ -66,7 +66,7 @@ export async function mount(host, ctx) {
   const single = await ctx.decide(data.doc, allQueries.slice(0, 1));
   const full = await ctx.decide(data.doc, allQueries);
   if (!full) {
-    caption.textContent = 'no recorded result for this handbook — offline.';
+    caption.textContent = 'No recorded result for this handbook (offline).';
     return;
   }
 
@@ -89,5 +89,5 @@ export async function mount(host, ctx) {
   statPair(onePass, full.ms / 1000, 'one pass, here');
   if (single) statPair(oneAt, (single.ms * data.questions.length) / 1000, 'one at a time');
 
-  caption.textContent = `${correct}/20 here: lookups and yes/no answers mostly land, ordered levels mostly don't — every miss is a number compared against a threshold in the text.`;
+  caption.textContent = `${correct}/20 here. Lookups and yes/no answers mostly land; ordered levels mostly do not. Every miss is a number compared against a threshold in the text.`;
 }

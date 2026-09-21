@@ -103,7 +103,7 @@ export async function mount(el0, ctx) {
   const caption = el(
     'p',
     'ex-caption',
-    "40 observations, 20 brands: brand .94 and category .94 with cue rules in the prompt (chance .05 / .125); is-it-an-ad .88 vs .80 always-yes. The cues are the program — without them brand drops to .75."
+    "40 observations, 20 brands. With cue rules in the prompt, brand .94 and category .94 (chance .05 / .125); is-it-an-ad .88 against .80 for always-yes. The cues are the program: without them brand drops to .75."
   );
   el0.appendChild(caption);
 

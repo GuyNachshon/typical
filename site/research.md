@@ -191,8 +191,9 @@ conditioned on non-∅; hard tier at chance for both models.
 
 The line is not monotone. The .750 → .694 drop at the typical-small step is a real trade
 ([§3ae](https://huggingface.co/OzLabs/typical-small)): DecisionMix v2 and the typed heads raise
-held-out noul/score/flip and clear two external floors (PagerDuty, jevlogs) at the cost of about 1
-SE of JevBench standard.
+held-out noul/score/flip and clear the PagerDuty floor for both models (.817 / .838 vs .792), at the
+cost of about 1 SE of JevBench standard. jevlogs (research-licensed, caveated) is marginal for small
+(.710 vs floor .697) and below floor for medium (.673).
 
 ## Findings
 
@@ -215,7 +216,9 @@ conditioned on non-∅; hard tier at chance for both models.
 3. **Rubric-conditioned workflow data teaches the decision shapes it contains, not general external
    abstraction.** Held-out rubric styles +34, held-out families +9–14, rubric-flip both-correct .43
    → .57. jevlogs, PagerDuty, and Mind2Web stayed at their constant-prediction floor for K-way
-   Choice until the typed heads and DecisionMix v2 (findings 6–7). (REPORT §3w, §3x)
+   Choice until the typed heads and DecisionMix v2 (findings 6–7); of those, only PagerDuty is
+   cleared by both released models (.817 / .838 vs .792). jevlogs (research-licensed, caveated) is
+   marginal for small (.710 vs .697) and below floor for medium (.673). (REPORT §3w, §3x)
 
 4. **Mixing is a first-class variable.** E .45–.50 restores evidence. ∅-augmented W rows fix
    abstention and MMLU, which no single eval-time null threshold can do for E and W at once. The
@@ -325,7 +328,8 @@ public 231 JevBench ids):
 | Qwen3-14B-Base | .819 | 1.00 | .559 | .60 |
 | **Qwen3.5-4B-Base** | .764 | 1.00 | **.495** | **.60** |
 
-Instruct-tuning of Qwen3 changes nothing on this task. The Qwen3.5 generation buys +5 hard and gives
+Instruct-tuning of Qwen3 leaves standard accuracy unchanged (.778 both) while hard-tier calibration
+is much worse (Brier .95 vs .67). The Qwen3.5 generation buys +5 hard and gives
 a 4B model hard-tier calibration matching the frozen 14B's, but not standard accuracy. The
 leaderboard's .83–.99 standard on the same checkpoint (SemIf, open-alternative-jev) comes from their
 rendering and method, which we are now replicating as a probe.

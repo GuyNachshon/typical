@@ -35,7 +35,7 @@
   <section class="section" id="results">
     <div class="container">
       <h2 class="section-title">Results</h2>
-      <p class="section-lede">Two released sizes, one recipe. The numbers that moved, and the ones that did not.</p>
+      <p class="section-lede">Two released sizes, one recipe. We report the numbers that moved and the ones that did not, including the JevBench hard tier, where both models are within one standard error of chance.</p>
 
       <div class="stat-grid">
         <div class="card stat-card">
@@ -51,7 +51,7 @@
         <div class="card stat-card">
           <span class="pill">CLINC-150</span>
           <div class="stat-number">.804 / .847</div>
-          <p class="stat-caption">small / medium · OOS abstain recall .827</p>
+          <p class="stat-caption">small / medium · OOS abstain recall .827 (typical-small)</p>
         </div>
       </div>
 
@@ -96,15 +96,15 @@
       <div class="how-grid">
         <div class="card how-card">
           <span class="pill">Choice</span>
-          <p class="how-sentence">Pick one candidate from a set you define at runtime; returns a probability for every option.</p>
+          <p class="how-sentence">Pick one candidate from a set you define at runtime. Returns a probability for every option and for &empty;.</p>
         </div>
         <div class="card how-card">
           <span class="pill">Noul</span>
-          <p class="how-sentence">A yes/no read on the same state — the one query type that is exact and order-invariant.</p>
+          <p class="how-sentence">A yes/no read on the same state. The only query type whose answer is exactly order-invariant.</p>
         </div>
         <div class="card how-card">
           <span class="pill">Score</span>
-          <p class="how-sentence">An ordered level, 0 through N, with an expected value under the candidates.</p>
+          <p class="how-sentence">An ordered level, 0 through N, plus the expected level under the candidates.</p>
         </div>
       </div>
 
@@ -118,13 +118,13 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
       </div>
 
       <p class="verified-copy">Typical is an open family of small decision models. Give it a text
-      state and a typed question — Choice over candidates you define at runtime, Noul (yes/no), or Score
-      (ordered levels) — and it returns a probability for every candidate plus an explicit &empty; in one
+      state and a typed question (Choice over candidates you define at runtime, Noul for yes/no, Score for
+      ordered levels) and it returns a probability for every candidate plus an explicit &empty; in one
       forward pass: no generation, no parsing, 45 ms per decision on one H100 and a few milliseconds per
-      extra question on the same state. It is not an LLM replacement and not a knowledge model: it decides
-      from the text you give it (&le;1k tokens), it does not plan, compute, or reason over long documents,
-      and on hard multi-step workflow judgments it is still at chance. Weights (1.7B, 4B) and inference
-      code are open on Hugging Face.</p>
+      extra question on the same state. It is not an LLM replacement or a knowledge model. It decides from
+      the text you give it (&le;1k tokens); it does not plan, compute, or reason over long documents, and
+      on hard multi-step workflow judgments it is still at chance. Weights (1.7B, 4B) and inference code
+      are open on Hugging Face.</p>
 
       <a class="ghost-link" href="research.html">Architecture and data →</a>
     </div>
@@ -134,23 +134,23 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
   <section class="section" id="demos">
     <div class="container">
       <h2 class="section-title">Demos</h2>
-      <p class="section-lede">Real games, real transcripts, one forward pass per decision. What works, what's partial, what fails.</p>
+      <p class="section-lede">Every demo runs the public <code>inference/typical</code> package, the same code behind the numbers above, one forward pass per decision. Live mode calls a local model server and shows its own measured latency and device; static mode replays recorded outputs. The tags say what works, what is partial, and what fails.</p>
 
       <h3 class="demos-subhead">Games</h3>
       <div class="games-grid">
         <div class="game-card">
-          <div class="game-card-head"><span class="pill">Works</span><h3>Snake</h3></div>
-          <p>Canvas, 10×10 board. No lookahead, one sentence per move — the candidate set is the only guardrail.</p>
+          <div class="game-card-head"><span class="pill">Partial</span><h3>Snake</h3></div>
+          <p>A 10×10 board on canvas. Each tick the model reads one sentence describing the board and picks one of the safe moves; the candidate set is the only guardrail, so it can never choose a collision. It trends toward the food only weakly (food-ward move .72 vs .53 chance in the probe; .55 vs .39 random-safe in the recorded run) and does not plan.</p>
           <div class="game-mount" data-game="snake"></div>
         </div>
         <div class="game-card">
           <div class="game-card-head"><span class="pill">Partial</span><h3>Drive</h3></div>
-          <p>Three.js toy road. The rules are in the prompt: it brakes and stops. It does not change lanes.</p>
+          <p>A Three.js toy road. The driving rules are in the prompt, and each tick the model picks one action from the legal set. It brakes and stops; it has never once changed lanes.</p>
           <div class="game-mount" data-game="drive"></div>
         </div>
         <div class="game-card">
           <div class="game-card-head"><span class="pill">Partial</span><h3>Doom</h3></div>
-          <p>Chocolate Doom, 1993 shareware, in WebAssembly. The model reads a sentence, presses a key — it mostly shoots.</p>
+          <p>Chocolate Doom, the 1993 shareware, running in WebAssembly. Each tick the model reads one sentence describing the scene and presses one key. It mostly shoots, enemy or no enemy.</p>
           <div class="game-mount" data-game="realdoom" data-game-fallback="doom"></div>
         </div>
       </div>
@@ -161,7 +161,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
         <div class="card exhibit-card exhibit-card--tryit">
           <span class="pill">Live</span>
           <h3>Try it</h3>
-          <p>Your own state, question, and options — one forward pass.</p>
+          <p>Your own state, question, and options, decided in one forward pass. Needs the local server; static mode cannot decide on new text.</p>
           <div data-demo="tryit"></div>
         </div>
 
@@ -176,7 +176,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
         <div class="card exhibit-card" data-exhibit-card>
           <span class="pill">Works</span>
           <h3>One document, twenty questions</h3>
-          <p>One KV pass over a handbook, twenty typed queries answered from the same cached state.</p>
+          <p>A short handbook is read once into the KV cache, then twenty typed questions (12 yes/no, 5 choice, 3 score) are answered from that cached state in one call. The card times the single pass against twenty one-at-a-time calls and marks each answer against a hand label.</p>
           <button class="ghost-link" type="button" data-exhibit-toggle>Run →</button>
           <div class="exhibit-body" data-exhibit-body hidden><div data-demo="doc-20"></div></div>
         </div>
@@ -184,7 +184,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
         <div class="card exhibit-card" data-exhibit-card>
           <span class="pill">Works</span>
           <h3>Rules are the program</h3>
-          <p>Same five facts. Reorder the rule precedence and the verdict moves live.</p>
+          <p>Five fixed facts about a loan applicant and four rules with a stated precedence. Reorder the rules and the model re-decides live on the same facts. A second panel runs six applicants under both orders and flags each flip.</p>
           <button class="ghost-link" type="button" data-exhibit-toggle>Run →</button>
           <div class="exhibit-body" data-exhibit-body hidden><div data-demo="rules"></div></div>
         </div>
@@ -192,7 +192,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
         <div class="card exhibit-card" data-exhibit-card>
           <span class="pill">Works</span>
           <h3>Ads</h3>
-          <p>One state, three typed questions, one pass: is it an ad, which brand, which category.</p>
+          <p>Forty short observations, each scored three ways in one call: is it an ad, which of 20 brands, which of 8 categories. The brand and category cues are written into the question, so the rules are the program. The tally compares every answer with a hand label.</p>
           <button class="ghost-link" type="button" data-exhibit-toggle>Run →</button>
           <div class="exhibit-body" data-exhibit-body hidden><div data-demo="ads"></div></div>
         </div>
@@ -200,7 +200,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
         <div class="card exhibit-card" data-exhibit-card>
           <span class="pill">Fails</span>
           <h3>Compaction</h3>
-          <p>A 24-call tool transcript, scored by relevance. P(keep) never crosses .5 on this pool.</p>
+          <p>A 24-call coding-tool transcript, each call scored with a yes/no relevance question. P(keep) never crosses .5 on this pool, so there is no usable keep/drop threshold; the card shows the ranking by P(keep) instead, with its AUROC against hand labels.</p>
           <button class="ghost-link" type="button" data-exhibit-toggle>Run →</button>
           <div class="exhibit-body" data-exhibit-body hidden><div data-demo="compaction"></div></div>
         </div>
@@ -208,10 +208,10 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
         <div class="card exhibit-card">
           <h3>What does not work</h3>
           <ul class="exhibit-list">
-            <li>Doom — mostly shoots, enemy or no enemy.</li>
-            <li>Drive — never once changes lanes.</li>
-            <li>Compaction — no usable keep/drop threshold.</li>
-            <li>Level-7 composition — temporal, units, expected value, trade-off: at chance.</li>
+            <li>Doom: mostly shoots, enemy or no enemy.</li>
+            <li>Drive: never once changes lanes.</li>
+            <li>Compaction: no usable keep/drop threshold.</li>
+            <li>Level-7 composition (temporal, units, expected value, trade-off): at chance.</li>
           </ul>
         </div>
 
@@ -224,11 +224,11 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
     <div class="container">
       <h2 class="section-title">What this isn't</h2>
       <p class="section-lede">Short states, literal rules, bounded candidate sets. No arithmetic, no timezones, no
-        trade-offs, no long policies, no vision. The hard tier is at chance and over-confident; Choice is
-        order-robust, not order-invariant. Here is the list.</p>
+        trade-offs, no long policies, no vision. The hard tier is at chance and over-confident, and Choice is
+        order-robust rather than order-invariant.</p>
       <ul class="limits-register">
-        <li>We do not claim to be faster, better, or cheaper than Jev or any hosted system &mdash; we have no
-          apples-to-apples run and JevBench is unranked here.</li>
+        <li>We do not claim to be faster, better, or cheaper than Jev or any hosted system: we have no
+          apples-to-apples run, and JevBench is unranked here.</li>
         <li>We do not do vision, audio, real-time control, game-playing skill, or planning/lookahead.
           Text-only, one forward pass, no search.</li>
         <li>We are not a knowledge model or a reasoner: MMLU-Pro among-K .34 / .46; level-7 composition
@@ -236,16 +236,16 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
           trade-offs.</li>
         <li>We do not read long documents: trained at &le;1,024-token states; JevBench long-policy items and
           multi-thousand-token states are out of distribution.</li>
-        <li>We do not claim "any label set, any domain" works equally well: some label sets regress against
-          their untyped control (CLINC &minus;4, TREC-fine &minus;10), and held-out rubric styles drop 4&ndash;6
-          points.</li>
+        <li>We do not claim "any label set, any domain" works equally well: CLINC is &minus;4 against the
+          untrained base, TREC-fine is &minus;10 (medium) against its untyped control, and held-out rubric styles
+          drop 4&ndash;6 points.</li>
         <li>We do not claim exact order-invariance for Choice, or exact IIA. Only Noul (yes/no) is exact;
           Choice is order-robust (mean-max &Delta;p .01&ndash;.08), and adding an irrelevant candidate can move
           log-odds .09&ndash;.22.</li>
         <li>We do not claim OOD calibration or hard-tier competence: both released models are at chance on the
           JevBench hard tier (Brier .79 / .77).</li>
-        <li>We have not released training code &mdash; only <code>inference/</code> is public; a training-code
-          release may follow.</li>
+        <li>We have not released training code. Only <code>inference/</code> is public; training code release
+          to follow.</li>
         <li>Licence: see the model card's licence section. The training mix includes sources with
           non-commercial or undeclared licences (ANLI is CC BY-NC 4.0); only <code>inference/</code> is
           public today.</li>
@@ -290,7 +290,7 @@ probs, runtime = m.decide(
 
 <footer class="footer">
   <div class="container footer-inner">
-    <div>Typical is research-grade, released open. Licence: see each model card on Hugging Face.</div>
+    <div>Research-grade, released open. Licence: see each model card on Hugging Face.</div>
     <div class="footer-links">
       <a href="https://huggingface.co/OzLabs/typical-small">typical-small</a>
       <a href="https://huggingface.co/OzLabs/typical-medium">typical-medium</a>

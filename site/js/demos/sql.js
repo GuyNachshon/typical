@@ -50,7 +50,7 @@ export async function mount(el, ctx) {
 
   const readoutLine = document.createElement('p');
   readoutLine.className = 'ex-readout';
-  readoutLine.textContent = 'pick a condition to scan the table.';
+  readoutLine.textContent = 'Pick a condition to scan the table.';
   el.appendChild(readoutLine);
 
   const register = document.createElement('div');
@@ -66,7 +66,7 @@ export async function mount(el, ctx) {
   const caption = document.createElement('p');
   caption.className = 'ex-caption';
   caption.textContent =
-    "129 rows, one forward pass each, no embeddings: 4 conditions at precision 1.00 and recall .69–1.00 against hand labels; it keys on the words in the rule — 'charged once' lit up 'duplicate charge'.";
+    "129 rows, one forward pass each, no embeddings. Four conditions score precision 1.00 and recall .69–1.00 against hand labels. It keys on the words in the rule: 'charged once' lit up 'duplicate charge'.";
   el.appendChild(caption);
 
   const rowEls = pool.rows.map((row) => {

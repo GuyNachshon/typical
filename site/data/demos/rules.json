@@ -1,6 +1,6 @@
 {
   "title": "Same facts, different rule - 6 applicants",
-  "caption": "Held-out DecisionMix v2 rule families and grammars: .836 / .898 accuracy (typical-small). Rubric flip (same facts, a different rule listed first) both-correct .718 / .743 - the model answers each order correctly more often than it answers both orders correctly, because the orders sometimes disagree.",
+  "caption": "Held-out DecisionMix v2 rule families and grammars: .836 / .898 accuracy (typical-small). Rubric flip (same facts, a different rule listed first) both-correct .718 / .743. The model answers each order correctly more often than it answers both orders correctly, because the orders sometimes disagree.",
   "applicants": [
     {
       "id": "a1-low-credit-verified",

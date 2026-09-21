@@ -145,7 +145,7 @@ export async function mount(host, ctx) {
       .map((s) => s.trim())
       .filter(Boolean);
     if (!state || !question || labels.length < 2) {
-      readout.textContent = 'need a state, a question, and at least two comma-separated options.';
+      readout.textContent = 'Needs a state, a question, and at least two comma-separated options.';
       return;
     }
     runBtn.disabled = true;

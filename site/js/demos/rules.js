@@ -29,7 +29,7 @@ export async function mount(host, ctx) {
     fetch('data/demos/rules.json').then((res) => (res.ok ? res.json() : null)).catch(() => null),
   ]);
   if (!flip || !rulesDoc) {
-    host.textContent = 'rules offline — data/presets.json or data/demos/rules.json missing';
+    host.textContent = 'rules offline: data/presets.json or data/demos/rules.json missing';
     return;
   }
 
@@ -90,7 +90,7 @@ export async function mount(host, ctx) {
     const next = order.slice();
     [next[from], next[to]] = [next[to], next[from]];
     if (ctx.mode() !== 'live' && !flip.orders.some((o) => sameOrder(o, next))) {
-      staticNote.textContent = 'static mode: only the two recorded orders (deny-first / approve-first) are available here — run the live server to try others.';
+      staticNote.textContent = 'Static mode: only the two recorded orders (deny-first / approve-first) are available. Run the live server to try others.';
       return;
     }
     staticNote.textContent = '';
@@ -105,7 +105,7 @@ export async function mount(host, ctx) {
     const res = await ctx.decide(flip.state, [{ type: 'choice', question, labels: order }]);
     const ms = res?.ms ?? performance.now() - t0;
     if (!res) {
-      readoutLine.textContent = 'no recorded result for this order — offline.';
+      readoutLine.textContent = 'No recorded result for this order (offline).';
       return;
     }
     const r = res.results[0];

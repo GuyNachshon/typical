@@ -74,7 +74,7 @@ export async function mount(host, ctx) {
   const register = el('div', 'compaction-register');
   wrap.appendChild(register);
 
-  const caption = el('p', 'ex-caption', '…this model does not read code well enough to compact a coding transcript. We show it anyway.');
+  const caption = el('p', 'ex-caption', 'This model does not read code well enough to compact a coding transcript. The ranking is shown anyway.');
   wrap.appendChild(caption);
 
   host.appendChild(wrap);
@@ -99,7 +99,7 @@ export async function mount(host, ctx) {
     scored.map((s) => s.call.keep)
   );
   const keepAcc = scored.filter((s) => (s.pKeep > 0.5) === s.call.keep).length / scored.length;
-  status.textContent = `ranked by P(keep) — AUROC ${auc != null ? auc.toFixed(2) : '—'} (spec: .72) · threshold-.5 accuracy ${keepAcc.toFixed(2)} (majority .542) · never crosses .5`;
+  status.textContent = `ranked by P(keep): AUROC ${auc != null ? auc.toFixed(2) : '—'} (spec: .72) · threshold-.5 accuracy ${keepAcc.toFixed(2)} (majority .542) · never crosses .5`;
 
   scored.forEach(({ call, pKeep }, rank) => {
     const r = el('div', 'ex-row');
