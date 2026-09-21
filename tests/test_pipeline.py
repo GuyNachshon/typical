@@ -1718,7 +1718,7 @@ def test_max_state_threads_through_run_readout_and_forward_batches(monkeypatch):
 # 15. native_choice_v1 (native.py, PLAN4 sec 11-12): --readout native --nc_head {n2,n3,n2n3}
 # ---------------------------------------------------------------------------
 
-from native import NativeHead, run_batch_native, native_features, shuffle_options, _fit_chunks, _effective_render, RENDERS  # noqa: E402
+from native import NativeHead, run_batch_native, native_features, shuffle_options, _fit_chunks, _effective_render, _yes_idx, RENDERS  # noqa: E402
 
 
 def _native_batch(head, examples, nc_head, null, vec_cache=None):
@@ -1965,6 +1965,27 @@ def test_bern_render_is_query_only():
     assert _effective_render(model) == "query_only"
     text, spans = RENDERS["query_only"]("is this eligible?", ["no", "yes"])
     assert text == "is this eligible?\n" and spans == []
+
+
+def test_bern_out_of_domain_kway_row_degrades_instead_of_crashing():
+    """--noul_head bern is trained/evaluated 2-way only (qtype == noul), but a mixed-family
+    eval run (JevBench) can hand it a K-way row with no literal "yes" candidate -- PLAN7 track
+    C: this must degrade to a well-defined (if meaningless) distribution, not crash the whole
+    eval batch. _yes_idx defaults such rows to column 0; _bern_probs spreads 1-p_yes uniformly
+    over the other valid candidates, which is exactly today's 1-p_yes-at-the-other-slot at K=2."""
+    torch.manual_seed(0)
+    d, B, Kmax = 8, 2, 5
+    model = NativeHead(d, nc_head="n3", noul_head="bern")
+    hz = torch.randn(B, d)
+    cmask = torch.zeros(B, Kmax, dtype=torch.bool)
+    cmask[0, :2] = True   # in-domain: 2-way
+    cmask[1, :5] = True   # out-of-domain: 5-way, no "yes" among its candidates
+    yi = _yes_idx([["no", "yes"], ["cancel", "refund", "status", "change_address", "other"]], hz.device)
+    assert yi.tolist() == [1, 0]  # row 1 has no "yes" -> defaults to column 0
+    p = model._bern_probs(hz, cmask, yi)
+    assert torch.allclose(p[0, :2].sum(), torch.tensor(1.0), atol=1e-5) and torch.all(p[0, 2:] == 0)
+    assert torch.allclose(p[1, :5].sum(), torch.tensor(1.0), atol=1e-5)
+    assert torch.all(p[1] >= 0)
 
 
 # ---------------------------------------------------------------------------

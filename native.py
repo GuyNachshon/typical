@@ -87,12 +87,15 @@ def _effective_render(model):
 def _yes_idx(cand_lists, dev):
     """[B] index of the literal "yes" candidate per row (case-insensitive) -- --noul_head bern
     places P(yes) there regardless of rendered order, so a reversed ["yes","no"] eval row gets
-    the identical P(yes) as ["no","yes"] (PLAN7 track C reversed-label control)."""
+    the identical P(yes) as ["no","yes"] (PLAN7 track C reversed-label control).
+    ponytail: a row with no literal "yes" (out-of-domain for a 2-way head -- e.g. a JevBench
+    K-way item scored by a --noul_head bern model) defaults to index 0 rather than raising, so
+    a mixed-family eval run degrades to "wrong on that row" instead of aborting entirely; the
+    matched-arm eval sets (qtype == noul) always have one, so training/val are unaffected."""
     idx = []
     for cl in cand_lists:
         matches = [i for i, c in enumerate(cl) if c.strip().lower() == "yes"]
-        assert matches, f"--noul_head bern needs a literal 'yes' candidate, got {cl}"
-        idx.append(matches[0])
+        idx.append(matches[0] if matches else 0)
     return torch.tensor(idx, dtype=torch.long, device=dev)
 
 
@@ -176,18 +179,21 @@ class NativeHead(nn.Module):
 
     def _bern_probs(self, hz, cmask, yes_idx):
         """PLAN7 track C --noul_head bern: P(yes) = sigmoid(w_n . h_D), no candidate text ever
-        read -> position-invariant by construction. 2-way only (assert): yes_idx places p_yes
-        at the caller-resolved "yes" column, 1-p_yes at the other -- this is exactly why the
-        reversed-label ["yes","no"] control must reproduce ["no","yes"]'s P(yes) exactly."""
-        assert (cmask.sum(-1) == 2).all(), "--noul_head bern is 2-way only"
+        read -> position-invariant by construction. yes_idx places p_yes at the caller-resolved
+        "yes" column; 1-p_yes spreads uniformly over the other valid candidates -- this is
+        exactly why the reversed-label ["yes","no"] control must reproduce ["no","yes"]'s
+        P(yes) exactly. Trained/evaluated rows are always 2-way (qtype == noul), where this
+        reduces to exactly 1-p_yes at the one other slot; an out-of-domain K-way row (e.g. a
+        JevBench item scored by this head) is well-defined but not meaningful -- see _yes_idx."""
         B, Kmax = cmask.shape
         p_yes = torch.sigmoid(self.w_n(hz).squeeze(-1))
         idx = yes_idx if yes_idx is not None else torch.ones(B, dtype=torch.long, device=hz.device)
-        p = hz.new_zeros(B, Kmax)
+        K = cmask.sum(-1)
+        other = (1 - p_yes) / (K - 1).clamp_min(1).float()
+        p = other.unsqueeze(-1).expand(B, Kmax) * cmask.float()
         ar = torch.arange(B, device=hz.device)
         p[ar, idx] = p_yes
-        p[ar, 1 - idx] = 1 - p_yes
-        return p
+        return p.masked_fill(~cmask, 0.0)
 
     def _cumlink_probs(self, hz, c3, cmask):
         """PLAN7 track C --score_head cumlink: cumulative-link ordinal head. u = w_o . h_D;
