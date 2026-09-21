@@ -48,8 +48,8 @@ function buildResultsTable(container, models, frozenDoc) {
   table.className = 'results-table';
   const thead = document.createElement('thead');
   thead.innerHTML =
-    '<tr><th>model</th><th>backbone</th><th>tap</th><th>ms K=2</th><th>ms K=32</th><th>ms K=256</th>' +
-    '<th>JevBench std</th><th>frozen backbone, 3-shot (std)</th><th>JevBench easy</th><th>JevBench hard</th><th>ECE std</th>' +
+    '<tr><th>model</th><th>backbone</th><th>tap</th><th>ms K=2</th><th>ms K=256</th>' +
+    '<th>JevBench std</th><th>frozen 3-shot (std)</th><th>JevBench hard</th><th>ECE std</th>' +
     '<th>CLINC-150</th><th>SNLI</th><th>MNLI</th><th>BoolQ</th><th>PagerDuty (floor .792)</th><th>HF</th></tr>';
   table.appendChild(thead);
   const tbody = document.createElement('tbody');
@@ -62,11 +62,9 @@ function buildResultsTable(container, models, frozenDoc) {
         td(m.backbone),
         td(m.tap),
         td(String(m.latency.single_ms.k2)),
-        td(String(m.latency.single_ms.k32)),
         td(String(m.latency.single_ms.k256)),
         tdAcc(m.jevbench.std.acc),
         tdAcc(frozenByTrained.get(m.id)),
-        tdAcc(m.jevbench.easy.acc),
         tdAcc(m.jevbench.hard.acc),
         td(fmt3(m.jevbench.std.ece)),
         tdAcc(m.topic_intent.clinc),
@@ -93,7 +91,7 @@ function buildResultsTable(container, models, frozenDoc) {
   const footnote = document.createElement('p');
   footnote.className = 'chart-caption';
   footnote.textContent =
-    'typical-small-preview → typical-small is .750 → .694 on JevBench standard (~1 SE, n_eff = 36), traded for typed heads and calibration (held-out score NLL 2.03 → 1.01).';
+    'JevBench easy is 1.000 for every model and is omitted. typical-small-preview → typical-small is .750 → .694 on JevBench standard (~1 SE, n_eff = 36), traded for typed heads and calibration (held-out score NLL 2.03 → 1.01).';
   container.appendChild(footnote);
 
   if (frozenByTrained.size) {

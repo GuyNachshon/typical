@@ -119,6 +119,8 @@ code, pre { font-family: var(--font-mono); font-size: 12px; }
 /* ---- pill tag ---- */
 .pill {
   display: inline-block;
+  width: auto;
+  align-self: flex-start;
   border: 1px solid var(--color-champagne);
   border-radius: var(--radius-pill);
   padding: 4px 10px;

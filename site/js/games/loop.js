@@ -5,13 +5,15 @@
 // re-deriving the same mount() contract three times. Chrome styles (.gc-*) live in
 // exhibits.css, which reuses the .ex-row/.ex-bar/.ex-ghost kit for the decision strip and
 // policy/restart controls - see the "game chrome" section there.
+// Atoms palette (keys kept so the renderers need no edits): canvas black, cream strokes,
+// champagne for the one emphasised element, ash for muted surfaces.
 export const TOKENS = {
-  putty: '#c4c3b6',
-  ink: '#000000',
-  bone: '#e7e5e4',
-  vellum: '#dfdcd5',
-  graphite: '#595855',
-  paper: '#ffffff',
+  putty: '#000000',   // field / ground
+  ink: '#fff7dd',     // primary marks (snake body, ego car, wall edges)
+  bone: '#8f8b83',    // secondary objects (traffic, floor)
+  vellum: '#2a2825',  // hairlines / grid
+  graphite: '#66635f',// muted surfaces (road)
+  paper: '#fff7dd',
 };
 
 // Builds the shared DOM inside `el`: canvas + HUD + policy/restart buttons + decision strip +

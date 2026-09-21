@@ -36,7 +36,8 @@ export async function mount(el) {
     // ponytail: fallback opacity if replays.json is missing/short — still reads as a field,
     // just not a real one. Floor at .06 so no tile disappears entirely.
     const p = probs[i] ?? 0.15;
-    tile.style.opacity = Math.max(0.1, Math.min(1, p)).toFixed(3);
+    // sqrt keeps the ordering but lets small probabilities read as texture instead of black
+    tile.style.opacity = (0.08 + 0.92 * Math.sqrt(Math.max(0, Math.min(1, p)))).toFixed(3);
     el.appendChild(tile);
   }
 }
