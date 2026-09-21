@@ -113,6 +113,28 @@ def apply_ordinal_smooth(examples, tau):
     return out
 
 
+def apply_drop_truncated(examples, tokenizer, max_state, label):
+    """--drop_truncated (tl1b item 1): drop train rows whose state exceeds --max_state backbone
+    tokens (no special tokens) -- states are right-truncated at train/eval time (native.py),
+    so a row whose facts land past max_state was training the model to answer confidently from
+    a state it never actually saw (REPORT S3ab/S3af: data_wf_long p50 1,845 tokens, 98.8% of
+    long rows > 1,024). Cheap pre-filter: only tokenize rows already longer than 3.5*max_state
+    chars (this repo's states are English; that many chars can't possibly under-run max_state
+    tokens) -- tokenizing every row of a ~1M-row corpus for a mostly-irrelevant check is the
+    expensive path this half-measure exists to avoid. Prints how many of `label`'s rows were
+    dropped."""
+    char_cut = 3.5 * max_state
+    suspect = [i for i, ex in enumerate(examples) if len(ex["state"]) > char_cut]
+    drop = set()
+    if suspect:
+        lens = [len(ids) for ids in tokenizer([examples[i]["state"] for i in suspect],
+                                                add_special_tokens=False)["input_ids"]]
+        drop = {suspect[j] for j, n in enumerate(lens) if n > max_state}
+    print(f"--drop_truncated {label}: {len(drop)}/{len(examples)} rows dropped "
+          f"({len(suspect)} tokenized, {len(examples) - len(suspect)} skipped by the char pre-filter)")
+    return [ex for i, ex in enumerate(examples) if i not in drop]
+
+
 def make_smoke_examples(n, seed):
     rng = random.Random(seed)
     tasks = ["snli", "unli", "clinc"]
@@ -208,6 +230,12 @@ def data_generator(examples, bs, seed):
                 yield b
 
 
+def base_backbone(backbone):
+    """The underlying encode.Backbone: --readout mcq/native wrap it in MCQHead (attribute
+    `.backbone`); --readout energy uses it directly."""
+    return getattr(backbone, "backbone", backbone)
+
+
 def bucket_for_dir(dirname, bucket_map):
     """PLAN6 Queue review: dir -> family bucket for --family_weights. --bucket_map overrides
     win; else data_kb*->K, data_wf*->W; anything else (including --data) falls back to E."""
@@ -293,7 +321,7 @@ def bucketed_data_generator(examples, bs, seed, weights):
         yield next(gens[rng.choices(names, weights=ws)[0]])
 
 
-def add_extra_data(args, train_examples, eval_sets):
+def add_extra_data(args, train_examples, eval_sets, tokenizer=None):
     """PLAN3 E3: mix --extra_data corpora (e.g. data_kb, closed-book MCQ with teacher labels) into
     training in place; each dir's val becomes an eval set (<dir>_val) so distillation quality is
     reported separately. multiset groups (meta.ms_group) are namespaced by dir so two expanded
@@ -311,6 +339,8 @@ def add_extra_data(args, train_examples, eval_sets):
                 ex["meta"]["ms_group"] = f"{ed.name}/{ex['meta']['ms_group']}"
         if args.family_weights or args.null_aug:
             tag_bucket(rows, ed.name, bucket_map)
+        if args.drop_truncated:
+            rows = apply_drop_truncated(rows, tokenizer, args.max_state, ed.name)
         train_examples += rows
         # --eval_cap: head-N (not a random sample) so adjacent rubric-flip pairs stay intact (PLAN6 §W)
         cap = lambda rows: rows[:args.eval_cap] if args.eval_cap else rows
@@ -334,7 +364,7 @@ def load_run_data(args, backbone):
         eval_sets = {"smoke_eval": make_smoke_examples(16, seed=2)}
         if args.family_weights or args.null_aug:
             tag_bucket(train_examples, Path(args.data).name, parse_bucket_map(args.bucket_map))
-        add_extra_data(args, train_examples, eval_sets)  # e.g. a tiny multiset file for an E3-ms smoke
+        add_extra_data(args, train_examples, eval_sets, tokenizer=base_backbone(backbone).tokenizer)  # e.g. a tiny multiset file for an E3-ms smoke
         cache = None
         if build_cache_:
             all_ex = train_examples + val_examples + eval_sets["smoke_eval"]
@@ -355,7 +385,10 @@ def load_run_data(args, backbone):
         eval_sets = {Path(p).stem: load_jsonl(p) for p in sorted(glob.glob(str(data_dir / "eval" / "*.jsonl")))}
         if args.family_weights or args.null_aug:
             tag_bucket(train_examples, data_dir.name, parse_bucket_map(args.bucket_map))
-        add_extra_data(args, train_examples, eval_sets)
+        if args.drop_truncated:
+            train_examples = apply_drop_truncated(train_examples, base_backbone(backbone).tokenizer,
+                                                   args.max_state, data_dir.name)
+        add_extra_data(args, train_examples, eval_sets, tokenizer=base_backbone(backbone).tokenizer)
 
         cache = None
         if build_cache_ and use_vec:
@@ -636,6 +669,36 @@ def dump_eval_logits(args, backbone, model, cache, val_examples, eval_sets):
         meta = [{k: v for k, v in ex.items() if k != "state"} for ex in examples]
         with open(out_dir / f"{name}.meta.json", "w") as f:
             json.dump(meta, f)
+
+
+def checkpoint_metric(backbone, model, cache, eval_sets, best_on, args, vec_cache, val_nll, wb, step):
+    """--best_on (tl1b item 4): the metric checkpoint selection watches. None (default) ->
+    val_nll, today's behaviour unchanged. Else the unweighted mean NLL of the named eval sets
+    (val_nll is still printed/logged by the caller either way -- this only changes what best.pt
+    tracks)."""
+    if not best_on:
+        return val_nll
+    per_set = {name: eval_val_loss(backbone, model, cache, eval_sets[name], args.eval_bs, joint=args.joint,
+                                    readout=args.readout, vec_cache=vec_cache, shots=args.shots)
+               for name in best_on}
+    metric = sum(per_set.values()) / len(per_set)
+    print(f"step {step} best_on_nll {metric:.4f} (" + ", ".join(f"{k}={v:.4f}" for k, v in per_set.items()) + ")")
+    if wb:
+        wb.log({"val/best_on_nll": metric, **{f"val/best_on/{k}": v for k, v in per_set.items()}}, step=step)
+    return metric
+
+
+def resolve_best_on(best_on_arg, eval_sets):
+    """--best_on NAME[,NAME...] (tl1b item 4): checkpoint-selection eval sets, e.g.
+    'data_u_val,data_wh_val' -- names as they appear in eval_sets (add_extra_data names an
+    extra dir's val split '<dir>_val'). None (default) -> None, today's in-distribution
+    val_nll selection is untouched."""
+    if not best_on_arg:
+        return None
+    names = [n.strip() for n in best_on_arg.split(",") if n.strip()]
+    missing = [n for n in names if n not in eval_sets]
+    assert not missing, f"--best_on: unknown eval set(s) {missing}; available: {sorted(eval_sets)}"
+    return names
 
 
 def resolve_calib_examples(calib_sets_arg, val_examples, eval_sets):
@@ -945,6 +1008,10 @@ def parse_args():
     p.add_argument("--calib_sets", default=None,
                     help="comma-separated eval-set names (as in results.json['eval'], plus 'val') to fit T and "
                          "the null_offset b jointly on by grid search; unset = today's behaviour (val only, b=0)")
+    p.add_argument("--best_on", default=None,
+                    help="tl1b item 4: comma-separated eval-set names (as in results.json['eval'], e.g. "
+                         "'data_u_val,data_wh_val') -- best.pt is picked on the unweighted mean NLL of these sets "
+                         "instead of the in-distribution val_nll (which is still logged/printed unchanged)")
     p.add_argument("--family_weights", default=None,
                    help="PLAN6 Queue review: e.g. 'E:0.35,K:0.25,W:0.40' -- family-balanced sampler over "
                         "meta.fam_bucket (else --data->E, a data_kb*/data_wf* --extra_data dir->K/W); "
@@ -960,6 +1027,10 @@ def parse_args():
     p.add_argument("--eval_limit", type=int, default=0, help="cap each eval set (smoke runs)")
     p.add_argument("--tap_layer", type=int, default=0, help="tower memory from layer T (0 = last layer)")
     p.add_argument("--zscore", action="store_true", help="per-dim standardise backbone features (stats from 512 train states)")
+    p.add_argument("--grad_ckpt", action="store_true",
+                    help="tl1b: backbone.model.gradient_checkpointing_enable (use_reentrant=False) -- trades "
+                         "recompute for activation memory on long W-family states at large backbones; LoRA "
+                         "layers still get grads (non-reentrant checkpointing needs no frozen-embedding trick)")
     p.add_argument("--eval_only", action="store_true")
     p.add_argument("--dump_logits", default=None,
                     help="with --eval_only: dump raw per-set logits/target/label/K + meta to DIR "
@@ -995,6 +1066,10 @@ def parse_args():
     p.add_argument("--max_state", type=int, default=256,
                     help="--readout native: decision-state truncation length in tokens, threaded to "
                          "run_batch_native/native_features/calibrate_zscore_native (256 = today's default)")
+    p.add_argument("--drop_truncated", action="store_true",
+                    help="tl1b item 1: drop --data/--extra_data train rows whose state tokenizes past "
+                         "--max_state (a right-truncated state can't carry the facts it was labelled on -- "
+                         "REPORT S3ab/S3af); val/eval rows are untouched. Prints a per-source-dir drop count")
     p.add_argument("--perm_lambda", type=float, default=0.0,
                     help="--readout native: weight on native.perm_consistency_loss -- a second forward of a random 1/4 of "
                          "the batch under a fresh option order, KL between the two candidate distributions aligned by "
@@ -1023,6 +1098,9 @@ def parse_args():
     p.add_argument("--delta_gamma", type=float, default=0.0,
                     help="PLAN3 E3-ms: weight on the Huber log-odds-shift term over meta.delta_t triples "
                          "(scripts/ms_targets.py); 0 = off (default, loss unchanged)")
+    p.add_argument("--brier_lambda", type=float, default=0.0,
+                    help="tl1b item 5: weight on lambda*((softmax(logits)-target)**2).sum(-1).mean() added to "
+                         "decision_loss (target includes the null column); 0 = off (default, loss unchanged)")
     args = p.parse_args()
 
     if args.readout == "native":
@@ -1084,6 +1162,8 @@ def main():
                               hybrid=not args.no_hybrid, mps_safe=(device == "mps"), listwise=args.listwise,
                               d_cand=d_cand, null=args.null, head=args.head, z_dim=args.z_dim, z_probes=args.z_probes,
                               tiny_layers=args.tiny_layers if args.cand_encoder == "tiny" else 0).to(device)
+    if args.grad_ckpt:
+        base_backbone(backbone).model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     cache, train_examples, val_examples, eval_sets = load_run_data(args, backbone)
     vec_cache = cache if args.cand_encoder == "qwen3emb" else None
     if args.zscore and args.readout == "native":
@@ -1120,6 +1200,7 @@ def main():
         finish_wandb(wb, results)
         return
 
+    best_on = resolve_best_on(args.best_on, eval_sets)
     opt, sched = build_optimizer(model, backbone, args)
     all_params = list(model.parameters()) + list(backbone.trainable_parameters())
 
@@ -1158,7 +1239,7 @@ def main():
                                   teacher=batch["teacher"], has_teacher=batch["has_teacher"],
                                   alpha=args.distill_alpha, beta=args.distill_beta, T=args.distill_T,
                                   delta_idx=batch.get("delta_idx"), delta_tgt=batch.get("delta_tgt"),
-                                  gamma=args.delta_gamma)
+                                  gamma=args.delta_gamma, brier_lambda=args.brier_lambda)
             if args.perm_lambda > 0:
                 loss = loss + args.perm_lambda * perm_consistency_loss(
                     lambda ex, b: run_batch_native(backbone, model, b, ex, max_state=args.max_state, vec_cache=vec_cache),
@@ -1199,8 +1280,9 @@ def main():
             print(f"step {step} val_nll {val_nll:.4f}")
             if wb:
                 wb.log({"val/nll": val_nll}, step=step)
-            if val_nll < best_val:
-                best_val = val_nll
+            ckpt_metric = checkpoint_metric(backbone, model, cache, eval_sets, best_on, args, vec_cache, val_nll, wb, step)
+            if ckpt_metric < best_val:
+                best_val = ckpt_metric
                 save_checkpoint(best_path, model, backbone, step, opt, sched, best_val, args, tower_lora_only=True)
 
         if step % args.eval_every == 0 and step != args.steps:  # final eval below uses best.pt

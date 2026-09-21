@@ -392,9 +392,13 @@ def long_prefix(dom, rng):
 
 def assemble_state(policy, facts, request, dom, rng, long):
     if long:
+        # tl1b (REPORT S3ab/S3af): Case FIRST, policy filler after -- states right-truncate at
+        # --max_state at train/eval time, so a Case rendered last (past the 20-55 filler
+        # sections + real policy) was silently dropped 98.8% of the time at max_state=1,024,
+        # training the model to answer confidently from facts it never saw.
         secs = long_prefix(dom, rng)
         secs.insert(rng.randint(0, len(secs)), f"## {cap(DOMAINS[dom]['noun'])}\n{policy}")
-        return "\n\n".join(secs) + f"\n\nCase: {facts} {request}"
+        return f"Case: {facts} {request}\n\n" + "\n\n".join(secs)
     order = rng.random()
     if order < 0.6:
         return f"{policy}\n{facts} {request}"

@@ -285,7 +285,7 @@ def factored_null_logits(gate, s, c, h, cmask, temperature: float = 1.0):
 
 def decision_loss(logits, target, p_null, cmask, teacher=None, has_teacher=None,
                    alpha: float = 1.0, beta: float = 0.0, T: float = 2.0,
-                   delta_idx=None, delta_tgt=None, gamma: float = 0.0):
+                   delta_idx=None, delta_tgt=None, gamma: float = 0.0, brier_lambda: float = 0.0):
     """Soft-CE against the hard/soft gold target (weight alpha), plus PLAN3 E3-T's
     distillation term beta * T^2 * KL(P_T^T || P_S^T) for rows carrying a `teacher`
     field (scripts/teacher_label.py) -- see collate_teacher. beta=0 (default) reproduces
@@ -294,18 +294,27 @@ def decision_loss(logits, target, p_null, cmask, teacher=None, has_teacher=None,
     gamma > 0 (PLAN3 E3-ms): + gamma * mean Huber(D^S_ij - D^T_ij) over collate_delta's triples,
     D^S_ij = [s_i - s_j](variant row) - [s_i - s_j](orig row) from the candidate logits (the
     per-row null composition cancels in the difference). Candidate-blind heads (z1/zr) have
-    D^S == 0 -> constant, no gradient; only set-conditioned heads (zr_set) can fit it."""
+    D^S == 0 -> constant, no gradient; only set-conditioned heads (zr_set) can fit it.
+    brier_lambda > 0 (tl1b item 5, Phase-10 calibration): + lambda * mean_row sum_j (softmax(logits)_j
+    - t_j)^2 over the full [K+1] target t (including the null column) -- a direct probability-quality
+    penalty alongside the log loss; 0 (default) leaves the loss unchanged."""
     t = torch.cat([(1 - p_null).unsqueeze(-1) * target, p_null.unsqueeze(-1)], dim=-1)
     logp = F.log_softmax(logits, dim=-1)
     loss = alpha * -(t * logp).sum(-1)
+    if brier_lambda > 0:
+        loss = loss + brier_lambda * (logp.exp() - t).pow(2).sum(-1)
     if beta > 0 and teacher is not None:
-        valid = torch.cat([cmask, torch.ones(cmask.shape[0], 1, dtype=torch.bool, device=cmask.device)], dim=-1)
+        # PLAN7 tl1b (§3ab/§3af follow-up): KL renormalised over the K candidate columns only,
+        # not the null column -- teacher rows are label>=0 decisions labelled with the null slot
+        # forced to 0 (scripts/teacher_label.py), so including it would just teach the student to
+        # zero its own null probability as a side effect of distillation, not from the gold target.
         neg = torch.finfo(logits.dtype).min
-        logp_s = F.log_softmax(logits.masked_fill(~valid, neg) / T, dim=-1)
+        s_cand = logits[:, :-1].masked_fill(~cmask, neg)
+        logp_s = F.log_softmax(s_cand / T, dim=-1)
         # ponytail: we only ever persist the teacher's T=1 probabilities (not logits), so
         # re-tempering to T is log(p) -> /T -> softmax again -- exact for T_orig=1 (the
         # lse(z) constant introduced by log-then-exp cancels in the softmax), see PLAN3.md E3-T.
-        logt = torch.log(teacher.clamp_min(1e-12)).masked_fill(~valid, neg)
+        logt = torch.log(teacher[:, :-1].clamp_min(1e-12)).masked_fill(~cmask, neg)
         logp_t = F.log_softmax(logt / T, dim=-1)
         kl = (logp_t.exp() * (logp_t - logp_s)).sum(-1)
         mask = has_teacher.to(kl.dtype) if has_teacher is not None else torch.ones_like(kl)

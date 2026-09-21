@@ -165,6 +165,28 @@ def test_null_target_all_mass_on_null():
     assert torch.allclose(loss, expected, atol=1e-6)
 
 
+def test_brier_lambda_matches_hand_computation_and_zero_is_noop():
+    """tl1b item 5: brier_lambda=0 (default) must reproduce the untouched CE loss exactly;
+    brier_lambda>0 adds lambda * mean_row sum_j (softmax(logits)_j - t_j)^2 over the full
+    [K+1] target (t includes the null column, via the same (1-p_null)*target/p_null split)."""
+    torch.manual_seed(1)
+    B, Kmax = 5, 4
+    logits = torch.randn(B, Kmax + 1) * 2
+    p_null = torch.rand(B) * 0.5
+    cmask = torch.ones(B, Kmax, dtype=torch.bool)
+    target = torch.softmax(torch.randn(B, Kmax), dim=-1)
+
+    ce_only = decision_loss(logits, target, p_null, cmask)
+    off = decision_loss(logits, target, p_null, cmask, brier_lambda=0.0)
+    assert torch.allclose(off, ce_only, atol=1e-6)
+
+    t = torch.cat([(1 - p_null).unsqueeze(-1) * target, p_null.unsqueeze(-1)], dim=-1)
+    p = torch.softmax(logits, dim=-1)
+    manual_brier = (p - t).pow(2).sum(-1).mean()
+    with_brier = decision_loss(logits, target, p_null, cmask, brier_lambda=0.5)
+    assert torch.allclose(with_brier, ce_only + 0.5 * manual_brier, atol=1e-6)
+
+
 # ---------------------------------------------------------------------------
 # 5. LoRA zero-init + grad isolation
 # ---------------------------------------------------------------------------
@@ -731,13 +753,11 @@ def test_factored_iia_add_candidate():
 # 13. MCQ-LoRA readout (mcq.py)
 # ---------------------------------------------------------------------------
 
-@pytest.fixture(scope="session")
-def tied_mcq_head(tmp_path_factory):
+def _make_tied_mcq_head(d, lora_layers=2, lora_r=4):
     """A tiny random-weight Qwen3 with TIED embeddings (conftest's tiny_model_dir defaults
     to untied, per Qwen3Config()'s default) + the real Qwen3-0.6B-Base tokenizer, so the
     lm_head-from-embed_tokens path in MCQHead is exercised without a second model load."""
     from transformers import AutoModel, AutoTokenizer, Qwen3Config
-    d = tmp_path_factory.mktemp("tiny_qwen3_tied")
     tok = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B-Base", padding_side="right")
     cfg = Qwen3Config(hidden_size=64, num_hidden_layers=4, num_attention_heads=4,
                        num_key_value_heads=2, intermediate_size=128, vocab_size=len(tok),
@@ -745,7 +765,12 @@ def tied_mcq_head(tmp_path_factory):
     AutoModel.from_config(cfg).save_pretrained(d)
     tok.save_pretrained(d)
     torch.manual_seed(0)
-    return MCQHead(name=str(d), lora_layers=2, lora_r=4, device="cpu")
+    return MCQHead(name=str(d), lora_layers=lora_layers, lora_r=lora_r, device="cpu")
+
+
+@pytest.fixture(scope="session")
+def tied_mcq_head(tmp_path_factory):
+    return _make_tied_mcq_head(tmp_path_factory.mktemp("tiny_qwen3_tied"))
 
 
 def _mcq_examples(ks, seed=0):
@@ -1263,6 +1288,19 @@ def test_gen_long_extra_all_rows_long_split_across_families():
     assert wf.gen_long_extra(0, random.Random(0)) == []
 
 
+def test_assemble_state_long_puts_case_first():
+    """tl1b (REPORT S3ab/S3af): long states must render Case: (facts+request) BEFORE the
+    policy filler, not after -- states right-truncate at --max_state at train/eval time, and
+    Case-last put the facts at ~97% of the text (98.8% of long rows dropped them at
+    max_state=1,024). Case must now sit within the first 10% of the state."""
+    rng = random.Random(0)
+    dom = next(iter(wf.DOMAINS))
+    for _ in range(10):  # long_prefix draws a random section count/order each call
+        state = wf.assemble_state("REAL POLICY TEXT", "the facts", "the request?", dom, rng, long=True)
+        assert state.startswith("Case: the facts the request?")
+        assert state.index("the facts") / len(state) < 0.10
+
+
 def test_multiset_expand_smoke(tmp_path):
     """scripts/multiset.py --variants 3 on 20 synthetic MCQ rows (PLAN3 E3-ms): yields
     80 rows, each ms_group of size 4 (orig + remove/add_unrel/reorder), and every row is
@@ -1343,6 +1381,42 @@ def test_distill_loss_zero_when_teacher_equals_student():
     assert torch.allclose(masked_out, ce_only, atol=1e-5)
 
 
+def test_distill_kl_renormalises_over_candidates_not_null():
+    """tl1b teacher rows (scripts/teacher_label.py) always carry teacher[..., null] == 0 --
+    the KL term must be computed over the K candidate columns only (renormalised), so a
+    student that happens to place nonzero mass on null is not penalised for it, and the null
+    column's own value never enters the KL at all (changing it must not move the loss)."""
+    B, Kmax = 3, 4
+    cmask = torch.zeros(B, Kmax, dtype=torch.bool)
+    cmask[:, :2] = True
+    logits = torch.zeros(B, Kmax + 1)
+    logits[:, 0] = 2.0  # student puts most candidate mass on slot 0
+    logits = logits.masked_fill(~torch.cat([cmask, torch.ones(B, 1, dtype=torch.bool)], -1),
+                                 torch.finfo(logits.dtype).min)
+    target = torch.zeros(B, Kmax); target[:, 0] = 1.0
+    p_null = torch.zeros(B)
+    has_teacher = torch.ones(B, dtype=torch.bool)
+
+    # teacher agrees with the student's candidate-only distribution exactly; only its null
+    # slot differs from what a full-softmax teacher would have put there (it's forced to 0
+    # by scripts/teacher_label.py, but here we vary the student's OWN null logit instead --
+    # the loss must not change, since the null column is excluded from the KL entirely).
+    cand_only = F.softmax(logits[:, :-1].masked_fill(~cmask, torch.finfo(logits.dtype).min), dim=-1)
+    teacher = torch.cat([cand_only, torch.zeros(B, 1)], dim=-1)
+    base = decision_loss(logits, target, p_null, cmask, teacher=teacher, has_teacher=has_teacher,
+                          alpha=1.0, beta=1.0, T=1.0)
+
+    logits_diff_null = logits.clone()
+    logits_diff_null[:, -1] = 5.0  # a wildly different null logit
+    changed_null = decision_loss(logits_diff_null, target, p_null, cmask, teacher=teacher,
+                                  has_teacher=has_teacher, alpha=1.0, beta=1.0, T=1.0)
+    # the alpha*CE term does see the null logit (it's part of the full softmax denominator),
+    # so isolate the KL contribution by comparing beta=0 (CE-only) deltas against beta=1 deltas.
+    base_ce = decision_loss(logits, target, p_null, cmask)
+    changed_ce = decision_loss(logits_diff_null, target, p_null, cmask)
+    assert torch.allclose(base - base_ce, changed_null - changed_ce, atol=1e-5)
+
+
 @pytest.mark.parametrize("collate_fn", ["energy", "mcq"])
 def test_collate_carries_teacher_with_mask(tiny_cache, collate_fn):
     examples = make_examples(n=3, ks=(2, 3, 1))
@@ -1394,6 +1468,58 @@ def test_teacher_label_perms(monkeypatch):
     # seeded per global row index: same row, same perms regardless of batch split
     q3, _ = tl.label_batch(None, ex[1:], 1.0, perms=3, start_idx=1)
     assert np.allclose(q3[0], p3[1])
+
+
+def test_teacher_label_zero_shot_scorer(tied_mcq_head):
+    """PLAN7 tl1b item 6: score_batch_zero_shot renders no null option (pcdm_jev.decider's
+    _render_zero_shot) and hardcodes p_null = 0, unlike the trained-checkpoint score_batch
+    which reads a null option out of the letter logits."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import teacher_label as tl
+    examples = _mcq_examples(ks=(2, 3))
+    probs = tl.score_batch_zero_shot(tied_mcq_head, examples, T=1.0)
+    assert len(probs) == 2
+    for p, ex in zip(probs, examples):
+        K = len(ex["candidates"])
+        assert len(p) == K + 1
+        assert p[-1] == 0.0                      # null is never rendered -> hardcoded 0
+        assert abs(sum(p[:K]) - 1.0) < 1e-5       # softmax over exactly the K candidates
+    # a --shots prefix changes the scored logits (real attended tokens), same shape/null=0.
+    prefixed = tl.score_batch_zero_shot(tied_mcq_head, examples, T=1.0, shots_prefix="Some worked example.\n\n",
+                                         shots_prefix_tokens=8)
+    assert prefixed[0][-1] == 0.0
+    assert not np.allclose(prefixed[0][:2], probs[0][:2])
+
+
+def test_teacher_label_zero_shot_skips_and_order(tmp_path, tied_mcq_head, monkeypatch):
+    """main()'s --zero_shot path: only label>=0, 2<=K<=MAXK_DIRECT rows get a teacher; every
+    row (labeled or not) is written back in its original order so the file stays usable as
+    train.jsonl and the line-count resume logic still lines up 1:1 with the input."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import teacher_label as tl
+    rows = [
+        {"state": "s0", "query": "q0", "candidates": ["a", "b"], "target": [1.0, 0.0], "p_null": 0.0, "label": 0},
+        {"state": "s1", "query": "q1", "candidates": ["only one"], "target": [1.0], "p_null": 0.0, "label": 0},  # K=1
+        {"state": "s2", "query": "q2", "candidates": ["a", "b"], "target": [0.0, 0.0], "p_null": 1.0, "label": -1},  # null row
+        {"state": "s3", "query": "q3", "candidates": ["a", "b", "c"], "target": [0.0, 1.0, 0.0], "p_null": 0.0, "label": 1},
+    ]
+    in_path = tmp_path / "in.jsonl"
+    with open(in_path, "w") as f:
+        for r in rows:
+            f.write(json.dumps(r) + "\n")
+
+    monkeypatch.setattr(tl, "MCQHead", lambda *a, **k: tied_mcq_head)
+    monkeypatch.setattr(sys, "argv", ["teacher_label.py", "--file", str(in_path), "--zero_shot",
+                                       "--backbone", "unused", "--bs", "2"])
+    tl.main()
+
+    out_path = in_path.with_suffix("").with_suffix(".teacher.jsonl")
+    out_rows = [json.loads(l) for l in open(out_path)]
+    assert [r["state"] for r in out_rows] == ["s0", "s1", "s2", "s3"]  # order preserved
+    assert "teacher" in out_rows[0] and len(out_rows[0]["teacher"]) == 3  # K=2 + null
+    assert "teacher" not in out_rows[1]  # K=1, skipped
+    assert "teacher" not in out_rows[2]  # label=-1, skipped
+    assert "teacher" in out_rows[3] and out_rows[3]["teacher"][-1] == 0.0
 
 
 def _ms_rows(n=6, seed=0):
@@ -1570,6 +1696,57 @@ def test_bucket_for_dir_and_tag_bucket():
     assert rows[1]["meta"]["fam_bucket"] == "K"            # pre-existing meta.fam_bucket wins
 
 
+class _FakeTok:
+    """Minimal HF-tokenizer-shaped stand-in: one "token" per char, no real tokenizer needed."""
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, texts, add_special_tokens=False):
+        assert add_special_tokens is False
+        self.calls.append(list(texts))
+        return {"input_ids": [list(t) for t in texts]}
+
+
+def test_apply_drop_truncated_char_prefilter_and_token_cut(capsys):
+    """tl1b item 1: rows short enough in chars to never exceed --max_state tokens skip
+    tokenization entirely (the char pre-filter); only the rest get tokenized and dropped iff
+    their real token count exceeds max_state."""
+    tok = _FakeTok()
+    max_state = 10  # char_cut = 35
+    short = {"state": "a" * 5}           # 5 chars <= 35 -> never tokenized, always kept
+    long_ok = {"state": "b" * 10}        # 10 chars <= 35 -> also never tokenized (still short enough)
+    long_over = {"state": "c" * 50}      # 50 chars > 35 -> tokenized, 50 "tokens" > 10 -> dropped
+    examples = [short, long_ok, long_over]
+
+    kept = T.apply_drop_truncated(examples, tok, max_state, "mylabel")
+
+    assert tok.calls == [[long_over["state"]]]
+    assert kept == [short, long_ok]
+    out = capsys.readouterr().out
+    assert "mylabel" in out and "1/3 rows dropped" in out
+
+
+def test_add_extra_data_drop_truncated(tmp_path, capsys):
+    ed = tmp_path / "data_x"
+    ed.mkdir()
+    rows = [
+        {"state": "a" * 5, "candidates": ["a"], "target": [1.0], "p_null": 0.0, "task": "t"},
+        {"state": "b" * 50, "candidates": ["a"], "target": [1.0], "p_null": 0.0, "task": "t"},
+    ]
+    with open(ed / "train.jsonl", "w") as f:
+        for r in rows:
+            f.write(json.dumps(r) + "\n")
+
+    args = argparse.Namespace(extra_data=str(ed), family_weights=None, null_aug=None, bucket_map=None,
+                               eval_cap=None, drop_truncated=True, max_state=10)
+    train_examples, eval_sets = [], {}
+    T.add_extra_data(args, train_examples, eval_sets, tokenizer=_FakeTok())
+
+    assert len(train_examples) == 1 and train_examples[0]["state"] == "a" * 5
+    out = capsys.readouterr().out
+    assert "data_x" in out and "1/2 rows dropped" in out
+
+
 def test_family_weights_parsing():
     assert T.parse_family_weights(None) is None
     assert T.parse_family_weights("") is None
@@ -1725,6 +1902,33 @@ def _native_batch(head, examples, nc_head, null, vec_cache=None):
     model = NativeHead(head.backbone.d, nc_head=nc_head, null=null)
     batch = collate_mcq(examples)
     return model, batch, run_batch_native(head, model, batch, examples, vec_cache=vec_cache)
+
+
+def test_grad_ckpt_lora_grads_and_loss_decreases(tmp_path):
+    """tl1b --grad_ckpt: backbone.model.gradient_checkpointing_enable(use_reentrant=False)
+    must not break LoRA gradients (a frozen base + LoRA-only-on-the-top-layers setup is the
+    classic case where reentrant checkpointing needs the enable_input_require_grads trick;
+    non-reentrant checkpointing needs no such trick) -- and a few SGD steps must still lower
+    the loss, i.e. gradients are not just non-None but actually useful."""
+    torch.manual_seed(0)
+    head = _make_tied_mcq_head(tmp_path, lora_layers=2, lora_r=4)
+    head.backbone.model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+    model = NativeHead(head.backbone.d, nc_head="n3", null="factored")
+    examples = _mcq_examples(ks=(2, 3, 2))
+    batch = collate_mcq(examples)
+    opt = torch.optim.SGD(list(model.parameters()) + head.trainable_parameters(), lr=0.5)
+
+    def step():
+        opt.zero_grad()
+        logits = run_batch_native(head, model, batch, examples, max_state=64)
+        loss = decision_loss(logits, batch["target"], batch["p_null"], batch["cmask"])
+        loss.backward()
+        assert all(p.grad is not None for p in head.trainable_parameters())
+        opt.step()
+        return loss.item()
+
+    losses = [step() for _ in range(6)]
+    assert losses[-1] < losses[0]
 
 
 @pytest.mark.parametrize("nc_head", ["n2", "n3", "n2n3"])
@@ -2517,6 +2721,34 @@ def test_resolve_calib_examples_default_and_named():
 
     with pytest.raises(AssertionError):
         T.resolve_calib_examples("nope", val_examples, eval_sets)
+
+
+def test_resolve_best_on_default_and_named():
+    eval_sets = {"data_u_val": [{"id": "a"}], "data_wh_val": [{"id": "b"}, {"id": "c"}]}
+    assert T.resolve_best_on(None, eval_sets) is None
+    assert T.resolve_best_on("data_u_val,data_wh_val", eval_sets) == ["data_u_val", "data_wh_val"]
+    with pytest.raises(AssertionError):
+        T.resolve_best_on("nope", eval_sets)
+
+
+def test_checkpoint_metric_uses_best_on_mean_not_val_nll(monkeypatch):
+    """tl1b item 4: with --best_on set, checkpoint_metric returns the unweighted mean NLL of
+    the named eval sets, not val_nll -- and None (default) returns val_nll unchanged."""
+    nll_by_set = {"data_u_val": 0.1, "data_wh_val": 0.3}  # mean = 0.2, far from val_nll=1.0
+
+    def fake_eval_val_loss(backbone, model, cache, examples, bs, **kw):
+        return nll_by_set[examples]  # examples stands in for its own set name here
+
+    monkeypatch.setattr(T, "eval_val_loss", fake_eval_val_loss)
+    eval_sets = {"data_u_val": "data_u_val", "data_wh_val": "data_wh_val"}
+    args = argparse.Namespace(eval_bs=8, joint=False, readout="native", shots=0)
+
+    unchanged = T.checkpoint_metric(None, None, None, eval_sets, None, args, None, val_nll=1.0, wb=None, step=1)
+    assert unchanged == 1.0
+
+    best_on = T.resolve_best_on("data_u_val,data_wh_val", eval_sets)
+    metric = T.checkpoint_metric(None, None, None, eval_sets, best_on, args, None, val_nll=1.0, wb=None, step=1)
+    assert metric == pytest.approx(0.2)
 
 
 def test_eval_dataset_accepts_T_offset_pairs(tiny_backbone, tiny_cache):
