@@ -144,7 +144,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
           <div class="game-mount" data-game="snake"></div>
         </div>
         <div class="game-card">
-          <div class="game-card-head"><span class="pill">Partial</span><h3>Drive</h3></div>
+          <div class="game-card-head"><span class="pill">Works</span><h3>Drive</h3></div>
           <p>A Three.js toy road. Each tick the road is rendered as the situations that apply (“the traffic light 40 m ahead is red”, “the car is closing on a slower vehicle 17 m ahead”), seven one-condition rules are in the prompt in precedence order, and the model picks one manoeuvre from the legal set (a lane change is only offered into a clear lane). It matched the rule list on 70/70 scripted situations (chance .16; .16 for random-among-legal; .16 with no rules) and on every tick of the recorded run: 18/18 red lights, 3 lane changes, exit taken. It cannot take a rule with an “or” in it, and it reads sentence order.</p>
           <div class="game-mount" data-game="drive"></div>
         </div>
@@ -208,10 +208,11 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre>
         <div class="card exhibit-card">
           <h3>What does not work</h3>
           <ul class="exhibit-list">
-            <li>Doom: mostly shoots, enemy or no enemy.</li>
-            <li>Drive: never once changes lanes.</li>
-            <li>Compaction: no usable keep/drop threshold.</li>
-            <li>Level-7 composition (temporal, units, expected value, trade-off): at chance.</li>
+            <li>Aiming. In Doom the model picks retreat, engage or explore correctly, but it cannot turn toward an enemy from a bearing sentence (0 of 12 in the probe), so the engine aims. In real DOOM it explores and rarely meets a monster.</li>
+            <li>Rules with "or" in them, negated conditions, or more than four rules before the default. Drive's 70/70 holds only with the state sentences in a fixed order; shuffled, it drops to .89–.93.</li>
+            <li>Compaction: P(keep) never crosses .5, so there is no usable keep/drop threshold, only a ranking.</li>
+            <li>Level-7 composition (temporal, units, expected value, trade-off): at chance on every checkpoint.</li>
+            <li>Long documents: states above ~1k tokens. The cause is a truncation bug in the training data; a fix is in training.</li>
           </ul>
         </div>
 
