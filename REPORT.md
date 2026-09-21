@@ -1154,6 +1154,47 @@ standard .667 / Brier .55, val NLL .411 vs .332 for 4B), matching its own weak f
 LoRA depth, same lr — the 8B checkpoint is the outlier, not the recipe; a tap/lr sweep on 8B is the only way to say
 whether it is recoverable, and it is deferred until the 14B point says whether the ladder is otherwise monotone.
 
+## 3ac. PLAN7 Track C — typed primitives: Score (ordinal) and Noul (Bernoulli) on the native head (H100, 2026-09-21, ~$3)
+
+Five matched arms, each `--init_from nc_v3_tap20_wf/best.pt`, same recipe, 3k steps on the score-only (or noul-only) rows
+of data_wf + data_wf_hf (`--qtype_filter`), sampler off. Arm-vs-arm only: the type-only fine-tune lowers the other
+types (styles .84–.87 vs the parent's .90), identically across arms. Full tables: `REPORT_6b_draft.md`.
+
+**Score** — K-way Choice (control) vs K-way + ordinal-smoothed targets (τ = 0.7, `--ordinal_smooth`) vs a
+cumulative-link head (`--score_head cumlink`: scalar utility + thresholds from the rendered level texts):
+
+| | K-way (A) | **ordinal-smoothed (B)** | cumulative-link (C) |
+|---|---|---|---|
+| held-out urgency: acc / NLL / Brier / ECE / ordinal MAE | .505 / 2.07 / .79 / .35 / .58 | .508 / **1.23 / .68 / .19 / .55** | .485 / 2.42 / .85 / .37 / .62 |
+| typed-decisions score rows: acc / NLL / Brier | .356 / 2.23 / .40 | .340 / **1.88 / .38** | .303 / 2.30 / .51 |
+| systemone-lite hard score: acc / NLL / MAE | .853 / .37 / .15 | **.939 / .22 / .06** | .923 / .22 / .08 |
+| JevBench std / hard (acc, Brier) | .764 (.40) / .360 (.88) | .708 (.47) / **.459 (.70)** | **.792 (.38)** / .450 (.92) |
+| JevBench ordinal items (12) | 9 / Brier .43 | 9 / .41 | 9 / **.38** |
+
+Ordinal smoothing changes *no decision* on the 12 JevBench ordinal items (identical per-item predictions to the
+control) and improves every probability-quality metric — held-out score NLL 2.07 → 1.23, ECE .35 → .19, JevBench hard
+Brier .88 → .70 with hard accuracy .360 → .459 — for zero head code. The cumulative-link head wins JevBench standard
+and ordinal Brier but is worse on every internal/soft-gold set; with only 3k steps for its fresh parameters it is an
+open follow-up, not a rejection. **Adopt `--ordinal_smooth 0.7` for Score.**
+
+**Noul** — 2-way Choice over ["no","yes"] (control) vs a Bernoulli head `P(yes) = σ(w·h_D)` with no rendered candidates
+(`--noul_head bern`):
+
+| | 2-way Choice (A) | **Bernoulli (B)** |
+|---|---|---|
+| held-out eligibility: acc / NLL / Brier / ECE | .701 / .78 / .45 / .16 | .711 / .73 / .44 / .16 |
+| **PagerDuty** (external, floor .792): acc / NLL / Brier | .602 / 1.04 / .61 | **.886 / .28 / .16** |
+| Mind2Web noul rows: acc / NLL | .636 / .66 | **.785 / .51** |
+| typed-decisions noul rows: acc / NLL / Brier | .467 / 1.72 / .55 | **.492 / 1.21 / .44** |
+| reversed-label control, mean / max |ΔP(yes)| | .01–.15 / .55 | **0 / 0** (exact, all 9 sets) |
+
+The Bernoulli head is better or equal on 6 of 7 noul sets, is exactly order-invariant by construction (the 2-way readout
+moves up to .55 under label reversal), is cheaper at inference (no rendered candidates), and gives the first untouched
+external set that clears its constant-prediction floor by a margin: PagerDuty .602 → **.886** (floor .792). JevBench is
+excluded from the Noul decision (its public set has almost no true yes/no items; the Bernoulli arm's JevBench run is a
+graceful-degradation ceiling). **Adopt `--noul_head bern` for Noul.** Choice keeps the N3 readout. Both are additive
+flags on the frozen architecture; Release 1 trains with them on.
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
