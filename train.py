@@ -1107,7 +1107,18 @@ def parse_args():
         # n2 needs the embedding cache; n3 needs nothing beyond the backbone
         args.cand_encoder = "qwen3emb" if "n2" in args.nc_head else "backbone"
     if args.smoke:
-        args.backbone, args.lora_layers, args.lora_r = "Qwen/Qwen3-0.6B-Base", 4, 8
+        # Smoke defaults -- only fill these in when the caller didn't explicitly pick a
+        # backbone/LoRA size of their own (e.g. `--smoke --backbone Qwen/Qwen3.5-0.8B-Base`
+        # for a from-scratch-family smoke run must keep that backbone, not silently fall back
+        # to Qwen3-0.6B-Base). Same "only if still at the parser's own default" rule the
+        # steps/bs/etc smoke defaults below use, just checked per-field since these three
+        # have real (non-None) defaults of their own.
+        if args.backbone == p.get_default("backbone"):
+            args.backbone = "Qwen/Qwen3-0.6B-Base"
+        if args.lora_layers == p.get_default("lora_layers"):
+            args.lora_layers = 4
+        if args.lora_r == p.get_default("lora_r"):
+            args.lora_r = 8
         if args.wandb:
             os.environ["WANDB_MODE"] = "offline"
     defaults = {"steps": 20, "bs": 8, "val_every": 10, "eval_every": 20, "ckpt_every": 10} if args.smoke else \

@@ -51,9 +51,11 @@ class MCQHead(nn.Module):
     """Backbone (frozen + top-layer LoRA, identical to the energy head) + a frozen LM
     head, restricted at read time to the single-token option letters."""
 
-    def __init__(self, name: str, lora_layers: int = 8, lora_r: int = 16, device: str = "auto", tap_layer: int = 0):
+    def __init__(self, name: str, lora_layers: int = 8, lora_r: int = 16, device: str = "auto", tap_layer: int = 0,
+                 dtype: torch.dtype = torch.bfloat16):
         super().__init__()
-        self.backbone = Backbone(name, lora_layers=lora_layers, lora_r=lora_r, device=device, tap_layer=tap_layer)
+        self.backbone = Backbone(name, lora_layers=lora_layers, lora_r=lora_r, device=device, tap_layer=tap_layer,
+                                 dtype=dtype)
         self.device = self.backbone.device
         if self.backbone.model.config.tie_word_embeddings:
             weight = self.backbone.model.embed_tokens.weight  # tied -> no second model load
@@ -61,7 +63,7 @@ class MCQHead(nn.Module):
             # untied (e.g. Qwen3-8B): the base AutoModel has no lm_head, so pull it from
             # a CausalLM load and drop the rest immediately (transient 2x memory).
             from transformers import AutoModelForCausalLM
-            causal = AutoModelForCausalLM.from_pretrained(name, dtype=torch.bfloat16)
+            causal = AutoModelForCausalLM.from_pretrained(name, dtype=dtype)
             weight = causal.lm_head.weight.detach().clone().to(self.device)
             del causal
             if self.device == "cuda":

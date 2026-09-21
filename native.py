@@ -380,6 +380,24 @@ def run_batch_native(head, model, batch, examples, max_state: int = 256, max_suf
     return logits
 
 
+def _cache_batch_repeat_interleave(cache, repeats: int):
+    """cache.batch_repeat_interleave(repeats), generalised to Qwen3.5's hybrid cache: its pure
+    linear-attention layers (Gated DeltaNet, layer_type "linear_attention") are a bare
+    LinearAttentionLayer with no batch_repeat_interleave of its own (only the fused
+    attention+linear hybrid layer classes define one) -- transformers issue, not a Qwen3.5
+    quirk we can configure around. Qwen3's DynamicLayer already has the method, so this is a
+    no-op passthrough for it (every layer hits the first branch)."""
+    for layer in cache.layers:
+        if hasattr(layer, "batch_repeat_interleave"):
+            layer.batch_repeat_interleave(repeats)
+            continue
+        for i in range(getattr(layer, "number_of_states", 1)):
+            if layer.is_conv_states_initialized[i]:
+                layer.conv_states[i] = layer.conv_states[i].repeat_interleave(repeats, dim=0)
+            if layer.is_recurrent_states_initialized[i]:
+                layer.recurrent_states[i] = layer.recurrent_states[i].repeat_interleave(repeats, dim=0)
+
+
 def _causal_pad_mask(attn2d, q_len, dtype):
     """Explicit additive (batch,1,q_len,kv_len) mask: causal by physical slot order
     within [past|current] (order-based, so identical across rows regardless of padding)
@@ -433,7 +451,7 @@ def native_kv_decide(head, model, state, queries, chunk: int = 32, max_state: in
             cmask[i, :len(c)] = True
 
         cache = copy.deepcopy(state_cache)
-        cache.batch_repeat_interleave(m)
+        _cache_batch_repeat_interleave(cache, m)
         attn = torch.cat([torch.ones(m, Ls, dtype=torch.long), am], dim=1).to(dev)
         position_ids = (torch.arange(T) + Ls).expand(m, -1).to(dev)
         H = lm(input_ids=input_ids.to(dev), attention_mask=_causal_pad_mask(attn, T, lm.dtype),
