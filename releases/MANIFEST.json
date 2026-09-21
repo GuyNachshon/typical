@@ -1,3 +1,4 @@
+[
 {
   "release": "typical-small-preview",
   "date": "2026-09-20",
@@ -19,4 +20,22 @@
     "typical-small-preview/baseline_nc_v3_tap20/jevbench_summary.json": null
   },
   "notes": "Files copied verbatim from guychuk/pcdm-runs/{nc_v3_tap20_wf,nc_v3_tap20,probe_nc_v3_tap20_wf,probe_nc_v3_tap20,jev_native_v3t20_wf,jev_native_v3t20}/ via huggingface_hub (download + create_commit); no retraining. sha256 given for the two checkpoint weight files (best.pt); the JSON/summary files are copied byte-identical to their source paths in the same repo."
+},
+{
+  "release": "typical-small",
+  "date": "2026-09-21",
+  "git_commit": "1ff61f4c40b84ba28983d2258e96ffc759bda162",
+  "source_checkpoint": "ts1b",
+  "parent": "typical-small-preview",
+  "hf_repo": "guychuk/pcdm-runs",
+  "hf_paths": {
+    "typical-small/best.pt": "sha256:f62d6e083ea80a08716d901f8409510b6a97cfe00bc65db25a37691ed555c46e",
+    "typical-small/results.json": null,
+    "typical-small/eval_wf_full.json": null,
+    "typical-small/probe_results.json": null,
+    "typical-small/jevbench_summary.json": null,
+    "typical-small/README.md": null
+  },
+  "notes": "Files copied server-side within guychuk/pcdm-runs from ts1b/{best.pt,results.json,eval_wf_full.json}, probe_ts1b/results.json, and jev_native_ts1b/summary.json into typical-small/ via huggingface_hub CommitOperationCopy (no download/reupload of the weight file, no retraining). sha256 for best.pt taken from the source LFS pointer via HfApi.get_paths_info and verified unchanged post-copy."
 }
+]
