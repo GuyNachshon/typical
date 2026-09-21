@@ -162,6 +162,45 @@ tier is within 1 SE of chance.
 
 ## How to run
 
+**Inference code included under `inference/`; training code release to follow.** The public repo
+(`OzLabs/typical-small-preview`) ships a minimal, self-contained inference package (own `Typical`
+class — no dependency on this training repo, just `torch`, `transformers`, `safetensors`,
+`huggingface_hub`, `numpy`). Download the `inference/` folder from that repo, then:
+
+```bash
+pip install -r inference/requirements.txt
+```
+
+```python
+from typical import Typical  # inference/typical/, downloaded alongside your code
+
+m = Typical.from_pretrained("OzLabs/typical-small-preview", device="auto")
+
+# K-way choice over a fixed label set -> {label: p, ...} + p_null
+m.choice(state, "What does the customer want?", ["refund", "replacement", "repair"])
+
+# Yes/no -> P(yes)
+m.noul(state, "Is the order still under warranty?")
+
+# Ordinal levels -> {level: p, ...} + p_null + expected (E[index])
+m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])
+
+# Full JevBench-style decide(): (probs, runtime) -- mirrors PCDMDecider.decide exactly
+probs, runtime = m.decide(
+    state,
+    {"type": "choice", "instructions": "What does the customer want?",
+     "criteria": {"refund": "money back", "replacement": "a new item shipped"}},
+    ["refund", "replacement"],
+)
+```
+
+`state` is a string or JSON-serialisable dict. Parity with the internal `PCDMDecider(mode="native")`
+was verified at max abs probability diff = 0.0 on this checkpoint (CPU and MPS), including this
+checkpoint's K-way `noul_head="choice"` path (the preview does not have a dedicated Bernoulli Noul
+head — see Known limitations above).
+
+Internal call shape (this training repo, not yet public):
+
 ```python
 from pcdm_jev.decider import PCDMDecider
 
@@ -171,7 +210,8 @@ probs, runtime = decider.decide(state="...", question=question, labels=["a", "b"
 # probs: dict label -> probability; runtime["p_null"] is the abstention mass
 ```
 
-Held-out workflow / external eval reproduction (post-hoc, full state length):
+Held-out workflow / external eval reproduction (post-hoc, full state length; requires this private
+training repo):
 
 ```bash
 uv run --no-sync python scripts/eval_wf.py --run runs/nc_v3_tap20_wf --mode native \
