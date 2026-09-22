@@ -13,6 +13,7 @@
   --color-white: #ffffff;     /* raised media cards */
   --color-mid: #938f89;       /* secondary copy, numerals, hairlines */
   --color-steel: #c2bfba;     /* borders, outlines */
+  --color-slate: #595855;     /* secondary copy: #938f89 on canvas is 2.78:1, under AA-large */
 
   --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -49,6 +50,9 @@
 
 @layer base {
   html { background: var(--color-warm); scroll-behavior: smooth; scroll-padding-top: 86px; }
+  /* clip, never hidden: overflow:hidden on an ancestor kills the hero's position:sticky, which is
+     an existing scar in this file. clip does not establish a scroll container. */
+  body { overflow-x: clip; }
   /* last-resort breaking everywhere: identifiers are kept whole with non-breaking hyphens
      (js/typography.js), and one too long for its column must break rather than widen the page */
   body { overflow-wrap: break-word; margin: 0; color: var(--color-off); background: var(--color-warm); font-family: var(--font-sans); font-size: var(--text-body); line-height: 1.5; letter-spacing: -0.195px; -webkit-font-smoothing: antialiased; text-wrap: pretty; }
@@ -86,21 +90,54 @@
   /* ---- layout ---- */
   .page { max-width: var(--container-page); margin-inline: auto; padding-inline: 50px; }
   @media (max-width: 48rem) { .page { padding-inline: 20px; } }
-  .chapter { padding-block: 128px; }
-  #results { padding-block: 180px 128px; }
+  /* One gap per boundary. 128 top + 128 bottom + a 64px head margin made every seam 256px of
+     nothing; the page gets shorter and heavier at the same time. */
+  .chapter { padding-block: 168px 0; }
+  #results { padding-block: 200px 0; }
   /* The side rail is gone. It put every h2 at x=330 while every panel below it started at x=80, so
      the two dominant objects in a section never shared an edge, and it left a 250px column empty in
      eight sections out of eight. The heading is now flush with its own panel, the rule is the hard
      top edge of the section (whitespace alone was signalling every boundary), and the lede sits in
      a second column bottom-aligned so its last line meets the heading's. */
-  .chapter-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 46ch); column-gap: 60px; row-gap: 28px; border-top: 1px solid var(--color-steel); padding-top: 16px; margin-bottom: 64px; }
+  .chapter-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 46ch); column-gap: 60px; row-gap: 28px; border-top: 1px solid var(--color-steel); padding-top: 16px; margin-bottom: 40px; }
   .chapter-head .t-eyebrow { grid-column: 1 / -1; color: var(--color-mid); }
   .chapter-head .t-section { grid-column: 1; max-width: 18ch; font-size: clamp(40px, 4.4vw, 58px); line-height: 0.98; letter-spacing: -2.2px; }
-  .chapter-head .lede { grid-column: 2; align-self: end; margin-top: 0; font-size: var(--text-ui); line-height: 1.25; letter-spacing: -0.19px; color: var(--color-mid); }
+  .chapter-head .lede { grid-column: 2; align-self: end; margin-top: 0; font-size: 17px; line-height: 1.35; letter-spacing: -0.19px; color: var(--color-slate); }
   @media (max-width: 64rem) {
     .chapter-head { grid-template-columns: 1fr; row-gap: 16px; margin-bottom: 40px; }
     .chapter-head .t-section { font-size: clamp(30px, 8vw, 40px); letter-spacing: -1.2px; max-width: 22ch; }
     .chapter-head .lede { grid-column: 1; align-self: start; }
+  }
+
+
+  /* ---- bands, not boxes -----------------------------------------------------------------
+     A surface spans the full viewport, has no radius, no border and no padding of its own, and
+     is entered by scrolling. A *box* — radius, clipped, inset in the column — is reserved for a
+     live screen: a canvas, an iframe, the instrument. Nothing holding only type gets a box.
+     That distinction is what nine identical rounded panels failed to make. */
+  .band { position: relative; }
+  .band::before { content: ''; position: absolute; inset: 0; left: calc(50% - 50vw); width: 100vw; z-index: -1; background: var(--band); }
+  section, .stage-track, .footer, .figband { position: relative; z-index: 1; }
+
+  /* the program runs on ground, not on paper: a measured, settled surface */
+  #runtime.band { --band: var(--color-lgray); }
+  /* lgray is also the default bar-track colour, so the tracks would vanish into their own band */
+  #runtime .program-track, #runtime .bar .track { background: var(--color-steel); }
+
+  /* ---- the figure band: --text-figure, defined since the first commit and used nowhere ---- */
+  /* full-bleed out of the .page column it is nested in: a band spans the viewport by definition */
+  .figband { background: var(--color-charcoal); color: var(--color-warm); padding-block: 96px; margin-inline: calc(50% - 50vw); width: 100vw; }
+  .figband-row { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .figband-row p { border-left: 1px solid rgba(240, 238, 235, 0.18); padding-left: 28px; }
+  .figband-row p:first-child { border-left: 0; padding-left: 0; }
+  .figband .t-figure { color: var(--color-warm); }
+  .figband i { font-family: var(--font-mono); font-size: 22px; font-style: normal; margin-left: 8px; color: rgba(240, 238, 235, 0.55); }
+  .figband em { display: block; margin-top: 20px; font: 700 12px/1.3 var(--font-mono); letter-spacing: 0.72px; text-transform: uppercase; font-style: normal; color: rgba(240, 238, 235, 0.5); }
+  @media (max-width: 64rem) {
+    .figband { padding-block: 56px; }
+    .figband-row { grid-template-columns: 1fr; gap: 34px; }
+    .figband-row p { border-left: 0; padding-left: 0; }
+    .figband em { margin-top: 12px; }
   }
 
   /* ---- floating translucent nav ---- */
@@ -322,8 +359,11 @@
      shape taught nothing, so this panel makes ordinary Python the large thing and hangs each call's
      answer off the line that asked for it. Only the choice opens out, because the answer space is
      the one thing you can change — and changing it lights a different branch two lines down. */
-  .program { display: grid; gap: 22px; padding: 34px 40px 30px; }
-  @media (max-width: 64rem) { .program { padding: 24px 20px 24px; gap: 16px; } }
+  /* The panel these lived inside is gone, and its interior padding went with it. Leaving 40px
+     here put the heading at x=80 and the code it describes at x=120 — two left edges, on every
+     evidence block. That gap was the whole "unfinished" read. */
+  .program { display: grid; gap: 22px; padding: 0; }
+  @media (max-width: 64rem) { .program { padding: 0; gap: 16px; } }
   .program-head { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; border-bottom: 1px solid var(--color-steel); padding-bottom: 16px; }
   .program-tag { font-size: 10px; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); }
   .program-foot { font-size: 10px; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); min-height: 12px; }
@@ -420,7 +460,7 @@
     .register td { display: block; text-align: right; border: 0; padding: 3px 0; }
     .register td::before { content: attr(data-label); float: left; margin-right: 16px; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--color-mid); }
   }
-  .note { font-size: 14px; color: var(--color-mid); max-width: 90ch; }
+  .note { font-size: 13px; font-family: var(--font-mono); letter-spacing: 0.1px; line-height: 1.6; color: var(--color-slate); max-width: 88ch; }
   /* The disclosure used to be hoisted above a results table that ran two viewports stacked, so it
      would still sit within one viewport of the numbers it qualifies. The board is four rows now and
      the disclosure follows it directly, so the hoist only had the effect of putting the fine print

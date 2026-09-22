@@ -49,7 +49,7 @@
 
 
 
-<section class="page chapter" id="runtime">
+<section class="page chapter band" id="runtime">
   <div class="chapter-head">
     <p class="t-eyebrow">Runtime answer space → your branch</p>
     <h2 class="t-section">Your program keeps its logic. It gets a new kind of condition.</h2>
@@ -64,9 +64,18 @@
     <h2 class="t-section">The second question is nearly free.</h2>
       <p class="lede">Reading the state is the work, and it happens once. A decision on a fresh state takes 45&nbsp;ms; every further question against that same state adds 2.7. Thirty&#8209;two questions on one ticket come to 129&nbsp;ms — four milliseconds a decision.</p>
   </div>
-  <div class="media">
-    <figure><figcaption class="t-eyebrow muted mb-18">Where the time goes</figcaption><div class="chart" id="chart-g2"></div></figure>
   </div>
+  <div class="figband">
+    <div class="page figband-row">
+      <p><span class="t-figure">45</span><i>ms</i><em>one decision, cold state</em></p>
+      <p><span class="t-figure">2.7</span><i>ms</i><em>every question after it</em></p>
+      <p><span class="t-figure">129</span><i>ms</i><em>thirty&#8209;two on one ticket</em></p>
+    </div>
+  </div>
+  <div class="page">
+    <div class="media mt-30">
+      <figure><figcaption class="t-eyebrow muted mb-18">Where the time goes</figcaption><div class="chart" id="chart-g2"></div></figure>
+    </div>
 </section>
 
 <section class="page chapter" id="results">
@@ -75,10 +84,10 @@
     <h2 class="t-section">Small models make useful decision engines.</h2>
       <p class="lede">Three tasks, each with the number you would get by guessing beside the number the model gets &mdash; and then the same benchmark run against general&#8209;purpose models of every size, prompted the ordinary way.</p>
   </div>
-  <div class="media results-panel">
+  <div class="media">
     <div id="results-table"></div>
   </div>
-  <div class="media results-panel mt-30" style="padding:34px 40px 30px">
+  <div class="media mt-30">
     <p class="t-eyebrow muted" style="margin-bottom:22px">Against general models, prompted</p>
     <div id="results-compare"></div>
   </div>
