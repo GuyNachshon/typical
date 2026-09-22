@@ -56,37 +56,18 @@
 </section>
 
 
-<section class="page chapter" id="how">
-  <div class="chapter-head">
-    <p class="t-eyebrow">Choice · Noul · Score</p>
-    <div>
-      <h2 class="t-section">Not tokens. Probabilities.</h2>
-      <p class="lede">Three shapes of question, all read off the same state: pick one of your options, answer a yes-or-no proposition, or place something on a scale you define.</p>
-    </div>
-  </div>
-  <div class="ucard-grid">
-    <div class="ucard"><div><h3 class="t-card">Choice</h3><p>Pick one of K candidates you define at runtime. A probability for each, and for ∅.</p></div><div class="diagram"><i></i><i class="on"></i><i></i><i></i><i class="dot"></i></div></div>
-    <div class="ucard"><div><h3 class="t-card">Noul · yes/no</h3><p>P(yes) for a proposition, off the same cached state. The only question type whose answer is exactly order-invariant.</p></div><div class="diagram"><i style="flex:0 0 60px"></i><i class="on" style="flex:0 0 60px"></i></div></div>
-    <div class="ucard"><div><h3 class="t-card">Score</h3><p>An ordered level, 0 through N, with the expected level under the candidates.</p></div><div class="diagram"><i style="height:10px"></i><i style="height:16px"></i><i class="on" style="height:22px"></i><i style="height:28px"></i></div></div>
-  </div>
-  
-  <div class="code mt-18"><pre>from typical import Typical
 
-m = Typical.from_pretrained("OzLabs/typical-small")
-m.choice(state, "What should happen to this ticket?", ["refund", "escalate", "close"])
-m.noul(state, "Does this need a human?")
-m.score(state, "How urgent is it?", ["0", "1", "2", "3"])</pre></div>
-</section>
 
 <section class="page chapter" id="runtime">
   <div class="chapter-head">
-    <p class="t-eyebrow">Runtime label space</p>
+    <p class="t-eyebrow">Runtime answer space</p>
     <div>
-      <h2 class="t-section">The choices are yours.</h2>
-      <p class="lede">The options arrive with the question, not in the weights. Reorder the rules a loan is judged by and the same five facts get a different answer, with no retraining and no new prompt to tune.</p>
+      <h2 class="t-section">The options are yours, per call.</h2>
+      <p class="lede">Nothing here was trained into the model: the questions, the options and the scale all arrive with the call. Run it, then take an option away — the weight has to go somewhere, and where it goes is the ∅ the model keeps for &ldquo;none of these&rdquo;.</p>
     </div>
   </div>
-  <div class="exlist">
+  <div class="media" style="padding:0"><div id="primitives"></div></div>
+<div class="exlist">
     <div class="exrow" data-exhibit-card>
       <div class="exrow-head">
         <span class="tag">Recorded</span>
@@ -96,7 +77,7 @@ m.score(state, "How urgent is it?", ["0", "1", "2", "3"])</pre></div>
       </div>
       <div class="exrow-body" data-exhibit-body hidden><div data-demo="rules"></div></div>
     </div>
-  </div>
+    </div>
 </section>
 
 <section class="page chapter" id="arch">

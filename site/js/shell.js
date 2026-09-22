@@ -349,6 +349,32 @@ function heroPool(presets, replays) {
 }
 
 let heroLive = null; // set by pushDecision in live mode
+// One state, three questions, resolving together (js/primitives.js).
+async function mountPrimitives(presets) {
+  const host = document.getElementById('primitives');
+  if (!host || !presets?.playground) return;
+  const replays = (await loadJSON('data/replays.json')) || {};
+  const pg = presets.playground;
+  const recorded = (q) => {
+    const hit = replays[hashKey(pg.state, [q])];
+    const r = hit?.results?.[0];
+    return r ? { ...r, ms: hit.ms ?? 0 } : undefined;
+  };
+  const byType = (type) => pg.queries.find((q) => q.type === type);
+  const questions = ['choice', 'noul', 'score'].map(byType).filter(Boolean);
+  if (questions.length !== 3 || !questions.every((q) => recorded(q))) return;
+  // the second choice question is the one the board adds on "ask another"
+  const extra = pg.queries.filter((q) => q.type === 'choice')[1];
+  const { mountBoard } = await import('./primitives.js');
+  mountBoard(host, {
+    state: pg.state,
+    questions,
+    extra: extra && recorded(extra) ? extra : null,
+    resultFor: recorded,
+    decide: mode() === 'live' ? decide : null,
+  });
+}
+
 async function mountHero(presets) {
   const host = document.getElementById('hero-decision');
   if (!host || !presets?.playground) return;
@@ -596,6 +622,7 @@ async function boot() {
   const ctx = { decide: liveDecide, mode, readout, presets, inkBars };
 
   mountHero(presets);
+  mountPrimitives(presets);
   // set before the film mounts; filmfx clears it the moment the cold start is over (or at once,
   // if it is skipped for a repeat visit or for reduced motion)
   document.documentElement.classList.add('booting');

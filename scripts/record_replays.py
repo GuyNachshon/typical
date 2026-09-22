@@ -69,6 +69,15 @@ def build_pairs() -> list[tuple[str, str, list]]:
     # recorded on its own - otherwise only the first cycles offline
     for i, query in enumerate(pg["queries"]):
         pairs.append((f"playground[q{i}]", pg["state"], [query]))
+    # The board lets a visitor take a candidate out of the Choice set (and put one back). Each
+    # variant is a different call, so each is recorded: dropping the winner is how abstention
+    # becomes something you watch happen rather than something the page claims.
+    base = pg["queries"][0]
+    extra = "send a replacement"
+    variants = [[l for l in base["labels"] if l != drop] for drop in base["labels"]]
+    variants.append([*base["labels"], extra])
+    for labels in variants:
+        pairs.append((f"playground[cand:{'|'.join(labels)}]", pg["state"], [q("choice", base["question"], labels)]))
 
     flip = PRESETS["flip"]
     for i, order in enumerate(flip["orders"]):

@@ -244,7 +244,67 @@
   }
   .inst-foot { margin-top: 30px; font-size: 10px; letter-spacing: 0.72px; text-transform: uppercase; color: rgba(240, 238, 235, 0.26); }
 
-  /* ---- utility cards ---- */
+  /* ---- the board: one state, three questions, resolved together ------------------------------
+     Tabs would have implied sequence, and sequence is exactly what this section says the model
+     does not do, so all three sit on the board and fill in the same frame. Each question renders
+     in its own idiom: a distribution, one number on an axis, an ordered scale. */
+  .board { display: grid; grid-template-columns: minmax(0, 330px) minmax(0, 1fr); grid-template-areas: 'state questions' 'controls questions'; align-items: start; gap: 0 56px; padding: 38px 40px 34px; }
+  @media (max-width: 64rem) { .board { grid-template-columns: 1fr; grid-template-areas: 'state' 'questions' 'controls'; gap: 24px; padding: 24px 20px 26px; } }
+  .board-state { grid-area: state; }
+  .board-tag { font-size: 10px; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); }
+  .board-state-text { margin: 12px 0 0; padding-left: 16px; border-left: 1px solid var(--color-steel); font-size: 15px; line-height: 1.5; color: var(--color-off); }
+  .board-cached { margin-top: 18px; font-size: 10px; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); opacity: 0; transition: opacity 400ms var(--ease-out); }
+  .board-cached.is-on { opacity: 1; }
+  .board-cached::before { content: '· '; }
+
+  .board-questions { grid-area: questions; display: grid; gap: 30px; }
+  .board-q { display: grid; gap: 12px; }
+  .board-q.is-new { animation: boardIn 460ms var(--ease-out) backwards; }
+  @keyframes boardIn { from { opacity: 0; transform: translateY(8px); } }
+  .board-qhead { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; border-bottom: 1px solid var(--color-steel); padding-bottom: 8px; }
+  .board-ask-text { font-size: 15px; color: var(--color-off); }
+  .board-type { font-size: 10px; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); flex: none; }
+  .board-out { display: grid; gap: 9px; transition: opacity 200ms var(--ease-out); }
+  .board-out.is-empty { opacity: 0.45; }
+  .is-running .board-out { opacity: 0.25; }
+
+  .board-row { display: grid; grid-template-columns: minmax(64px, 210px) 1fr 40px 18px; align-items: center; gap: 14px; }
+  .board-label { font-size: 14px; color: var(--color-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .board-track { position: relative; height: 1px; background: var(--color-steel); }
+  .board-track i { position: absolute; left: 0; top: 50%; height: 1px; margin-top: -0.5px; background: var(--color-off); transition: width 460ms var(--ease-out); }
+  .board-val { font-family: var(--font-mono); font-size: 12px; text-align: right; color: var(--color-mid); font-variant-numeric: tabular-nums; }
+  .board-row.is-win .board-label, .board-row.is-win .board-val { color: var(--color-off); font-size: 17px; }
+  .board-row.is-win .board-track i { height: 3px; margin-top: -1.5px; }
+  .board-row.is-none { opacity: 0.6; }
+  .board-row.is-none .board-track { background: none; border-top: 1px dashed var(--color-steel); height: 0; }
+  /* taking a candidate out is the point, so the control only shows when you are on the row */
+  .board-drop { appearance: none; border: 0; background: none; padding: 0; font-size: 13px; line-height: 1; color: var(--color-mid); cursor: pointer; opacity: 0; transition: opacity 150ms var(--ease-out); }
+  .board-row:hover .board-drop, .board-drop:focus-visible { opacity: 1; }
+  .board-drop:hover { color: var(--color-off); }
+  .board-note { font-size: 13px; line-height: 1.5; color: var(--color-off); max-width: 52ch; margin-top: 4px; }
+  .board-add { justify-self: start; appearance: none; border: 0; background: none; padding: 4px 0 0; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.36px; color: var(--color-mid); cursor: pointer; }
+  .board-add:hover { color: var(--color-off); text-decoration: underline; text-underline-offset: 3px; }
+
+  /* noul: the smallest decision there is — one number */
+  .board-noul { display: grid; gap: 10px; max-width: 320px; }
+  .board-noul-val { font-family: var(--font-mono); font-size: 30px; line-height: 1; color: var(--color-off); min-height: 30px; }
+  .board-noul-axis { position: relative; height: 3px; background: var(--color-steel); }
+  .board-noul-axis i { position: absolute; left: 0; top: 0; height: 3px; background: var(--color-off); transition: width 460ms var(--ease-out); }
+  .board-noul-ends { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); }
+
+  /* score: ordered, so it reads as a scale rather than a set of options */
+  .board-score { position: relative; max-width: 420px; padding-bottom: 26px; }
+  .board-score-line { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-steel); padding-bottom: 14px; }
+  .board-stop { display: grid; justify-items: center; gap: 8px; }
+  .board-stop i { width: 13px; height: 13px; border-radius: 50%; background: var(--color-off); transition: transform 460ms var(--ease-out); }
+  .board-stop-label { font-size: 13px; color: var(--color-mid); }
+  .board-caret { position: absolute; bottom: 4px; width: 1px; height: 22px; background: var(--color-off); transition: left 460ms var(--ease-out); }
+  .board-caret-val { position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--color-off); }
+
+  .board-controls { grid-area: controls; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 30px; }
+  .board-foot { flex-basis: 100%; font-size: 10px; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); }
+
+  /* ---- utility cards ---- */  /* ---- utility cards ---- */
   .ucard { background: var(--color-lgray); border-radius: var(--radius-card); padding: 88px 18px 18px; min-height: 300px; display: flex; flex-direction: column; justify-content: space-between; gap: 30px; }
   .ucard .t-card { margin-bottom: 10px; }
   .fit { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; font-size: 14px; color: var(--color-off); }

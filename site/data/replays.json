@@ -41,7 +41,7 @@
         "argmax": "a working tracking number"
       }
     ],
-    "ms": 231.04991600848734,
+    "ms": 117.80116695445031,
     "device": "mps",
     "model": "typical-small"
   },
@@ -58,7 +58,7 @@
         "argmax": "support"
       }
     ],
-    "ms": 61.62141700042412,
+    "ms": 62.532917014323175,
     "device": "mps",
     "model": "typical-small"
   },
@@ -76,7 +76,7 @@
         "expected": 2.500976584851742
       }
     ],
-    "ms": 80.74691705405712,
+    "ms": 75.3958749701269,
     "device": "mps",
     "model": "typical-small"
   },
@@ -91,7 +91,7 @@
         "argmax": "yes"
       }
     ],
-    "ms": 85.01854201313108,
+    "ms": 70.14812499983236,
     "device": "mps",
     "model": "typical-small"
   },
@@ -108,7 +108,89 @@
         "argmax": "a working tracking number"
       }
     ],
-    "ms": 71.01670897100121,
+    "ms": 76.73612498911098,
+    "device": "mps",
+    "model": "typical-small"
+  },
+  "1nfaopw": {
+    "results": [
+      {
+        "probs": {
+          "shipping": 0.46390092372894287,
+          "support": 0.5134168267250061,
+          "retention": 0.02268226258456707
+        },
+        "p_null": 0.23860199749469757,
+        "argmax": "support"
+      }
+    ],
+    "ms": 68.48266697488725,
+    "device": "mps",
+    "model": "typical-small"
+  },
+  "7gg9fn": {
+    "results": [
+      {
+        "probs": {
+          "billing": 0.0580059252679348,
+          "support": 0.9122232794761658,
+          "retention": 0.029770731925964355
+        },
+        "p_null": 0.24572113156318665,
+        "argmax": "support"
+      }
+    ],
+    "ms": 66.17491698125377,
+    "device": "mps",
+    "model": "typical-small"
+  },
+  "17aktqg": {
+    "results": [
+      {
+        "probs": {
+          "billing": 0.11613054573535919,
+          "shipping": 0.8475806713104248,
+          "retention": 0.036288753151893616
+        },
+        "p_null": 0.7222514152526855,
+        "argmax": "shipping"
+      }
+    ],
+    "ms": 64.76241699419916,
+    "device": "mps",
+    "model": "typical-small"
+  },
+  "1px1619": {
+    "results": [
+      {
+        "probs": {
+          "billing": 0.03981930762529373,
+          "shipping": 0.3402183949947357,
+          "support": 0.6199622750282288
+        },
+        "p_null": 0.25819337368011475,
+        "argmax": "support"
+      }
+    ],
+    "ms": 63.4054999682121,
+    "device": "mps",
+    "model": "typical-small"
+  },
+  "7j2v4": {
+    "results": [
+      {
+        "probs": {
+          "billing": 0.039875924587249756,
+          "shipping": 0.30890747904777527,
+          "support": 0.6160086393356323,
+          "retention": 0.01710416004061699,
+          "send a replacement": 0.018103837966918945
+        },
+        "p_null": 0.061904896050691605,
+        "argmax": "support"
+      }
+    ],
+    "ms": 139.16616595815867,
     "device": "mps",
     "model": "typical-small"
   },
@@ -125,7 +207,7 @@
         "argmax": "deny"
       }
     ],
-    "ms": 99.71658303402364,
+    "ms": 101.32512502605096,
     "device": "mps",
     "model": "typical-small"
   },
@@ -142,7 +224,7 @@
         "argmax": "approve"
       }
     ],
-    "ms": 90.53183300420642,
+    "ms": 91.84020903194323,
     "device": "mps",
     "model": "typical-small"
   },
@@ -165,7 +247,7 @@
         "argmax": "yes"
       }
     ],
-    "ms": 90.43620800366625,
+    "ms": 76.38495904393494,
     "device": "mps",
     "model": "typical-small"
   },
@@ -181,7 +263,7 @@
         "argmax": "currency headwinds"
       }
     ],
-    "ms": 71.73683401197195,
+    "ms": 60.98924996331334,
     "device": "mps",
     "model": "typical-small"
   },
@@ -197,7 +279,7 @@
         "argmax": "cloud division"
       }
     ],
-    "ms": 75.80620900262147,
+    "ms": 63.38429095922038,
     "device": "mps",
     "model": "typical-small"
   },
@@ -360,7 +442,7 @@
         "argmax": "transfer"
       }
     ],
-    "ms": 422.3452910082415,
+    "ms": 414.9933750159107,
     "device": "mps",
     "model": "typical-small"
   },
@@ -523,7 +605,7 @@
         "argmax": "weather"
       }
     ],
-    "ms": 391.5162909543142,
+    "ms": 396.73429203685373,
     "device": "mps",
     "model": "typical-small"
   },
@@ -686,7 +768,7 @@
         "argmax": "recipe"
       }
     ],
-    "ms": 404.5077909831889,
+    "ms": 395.1050419709645,
     "device": "mps",
     "model": "typical-small"
   },
@@ -702,7 +784,7 @@
         "argmax": "page"
       }
     ],
-    "ms": 125.20916695939377,
+    "ms": 106.00870900088921,
     "device": "mps",
     "model": "typical-small"
   },
@@ -718,7 +800,7 @@
         "argmax": "page"
       }
     ],
-    "ms": 108.93395799212158,
+    "ms": 103.50587504217401,
     "device": "mps",
     "model": "typical-small"
   },
@@ -734,7 +816,7 @@
         "argmax": "page"
       }
     ],
-    "ms": 104.96637504547834,
+    "ms": 102.13245800696313,
     "device": "mps",
     "model": "typical-small"
   },
@@ -750,7 +832,7 @@
         "argmax": "ignore"
       }
     ],
-    "ms": 94.57212500274181,
+    "ms": 85.66633303416893,
     "device": "mps",
     "model": "typical-small"
   },
@@ -766,7 +848,7 @@
         "argmax": "ignore"
       }
     ],
-    "ms": 98.9692080183886,
+    "ms": 85.88437497382984,
     "device": "mps",
     "model": "typical-small"
   },
@@ -782,7 +864,7 @@
         "argmax": "ignore"
       }
     ],
-    "ms": 94.41795799648389,
+    "ms": 90.95262503251433,
     "device": "mps",
     "model": "typical-small"
   }
