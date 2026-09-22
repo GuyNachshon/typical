@@ -402,21 +402,28 @@ function pushDecision(res, state, queries) {
 
 // The hero film is shown as a character field, not a picture (js/ascii.js). Mounting is
 // best-effort: no iframe, no canvas or an unreadable buffer and the film just plays as itself.
-function mountFilmAscii(film) {
+// Returns a handle whose pulse() the decision loop calls, or a no-op if the effect never mounts.
+function mountFilmFxOn(film) {
   const stage = film?.closest('.stage');
-  if (!film || !stage) return;
-  import('./ascii.js').then(({ mountAscii }) => {
-    mountAscii(stage, () => {
+  const handle = { pulse() {}, stop() {} };
+  if (!film || !stage) return handle;
+  import('./filmfx.js').then(({ mountFilmFx }) => {
+    const fx = mountFilmFx(stage, () => {
       const c = film.contentDocument?.getElementById('canvas');
       return c && c.width ? c : null;
-    }, { after: film, mode: 'bloom' });
+    }, { after: film });
+    handle.pulse = fx.pulse;
+    handle.stop = fx.stop;
   }).catch(() => {});
+  return handle;
 }
 
 // ---- the film: real DOOM in the hero, driven by the model (live) or the rule list (recorded) ----
 function mountFilm(ctx, ids = {}) {
   const film = document.getElementById(ids.film || 'film');
-  if (ids.bloom === true) mountFilmAscii(film); // off by default: the gameplay is shown as the engine draws it
+  // The treatment is the hero's alone: the card in chapter 04 shows the frame untouched.
+  const fx = ids.fx === true ? mountFilmFxOn(film) : { pulse() {} };
+  if (ids.fx === true && typeof window !== 'undefined') window.__fxPulse = () => fx.pulse(); // probe hook for the effect check
   const rowsEl = document.getElementById(ids.rows || 'hud-rows');
   const sentEl = document.getElementById(ids.sentence || 'hud-sentence');
   const rec = document.getElementById(ids.rec || 'hud-rec');
@@ -491,6 +498,7 @@ function mountFilm(ctx, ids = {}) {
     rec.textContent = glued(`${source.startsWith('model') ? 'LIVE' : 'REC'} · typical-small · E1M1 · ${source}`);
     sentEl.textContent = sentence;
     rowsEl.innerHTML = '';
+    fx.pulse(); // the probability panel is being rewritten: run a processing pulse through the film
     labels.forEach((l) => {
       const d = document.createElement('div'); d.className = 'line' + (l === move ? ' on' : '');
       const a = document.createElement('span'); a.textContent = l;
@@ -553,10 +561,10 @@ async function boot() {
   const ctx = { decide: liveDecide, mode, readout, presets, inkBars };
 
   mountHero(presets);
-  mountFilm(ctx);
+  mountFilm(ctx, { fx: true });
   // The same game again in chapter 04, plain: no bloom layer, so the card shows the frame exactly
   // as the engine draws it. Only one of the two runs at a time — each pauses when off screen.
-  mountFilm(ctx, { film: 'film-card', rows: 'card-rows', sentence: 'card-sentence', rec: 'card-rec', bloom: false });
+  mountFilm(ctx, { film: 'film-card', rows: 'card-rows', sentence: 'card-sentence', rec: 'card-rec' });
   import('./motion.js').then((m) => { const go = () => m.mountMotion(); if (window.gsap) go(); else window.addEventListener('load', go); });
   mountFindings();
   mountResults(models, reliabilityDoc, chanceDoc, frozenDoc);

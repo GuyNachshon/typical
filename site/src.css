@@ -123,7 +123,8 @@
   /* The mask is owned by js/ascii.js (it carries the cursor lens); the base gradient there keeps
      the glyph field off the copy and HUD, since a headline over live character noise is
      unreadable and the bottom third of the stage is where every word lives. */
-  .ascii-layer { position: absolute; inset: 0; opacity: 1; transition: opacity 420ms var(--ease-out); pointer-events: none; }
+  /* the treatment layer: over the film, under the shade, copy and HUD, which stay sharp */
+  .film-fx { position: absolute; inset: 0; pointer-events: none; }
   .stage-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.05) 40%, rgba(0,0,0,0.35) 100%); }
   /* The film runs as a dense character field (js/ascii.js), so copy can no longer sit straight on
      it — every word needs its own surface, the way a frame-transcription hero always ends up. */
