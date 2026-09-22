@@ -12,6 +12,8 @@
 //     entries: [{ q, result }]   q: {type, question, labels}
 //     decide:  optional (state, [q]) => result — used to refresh a row live
 
+import { fmtProb } from './api.js';
+
 const CYCLE_MS = 7000;
 const FLOW_FPS = 30;
 
@@ -189,7 +191,7 @@ export function mountInstrument(host, { state, entries, decide, onLive } = {}) {
       const rule = el('i', 'inst-rule');
       rule.style.width = `${(ruleWidth(r.p) * 100).toFixed(1)}%`;
       track.appendChild(rule);
-      const val = el('span', 'inst-value', r.p.toFixed(2));
+      const val = el('span', 'inst-value', fmtProb(r.p));
       row.append(name, track, val);
       rows.appendChild(row);
     });

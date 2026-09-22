@@ -1,23 +1,64 @@
-// primitives.js — one state, three questions, all resolving at once.
+// primitives.js — the program, not another readout.
 //
-// The section's claim is "not tokens, probabilities". A tabbed version of this said it and then
-// undercut it: tabs imply sequence, and sequence is what a generating model does. So the three
-// questions sit on the board together and fill in the same instant, which is the difference
-// being claimed, demonstrated.
+// The section above this one already shows a state being read and a distribution coming back. A
+// second panel with the same ticket, the same questions and the same rows says nothing new, so
+// this one changes the subject: the dominant object here is ordinary Python, and the model's
+// numbers are annotations on the lines that called for them.
 //
-// The interactions each teach one property, and none of them are decorative:
-//   run              all three resolve together, off one read of the state
-//   ask another      a fourth question resolves alone — the state was kept, not recomputed
-//   drop a candidate the distribution recomputes, and taking the winner out sends ∅ up
-//   add a candidate  the answer space is yours, defined per call
+// The claim it makes, which the instrument above cannot: a distribution is only interesting
+// because a branch depends on it. Take "support" out of the answer space and ∅ passes .5, so the
+// program stops paging anyone and calls a human instead. The line that runs changes.
 //
-// Each question renders in its own idiom, because that is what distinguishes the three types:
-// a distribution for choice, one number on an axis for noul, an ordered scale for score.
+// The calls are the real ones from inference/typical/core.py, returning what it actually returns:
+// plain dicts for choice and score, a bare float for noul. That also names the three primitives
+// where a reader meets them, instead of in a panel that defines them first.
 //
-//   mountBoard(host, { state, questions, extra, resultFor, decide })
+//   mountProgram(host, { state, questions, resultFor, decide })
 //     resultFor(q) -> recorded result or undefined      decide(state, [q...]) -> live results
 
+import { fmtProb as fmt } from './api.js';
+
 const ADDABLE = 'send a replacement';
+
+const CALLS = [
+  { key: 'team', type: 'choice', code: ['team', '= m.choice(ticket, "Which team owns this?", TEAMS)'] },
+  { key: 'urgency', type: 'score', code: ['urgency', '= m.score(ticket, "How urgent?", LEVELS)'] },
+  { key: 'escalate', type: 'noul', code: ['escalate', '= m.noul(ticket, "Escalate to a manager?")'] },
+  { key: null, code: ['owner', '= max(TEAMS, key=team.get)'] },
+];
+
+const PROGRAM = [
+  { cond: 'if team["p_null"] > .5:', body: 'human_triage()', reads: ['none'], test: (v) => v.none > 0.5 },
+  { cond: 'elif escalate > .9 and urgency["expected"] > 2.0:', body: 'page(owner)', reads: ['escalate', 'urgency'], test: (v) => v.escalate > 0.9 && v.urgency > 2 },
+  { cond: 'else:', body: 'queue(owner)', reads: [], test: () => true },
+];
+
+// urgency is a position on a scale, so it keeps its units digit; probabilities drop the leading zero
+const fmtRead = (key, p) => (key === 'urgency' ? p.toFixed(2) : fmt(p));
+
+// which line of PROGRAM the current readings select, or -1 before anything has run
+export function branchOf(v) {
+  return v ? PROGRAM.findIndex((b) => b.test(v)) : -1;
+}
+
+// what a call line shows next to itself once it has an answer: the value the code below reads,
+// not the whole distribution — that is one click away, on the only call where it can be changed
+export function readOf(type, result) {
+  if (!result) return '';
+  if (type === 'noul') return fmt(result.probs?.yes ?? 0);
+  if (type === 'score') return (result.expected ?? 0).toFixed(2);
+  const probs = result.probs ?? {};
+  const top = Object.keys(probs).reduce((a, b) => (probs[b] > probs[a] ? b : a), Object.keys(probs)[0]);
+  return top ? `"${top}" ${fmt(probs[top])}` : '';
+}
+
+// A line under the expanded choice: taking the winner out of the answer space moves ∅ far enough
+// to be the point of the whole section, and it has to be readable.
+export function nullNote(pNull, removedWinner) {
+  if (removedWinner && pNull > 0.4) return 'The answer you removed is gone, so ∅ takes the weight it had — past the threshold on the first line, so the program asks a human instead of paging one.';
+  if (pNull > 0.4) return 'None of the options you passed fit this ticket.';
+  return '';
+}
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -26,174 +67,150 @@ function el(tag, cls, text) {
   return n;
 }
 
-const fmt = (p) => p.toFixed(2).replace(/^0/, '');
-
-// The short form of a question: the sentence being asked, without the instructions after it.
-export function askOf(q) {
-  return String(q.question).split(/(?<=\?)\s/)[0].trim();
-}
-
-// A line under the block, not text in the ∅ row: taking the winner out of the answer space moves
-// that number far enough to be the point of the whole section, and it has to be readable.
-export function nullNote(pNull, removedWinner) {
-  if (removedWinner && pNull > 0.4) return 'The answer you removed is gone, so ∅ takes the weight it had.';
-  if (pNull > 0.4) return 'None of the options you passed fit this ticket.';
-  return '';
-}
-
-export function mountBoard(host, { state, questions, extra, resultFor, decide } = {}) {
+export function mountProgram(host, { state, questions, resultFor, decide } = {}) {
   if (!host || !questions?.length) return { stop() {} };
   host.replaceChildren();
-  host.classList.add('board');
+  host.classList.add('program');
 
-  const left = el('div', 'board-state');
-  left.append(el('p', 'board-tag t-mono', 'state'), el('p', 'board-state-text', state));
-  const cached = el('p', 'board-cached t-mono', 'state cached');
-  left.append(cached);
+  // one call per primitive, carrying the question it stands for and whatever came back for it
+  const calls = CALLS.map((c) => ({
+    ...c,
+    q: c.key ? { ...questions.find((q) => q.type === c.type), labels: [...(questions.find((q) => q.type === c.type)?.labels || [])] } : null,
+    result: null,
+    removed: [],
+    droppedWinner: false,
+  }));
+  if (calls.some((c) => c.key && !c.q?.question)) return { stop() {} };
 
-  const right = el('div', 'board-questions');
-  const controls = el('div', 'board-controls');
-  const runBtn = el('button', 'btn dark board-run', 'Run typical');
+  const head = el('div', 'program-head');
+  const runBtn = el('button', 'btn dark', 'Run typical');
   runBtn.type = 'button';
-  const askBtn = el('button', 'btn outline board-ask', '+ ask another');
-  askBtn.type = 'button';
-  askBtn.hidden = true;
-  const foot = el('p', 'board-foot t-mono');
-  controls.append(runBtn, askBtn, foot);
-  host.append(left, right, controls);
+  const foot = el('p', 'program-foot t-mono');
+  head.append(el('p', 'program-tag t-mono', `your program · ${state.split(':')[0]}`), runBtn);
+  const code = el('div', 'program-code');
+  host.append(head, code, foot);
 
-  // one block per question, built empty; running fills them
-  const blocks = questions.map((q) => makeBlock(q));
-  blocks.forEach((b) => right.appendChild(b.node));
-  let asked = false;
+  let open = 'team'; // the choice is expanded by default: it is the one you can change
 
-  function makeBlock(q) {
-    const node = el('div', 'board-q');
-    const head = el('div', 'board-qhead');
-    head.append(el('p', 'board-ask-text', askOf(q)), el('span', 'board-type t-mono', q.type));
-    const out = el('div', 'board-out');
-    node.append(head, out);
-    const block = { node, out, q: { ...q, labels: [...(q.labels || [])] }, result: null, removed: [], droppedWinner: false };
-    render(block);
-    return block;
+  function readings() {
+    const by = (k) => calls.find((c) => c.key === k)?.result;
+    const [team, urgency, escalate] = [by('team'), by('urgency'), by('escalate')];
+    if (!team || !urgency || !escalate) return null;
+    return { none: team.p_null ?? 0, urgency: urgency.expected ?? 0, escalate: escalate.probs?.yes ?? 0 };
   }
 
-  function render(block) {
-    const { q, result } = block;
-    block.out.replaceChildren();
-    if (q.type === 'noul') renderNoul(block);
-    else if (q.type === 'score') renderScore(block);
-    else renderChoice(block);
-    block.out.classList.toggle('is-empty', !result);
+  function line(cls, text) {
+    return el('div', `program-line${cls ? ` ${cls}` : ''}`, text);
   }
 
-  function renderChoice(block) {
-    const { q, result } = block;
-    const probs = result?.probs || {};
+  function render() {
+    const v = readings();
+    const taken = branchOf(v);
+    code.replaceChildren();
+
+    calls.forEach((c) => {
+      const row = line('is-call');
+      const src = el('code', 'program-src');
+      src.append(el('b', null, c.code[0]), document.createTextNode(` ${c.code[1]}`));
+      row.append(src);
+      if (c.key) {
+        const read = el('span', 'program-read t-mono', readOf(c.type, c.result));
+        row.appendChild(read);
+        if (c.type === 'choice') {
+          row.classList.add('is-openable');
+          row.tabIndex = 0;
+          const toggle = () => { open = open === c.key ? null : c.key; render(); };
+          row.addEventListener('click', toggle);
+          row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+        }
+      }
+      code.appendChild(row);
+      if (c.key === open && c.type === 'choice') code.appendChild(expand(c));
+    });
+
+    code.appendChild(line('is-gap', ' '));
+    PROGRAM.forEach((b, n) => {
+      const on = n === taken ? ' is-taken' : '';
+      const cond = line(`is-branch${on}`, b.cond);
+      // the numbers the condition tested, beside the condition — so ".72 > .5" is something the
+      // reader sees rather than something the prose has to assert
+      if (v && b.reads.length) cond.appendChild(el('span', 'program-read t-mono', b.reads.map((k) => fmtRead(k, v[k])).join(' · ')));
+      code.append(cond, line(`is-branch is-body${on}`, `    ${b.body}`));
+    });
+    code.classList.toggle('is-live', taken >= 0);
+  }
+
+  // The answer space, opened out: every option with its share, ∅ below the rule, and an × that
+  // takes an option out. This is the only editable thing on the panel, and editing it is the
+  // demonstration — the distribution moves, and two lines down a different branch lights up.
+  function expand(c) {
+    const wrap = el('div', 'program-expand');
+    const probs = c.result?.probs || {};
     const top = Object.keys(probs).reduce((a, b) => (probs[b] > probs[a] ? b : a), Object.keys(probs)[0]);
-    q.labels.forEach((label) => {
+    c.q.labels.forEach((label) => {
       const p = probs[label];
-      const row = el('div', `board-row${label === top && result ? ' is-win' : ''}`);
-      const name = el('span', 'board-label', label);
-      const track = el('span', 'board-track');
+      const row = el('div', `program-row${label === top && c.result ? ' is-win' : ''}`);
+      const track = el('span', 'program-track');
       const rule = el('i');
-      rule.style.width = result ? `${Math.max(1, (p ?? 0) * 100).toFixed(1)}%` : '0%';
+      rule.style.width = c.result ? `${Math.max(1, (p ?? 0) * 100).toFixed(1)}%` : '0%';
       track.appendChild(rule);
-      const val = el('span', 'board-val', result ? fmt(p ?? 0) : '');
-      const drop = el('button', 'board-drop', '×');
+      const drop = el('button', 'program-drop', '×');
       drop.type = 'button';
       drop.title = `take "${label}" out of the answer space`;
       drop.addEventListener('click', (e) => {
         e.stopPropagation();
-        block.droppedWinner = label === top;
-        block.removed.push(label);
-        block.q.labels = block.q.labels.filter((l) => l !== label);
-        resolve([block], 'one question');
+        c.droppedWinner = label === top;
+        c.removed.push(label);
+        c.q.labels = c.q.labels.filter((l) => l !== label);
+        resolve([c], 'the answer space changed');
       });
-      row.append(name, track, val, drop);
-      block.out.appendChild(row);
+      row.append(el('span', 'program-label', label), track, el('span', 'program-val t-mono', c.result ? fmt(p ?? 0) : ''), drop);
+      wrap.appendChild(row);
     });
-    const none = el('div', 'board-row is-none');
+    const none = el('div', 'program-row is-none');
     none.append(
-      el('span', 'board-label', '∅ none of them'),
-      el('span', 'board-track'),
-      el('span', 'board-val', result ? fmt(result.p_null ?? 0) : ''),
+      el('span', 'program-label', '∅ none of them'),
+      el('span', 'program-track'),
+      el('span', 'program-val t-mono', c.result ? fmt(c.result.p_null ?? 0) : ''),
     );
-    block.out.appendChild(none);
-    const note = result ? nullNote(result.p_null ?? 0, block.droppedWinner) : '';
-    if (note) block.out.appendChild(el('p', 'board-note', note));
-    if (result && block.removed.length) {
-      const back = el('button', 'board-add', `+ put back ${block.removed[block.removed.length - 1]}`);
-      back.type = 'button';
-      back.addEventListener('click', () => {
-        const label = block.removed.pop();
-        block.q.labels = [...questions[0].labels, ...(block.q.labels.includes(ADDABLE) ? [ADDABLE] : [])].filter(
-          (l) => l === label || block.q.labels.includes(l),
-        );
-        block.droppedWinner = false;
-        resolve([block], 'one question');
-      });
-      block.out.appendChild(back);
-    } else if (result && !block.q.labels.includes(ADDABLE)) {
-      const add = el('button', 'board-add', `+ ${ADDABLE}`);
-      add.type = 'button';
-      add.addEventListener('click', () => {
-        block.q.labels = [...block.q.labels, ADDABLE];
-        resolve([block], 'one question');
-      });
-      block.out.appendChild(add);
+    wrap.appendChild(none);
+    const note = c.result ? nullNote(c.result.p_null ?? 0, c.droppedWinner) : '';
+    if (note) wrap.appendChild(el('p', 'program-note', note));
+    if (c.result && c.removed.length) {
+      wrap.appendChild(editBtn(`+ put back ${c.removed[c.removed.length - 1]}`, () => {
+        const label = c.removed.pop();
+        const order = questions.find((q) => q.type === 'choice').labels;
+        c.q.labels = [...order, ADDABLE].filter((l) => l === label || c.q.labels.includes(l));
+        c.droppedWinner = false;
+        resolve([c], 'the answer space changed');
+      }));
+    } else if (c.result && !c.q.labels.includes(ADDABLE)) {
+      wrap.appendChild(editBtn(`+ ${ADDABLE}`, () => {
+        c.q.labels = [...c.q.labels, ADDABLE];
+        resolve([c], 'the answer space changed');
+      }));
     }
+    return wrap;
   }
 
-  function renderNoul(block) {
-    const p = block.result?.probs?.yes;
-    const wrap = el('div', 'board-noul');
-    const value = el('p', 'board-noul-val', block.result ? fmt(p ?? 0) : '');
-    const axis = el('div', 'board-noul-axis');
-    const fill = el('i');
-    fill.style.width = block.result ? `${((p ?? 0) * 100).toFixed(1)}%` : '0%';
-    axis.appendChild(fill);
-    const ends = el('div', 'board-noul-ends t-mono');
-    ends.append(el('span', null, 'no'), el('span', null, 'yes'));
-    wrap.append(value, axis, ends);
-    block.out.appendChild(wrap);
+  function editBtn(text, onClick) {
+    const b = el('button', 'program-add', text);
+    b.type = 'button';
+    b.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
+    return b;
   }
 
-  function renderScore(block) {
-    const { result } = block;
-    const levels = block.q.labels || [];
-    const wrap = el('div', 'board-score');
-    const line = el('div', 'board-score-line');
-    levels.forEach((lv) => {
-      const stop = el('div', 'board-stop');
-      const dot = el('i');
-      const p = result?.probs?.[lv] ?? 0;
-      dot.style.transform = `scale(${result ? (0.3 + p * 1.7).toFixed(2) : 0.3})`;
-      stop.append(dot, el('span', 'board-stop-label', lv));
-      line.appendChild(stop);
-    });
-    wrap.appendChild(line);
-    if (result) {
-      const e = result.expected ?? 0;
-      const caret = el('div', 'board-caret');
-      caret.style.left = `${((e / Math.max(1, levels.length - 1)) * 100).toFixed(1)}%`;
-      caret.appendChild(el('span', 'board-caret-val t-mono', e.toFixed(2)));
-      wrap.appendChild(caret);
-    }
-    block.out.appendChild(wrap);
-  }
-
-  // Resolve a set of blocks together. Live, that is one call carrying every question, which is
-  // the honest version of "all at once"; offline it is the recordings, revealed in one frame.
+  // Resolve a set of calls. Live, that is one request carrying every question, which is the honest
+  // version of "one read"; offline it is the recordings, revealed in the same frame.
   async function resolve(set, label) {
     host.classList.add('is-running');
     const started = performance.now();
     let source = 'recorded';
     let ms = 0;
-    let results = set.map((b) => resultFor(b.q));
+    let results = set.map((c) => resultFor(c.q));
     if (decide) {
       try {
-        const res = await decide(state, set.map((b) => b.q));
+        const res = await decide(state, set.map((c) => c.q));
         if (res?.results?.length === set.length) {
           results = res.results;
           source = 'live';
@@ -202,45 +219,34 @@ export function mountBoard(host, { state, questions, extra, resultFor, decide } 
       } catch {}
     }
     if (source === 'recorded') {
-      ms = Math.round(performance.now() - started);
       // let a replay breathe for a beat, so the fill still reads as a single event
-      await new Promise((r) => setTimeout(r, Math.max(0, 260 - ms)));
-      ms = set.reduce((a, b) => a + (resultFor(b.q)?.ms ?? 0), 0);
+      await new Promise((r) => setTimeout(r, Math.max(0, 260 - (performance.now() - started))));
+      ms = set.reduce((a, c) => a + (resultFor(c.q)?.ms ?? 0), 0);
     }
-    set.forEach((b, n) => {
-      b.result = results[n] || b.result;
-      render(b);
-    });
+    set.forEach((c, n) => { c.result = results[n] || c.result; });
+    render();
     host.classList.remove('is-running');
-    host.classList.add('has-run');
-    askBtn.hidden = asked || !extra;
-    foot.textContent = `${label} · ${source} · ${Math.round(ms)} ms · one read of the state`;
-    cached.classList.add('is-on');
+    runBtn.textContent = 'Run again';
+    foot.textContent = `${label} · ${source} · ${Math.round(ms)} ms`;
   }
 
-  runBtn.addEventListener('click', () => {
-    runBtn.textContent = 'Run again';
-    resolve(blocks, 'three questions, one pass');
-  });
-  askBtn.addEventListener('click', () => {
-    if (asked || !extra) return;
-    asked = true;
-    askBtn.hidden = true;
-    const block = makeBlock(extra);
-    block.node.classList.add('is-new');
-    right.appendChild(block.node);
-    blocks.push(block);
-    resolve([block], 'a fourth question, on the state already read');
-  });
-
+  render();
+  runBtn.addEventListener('click', () => resolve(calls.filter((c) => c.key), 'three calls, one read of the ticket'));
   return { stop() {} };
 }
 
 export function selfTest() {
-  console.assert(askOf({ question: 'Which team should own this ticket? Answer with one.' }) === 'Which team should own this ticket?', 'the board asks the question, not the instructions');
-  console.assert(nullNote(0.72, true).includes('gone'), 'dropping the winner names why ∅ moved');
+  console.assert(readOf('choice', { probs: { a: 0.6, b: 0.4 }, p_null: 0.1 }) === '"a" .60', 'a choice reads as its winner');
+  console.assert(readOf('score', { expected: 2.5009 }) === '2.50', 'a score reads as its expected index');
+  console.assert(readOf('noul', { probs: { yes: 0.998 } }) === '.998', 'a noul reads as P(yes), and never rounds to certainty');
+  console.assert(readOf('choice', null) === '', 'and nothing reads as nothing');
+  // the recorded numbers, before and after "support" is taken out of the answer space
+  console.assert(branchOf({ none: 0.083, escalate: 0.998, urgency: 2.5 }) === 1, 'the ticket pages someone');
+  console.assert(branchOf({ none: 0.722, escalate: 0.998, urgency: 2.5 }) === 0, 'and drops to a human once ∅ carries it');
+  console.assert(branchOf({ none: 0.083, escalate: 0.2, urgency: 2.5 }) === 2, 'an unescalated ticket just queues');
+  console.assert(branchOf(null) === -1, 'nothing is taken before anything has run');
+  console.assert(nullNote(0.72, true).includes('asks a human'), 'dropping the winner names what changed in the code');
   console.assert(nullNote(0.08, false) === '', 'and stays quiet otherwise');
-  console.assert(fmt(0.083) === '.08', 'two places, no leading zero');
   console.log('primitives.js self-test OK');
   return true;
 }

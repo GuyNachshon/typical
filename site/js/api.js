@@ -22,6 +22,15 @@ export function hashKey(state, queries) {
   return (h >>> 0).toString(36);
 }
 
+// Every probability on the site prints through here. Two places, leading zero dropped — except
+// where two places would lie: .998 must not read as 1.00, because the difference between certain
+// and nearly certain is the only thing a calibrated model is selling.
+export function fmtProb(p) {
+  const s = p.toFixed(2);
+  if ((s === '1.00' && p < 1) || (s === '0.00' && p > 0)) return p.toFixed(3).replace(/^0/, '');
+  return s.replace(/^0/, '');
+}
+
 // ponytail: one in-flight request at a time -- the local MPS server serializes anyway, and
 // concurrent fetches from several screens only add queueing latency (and once crashed Metal).
 let chain = Promise.resolve();
@@ -87,6 +96,10 @@ function selfTest() {
   console.assert(hashKey('a', [{ q: 1 }]) === hashKey('a', [{ q: 1 }]), 'hashKey is deterministic');
   console.assert(hashKey('a', [{ q: 1 }]) !== hashKey('b', [{ q: 1 }]), 'hashKey differs on different state');
   console.assert(hashKey('a', [{ q: 1 }]) !== hashKey('a', [{ q: 2 }]), 'hashKey differs on different queries');
+  console.assert(fmtProb(0.5874) === '.59' && fmtProb(0.083) === '.08', 'two places, no leading zero');
+  console.assert(fmtProb(0.998) === '.998', 'near-certain never prints as certain');
+  console.assert(fmtProb(1) === '1.00' && fmtProb(0) === '.00', 'and the actual ends are left alone');
+  console.assert(fmtProb(0.0013) === '.001', 'nor near-zero as zero');
   console.log('api.js self-test OK');
   return true;
 }

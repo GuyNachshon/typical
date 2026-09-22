@@ -363,13 +363,10 @@ async function mountPrimitives(presets) {
   const byType = (type) => pg.queries.find((q) => q.type === type);
   const questions = ['choice', 'noul', 'score'].map(byType).filter(Boolean);
   if (questions.length !== 3 || !questions.every((q) => recorded(q))) return;
-  // the second choice question is the one the board adds on "ask another"
-  const extra = pg.queries.filter((q) => q.type === 'choice')[1];
-  const { mountBoard } = await import('./primitives.js');
-  mountBoard(host, {
+  const { mountProgram } = await import('./primitives.js');
+  mountProgram(host, {
     state: pg.state,
     questions,
-    extra: extra && recorded(extra) ? extra : null,
     resultFor: recorded,
     decide: mode() === 'live' ? decide : null,
   });

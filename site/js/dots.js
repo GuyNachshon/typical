@@ -1,3 +1,4 @@
+import { fmtProb } from './api.js';
 // dots.js — the one visual primitive. Every dot's brightness is a probability the model produced
 // (or, where no data applies, a fixed value). Canvas-based, retina-aware, no animation on load;
 // update() eases alpha only.
@@ -189,7 +190,7 @@ export function dotBars(el, rows, { dots = 24 } = {}) {
       label.textContent = r.label; // labels can be user-typed (Try it): text only
       const num = document.createElement('span');
       num.className = 'dotbars-num';
-      num.textContent = r.p.toFixed(2);
+      num.textContent = fmtProb(r.p);
       row.append(label, strip, num);
       el.appendChild(row);
     });
