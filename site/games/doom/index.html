@@ -40,6 +40,20 @@ window.Doom = {
     Doom.key(key, true);
     return new Promise(r => setTimeout(() => { Doom.key(key, false); r(); }, ms));
   },
+  // Closed-loop turn: hold left/right until the view has turned `deg` degrees (or maxMs). Fixed
+  // hold times are useless here - the wasm build runs ~18 tics/s headless, presses under ~150ms
+  // are dropped, and a 180ms press is ~20 degrees, so aiming into an 8-degree crosshair needs
+  // the angle read back. Resolves with the actual delta.
+  async turnBy(key, deg, maxMs = 1500) {
+    const norm = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
+    const a0 = Doom.state().angle;
+    const t0 = performance.now();
+    Doom.key(key, true);
+    while (Math.abs(norm(Doom.state().angle - a0)) < deg && performance.now() - t0 < maxMs) await new Promise(r => setTimeout(r, 8));
+    Doom.key(key, false);
+    await new Promise(r => setTimeout(r, 60));
+    return norm(Doom.state().angle - a0);
+  },
   // skill 1..5 as in the menu; loads E1M1 on the next game tic.
   newGame(skill = 3) { Module._typical_new_game(skill - 1); },
   releaseAll() { for (const c in held) if (held[c]) Doom.key(+c, false); },

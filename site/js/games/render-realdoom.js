@@ -4,7 +4,7 @@
 // demo-spec-v2.md #5 found the model says "shoot" 29/30 times regardless of state on that
 // engine, and this card lets the same failure play out against id's actual E1M1.
 import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, loadJSON, scoreboardLine } from './loop.js';
-import { candidatesFor, describeDoom, scriptedPolicy, resolveIntent, resetNav, KEY_FOR_MOVE } from './realdoom-logic.js';
+import { candidatesFor, describeDoom, scriptedPolicy, resolveIntent, resetNav, keyPress } from './realdoom-logic.js';
 import { QUESTION } from './doom.js';
 
 const TICK_MS = 400;
@@ -14,10 +14,10 @@ const KEYMAP = {
   w: 'move forward', s: 'move back', a: 'turn left', d: 'turn right',
 };
 
-function applyMove(doom, move) {
-  const spec = KEY_FOR_MOVE[move];
+// [key, ms] -> a timed press; [key, { deg }] -> a closed-loop turn (games/doom/index.html).
+function applyMove(doom, spec) {
   if (!spec || !doom) return Promise.resolve();
-  return doom.press(spec[0], spec[1]);
+  return typeof spec[1] === 'object' ? doom.turnBy(spec[0], spec[1].deg) : doom.press(spec[0], spec[1]);
 }
 
 // Polls iframe.contentWindow.Doom until the level is actually running (Doom.ready flips as
@@ -176,10 +176,10 @@ export async function mount(el, { decide, mode } = {}) {
       }
       lastDecision = decision;
 
-      const action = resolveIntent(currState, move); // the engine aims
+      const action = resolveIntent(currState, move); // the model aims; the engine presses the key
       if (action === 'shoot') shots += 1;
       const killsBefore = currState.kills ?? 0;
-      await applyMove(doom, action);
+      await applyMove(doom, keyPress(currState, move, action));
       const after = doom.state();
       if ((after.kills ?? 0) > killsBefore) {
         const delta = after.kills - killsBefore;

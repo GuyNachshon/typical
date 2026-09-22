@@ -9,7 +9,7 @@
 // Usage: node scripts/record_realdoom.mjs
 import fs from 'node:fs';
 import { chromium } from '/Users/guynachshon/.npm/_npx/e41f203b7505f1fb/node_modules/playwright/index.mjs';
-import { candidatesFor, describeDoom, resolveIntent, scriptedPolicy, KEY_FOR_MOVE } from '../site/js/games/realdoom-logic.js';
+import { candidatesFor, describeDoom, resolveIntent, scriptedPolicy, keyPress } from '../site/js/games/realdoom-logic.js';
 import { QUESTION } from '../site/js/games/doom.js';
 
 const PAGE = 'http://localhost:8788/games/doom/index.html';
@@ -72,22 +72,23 @@ async function main() {
 
     const gold = scriptedPolicy(state); // the rule list applied literally
     if (move === gold) rule_agreement += 1;
-    const action = resolveIntent(state, move); // the engine aims
-    const [key, holdMs] = KEY_FOR_MOVE[action];
+    const action = resolveIntent(state, move); // the model aims; the engine presses the key
+    const [key, hold] = keyPress(state, move, action);
     if (action === 'shoot') shots += 1;
     const killsBefore = state.kills ?? 0;
-    await page.evaluate(({ key, holdMs }) => window.Doom.press(key, holdMs), { key, holdMs });
+    await page.evaluate(({ key, hold }) => (typeof hold === 'object' ? window.Doom.turnBy(key, hold.deg) : window.Doom.press(key, hold)), { key, hold });
     const after = await page.evaluate(() => window.Doom.state());
     if ((after.kills ?? 0) > killsBefore) kills += after.kills - killsBefore;
     health_end = after.health ?? health_end;
 
-    decisions.push({ tic, desc, candidates, probs: candidates.map((m) => probs[m] ?? 0), move, gold, action, ms });
+    decisions.push({ tic, desc, candidates, probs: candidates.map((m) => probs[m] ?? 0), move, gold, action, ms, x: Math.round(state.x), y: Math.round(state.y) });
     console.log(`[${tic}] ${move} -> ${action} (${ms}ms) — ${desc.slice(0, 90)}`);
 
     if (!after.in_level) break; // died / demo kicked back to menu
   }
 
-  const summary = { decisions: decisions.length, rule_agreement, shots, kills, health_end };
+  const count = (k) => decisions.filter((d) => d.move === k).length;
+  const summary = { decisions: decisions.length, rule_agreement, shots, kills, health_end, by_label: Object.fromEntries(['retreat', 'shoot', 'turn left', 'turn right', 'explore'].map((k) => [k, count(k)])) };
   fs.writeFileSync(new URL('../site/data/replays/realdoom.json', import.meta.url), JSON.stringify({ decisions, summary }));
   console.log('STATS_JSON', JSON.stringify(summary));
   await browser.close();

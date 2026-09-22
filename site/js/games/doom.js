@@ -75,7 +75,8 @@ const HEADINGS = [
 const ARROW = ['▲', '▶', '▶', '▼', '▼', '▼', '◀', '◀'];
 
 const ACTIONS = ['move forward', 'move back', 'turn left', 'turn right', 'shoot'];
-const AWARE_RANGE = 8; // describe()/enemy-aggro radius, in cells
+const AWARE_RANGE = 8; // describe() radius, in cells
+const CHASE_RANGE = 4; // enemies wander beyond this and chase inside it, so sightings need turns (the model's job)
 const SHOOT_RANGE = AWARE_RANGE; // "in the crosshair" == shoot() would hit
 const CROSSHAIR_DEG = 22.5; // half the 8-heading step: a turn cannot line up any better than this
 const DAMAGE = 10;
@@ -124,6 +125,10 @@ export class Doom {
       { x: 20, y: 12, alive: true },
       { x: 3, y: 12, alive: true },
       { x: 12, y: 6, alive: true },
+      { x: 16, y: 2, alive: true },
+      { x: 21, y: 7, alive: true },
+      { x: 14, y: 13, alive: true },
+      { x: 7, y: 8, alive: true },
     ];
     this.dead = false;
     this.score = 0;
@@ -232,7 +237,15 @@ export class Doom {
         p.health = Math.max(0, p.health - DAMAGE);
         continue;
       }
-      if (dist > AWARE_RANGE) continue;
+      if (dist > CHASE_RANGE) {
+        // wander (seeded), so a sighted enemy drifts out of the cone and the model has to turn
+        const w = HEADINGS[Math.floor(this.rng() * 8)];
+        if (this.rng() < 0.5 && !this._occupied(e.x + w.dx, e.y + w.dy, e)) {
+          e.x += w.dx;
+          e.y += w.dy;
+        }
+        continue;
+      }
       const adx = Math.abs(p.x - e.x);
       const ady = Math.abs(p.y - e.y);
       const sx = Math.sign(p.x - e.x);
@@ -290,12 +303,14 @@ export class Doom {
     return this.state();
   }
 
-  // Situations-only grammar (demo-spec v4): health/ammo, then only the situations that apply,
-  // worded exactly as the rule conditions, in this fixed order. The leading enemy (crosshair
-  // first, then nearest) is the one the sentence is about; the turn side is pre-computed.
+  // Situations-only grammar (demo-spec v4): only the situations that apply, worded exactly as
+  // the rule conditions, in this fixed order. No health/ammo numbers: "41 health" with an enemy
+  // in the crosshair read as danger (retreat .56 / shoot .42; without the numbers shoot .89).
+  // The leading enemy (crosshair first, then nearest) is the one the sentence is about; the
+  // turn side is pre-computed.
   describe() {
     const p = this.player;
-    const sentences = [`The player has ${p.health} health and ${p.ammo} ammo.`];
+    const sentences = [];
     if (p.health < HURT_BELOW) sentences.push('The player is badly hurt.');
     const seen = this._visible();
     if (seen.length > 1) sentences.push(`The player has ${seen.length} enemies in sight.`);
@@ -480,7 +495,7 @@ export function greedyPolicy(engine) {
 function selfTest() {
   const d = new Doom({ seed: 3 });
   console.assert(d.player.health === 100 && d.player.ammo === 12, 'starts at full health/ammo');
-  console.assert(d.enemies.length === 4, 'has 4 enemies');
+  console.assert(d.enemies.length === 8, 'has 8 enemies');
   console.assert(d.candidates().join() === 'retreat,shoot,turn left,turn right,explore', 'candidates are the five labels in rule order');
 
   const render1 = d.render();
@@ -497,10 +512,10 @@ function selfTest() {
   ];
   d2.items = [];
   d2.grid[5][6] = '.'; // ensure open ahead
-  console.assert(d2.describe() === 'The player has 60 health and 8 ammo. The player has 2 enemies in sight. The player has an enemy in the crosshair, 4 cells ahead.', 'crosshair enemy leads the sentence');
+  console.assert(d2.describe() === 'The player has 2 enemies in sight. The player has an enemy in the crosshair, 4 cells ahead.', 'crosshair enemy leads the sentence');
   console.assert(greedyPolicy(d2) === 'shoot' && d2.resolve('shoot') === 'shoot' && d2._shootTarget() === d2.enemies[0], 'crosshair target -> shoot hits it');
   d2.enemies[0].alive = false;
-  console.assert(d2.describe() === 'The player has 60 health and 8 ammo. The player must turn left to face the enemy.', 'single off-axis enemy -> pre-computed turn side');
+  console.assert(d2.describe() === 'The player must turn left to face the enemy.', 'single off-axis enemy -> pre-computed turn side');
   console.assert(greedyPolicy(d2) === 'turn left' && d2.resolve('turn left') === 'turn left', 'the model turns; the engine presses the key');
   d2.enemies[1].y = 7; // 2 down, 0 across = to the right when facing E
   console.assert(greedyPolicy(d2) === 'turn right', 'right side');
@@ -524,7 +539,7 @@ function selfTest() {
   const d3 = new Doom({ seed: 1 });
   d3.player = { x: 1, y: 1, h: 6, health: 100, ammo: 0 }; // facing W, wall ahead, open behind (E)
   d3.enemies = [];
-  console.assert(d3.describe() === 'The player has 100 health and 0 ammo. The player sees no enemy. A wall is ahead.', 'no enemy + wall');
+  console.assert(d3.describe() === 'The player sees no enemy. A wall is ahead.', 'no enemy + wall');
   console.assert(greedyPolicy(d3) === 'explore' && d3.resolve('explore') === 'turn right', 'explore turns when blocked');
   console.assert(!d3._legalActions().includes('shoot'), 'no shoot at 0 ammo');
   // an enemy behind a wall is not in sight

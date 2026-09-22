@@ -88,9 +88,9 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
   <div class="plates">
   <article class="plate" id="game-snake">
     <div class="plate-copy">
-      <span class="pill">Partial</span>
+      <span class="pill">Works</span>
       <h3>Snake</h3>
-      <p>A 10×10 board on canvas. Each tick the model reads one sentence describing the board and picks one of the safe moves; the candidate set is the only guardrail, so it can never choose a collision. It trends toward the food only weakly (food-ward move .72 vs .53 chance in the probe; .55 vs .39 random-safe in the recorded run) and does not plan.</p>
+      <p>A 10×10 board on canvas. Each tick the board is rendered as the situations that apply, pre-computed as agent-subject sentences (“the snake must move right to close the larger gap to the food”, “the snake can also move up to close the smaller gap”, “moving down hits the wall”), and the model picks one of the safe moves; the candidate set is the only guardrail. Following the sentences literally is a greedy policy that eats about 28 food per 300 ticks; the model matched it on 61/62 scripted boards (chance .48) and on 216/217 ticks of the recorded run, eating 24 food before greedy trapped it at length 27. It does not plan, and spelling the same rules out in the question made it worse (.82–.95, p_null .9).</p>
     </div>
     <div class="plate-stage game-mount" data-game="snake"></div>
   </article>
@@ -104,9 +104,9 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
   </article>
   <article class="plate" id="game-realdoom">
     <div class="plate-copy">
-      <span class="pill">Partial</span>
+      <span class="pill">Works</span>
       <h3>Doom</h3>
-      <p>Chocolate Doom, the 1993 shareware, running in WebAssembly. Each tick the model reads two facts (badly hurt? an enemy in line of sight?) and picks an intent, retreat, engage or explore, and the engine aims and presses the key. It matches the three rules 30/30 (chance .33; .60 with no rules), but when it was asked to aim itself (shoot / turn left / turn right) it said “shoot” for any enemy mention, 0/12 turns over five phrasings. In the recorded E1M1 run its explorer never left the first rooms, so it decided “explore” 199 times and “engage” once.</p>
+      <p>Chocolate Doom, the 1993 shareware, running in WebAssembly. Each tick the model reads the situations that apply, pre-computed as agent-subject sentences (“the player is badly hurt”, “the player has a zombieman in the crosshair, 6 cells ahead”, “the player must turn left to face the imp”) and picks retreat, shoot, turn left, turn right or explore from five one-condition rules; the engine only presses the key (a closed-loop turn by the enemy’s bearing) and walks a scripted route from the E1M1 spawn to the first zombiemen. It matched the rule list 48/48 in the probe (chance .20; .73 with no rules) and 200/200 in the recorded E1M1 run: 3 turns, 64 shots, 4 kills, health 86. The v3 form “the enemy is 5 cells to the left” never fired a turn (0/12); the rewrite to “the player must turn left to face the enemy” did. Raw health numbers had to go: “41 health” with an enemy in the crosshair read as danger (retreat .56 over shoot).</p>
     </div>
     <div class="plate-stage game-mount" data-game="realdoom" data-game-fallback="doom"></div>
   </article>
@@ -171,7 +171,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
     <div class="notwork">
       <h3>What does not work</h3>
       <ul>
-        <li>Aiming. In Doom the model picks retreat, engage or explore correctly, but it cannot turn toward an enemy from a bearing sentence (0 of 12 in the probe), so the engine aims. In real DOOM it explores and rarely meets a monster.</li>
+        <li>Object-location sentences. Doom’s “the enemy is 5 cells to the left” never fired a turn (0 of 12); the model aims only once the state says “the player must turn left to face the enemy”. Numbers it must compare itself (“41 health”) leak into the decision: with them, an enemy in the crosshair at mid health read as retreat. Snake and Doom both need the engine to pre-compute the comparison.</li>
         <li>Rules with "or" in them, negated conditions, or more than four rules before the default. Drive's 70/70 holds only with the state sentences in a fixed order; shuffled, it drops to .89–.93.</li>
         <li>Compaction: P(keep) never crosses .5, so there is no usable keep/drop threshold, only a ranking.</li>
         <li>Level-7 composition (temporal, units, expected value, trade-off): at chance on every checkpoint.</li>

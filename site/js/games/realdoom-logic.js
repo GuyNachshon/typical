@@ -10,9 +10,9 @@ import { LABELS, HURT_BELOW } from './doom.js';
 const CELL_UNITS = 64; // map units per Doom grid cell (doom-wasm-notes.md)
 const CROSSHAIR_DEG = 8;
 const BEHIND_DEG = 100; // |bearing| beyond this = behind the player = not "in sight"
-const SIGHT_CELLS = 40; // Doom.state() lists the nearest monsters map-wide; "in sight" = line of sight (visible), not behind, this close
+const SIGHT_CELLS = 12; // Doom.state() lists the nearest monsters map-wide; "in sight" = line of sight (visible), not behind, within pistol range (an imp 18 cells off across the nukage ate 69 shots and all the ammo in a recorded run)
 
-export const ACTIONS = ['move forward', 'move back', 'turn left', 'turn right', 'shoot'];
+export const ACTIONS = ['move forward', 'move back', 'turn left', 'turn right', 'shoot', 'use'];
 
 // Chocolate Doom key id + hold duration (ms) for each key press - press(key, ms) on
 // window.Doom (site/games/doom/index.html's harness).
@@ -24,9 +24,10 @@ export const KEY_FOR_MOVE = {
   // ticker just skips a tick while the press is still held, same as it already does at 350ms).
   'move forward': ['forward', 550],
   'move back': ['back', 350],
-  'turn left': ['left', 180],
+  'turn left': ['left', 180], // keyPress() replaces these with a closed-loop turn by degrees
   'turn right': ['right', 180],
   shoot: ['fire', 120],
+  use: ['use', 150], // explore only: opens the corridor door on the ROUTE
 };
 
 export function cellsOf(units) {
@@ -53,11 +54,12 @@ export function candidatesFor(state) {
   return LABELS.filter((l) => l !== 'shoot' || (state.ammo ?? 0) > 0);
 }
 
-// state -> the sentence the model reads: health/ammo, then only the situations that apply,
-// worded exactly as the rule conditions (js/games/doom.js RULES), monster type included, in a
-// fixed order. The lead monster (crosshair first, then nearest) is the one the sentence is about.
+// state -> the sentence the model reads: only the situations that apply, worded exactly as the
+// rule conditions (js/games/doom.js RULES), monster type included, in a fixed order. No
+// health/ammo numbers (see doom.js describe()). The lead monster (crosshair first, then
+// nearest) is the one the sentence is about.
 export function describeDoom(state) {
-  const sentences = [`The player has ${state.health} health and ${state.ammo} ammo.`];
+  const sentences = [];
   if (state.health < HURT_BELOW) sentences.push('The player is badly hurt.');
   const seen = inSight(state);
   const lead = seen[0];
@@ -72,86 +74,107 @@ export function describeDoom(state) {
   return sentences.join(' ');
 }
 
-// explore navigator: forward + wall-follow, plus a stuck-timer escape. Pure wall-following
-// (fixed turn preference) loops around whichever room it starts in almost indefinitely on
-// E1M1 - state.monsters carries dist/bearing for the nearest thinkers map-wide even when
-// they're behind walls (P_CheckSight/visible is what's withheld from the model's sentence,
-// not from the engine), so a wall-hit turns toward the nearest one's side instead of a fixed
-// direction. That's still "the engine aims", not the model - it only decides the intent.
-// State is module-level (one page, one player) - resetNav() clears it on restart.
-let navBias = 1; // 1 = right, -1 = left; the stuck-escape direction, flips when stuck
-let navHist = []; // {x, y, t} samples since navWindowSince - a corner where the player
-// alternates turnLock direction can still cover >32 units step to step (bouncing between two
-// points a wall-width apart), so "progress" is a bounding box over a fixed time window, not
-// distance from the last sample.
-let navWindowSince = null; // when the current STUCK_MS window started
-let navForce = 0; // ticks left in a forced stuck-escape turn
-let navForceFwd = 0; // ticks left in the forced-forward burst that follows the turn
-let turnLock = 0; // 0 outside a wall encounter, else the direction (1/-1) picked for its whole duration
-const STUCK_MS = 2500;
-const STUCK_RADIUS = 150; // bounding-box diagonal of the last STUCK_MS of positions, below this = no real progress
-// A tight pillar room (E1M1 has one) can bounce the plain wall-follow turn back and forth
-// between two spots a wall-width apart forever - the escape needs to be decisive: ~half a
-// turn (not a quarter) plus a forced walk out of the pocket, not just a re-aim in place.
-const FORCE_TURN_TICKS = 8; // ~8 * KEY_FOR_MOVE['turn right'][1] (180ms) holds ~= a 144 degree turn
-const FORCE_FWD_TICKS = 4; // ~4 * KEY_FOR_MOVE['move forward'][1] (350ms) holds - walk out of the pocket
+// explore navigator: a scripted route from the E1M1 spawn to the first zombiemen, then a
+// minimal wall-turn fallback. Map units, Doom frame (x east, y north, angle CCW from east).
+// The spawn (1056,-3616) room only opens north; its east "exits" are windows. The corridor
+// door at x=1536 is a DR door: one `use` press opens it (a second press while it is opening
+// closes it again), then walking into it until it is open. The two HMP zombiemen stand in
+// the raised alcove at (2272,-2432)/(2272,-2352) and come to the player once seen.
+export const ROUTE = [
+  { x: 1230, y: -3000 }, // north along the start room's east side (the pillar platform is west)
+  { x: 1300, y: -2650 }, // the corridor north-east
+  { x: 1480, y: -2450 }, // corridor end, facing the door
+  { x: 1620, y: -2448, door: true }, // past the door: blocked here -> use, then walk in
+  { x: 1950, y: -2440 }, // pillar room, in front of the alcove
+  { x: 1950, y: -2640 }, // round the alcove's south side (its wall is y=-2544)
+  { x: 2380, y: -2640 },
+  { x: 2500, y: -2600 }, // the room's east passage
+  { x: 2700, y: -2600 },
+  { x: 2800, y: -2700 }, // south-east into the third zombieman's nook at (2912,-2816)
+  { x: 2850, y: -2830 },
+  { x: 2950, y: -2800 },
+];
+const PATROL_FROM = 4; // once the route is done, patrol between ROUTE[4] (pillar room) and its end
+const WP_RADIUS = 80;
+const TURN_TOL_DEG = 12;
+const STUCK_TICKS = 8; // explore ticks without moving 8 units -> skip the waypoint
+const DOOR_RETRY_MS = 8000; // a DR door takes ~4 s to open at the wasm build's tic rate
+const DEFAULT_TURN_DEG = 60;
+let wpIndex = 0;
+let wpDir = 1; // +1 outbound, -1 walking the route back (patrol)
+let wpStuck = 0;
+let lastPos = null;
+let usedAt = -Infinity;
+let navTurnDeg = DEFAULT_TURN_DEG; // what the last explore turn asked for (keyPress reads it)
+let retreatPos = null; // where the last retreat started; no movement since -> the way back is blocked
 
 export function resetNav() {
-  navBias = 1;
-  navHist = [];
-  navWindowSince = null;
-  navForce = 0;
-  navForceFwd = 0;
-  turnLock = 0;
+  wpIndex = 0;
+  wpDir = 1;
+  wpStuck = 0;
+  retreatPos = null;
+  lastPos = null;
+  usedAt = -Infinity;
+  navTurnDeg = DEFAULT_TURN_DEG;
 }
 
+const norm = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
+
 function exploreAction(state, now = Date.now()) {
-  if (navWindowSince == null) navWindowSince = now;
-  navHist.push({ x: state.x, y: state.y, t: now });
-  // Check once per fixed STUCK_MS window, not "trim to the last STUCK_MS then compare" - trimming
-  // first always leaves the oldest sample younger than STUCK_MS, so that check never fires.
-  if (navForce === 0 && navForceFwd === 0 && now - navWindowSince >= STUCK_MS) {
-    const xs = navHist.map((p) => p.x);
-    const ys = navHist.map((p) => p.y);
-    const span = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-    navWindowSince = now;
-    navHist = [{ x: state.x, y: state.y, t: now }];
-    if (span < STUCK_RADIUS) {
-      // A fixed alternation (always flip) can settle into an exact repeating loop around a
-      // tight obstacle (E1M1's pillar room does this) - a random side plus a randomised turn
-      // length breaks that periodicity instead of retracing the same failed escape every time.
-      navBias = Math.random() < 0.5 ? 1 : -1;
-      navForce = FORCE_TURN_TICKS + Math.floor(Math.random() * 5); // 8-12 ticks, ~144-216 degrees
-      turnLock = 0; // the stuck escape overrides whatever the wall encounter had picked
-    }
+  // Past the last waypoint the route is walked back to PATROL_FROM and forward again: a free
+  // explorer wandered off the far end into the nukage courtyard and died there (health 0 at
+  // decision 200 of a recorded run). Monsters woken along the way come to the patrol.
+  if (wpIndex >= ROUTE.length) {
+    wpDir = -1;
+    wpIndex = ROUTE.length - 2;
+  } else if (wpDir < 0 && wpIndex < PATROL_FROM) {
+    wpDir = 1;
+    wpIndex = PATROL_FROM + 1;
   }
-  if (navForce > 0) {
-    navForce -= 1;
-    if (navForce === 0) navForceFwd = FORCE_FWD_TICKS;
-    return navBias > 0 ? 'turn right' : 'turn left';
+  const wp = ROUTE[wpIndex];
+  if (Math.hypot(wp.x - state.x, wp.y - state.y) < WP_RADIUS) {
+    wpIndex += wpDir;
+    return exploreAction(state, now);
   }
-  if (navForceFwd > 0) {
-    navForceFwd -= 1;
-    return 'move forward'; // committed - blocked_ahead resumes governing once this burst ends
+  if (lastPos && Math.hypot(state.x - lastPos.x, state.y - lastPos.y) < 8) wpStuck += 1;
+  else wpStuck = 0;
+  lastPos = { x: state.x, y: state.y };
+  if (wpStuck > STUCK_TICKS && !wp.door) { // a door waypoint is never skipped: it retries `use`
+    wpIndex += wpDir;
+    wpStuck = 0;
+    return exploreAction(state, now);
   }
-  if (state.blocked_ahead) {
-    // Pick (and keep) one turn direction for this whole wall encounter - recomputing it every
-    // tick from the target's bearing oscillates left/right forever right at a corner, where the
-    // bearing sign flips as the player's own angle changes.
-    if (turnLock === 0) {
-      const nearest = (state.monsters ?? []).reduce((best, m) => (best == null || m.dist < best.dist ? m : best), null);
-      turnLock = nearest ? (((nearest.bearing ?? 0) >= 0) ? 1 : -1) : navBias;
-    }
-    return turnLock > 0 ? 'turn right' : 'turn left';
+  // bearing to the waypoint, positive = to the right (same convention as state.monsters)
+  const bearing = -norm((Math.atan2(wp.y - state.y, wp.x - state.x) * 180) / Math.PI - state.angle);
+  if (Math.abs(bearing) > TURN_TOL_DEG) {
+    navTurnDeg = Math.abs(bearing);
+    return bearing > 0 ? 'turn right' : 'turn left';
   }
-  turnLock = 0;
+  // `use` reaches 64 units; blocked_ahead fires 64 units out - so press it only once the walk
+  // has actually stopped against the door (wpStuck >= 1), and never while it is still opening.
+  if (state.blocked_ahead && wp.door && wpStuck >= 1 && now - usedAt > DOOR_RETRY_MS) {
+    usedAt = now;
+    wpStuck = 0;
+    return 'use';
+  }
   return 'move forward';
 }
 
 // Label -> key action. The model aims (shoot / turn left / turn right are its own labels); the
 // engine walks for retreat/explore. Raw actions pass through for the human override.
 export function resolveIntent(state, move) {
-  if (move === 'retreat') return 'move back';
+  if (move === 'retreat') {
+    // move back, unless the last retreat did not move the player (a wall behind: a recorded run
+    // died in nukage backing into a wall 80 ticks running) - then turn to find another way out.
+    const stuck = retreatPos && Math.hypot(state.x - retreatPos.x, state.y - retreatPos.y) < 8;
+    retreatPos = { x: state.x, y: state.y };
+    if (stuck) {
+      navTurnDeg = 90;
+      return 'turn right';
+    }
+    return 'move back';
+  }
+  retreatPos = null;
   if (move === 'explore') return exploreAction(state);
   return move;
 }
@@ -162,7 +185,7 @@ export function resolveIntent(state, move) {
 export function keyPress(state, move, action) {
   if (action !== 'turn left' && action !== 'turn right') return KEY_FOR_MOVE[action];
   const key = action === 'turn left' ? 'left' : 'right';
-  if (move === 'explore') return [key, { deg: navTurnDeg }];
+  if (move === 'explore' || move === 'retreat') return [key, { deg: navTurnDeg }];
   const lead = inSight(state)[0];
   return [key, { deg: lead ? Math.min(120, Math.max(8, Math.abs(lead.bearing ?? 0))) : DEFAULT_TURN_DEG }];
 }
@@ -179,24 +202,51 @@ export function scriptedPolicy(state) {
 
 function selfTest() {
   const s1 = { health: 84, ammo: 40, blocked_ahead: false, monsters: [{ type: 'zombieman', dist: 320, bearing: 3, in_crosshair: true }] };
-  console.assert(describeDoom(s1) === 'The player has 84 health and 40 ammo. The player has an enemy in sight: a zombieman 5 cells ahead in the crosshair.', 'crosshair sentence');
-  console.assert(candidatesFor(s1).join() === 'retreat,engage,explore', 'candidates are the intents');
-  console.assert(scriptedPolicy(s1) === 'engage' && resolveIntent(s1, 'engage') === 'shoot', 'engage on a crosshair target -> shoot');
+  console.assert(describeDoom(s1) === 'The player has a zombieman in the crosshair, 5 cells ahead.', 'crosshair sentence');
+  console.assert(candidatesFor(s1).join() === 'retreat,shoot,turn left,turn right,explore', 'candidates are the five labels in rule order');
+  console.assert(scriptedPolicy(s1) === 'shoot' && resolveIntent(s1, 'shoot') === 'shoot' && keyPress(s1, 'shoot', 'shoot')[0] === 'fire', 'crosshair target -> shoot');
 
   const s2 = { health: 20, ammo: 0, blocked_ahead: true, monsters: [{ type: 'imp', dist: 700, bearing: -40, in_crosshair: false }, { type: 'demon', dist: 3000, bearing: 10, in_crosshair: false }, { type: 'zombieman', dist: 500, bearing: 2, in_crosshair: true, visible: false }] };
-  console.assert(describeDoom(s2) === 'The player has 20 health and 0 ammo. The player is badly hurt. The player has an enemy in sight: an imp 11 cells to the left. A wall is ahead.', 'hurt + left bearing + far monster and wall-hidden monster dropped + wall');
+  console.assert(describeDoom(s2) === 'The player is badly hurt. The player must turn left to face the imp. A wall is ahead.', 'hurt + pre-computed turn side + far monster and wall-hidden monster dropped + wall');
+  console.assert(!candidatesFor(s2).includes('shoot'), 'no shoot without ammo');
   console.assert(scriptedPolicy(s2) === 'retreat' && resolveIntent(s2, 'retreat') === 'move back', 'badly hurt -> retreat -> move back');
-  console.assert(resolveIntent(s2, 'engage') === 'turn left', 'engage on a left monster -> turn left');
-  console.assert(resolveIntent(s2, 'explore') === 'turn right', 'explore into a wall -> turn right');
+  console.assert(resolveIntent(s2, 'turn left') === 'turn left' && JSON.stringify(keyPress(s2, 'turn left', 'turn left')) === '["left",{"deg":40}]', 'a model turn is a closed-loop turn by the lead bearing');
   console.assert(resolveIntent(s2, 'turn right') === 'turn right', 'raw actions pass through');
 
   const s3 = { health: 100, ammo: 50, blocked_ahead: false, monsters: [{ type: 'imp', dist: 500, bearing: 160, in_crosshair: false }] };
-  console.assert(describeDoom(s3) === 'The player has 100 health and 50 ammo. The player sees no enemy.', 'a monster behind is not in sight');
-  console.assert(scriptedPolicy(s3) === 'explore' && resolveIntent(s3, 'explore') === 'move forward', 'scripted advances with nothing in sight');
+  console.assert(describeDoom(s3) === 'The player sees no enemy.', 'a monster behind is not in sight');
+  console.assert(scriptedPolicy(s3) === 'explore', 'scripted explores with nothing in sight');
 
   const s4 = { health: 60, ammo: 8, blocked_ahead: false, monsters: [{ type: 'imp', dist: 400, bearing: 30, in_crosshair: false }, { type: 'zombieman', dist: 600, bearing: -2, in_crosshair: true }] };
-  console.assert(describeDoom(s4) === 'The player has 60 health and 8 ammo. The player has 2 enemies in sight; the nearest is a zombieman 9 cells ahead in the crosshair.', 'crosshair monster leads even if farther');
+  console.assert(describeDoom(s4) === 'The player has 2 enemies in sight. The player has a zombieman in the crosshair, 9 cells ahead.', 'crosshair monster leads even if farther; count sentence first');
+  s4.monsters[1].bearing = 20;
+  s4.monsters[1].in_crosshair = false;
+  console.assert(describeDoom(s4).endsWith('The player must turn right to face the nearest enemy.') && scriptedPolicy(s4) === 'turn right', 'two off-axis enemies -> turn toward the nearest');
 
+  // route navigator: spawn faces north (90); first waypoint is north-north-east -> turn right by
+  // the bearing, then walk; at the door waypoint a blocked player uses once, then keeps walking.
+  resetNav();
+  const spawn = { x: 1056, y: -3616, angle: 90, blocked_ahead: false, monsters: [], health: 100, ammo: 50 };
+  console.assert(resolveIntent(spawn, 'explore') === 'turn right' && keyPress(spawn, 'explore', 'turn right')[1].deg > 10, 'explore turns toward the first waypoint');
+  const aimed = { ...spawn, angle: 74 };
+  console.assert(resolveIntent(aimed, 'explore') === 'move forward', 'explore walks once aimed');
+  const atDoor = { ...spawn, x: 1520, y: -2448, angle: 0, blocked_ahead: true };
+  resetNav();
+  for (const wp of ROUTE.slice(0, 3)) resolveIntent({ ...atDoor, x: wp.x, y: wp.y, blocked_ahead: false }, 'explore'); // stand on each waypoint -> reached
+  const t0 = 1000;
+  const acts = [0, 400, 800, 1200].map((dt) => exploreAction(atDoor, t0 + dt));
+  console.assert(acts.join() === 'move forward,use,move forward,move forward', `door: walk up, use once, then walk in (${acts})`);
+  resetNav();
+  // patrol: past the route's end the index walks back toward PATROL_FROM
+  for (const wp of ROUTE) resolveIntent({ ...spawn, x: wp.x, y: wp.y }, 'explore');
+  resolveIntent({ ...spawn, x: ROUTE[ROUTE.length - 1].x, y: ROUTE[ROUTE.length - 1].y }, 'explore');
+  console.assert(wpDir === -1 && wpIndex === ROUTE.length - 2, `patrol turns back at the end (${wpDir}, ${wpIndex})`);
+  // retreat: move back, but a second retreat from the same spot turns
+  resetNav();
+  const hurt = { ...spawn, health: 20 };
+  console.assert(resolveIntent(hurt, 'retreat') === 'move back' && resolveIntent(hurt, 'retreat') === 'turn right' && keyPress(hurt, 'retreat', 'turn right')[1].deg === 90, 'retreat backs off, turns when stuck');
+  console.assert(resolveIntent({ ...hurt, x: 900 }, 'retreat') === 'move back', 'retreat backs off again after moving');
+  resetNav();
   console.log('realdoom-logic.js self-test OK');
   return true;
 }
