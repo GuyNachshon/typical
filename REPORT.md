@@ -1382,7 +1382,7 @@ distribution (α·CE + β·KL, T = 2) on 63k labelled rows, checkpoint selected 
 | JevBench std / easy / hard | .875 / 1.00 / .468 | **.931** / 1.00 / .450 | .819 / 1.00 / .559 |
 | JevBench Brier std / hard | .17 / .85 | .18 / **.66** | .30 / .60 |
 | hard: long_policy / multi_hop / trap / adversarial | .05 / .44 / 1.00 / .67 | **.158 / .611** / 1.00 / .667 | – |
-| hard: temporal / probability / tradeoff | .20 / .40 / .67 | .20 / .30 / .17 | – |
+| hard: temporal / probability / tradeoff | .33 / .50 / .67 | .20 / .30 / .17 | – |
 | MMLU-Pro among-K / Δ_q_sh | .487 / .246 | .486 / .235 | – |
 | CLINC-150 / TREC-fine / HWU64 / 20NG | .834 / .472 / .792 / .668 | .827 / **.508** / .760 / .690 | – |
 | SNLI / MNLI / BoolQ / ANLI | .910 / .864 / .894 / .588 | .911 / .868 / .882 / .583 | – |
@@ -1396,7 +1396,7 @@ JevBench standard .875 → **.931** (the best number this project has produced, 
 ids) with knowledge, NLI and latency unchanged; the calibration collapse of §3ab is gone — held-out score NLL 2.87 →
 0.95, typed-decisions 1.96 → 1.04, JevBench hard Brier .85 → .66; long_policy tripled (.05 → .158) and multi_hop
 .44 → .611; level-7 composition reached **.620**, the first time any model has been clearly above chance there. What
-did not move: hard-tier *accuracy* (.468 → .450, within noise at n = 111) and the serial-symbolic families
+(the `ladder_14b` per-family values here are recomputed from `jev_native_ladder_14b/hard/results.jsonl`; an earlier draft of §3ab quoted .20/.40 for temporal/probability from a transcription error.) did not move: hard-tier *accuracy* (.468 → .450, within noise at n = 111) and the serial-symbolic families
 (temporal .20, probability .30, tradeoff .17). The pass rule (hard ≥ .559 or Brier ≤ .65; long_policy ≥ .35) is
 missed on both counts — narrowly on Brier (.656) — so **`tl1b` is not released as `typical-large` yet**; the frozen
 14B with three exemplars still leads it on hard (.559), which keeps §3ab's uncomfortable finding alive: our training
