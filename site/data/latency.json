@@ -51,7 +51,7 @@
         "k256": 18.6
       },
       "bench": "runs/bench_tm1b/bench.json",
-      "source": "runs/bench_tm1b/bench.json"
+      "source": "releases/typical-medium.md#latency"
     },
     "typical-14b-ladder": {
       "single_ms": {

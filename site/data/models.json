@@ -221,7 +221,7 @@
     },
     "sources": {
       "jevbench": "runs/jev_native_tm1b/summary.json",
-      "latency": "runs/bench_tm1b/bench.json",
+      "latency": "releases/typical-medium.md#latency",
       "mmlu_pro_among_k": "releases/typical-medium.md#\u00a73af-table",
       "nlu": "releases/typical-medium.md#\u00a73af-table",
       "topic_intent": "releases/typical-medium.md#\u00a73af-table",

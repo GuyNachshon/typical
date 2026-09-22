@@ -21,6 +21,7 @@
     <h1 class="t-hero">Models that decide, not generate.</h1>
     <p class="sub">A text state and a typed question go in. One probability per option, and an explicit abstain, come out. 45 ms per decision on one H100. This is the model playing DOOM, one sentence per tick.</p>
     <div class="btns"><a class="btn" href="#results">See the results</a><a class="btn outline" href="research.html">Read the research</a></div>
+    <p class="t-mono" style="margin-top:22px;opacity:.8">45 ms / decision · CLINC-150 .804 / .847 · held-out rules .836 / .874 · open weights, 1.7B and 4B</p>
   </div>
   <div class="stage-hud" id="hud">
     <div class="rec"><i></i><span id="hud-rec">REC · typical-small · E1M1</span></div>
@@ -55,18 +56,12 @@
     </div>
   </div>
   <div class="ucard-grid" style="margin-bottom:18px">
-    <div class="ucard"><div><p class="t-eyebrow muted">Latency · 1.7B · H100 · K = 2</p><p class="t-figure" style="margin:30px 0 18px">45<span class="t-card" style="letter-spacing:-.5px"> ms</span></p><p class="figure-floor">per decision, in-process. 2.7 ms per extra question on a cached state (M = 32).</p><p class="figure-src">releases/typical-small.md#latency · runs/bench_tm1b</p></div><div class="diagram"><i class="on" style="flex:0 0 18%"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i></div></div>
+    <div class="ucard"><div><p class="t-eyebrow muted">Latency · 1.7B · H100 · K = 2</p><p class="t-figure" style="margin:30px 0 18px">45<span class="t-card" style="letter-spacing:-.5px"> ms</span></p><p class="figure-floor">per decision, in-process. 2.7 ms per extra question on a cached state (M = 32).</p><p class="figure-src">releases/typical-small.md#latency · REPORT §3ab apples-to-apples ladder</p></div><div class="diagram"><i class="on" style="flex:0 0 18%"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i></div></div>
     <div class="ucard"><div><p class="t-eyebrow muted">CLINC-150 · small / medium</p><p class="t-figure" style="margin:30px 0 18px">.804</p><p class="figure-floor">intent accuracy over 150 runtime labels (medium .847). Out-of-scope abstain recall .827 (small). Frozen base .845.</p><p class="figure-src">runs/ts1b/results.json · runs/tm1b/results.json</p></div><div class="diagram"><i class="on" style="flex:0 0 80.4%"></i><i class="dot"></i></div></div>
     <div class="ucard"><div><p class="t-eyebrow muted">Held-out rule families · small / medium</p><p class="t-figure" style="margin:30px 0 18px">.836</p><p class="figure-floor">same facts, different rule order, different answer (medium .874). Rubric flip both-correct .718 / .743.</p><p class="figure-src">runs/ts1b/eval_wf_full.json · runs/tm1b/eval_wf.json</p></div><div class="diagram"><i class="on" style="flex:0 0 83.6%"></i><i class="dot"></i></div></div>
   </div>
   <div class="media" style="padding:30px">
     <div id="results-table"></div>
-    <div class="grid gap-30 mt-55 lg:grid-cols-2">
-      <figure><figcaption class="t-eyebrow muted mb-18">Scaling ladder</figcaption><div class="chart" id="chart-g1"></div></figure>
-      <figure><figcaption class="t-eyebrow muted mb-18">Single-decision latency vs K</figcaption><div class="chart" id="chart-g2"></div></figure>
-    </div>
-    <figure class="mt-55"><figcaption class="t-eyebrow muted mb-18">Reliability, JevBench standard and hard</figcaption><div class="grid gap-18 md:grid-cols-2 lg:grid-cols-4" id="chart-g4"></div><div id="g4-caption" class="note mt-18"></div></figure>
-    <div class="note mt-30" id="in-training"></div>
     <div class="note mt-18"><blockquote class="disclosure-box">
         <strong>JevBench disclosure.</strong> JevBench numbers are a public-subset run against
         <code>fstandhartinger/jevbench</code> v1.2.1 (72 standard / 48 easy / 111 hard public ids), not a
@@ -78,6 +73,12 @@
         baselines are .311 standard / .284 easy / .336 hard (n = 72 standard, SE &asymp; .058) &mdash; the hard
         tier of both released models is within 1 SE of chance.
       </blockquote></div>
+    <div class="grid gap-30 mt-55 lg:grid-cols-2">
+      <figure><figcaption class="t-eyebrow muted mb-18">Scaling ladder</figcaption><div class="chart" id="chart-g1"></div></figure>
+      <figure><figcaption class="t-eyebrow muted mb-18">Single-decision latency vs K</figcaption><div class="chart" id="chart-g2"></div></figure>
+    </div>
+    <figure class="mt-55"><figcaption class="t-eyebrow muted mb-18">Reliability, JevBench standard and hard</figcaption><div class="grid gap-18 md:grid-cols-2 lg:grid-cols-4" id="chart-g4"></div><div id="g4-caption" class="note mt-18"></div></figure>
+    <div class="note mt-30" id="in-training"></div>
   </div>
 </section>
 
@@ -120,14 +121,14 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
   </div>
   <div class="grid gap-18 lg:grid-cols-2" style="margin-bottom:55px">
     <div><div class="media dark"><p class="media-label t-eyebrow">Snake · canvas</p><div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="snake"></div></div></div><p class="note mt-18">One sentence per tick; the candidate set is the safe moves. .984 on 62 boards (chance .48); 24 food in the recorded run. Arrow keys take over.</p></div>
-    <div><div class="media dark"><p class="media-label t-eyebrow">DOOM · WebAssembly</p><div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="realdoom" data-game-fallback="doom"></div></div></div><p class="note mt-18">Chocolate Doom, shareware 1.9. Two facts per tick (badly hurt? an enemy in sight?), the model picks retreat, engage or explore, and now aims from "the player must turn left to face the imp". 200 / 200 decisions matched the rule list, 4 kills, on E1M1.</p></div>
+    <div><div class="media dark" style="min-height:520px;display:flex;flex-direction:column;justify-content:space-between;padding:30px"><p class="t-eyebrow">DOOM · recorded run · E1M1</p><div><p class="t-figure" style="font-size:96px;letter-spacing:-3.6px">200<span class="t-card" style="letter-spacing:-.5px"> / 200</span></p><p class="t-ui" style="max-width:26ch;margin-top:18px">decisions matched the rule list. 64 shots, 4 kills, health 86 at the end.</p></div><p class="t-mono muted">The live game is the film at the top of this page. site/data/replays/realdoom.json</p></div><p class="note mt-18">Chocolate Doom, shareware 1.9. Two facts per tick (badly hurt? an enemy in sight?), the model picks retreat, engage or explore, and aims from "the player must turn left to face the imp". Recorded against the local model.</p></div>
   </div>
   <div id="tryit">
     <div class="exrow" data-exhibit-card>
       <div class="exrow-head">
         <span class="tag">Live</span>
         <h3 class="t-feature">Try it</h3>
-        <p>Your own state, question and options, decided in one forward pass. Needs the local model server; static mode replays the prefilled example only.</p>
+        <p>Your own state, question and options, decided in one forward pass. Needs the local model server; without it the prefilled example replays.</p>
         <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
       </div>
       <div class="exrow-body" data-exhibit-body hidden><div data-demo="tryit"></div></div>
@@ -145,7 +146,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
       <div class="exrow-head">
         <span class="tag">Works</span>
         <h3 class="t-feature">SQL over judgment</h3>
-        <p><code>SELECT * FROM tickets WHERE typical(body, 'customer is angry about billing')</code>. 129 rows, one forward pass each, no embeddings; four conditions against hand labels.</p>
+        <p><code>SELECT * FROM tickets WHERE typical(body, 'the customer mentions a duplicate charge')</code>. 129 rows, one forward pass each, no embeddings; four conditions against hand labels.</p>
         <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
       </div>
       <div class="exrow-body" data-exhibit-body hidden><div data-demo="sql"></div></div>
@@ -190,7 +191,7 @@ m.choice(state, "What does the customer want?", ["refund", "replacement", "repai
 m.noul(state, "Is the order still under warranty?")
 m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
   <div class="dest mt-55">
-    <a href="research.html"><span class="t-card">Read the research: architecture, data, 88 runs.</span><span class="t-eyebrow">Research →</span></a>
+    <a href="research.html"><span class="t-card">Read the research: architecture, data, 130 runs.</span><span class="t-eyebrow">Research →</span></a>
     <a href="https://huggingface.co/OzLabs/typical-small"><span class="t-card">Get the weights: 1.7B and 4B, open.</span><span class="t-eyebrow">Hugging Face →</span></a>
   </div>
 </section>

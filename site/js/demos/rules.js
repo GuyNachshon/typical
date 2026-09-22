@@ -25,6 +25,31 @@ function sameOrder(a, b) {
   return a.length === b.length && a.every((v, i) => v === b[i]);
 }
 
+// Ground truth for panel 2: apply the four rules by hand, in the stated precedence order,
+// against each applicant's facts - independent of the model. Parsed straight from the
+// applicant's rendered state sentences (same three facts the rules test: credit score,
+// income verification, collateral), not from a separate structured field, so there is only
+// one fact source to keep in sync.
+function parseApplicantFacts(state) {
+  const credit = Number((state.match(/credit score is (\d+)/) || [])[1]);
+  const incomeVerified = /verified with pay stubs/.test(state);
+  const collateralPledged = !/No collateral was pledged/.test(state) && /Collateral of/.test(state);
+  return { credit, incomeVerified, collateralPledged };
+}
+
+// First rule (in the given order) whose condition holds wins; refer_to_underwriter's own
+// condition ("none of the above fired") is exactly "always true when reached", since we stop
+// at the first true condition walking the order.
+function literalOutcome(order, facts) {
+  for (const label of order) {
+    if (label === 'deny' && facts.credit < 650) return label;
+    if (label === 'approve' && facts.incomeVerified) return label;
+    if (label === 'approve_with_conditions' && facts.collateralPledged) return label;
+    if (label === 'refer_to_underwriter') return label;
+  }
+  return null;
+}
+
 export async function mount(host, ctx) {
   const [flip, rulesDoc] = await Promise.all([
     Promise.resolve(ctx.presets?.flip),
@@ -94,7 +119,7 @@ export async function mount(host, ctx) {
     const next = order.slice();
     [next[from], next[to]] = [next[to], next[from]];
     if (ctx.mode() !== 'live' && !flip.orders.some((o) => sameOrder(o, next))) {
-      staticNote.textContent = 'Static mode: only the two recorded orders (deny-first / approve-first) are available. Run the live server to try others.';
+      staticNote.textContent = 'Recorded mode: the two recorded orders (deny-first / approve-first) are available. Run the local server to try others.';
       return;
     }
     staticNote.textContent = '';
@@ -141,6 +166,8 @@ export async function mount(host, ctx) {
   host.appendChild(wrap);
 
   const orderQueries = flip.orders.map((o) => ({ type: 'choice', question: orderQuery(flip, o), labels: o }));
+  let correctBoth = 0;
+  let flips = 0;
   for (const applicant of rulesDoc.applicants) {
     const tr = document.createElement('tr');
     const nameTd = document.createElement('td');
@@ -151,16 +178,23 @@ export async function mount(host, ctx) {
     if (!res) {
       tr.append(el('td', 'rules-applicant', '—'), el('td', 'rules-applicant', '—'));
     } else {
+      const facts = parseApplicantFacts(applicant.state);
       const [denyFirst, approveFirst] = res.results;
-      const flipped = denyFirst.argmax !== approveFirst.argmax;
+      const literals = flip.orders.map((o) => literalOutcome(o, facts));
+      const marks = [denyFirst, approveFirst].map((r, i) => r.argmax === literals[i]);
+      const bothCorrect = marks[0] && marks[1];
+      const flipped = bothCorrect && denyFirst.argmax !== approveFirst.argmax;
+      if (bothCorrect) correctBoth += 1;
+      if (flipped) flips += 1;
       [denyFirst, approveFirst].forEach((r, i) => {
         const td = document.createElement('td');
         const cell = el('div', 'ex-cell');
         const word = el('span', 'ex-cell-word', r.argmax);
-        word.title = r.argmax;
+        word.title = `${r.argmax} — rule-list says ${literals[i]}`;
+        const mark = el('span', 'rules-mark t-mono muted', marks[i] ? '✓ matches rule list' : 'miss (rule list: ' + literals[i] + ')');
         const barWrap = el('div', 'rules-cell-bar');
         bars(barWrap, [{ label: '', p: r.probs[r.argmax] ?? 0 }]);
-        cell.append(word, barWrap);
+        cell.append(word, mark, barWrap);
         if (i === 1 && flipped) cell.appendChild(el('span', 'tag', 'FLIP'));
         td.appendChild(cell);
         tr.appendChild(td);
@@ -168,4 +202,7 @@ export async function mount(host, ctx) {
     }
     tbody.appendChild(tr);
   }
+  const n = rulesDoc.applicants.length;
+  panel2Caption.appendChild(el('span', null,
+    ` — computed from this order pair: ${correctBoth}/${n} correct under both orders, ${flips} flip${flips === 1 ? '' : 's'} (both-correct and disagreeing).`));
 }

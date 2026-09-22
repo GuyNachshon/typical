@@ -11,6 +11,7 @@
   /* film: scale the 4:3 frame to the viewport width and centre the 3D viewport (top 84% of the frame); the status bar falls below the fold */
   body.film canvas { width:100vw; height:75vw; margin-top: calc((100vh - 63vw) / 2); image-rendering:pixelated; }
   body.film pre { display:none; }
+  @media (max-aspect-ratio: 1/1) { body.film canvas { width:133.4vh; height:100vh; margin-top:0; margin-left:calc((100vw - 133.4vh) / 2); } }
 </style>
 </head>
 <body>

@@ -222,7 +222,7 @@ FROZEN = {
         {"backbone": "Qwen3-14B-Base", "std": 0.819, "easy": 1.00, "hard": 0.559, "brier_hard": 0.60, "trained": "typical-14b-ladder"},
         {"backbone": "Qwen3.5-4B-Base", "std": 0.764, "easy": 1.00, "hard": 0.495, "brier_hard": 0.60, "trained": None},
     ],
-    "in_flight": "typical-large (Qwen3-14B, facts-first long rows, 3,072-token states, frozen-14B distillation) and tm2 (Qwen3.5-4B); pass rule: hard >= .559 or hard Brier <= .65, long_policy >= .35 (REPORT §3ag)",
+    "in_flight": "a 14B release candidate, not yet a release (Qwen3-14B, facts-first long rows, 3,072-token states, frozen-14B distillation) and tm2 (Qwen3.5-4B); pass rule: hard >= .559 or hard Brier <= .65, long_policy >= .35 (REPORT §3ag)",
     "long_state_bug": "data_wf_long rendered the case facts last and training right-truncated at max_state, so 98.8% of long-policy rows lost their facts at 1,024 tokens; fixed by facts-first regeneration + --drop_truncated (REPORT §3ag, commit 2fad326)",
 }
 (OUT / "frozen.json").write_text(json.dumps(FROZEN, indent=2))

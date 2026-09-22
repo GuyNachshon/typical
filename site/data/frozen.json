@@ -51,6 +51,6 @@
       "trained": null
     }
   ],
-  "in_flight": "typical-large (Qwen3-14B, facts-first long rows, 3,072-token states, frozen-14B distillation) and tm2 (Qwen3.5-4B); pass rule: hard >= .559 or hard Brier <= .65, long_policy >= .35 (REPORT \u00a73ag)",
+  "in_flight": "a 14B release candidate, not yet a release (Qwen3-14B, facts-first long rows, 3,072-token states, frozen-14B distillation) and tm2 (Qwen3.5-4B); pass rule: hard >= .559 or hard Brier <= .65, long_policy >= .35 (REPORT \u00a73ag)",
   "long_state_bug": "data_wf_long rendered the case facts last and training right-truncated at max_state, so 98.8% of long-policy rows lost their facts at 1,024 tokens; fixed by facts-first regeneration + --drop_truncated (REPORT \u00a73ag, commit 2fad326)"
 }

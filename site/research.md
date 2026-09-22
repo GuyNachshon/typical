@@ -170,7 +170,7 @@ seed: 0
 
 *Specimen: typical-small training args.*
 
-88 training, baseline, and ablation run directories sit under `runs/` on the source branch, across
+130 run directories sit under `runs/` on the source branch (88 of them training, baseline and ablation runs; the rest probes, benches and zero-shot controls), across
 six days (2026-09-16 → 09-21), most under $20 of H100 time. The line moves because of bugs found
 and controls run rather than scale (decision log below). typical-medium (4B) uses the same recipe on `Qwen3-4B-Base`, tap 26/36, effective batch 64 via
 `--grad_accum 4` (releases/typical-medium.md). Final val NLL 0.376, temperature T = 1.124,
@@ -399,7 +399,7 @@ port.
 
 `tl1b` (Qwen3-14B, facts-first long rows, 3,072-token states, frozen-14B knowledge distillation, 8k
 steps, best-on calibration val) and its matched control `tl1b_nokd`; `tm2` (the Release-1 recipe on
-Qwen3.5-4B-Base, 2,048-token states); and the SemIf rendering probe. Pass rule for typical-large:
+Qwen3.5-4B-Base, 2,048-token states); and the SemIf rendering probe. Pass rule for the 14B release candidate (not yet a release):
 hard ≥ .559 or hard Brier ≤ .65, long_policy ≥ .35, and CLINC-150 / MMLU among-K within 2 points of
 `ladder_14b`.
 

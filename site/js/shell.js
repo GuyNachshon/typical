@@ -397,7 +397,7 @@ function mountFilm(ctx) {
         if (r) { probs = r.probs; move = cands.reduce((a, c) => ((r.probs[c] ?? 0) > (r.probs[a] ?? 0) ? c : a), cands[0]); source = `model · ${Math.round(res.ms)} ms`; }
       } catch {}
     }
-    rec.textContent = `REC · typical-small · E1M1 · ${source}`;
+    rec.textContent = `${source.startsWith('model') ? 'LIVE' : 'REC'} · typical-small · E1M1 · ${source}`;
     sentEl.textContent = sentence;
     rowsEl.innerHTML = '';
     labels.forEach((l) => {

@@ -448,6 +448,27 @@ async function mountRunExplorer() {
   if (!idx) return missing(el, 'data/runs-index.json');
 
   const runsWithDate = idx.runs.filter((r) => r.date);
+  // Lineage (creation) order — the x-axis is run index in this order, not the date itself:
+  // 130 runs across 6 calendar days collapse into two or three stacks on a date axis (most
+  // runs share a day), which is unreadable. Index order keeps every run its own tick; the
+  // date is printed once, at the first run of each day, as a ruler under the index ticks.
+  const lineageOrder = runsWithDate.slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const indexOf = new Map(lineageOrder.map((r, i) => [r.name, i]));
+  const N = lineageOrder.length;
+  function indexForDate(dateStr) {
+    const i = lineageOrder.findIndex((r) => r.date >= dateStr);
+    return i === -1 ? N - 1 : i;
+  }
+  // typical-small-preview has no run directory named in runs-index.json's own fields, but
+  // models.json['typical-small-preview'].sources.jevbench points at runs/jev_native_v3t20_wf,
+  // which evaluates the nc_v3_tap20_wf checkpoint (the jev run name encodes it) - the only
+  // other released checkpoint besides ts1b/tm1b worth labeling on this chart.
+  const PREVIEW_RUN = 'nc_v3_tap20_wf';
+  function releaseLabel(r) {
+    if (r.released_as) return r.released_as;
+    if (r.name === PREVIEW_RUN) return 'typical-small-preview';
+    return null;
+  }
   const GROUPS = [
     { value: 'lineage', label: 'lineage' },
     { value: 'ablation', label: 'ablations' },
@@ -501,23 +522,13 @@ async function mountRunExplorer() {
   const body = document.createElement('div');
   root.appendChild(body);
 
-  function toDay(iso) {
-    const d0 = new Date('2026-09-16T00:00:00Z');
-    return (new Date(iso + 'T00:00:00Z') - d0) / 86400000;
-  }
-  function fmtDay(day) {
-    const dt = new Date(Date.UTC(2026, 8, 16) + day * 86400000);
-    return `${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
-  }
-
   function renderSetPivot() {
     const rows = runsWithDate.filter((r) => activeGroups.has(r.group) && r.eval[state.set]);
     body.innerHTML = '';
+    body.dataset.dotCount = String(rows.filter((r) => isNum(r.eval[state.set][state.metric])).length); // Playwright hook
     if (!rows.length) { body.appendChild(p('no runs with this set in the selected groups', 'note')); return; }
-    const w = 1040, h = 360, mm = { t: 20, r: 100, b: 50, l: 50 };
+    const w = 1040, h = 380, mm = { t: 20, r: 24, b: 58, l: 50 };
     const iw = w - mm.l - mm.r, ih = h - mm.t - mm.b;
-    const days = rows.map((r) => toDay(r.date));
-    const maxDay = Math.max(...days, 5);
     const vals = rows.map((r) => r.eval[state.set][state.metric]).filter(isNum);
     const yMax = state.metric === 'nll' ? Math.max(...vals, 1) * 1.1 : 1;
     const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, width: '100%', role: 'img' });
@@ -527,15 +538,25 @@ async function mountRunExplorer() {
     container.appendChild(svg);
     const g = svgEl('g', { transform: `translate(${mm.l},${mm.t})` });
     svg.appendChild(g);
-    const x = scale([0, maxDay], [0, iw]);
+    const x = scale([0, Math.max(N - 1, 1)], [0, iw]);
     const y = scale([0, yMax], [ih, 0]);
     niceTicks(0, yMax, 5).forEach((t) => {
       g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(t), y2: y(t), stroke: STEEL, 'stroke-dasharray': '2,3' }));
       g.appendChild(text(-8, y(t) + 3, fmtNum(t), { fill: MID, 'text-anchor': 'end' }));
     });
-    for (let day = 0; day <= Math.ceil(maxDay); day++) {
-      g.appendChild(text(x(day), ih + 18, fmtDay(day), { fill: MID, 'text-anchor': 'middle' }));
+    // index ticks every 10 runs, in lineage (creation) order
+    for (let i = 0; i < N; i += 10) {
+      g.appendChild(svgEl('line', { x1: x(i), x2: x(i), y1: ih, y2: ih + 4, stroke: STEEL }));
+      g.appendChild(text(x(i), ih + 16, String(i), { fill: MID, 'text-anchor': 'middle', 'font-size': 11 }));
     }
+    // the date, once, at the first run of each calendar day - the index ruler's day boundaries
+    let lastDate = null;
+    lineageOrder.forEach((r, i) => {
+      if (r.date === lastDate) return;
+      lastDate = r.date;
+      g.appendChild(svgEl('line', { x1: x(i), x2: x(i), y1: 0, y2: ih, stroke: STEEL, 'stroke-dasharray': '1,3' }));
+      g.appendChild(text(x(i), ih + 32, r.date.slice(5), { fill: MID, 'text-anchor': 'start', 'font-size': 10, 'font-family': 'var(--font-mono)' }));
+    });
     const floor = idx.floors[state.set];
     if (floor && state.metric === 'acc') {
       g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(floor.value), y2: y(floor.value), stroke: MID, 'stroke-dasharray': '4,3' }));
@@ -544,18 +565,19 @@ async function mountRunExplorer() {
     rows.forEach((r) => {
       const val = r.eval[state.set][state.metric];
       if (!isNum(val)) return;
-      const cx = x(toDay(r.date));
+      const cx = x(indexOf.get(r.name));
       const cy = y(val);
-      const released = !!r.released_as;
-      const dot = svgEl('circle', { cx, cy, r: released ? 6 : 5, fill: released ? INK : 'none', stroke: INK, 'stroke-width': released ? 0 : 1.6, ...(released ? {} : { 'stroke-dasharray': '2,1.5' }) });
+      const label = releaseLabel(r);
+      const released = !!label;
+      const dot = svgEl('circle', { cx, cy, r: released ? 6 : 4, fill: released ? INK : 'none', stroke: INK, 'stroke-width': released ? 0 : 1.4, ...(released ? {} : { 'stroke-dasharray': '2,1.5' }) });
       const ttl = svgEl('title');
-      ttl.textContent = `${r.name} · ${r.date} · ${state.metric} ${val.toFixed(3)}${released ? ` · released as ${r.released_as}` : ' · (not released)'}`;
+      ttl.textContent = `${r.name} · ${r.date} · ${state.metric} ${val.toFixed(3)}${released ? ` · released as ${label}` : ' · (not released)'}`;
       dot.appendChild(ttl);
       g.appendChild(dot);
+      if (released) g.appendChild(text(cx, cy - 10, label, { fill: INK, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, 'font-family': 'var(--font-mono)' }));
     });
     (timeline?.bugs || []).forEach((b) => {
-      const bx = x(toDay(b.date));
-      if (bx < 0 || bx > iw) return;
+      const bx = x(indexForDate(b.date));
       g.appendChild(svgEl('line', { x1: bx, x2: bx, y1: 0, y2: ih, stroke: STEEL, 'stroke-dasharray': '1,3' }));
     });
     g.appendChild(svgEl('line', { x1: 0, x2: 0, y1: 0, y2: ih, stroke: STEEL }));
@@ -563,6 +585,7 @@ async function mountRunExplorer() {
     body.appendChild(container);
     const cap = p(floor ? `floor: ${floor.value.toFixed(3)} (${floor.source})` : 'no sourced floor for this set', 'note');
     body.appendChild(cap);
+    body.appendChild(p(`x = run index in lineage (creation) order, ${N} runs with a sourced date; ticks every 10, date at the first run of each day.`, 'note'));
     sourceLine(body, idx.source);
   }
 
@@ -597,7 +620,8 @@ async function mountRunExplorer() {
       g.appendChild(dot);
     });
     body.appendChild(container);
-    body.appendChild(p(`${sets.length} sets · ${run.date || 'date not sourced'} · ${run.group}${run.released_as ? ` · released as ${run.released_as}` : ''}`, 'note'));
+    const label = releaseLabel(run);
+    body.appendChild(p(`${sets.length} sets · ${run.date || 'date not sourced'} · ${run.group}${label ? ` · released as ${label}` : ''}`, 'note'));
     sourceLine(body, idx.source);
   }
 
