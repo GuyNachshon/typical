@@ -416,7 +416,7 @@ function mountFilmAscii(film) {
 // ---- the film: real DOOM in the hero, driven by the model (live) or the rule list (recorded) ----
 function mountFilm(ctx, ids = {}) {
   const film = document.getElementById(ids.film || 'film');
-  if (ids.bloom !== false) mountFilmAscii(film);
+  if (ids.bloom === true) mountFilmAscii(film); // off by default: the gameplay is shown as the engine draws it
   const rowsEl = document.getElementById(ids.rows || 'hud-rows');
   const sentEl = document.getElementById(ids.sentence || 'hud-sentence');
   const rec = document.getElementById(ids.rec || 'hud-rec');
@@ -431,7 +431,12 @@ function mountFilm(ctx, ids = {}) {
   // "badly hurt → retreat" against a wall is a loop that ends in a corpse on the hero of the
   // page. Restart when the player dies, leaves the level, or stops making progress while taking
   // damage — and start the route again from the top.
-  const STUCK_TICKS = 45; // ~18 s at the 380 ms loop
+  // Two stages, because most stalls are not fatal: a player wedged against a wall takes no damage
+  // and would otherwise stand there for ever (which is also what draws the smeared "hall of
+  // mirrors" frame — DOOM renders that when the view is inside geometry). Nudge first, restart
+  // only if the nudge fails.
+  const NUDGE_TICKS = 8; // ~6 s of no progress -> turn hard and walk
+  const STUCK_TICKS = 24; // ~18 s -> give up and restart the level
   let anchor = null;
   let stuckFor = 0;
   let lastHealth = 100;
@@ -458,11 +463,20 @@ function mountFilm(ctx, ids = {}) {
     } else {
       stuckFor += 1;
     }
-    const losing = (st.health ?? 100) < lastHealth;
     lastHealth = st.health ?? lastHealth;
-    if (stuckFor > STUCK_TICKS && (losing || (st.health ?? 100) < 40)) {
+    if (typeof window !== 'undefined' && window.__filmProbe) window.__filmStuck = stuckFor;
+    if (stuckFor > STUCK_TICKS) {
       restart(D);
       return setTimeout(loop, 1500);
+    }
+    if (stuckFor > 0 && stuckFor % NUDGE_TICKS === 0) {
+      // hard turn + a walk, outside the model's decision: the engine is getting the player out of
+      // a corner, not choosing an action, so the HUD keeps showing the model's own last call
+      try {
+        await D.turnBy(stuckFor % (NUDGE_TICKS * 2) === 0 ? 'right' : 'left', 100);
+        await D.press('forward', 650);
+      } catch {}
+      return setTimeout(loop, 120);
     }
     const cands = candidatesFor(st);
     const sentence = describeDoom(st);

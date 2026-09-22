@@ -27,7 +27,7 @@ const BAYER4 = [
   15, 7, 13, 5,
 ].map((v) => (v + 0.5) / 16);
 const FLOOR = 0.2;
-const HOT = 0.78; // luminance above which a dithered cell blooms // below this share of the frame's own range, a cell stays blank
+const HOT = 0.62; // luminance above which a cell blooms // below this share of the frame's own range, a cell stays blank
 const RAMP = [
   ' ', ' ', '.', ',', ':', ';', 'i', 'l', '!', '|', '/', '\\', '1', 'I', '{', '}', '[', ']',
   '?', 'r', 'c', 'v', 'z', 'x', 'Y', 'U', 'J', 'C', 'L', 'Q', '0', 'O', 'Z', 'm', 'w', 'q',
@@ -44,7 +44,7 @@ export function mountAscii(host, getSource, opts = {}) {
   const maxCols = opts.cols ?? 150;
   // Cell size is per treatment: a glyph has to be big enough to read as a character, a dither
   // cell has to be small enough to disappear into an image.
-  const CELL_PX = { glyphs: 14, dither: 3.4, edges: 4.5, bloom: 2.6 };
+  const CELL_PX = { glyphs: 14, dither: 3.4, edges: 4.5, bloom: 4.5 };
   const modeNow = () => (typeof window !== 'undefined' && window.__heroMode) || opts.mode || 'glyphs';
   const colsFor = (w) => Math.max(44, Math.min(1400, Math.round(w / (opts.cellPx ?? CELL_PX[modeNow()] ?? 14))));
   let cols = colsFor(host.clientWidth || 1200);
@@ -239,7 +239,7 @@ export function paintBloom(lctx, px, cols, rows, W, H, lo, span, hot) {
   for (let i = 0; i < px.length; i += 4) {
     const raw = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) / 255;
     const l = Math.max(0, Math.min(1, (raw - lo) / span));
-    const a = l > HOT ? Math.min(1, (l - HOT) / (1 - HOT)) : 0;
+    const a = l > HOT ? Math.min(1, (l - HOT) / (1 - HOT)) ** 0.8 : 0;
     // keep the source colour in the glow so a green lamp blooms green, not white
     g[i] = Math.min(255, px[i] * 1.15);
     g[i + 1] = Math.min(255, px[i + 1] * 1.15);
@@ -254,11 +254,16 @@ export function paintBloom(lctx, px, cols, rows, W, H, lo, span, hot) {
   lctx.save();
   lctx.globalCompositeOperation = 'lighter';
   lctx.imageSmoothingEnabled = true;
-  lctx.globalAlpha = 0.55;
-  lctx.filter = 'blur(10px)';
+  // three octaves: a tight halo on the source, a soft spill, and a wide atmospheric wash. DOOM's
+  // lit surfaces are small and bright, so one blur radius alone reads as nothing at all.
+  lctx.globalAlpha = 0.8;
+  lctx.filter = 'blur(5px)';
   lctx.drawImage(hot.el, 0, 0, W, H);
-  lctx.globalAlpha = 0.32;
-  lctx.filter = 'blur(34px)';
+  lctx.globalAlpha = 0.45;
+  lctx.filter = 'blur(16px)';
+  lctx.drawImage(hot.el, 0, 0, W, H);
+  lctx.globalAlpha = 0.22;
+  lctx.filter = 'blur(40px)';
   lctx.drawImage(hot.el, 0, 0, W, H);
   lctx.restore();
   lctx.filter = 'none';

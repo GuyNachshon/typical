@@ -115,7 +115,7 @@
 
   /* ---- hero media stage ---- */
   .stage { position: relative; height: 100vh; min-height: 640px; background: var(--color-black); overflow: hidden; color: var(--color-warm); }
-  .stage-film { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; filter: saturate(0.9) contrast(1.08) brightness(1.22); } /* the film is the subject again: bright enough to read under the character veil */
+  .stage-film { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; } /* no filter: the film is shown exactly as the engine draws it */
   /* the film as characters (js/ascii.js) — the state the model actually gets is text, so text is
      what the hero shows; hovering the stage dissolves it to the frame underneath */
   /* The mask is owned by js/ascii.js (it carries the cursor lens); the base gradient there keeps
@@ -123,13 +123,12 @@
      unreadable and the bottom third of the stage is where every word lives. */
   .ascii-layer { position: absolute; inset: 0; opacity: 1; transition: opacity 420ms var(--ease-out); pointer-events: none; }
   .stage-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.05) 40%, rgba(0,0,0,0.35) 100%); }
-  .stage-hint { position: absolute; left: 40px; top: 34px; padding: 10px 14px; border-radius: var(--radius-btn); background: rgba(9, 9, 10, 0.88); font-size: 11px; letter-spacing: 0.36px; text-transform: uppercase; color: rgba(240, 238, 235, 0.5); max-width: 34ch; }
-  @media (max-width: 64rem) { .stage-hint { left: 20px; top: 84px; font-size: 10px; max-width: 26ch; } }
   /* The film runs as a dense character field (js/ascii.js), so copy can no longer sit straight on
      it — every word needs its own surface, the way a frame-transcription hero always ends up. */
-  .stage-copy { position: absolute; left: 40px; right: 50px; bottom: 44px; max-width: 800px; padding: 34px 38px; border-radius: var(--radius-card); background: rgba(9, 9, 10, 0.88); backdrop-filter: blur(2px); }
+  .stage-copy .t-mono { text-wrap: balance; }
+  .stage-copy { position: absolute; left: 40px; right: auto; bottom: 44px; max-width: 585px; padding: 30px 32px; border-radius: var(--radius-card); background: rgba(9, 9, 10, 0.88); backdrop-filter: blur(2px); }
   .stage-copy .t-hero { margin: 18px 0 22px; max-width: 12ch; }
-  .stage-copy .sub { font-size: var(--text-ui); line-height: 1.2; letter-spacing: -0.19px; max-width: 46ch; color: rgba(240, 238, 235, 0.85); margin-bottom: 26px; }
+  .stage-copy .sub { text-wrap: balance; font-size: var(--text-ui); line-height: 1.2; letter-spacing: -0.19px; max-width: 40ch; color: rgba(240, 238, 235, 0.85); margin-bottom: 26px; }
   .stage-hud { position: absolute; right: 40px; bottom: 44px; width: 300px; padding: 22px 24px; border-radius: var(--radius-card); background: rgba(9, 9, 10, 0.88); backdrop-filter: blur(2px); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.36px; line-height: 1.5; }
   .stage-hud .rec { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; }
   .stage-hud .rec i { width: 8px; height: 8px; border-radius: 50%; background: var(--color-warm); display: inline-block; }
