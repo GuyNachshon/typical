@@ -35,6 +35,26 @@ standard and +11 points of MMLU-Pro among-K over `typical-small` for 1.25× the 
 **.931** — the best number this project has produced — but is not yet released; see `PROJECT.md` §1 and §7 for
 why and what's still open.
 
+### Known issue: state ordering on long documents
+
+All three public checkpoints were trained before a corpus fix (REPORT.md §3ag) and inherit a positional bias:
+on long policy documents they expect the case facts **after** the policy body. Measured on 605 held-out long
+states — identical items, only the position of the case block differs, no truncation at scoring:
+
+| model | facts **last** | facts **first** | drop |
+|---|---:|---:|---:|
+| `typical-small-preview` | .744 | .534 | −21 pts (below the .612 majority floor on Noul) |
+| `typical-small` | .798 | .598 | −20 pts |
+| `typical-medium` | .866 | .612 | −25 pts |
+
+Short states are unaffected. Retrained checkpoints without the bias already exist and will supersede this line
+(`ts1c` at 1.7B: .947 facts-first, +34.9; `tm2` at Qwen3.5-4B: .950, +33.8), giving up nothing on facts-last.
+
+This also illustrates why JevBench alone is not a sufficient gate here: `ts1c` reads .708 / .432 against
+`typical-small`'s .694 / .432 — statistically indistinguishable — while being 35 points better on the axis the
+fix targeted. RESULTS.md §5a carries confidence intervals for every checkpoint; every adjacent pair on that
+benchmark is inside the noise.
+
 ## Quickstart
 
 ```bash
