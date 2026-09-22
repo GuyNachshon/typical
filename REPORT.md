@@ -1554,6 +1554,32 @@ that the original single-render ablation design was inadequate — it confounded
 render compatibility, and only the 2x2 separates them.
 
 
+### 3ak-c. The 2x2 replicated at 14B
+
+Same 605 held-out long states, same two renders, no truncation at eval. `tl1b_nokd` is the facts-first 14B
+(the KD-free arm, so no distillation confound); `ladder_14b` is the facts-last 14B trained under the old recipe.
+
+| model | trained on | scored on | overall | policy_permit | action_select |
+|---|---|---|---:|---:|---:|
+| `tl1b_nokd` | facts-first | facts-first *(matched)* | **.997** | .997 | .996 |
+| `tl1b_nokd` | facts-first | facts-last | .921 | .933 | .905 |
+| `ladder_14b` | facts-last | facts-first | .851 | .839 | .865 |
+| `ladder_14b` | facts-last | facts-last *(matched)* | .919 | .930 | .905 |
+
+**Matched-condition gap at 14B: +.078, 95% CI [+.055, +.100], p = 7e-12** — against +.112 [+.077, +.147],
+p = 5e-10 at 1.7B. The effect replicates at two scales an order of magnitude apart, with the smaller gap at 14B
+simply because the facts-first 14B is at ceiling (.997).
+
+Two further readings:
+- **`ladder_14b` is not incapable on long states — it scores .919 in its own matched render.** Its JevBench
+  `long_policy` of .053 was therefore never a pure capability measurement: it compounds the truncation damage with
+  a render mismatch against JevBench's fixed format, and an n=19 sample on top. This is the cleanest available
+  illustration of why the rendering factor has to be controlled before a benchmark delta is read as capability.
+- The facts-first 14B loses 7.6 points when the render is switched against it, the facts-last 14B 6.8 — at 14B the
+  robustness difference seen at 1.7B (14.5 vs 19.0) essentially disappears. Capacity appears to buy render
+  tolerance, which the 1.7B pair alone would have missed.
+
+
 ## 3ak-b. Cluster-bootstrap confidence intervals on the JevBench public subset
 
 `scripts/jev_ci.py`. The standard tier is 72 items but only **36 independent states** (each appears as two
