@@ -1484,6 +1484,72 @@ tap17), which is backwards, since a shallower tap can only reduce the one-time s
 sweep's own baseline is mismatched. Recorded as a closed negative; re-open only with a matched tap20 arm.
 
 
+## 3ak. The render-order ablation, and confidence intervals that change several earlier readings (2026-09-22)
+
+Two matched 1.7B arms, byte-identical flags, differing only in whether `data_wf_long` renders `Case:` first
+(p50 0.000 of the text) or last (p50 0.976). `--max_state 1024`, `--drop_truncated` deliberately **off**, so
+truncation bites as it did in Release 1. Corpora verified identical in row count (23,318) and differing in md5.
+Tokenizer `truncation_side` is `right`, verified empirically (keeps the start, drops the end), so facts-last rows
+did lose their `Case:` at train time -- the §3ag mechanism description is accurate as a description of the data.
+
+| | arm A `trunc_first` | arm B `trunc_last` |
+|---|---|---|
+| JevBench standard | .750 | .736 |
+| JevBench hard | .378 | **.396** |
+| hard: long_policy (n = 19) | **.316** (6/19) | .105 (2/19) |
+
+**The pre-registered primary metric moves in the predicted direction and is not significant.** long_policy
+.105 -> .316 is the effect §3ag predicts, but it is 2 items against 6 out of 19: Fisher exact two-sided
+**p = 0.232**, bootstrap 95% CI on the difference **[-0.053, +0.474]**, which contains zero. Hard *aggregate*
+goes the other way (arm A .378 < arm B .396). Standard is a coin-flip apart. **The ablation therefore does not
+establish the truncation mechanism**; it is consistent with it and underpowered to confirm it.
+
+**A render-mismatch effect that is larger and much better powered than the truncation effect.** On a held-out
+long-state set built for this purpose (n = 605, `scripts/make_long_eval.py`; zero exact-state overlap with either
+training corpus, Case-stem overlaps dropped), scored with **no truncation at all** (eval window 4,096; state p50
+1,965 tokens, max 2,843):
+
+| arm B (facts-last-trained) scored on | overall | policy_permit (n=330, K=2, floor **.612**) | action_select (n=275, K=4, floor .233) |
+|---|---|---|---|
+| facts-**first** render (mismatched) | .640 | **.615 — at the floor** | .669 |
+| facts-**last** render (matched) | **.830** | **.842** | .815 |
+
+With the identical 605 items and the Case fully visible in both, moving the Case from the end to the start costs
+arm B **23 points** on policy_permit and drops it exactly onto the majority-class floor. It is not that the model
+cannot use the facts; it uses them only where its training put them. So a substantial part of what §3ag attributes
+to truncation is **train/test render mismatch**, and by the same argument `ladder_14b`'s long_policy .053 against
+`tl1b`'s .158 is partly a render-match effect too, since `ladder_14b` trained facts-last and was scored on
+JevBench's fixed render. (Arm A's two cells were still running at the time of writing.)
+
+## 3ak-b. Cluster-bootstrap confidence intervals on the JevBench public subset
+
+`scripts/jev_ci.py`. The standard tier is 72 items but only **36 independent states** (each appears as two
+paraphrases sharing a `group`), so standard is cluster-bootstrapped over `group`; hard has one item per group.
+20,000 resamples.
+
+| run | standard | 95% CI | hard | 95% CI |
+|---|---:|---|---:|---|
+| `ladder_14b` | .875 | [.792, .944] | .468 | [.378, .559] |
+| `tl1b` (KD) | .931 | [.861, .986] | .450 | [.360, .541] |
+| `tl1b_nokd` (no KD) | .917 | [.833, .986] | .477 | [.387, .568] |
+| arm A `trunc_first` | .750 | [.625, .861] | .378 | [.288, .468] |
+| arm B `trunc_last` | .736 | [.597, .861] | .396 | [.306, .486] |
+
+**Every hard-tier comparison in this record is inside the noise.** The hard interval is ±9 points at n = 111, and
+±6–13 points on standard at n_eff = 36. Consequences for claims already written down:
+
+- **§3ai overstated the KD control.** It says the teacher "contributed nothing measurable and was slightly
+  negative on the hard tier". `tl1b` .450 [.360, .541] against `tl1b_nokd` .477 [.387, .568] is an overlap of
+  almost the entire interval. The honest statement is that **no effect of KD is detectable at this sample size in
+  either direction**, which is a weaker claim than "KD did not help" and much weaker than "KD hurt". The direction
+  was consistent across several metrics, which is worth saying, but it is not evidence of a negative effect.
+- The `ladder_14b` -> `tl1b` standard gain (.875 -> .931) also has overlapping intervals; the paired
+  within-model comparisons and the n=605 set are the only places in this project with real statistical power.
+- The pre-registered `typical-large` pass rule ("hard >= .559") is a *point* threshold on a quantity whose 95%
+  interval is ±9 points wide. It should be restated as a rule on a lower confidence bound, or on a metric with
+  more items, before it is used to gate another release.
+
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
