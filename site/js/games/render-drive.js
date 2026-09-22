@@ -220,8 +220,7 @@ function buildLight(pos) {
   return { group, lamp, sign };
 }
 
-// Simple extruded block with a two-tone "glass-grid" facade (a handful of contrasting horizontal
-// bands, not per-window geometry) - flat rectangles in two tones, no textures, per the brief.
+// Floor bands, piers and a recessed roof articulate both street-facing elevations.
 function buildBuilding(w, d, h, baseColor, glassColor) {
   const group = new THREE.Group();
   const base = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color: baseColor, flatShading: true }));
@@ -574,8 +573,6 @@ export async function mount(el, { decide, mode } = {}) {
 
   const ribbonGroup = new THREE.Group();
   scene.add(ribbonGroup);
-  const label = buildLabelSprite();
-  // The probability is already printed in the instrument column.
   let ribbonMesh = null;
   let ribbonKey = null;
 
@@ -724,13 +721,11 @@ export async function mount(el, { decide, mode } = {}) {
     }
     camera.lookAt(camX, CAM_LOOK_Y, egoZ + CAM_AHEAD); // straight ahead: aiming back at the ego cancelled the offset
 
-    // intent ribbon: the model's own chosen action, drawn on the road ahead of the car, with its
-    // winning probability at the tip - rebuilt only when the action changes, not every frame.
+    // Intent ribbon follows the model; probabilities stay in the instrument column.
     ribbonGroup.position.set(egoX, 0, egoZ);
     const probs = lastDecision.probs ?? {};
     const ranked = Object.entries(probs).sort((a, b) => b[1] - a[1])[0];
     const action = ranked ? ranked[0] : lastDecision.candidates?.[0] ?? 'hold speed';
-    const prob = ranked ? ranked[1] : lastDecision.candidates?.length === 1 ? 1 : null;
     if (action !== ribbonKey) {
       if (ribbonMesh) {
         ribbonGroup.remove(ribbonMesh.mesh);
@@ -738,10 +733,8 @@ export async function mount(el, { decide, mode } = {}) {
       }
       ribbonMesh = buildRibbon(action);
       ribbonGroup.add(ribbonMesh.mesh);
-      label.sprite.position.copy(ribbonMesh.tip).add(new THREE.Vector3(0, 1.15, 0));
       ribbonKey = action;
     }
-    label.update(prob != null ? `${Math.round(prob * 100)}%` : action);
 
     const traffic = ensurePool(trafficPool, () => {
       const placed = currState.traffic[trafficPool.length]?.placed;
@@ -824,9 +817,7 @@ export async function mount(el, { decide, mode } = {}) {
   // the same describe() sentence used for procedurally spawned pedestrians/traffic, so the next
   // tick's model call sees one of the pre-computed sentences and the decision bars move. A
   // marker ring (drawn above) appears under anything the visitor placed.
-  // The hint lives in the hazard-chip label (bottom-right), not in `.gc-foot` (bottom-left) -
-  // .gc-foot's height is part of the "keep clear of the readout" budget the composition is tuned
-  // against, so nothing of mine grows it.
+  // Hazard controls share the instrument column with the model controls.
   let hazardKind = HAZARDS[0].key;
   const hazardWrap = document.createElement('div');
   hazardWrap.className = 'gc-hazards-wrap';
@@ -884,4 +875,18 @@ export async function mount(el, { decide, mode } = {}) {
       refs.policyBtn.classList.toggle('gc-on', policyName === 'model');
     },
   };
+}
+
+export function selfTest() {
+  const { group } = buildCar(EGO_BODY, CABIN_DARK);
+  const bounds = new THREE.Box3().setFromObject(group);
+  if (Math.abs(bounds.min.y - 0.01) > 0.001) throw new Error('Tyres must meet the road surface');
+  const size = bounds.getSize(new THREE.Vector3());
+  if (size.z / size.x < 2 || size.y > 1.5) throw new Error('Sedan proportions regressed');
+  group.traverse((mesh) => {
+    if (!mesh.geometry) return;
+    const positions = mesh.geometry.attributes.position.array;
+    if (![...positions].every(Number.isFinite)) throw new Error('Invalid vehicle geometry');
+  });
+  return { tyreBottom: bounds.min.y, width: size.x, height: size.y, length: size.z };
 }

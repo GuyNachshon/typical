@@ -200,3 +200,51 @@
 /* A game strip ticks every 200-450ms; the 600ms page-wide fill transition would still be catching
    up with the previous decision when the next one lands. */
 .gc-decision .bar .fill { transition-duration: 200ms; }
+
+/* Drive: the street and its instruments occupy separate, untransformed cells. */
+.media.dark:has(.gc-drive) { background: #292827; border-radius: 0; }
+.media:has(.gc-drive) > .media-label {
+  position: static; margin: 0; padding: 14px 18px; color: #c2bfba;
+  border-bottom: 1px solid #938f89; transform: none; clip-path: none;
+  line-height: 1.5; white-space: normal;
+}
+.media-scene:has(> .gc-drive) { min-height: 0; background: #292827; }
+.media-scene > .gc-drive {
+  position: relative; inset: auto; display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  overflow: visible; color: #f0eeeb; background: #292827;
+}
+.gc-drive .gc-stage { position: relative; inset: auto; min-height: 520px; }
+.gc-drive canvas { cursor: crosshair; touch-action: manipulation; }
+.gc-drive .drive-surface { pointer-events: none; }
+.gc-drive .drive-instruments {
+  display: flex; flex-direction: column; gap: 22px; min-width: 0;
+  padding: 22px; border-left: 1px solid #938f89;
+}
+.gc-drive .gc-hud, .gc-drive .gc-foot, .gc-drive .gc-foot-top,
+.gc-drive .gc-hazards-wrap {
+  position: static; inset: auto; width: auto; max-width: none;
+  padding: 0; margin: 0; background: none; transform: none; clip-path: none;
+  text-align: left; min-width: 0;
+}
+.gc-drive .gc-hud { color: #c2bfba; font-size: 10px; line-height: 1.8; }
+.gc-drive .gc-hud div { white-space: normal; overflow-wrap: anywhere; }
+.gc-drive .gc-hud div:first-child { color: #f0eeeb; margin-bottom: 12px; }
+.gc-drive .gc-foot { pointer-events: auto; }
+.gc-drive .gc-decision { gap: 9px; margin-bottom: 20px; }
+.gc-drive .gc-decision .bar { grid-template-columns: 122px minmax(0, 1fr) 32px; gap: 8px; font-size: 11px; }
+.gc-drive .bar .label { white-space: normal; overflow: visible; text-overflow: clip; }
+.gc-drive .gc-sentence {
+  display: block; overflow: visible; -webkit-line-clamp: unset;
+  color: #c2bfba; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere;
+}
+.gc-drive .gc-hazards-wrap { margin-top: auto; }
+.gc-drive .gc-hazards-label { color: #c2bfba; font: 10px/1.6 var(--font-mono, monospace); margin-bottom: 8px; }
+.gc-drive .gc-hazards, .gc-drive .gc-controls { display: flex; flex-wrap: wrap; gap: 6px; }
+.gc-drive .gc-btn { font-size: 10px; padding: 7px 10px; }
+.gc-drive .gc-btn:focus-visible { outline: 2px solid #f0eeeb; outline-offset: 3px; }
+@media (max-width: 48rem) {
+  .media-scene > .gc-drive { grid-template-columns: minmax(0, 1fr); }
+  .gc-drive .gc-stage { min-height: 320px; }
+  .gc-drive .drive-instruments { padding: 18px; gap: 18px; border-left: 0; border-top: 1px solid #938f89; }
+}
