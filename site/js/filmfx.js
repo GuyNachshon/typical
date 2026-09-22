@@ -53,15 +53,14 @@ const BOOT_LINES = [
   'state read once, cached · choice · yes/no · score · ∅',
   'now playing: DOOM E1M1, one sentence per tick',
 ];
-const BOOT_CPS = 60; // characters a second for the lines under the word
+const BOOT_CPS = 85; // characters a second for the lines under the word
 const BOOT_WORD_MS = 1100; // the word rasterises in over this
-const BOOT_HOLD = 1000; // after the last character, before the game fades up
+const BOOT_HOLD = 750; // after the last character, before the game fades up
 const BOOT_FADE = 700;
 const FILL_CHAR = '·';
 const ON_CHAR = '█';
 const MID_CHAR = '▓';
 const EDGE_CHAR = '▒';
-const BOOT_KEY = 'typical_boot';
 
 // Where the cold start is at a given moment: how much of the word has rasterised, how much of
 // the text under it has been typed, and how far into the hand-over to the game we are.
@@ -124,7 +123,9 @@ export function mountFilmFx(host, getSource, opts = {}) {
   let pulseAt = -1e9;
   let lastFilter = 'none'; // what the pulse is currently grading with, for verification
   const bootChars = BOOT_LINES.join('\n').length;
-  const skipBoot = still || opts.boot === false || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(BOOT_KEY));
+  // Every load, not once per session: a reload that skipped it read as the opening being broken.
+  // It is short enough to sit through, and reduced motion still skips it outright.
+  const skipBoot = still || opts.boot === false;
   let bootAt = skipBoot ? -1e9 : 0; // set on the first frame that has a source to draw
   let booted = skipBoot;
   if (skipBoot && opts.onReady) opts.onReady();
@@ -322,7 +323,6 @@ export function mountFilmFx(host, getSource, opts = {}) {
       const b = bootState(now - bootAt, bootChars);
       if (b.done) {
         booted = true;
-        try { sessionStorage.setItem(BOOT_KEY, '1'); } catch {}
         opts.onReady?.();
       } else {
         drawBoot(warp.el.width, warp.el.height, b);
