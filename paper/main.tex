@@ -1,5 +1,5 @@
 \documentclass{article}
-\usepackage{iclr2026_conference,times}
+\usepackage[preprint]{neurips_2023}
 
 % Math
 \usepackage{amsmath,amssymb,amsfonts,amsthm,mathtools}
@@ -40,12 +40,17 @@
 % Shared math commands
 \input{math_commands}
 
-% === ANONYMOUS SUBMISSION ===
-% \iclrfinalcopy
+\makeatletter
+\renewcommand{\@noticestring}{Preprint.}
+\makeatother
 
 \title{Typical: Reading Typed, Calibrated Decisions Directly from a Pretrained Language Model's Hidden State}
 
-\author{Anonymous authors \\ Paper under double-blind review}
+\author{%
+  Guy Nachshon \\
+  OzLabs \\
+  \texttt{Guy@ozlabs.ai}
+}
 
 \begin{document}
 
@@ -64,7 +69,7 @@
 \input{sections/7_limitations_conclusion}
 
 \bibliography{references}
-\bibliographystyle{iclr2026_conference}
+\bibliographystyle{plainnat}
 
 \newpage
 \appendix
