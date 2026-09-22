@@ -3,15 +3,13 @@
 // glyph bloom (crt.js), ~2-tick phosphor persistence on cells that just went dark, and a
 // terminal status line baked into the same canvas so the panel reads as one machine.
 import { Snake, greedyPolicy } from '../snake.js';
-import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, replayFrame, loadJSON, scoreboardLine } from './loop.js';
+import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, modelPolicy, replayFrame, loadJSON } from './loop.js';
 import { drawScanlines, drawGlyphBloom, phosphorDecay, prefersReducedMotion, drawBezel, drawGlass, drawFringe } from './crt.js';
 
 const TICK_MS = 200;
 const FADE_MS = TICK_MS * 2; // phosphor persistence window
-const KEYMAP = {
-  ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-  w: 'up', s: 'down', a: 'left', d: 'right',
-};
+// No key map: Snake is a demonstration of the model deciding, not a game to play. The other
+// panels keep their human override; this one deliberately has none.
 
 // Green P1 phosphor (VT100/Apple II/IBM 5151 terminals) rather than amber: it's the more
 // common "terminal" association, and a single hue read against near-black lets brightness
@@ -26,7 +24,7 @@ const BORDER = { tl: '┌', tr: '┐', bl: '└', br: '┘', h: '─', v: '│' 
 const pad = (n, digits) => String(n).padStart(digits, '0');
 
 export async function mount(el, { decide, mode, ctx } = {}) {
-  const refs = mountChrome(el, { label: 'Snake · 10×10 board' });
+  const refs = mountChrome(el, { label: 'Snake · 10×10 board', takeover: false });
   const canvas = refs.canvas;
   const dctx = canvas.getContext('2d');
 
@@ -46,8 +44,6 @@ export async function mount(el, { decide, mode, ctx } = {}) {
   let deathFlashAt = 0;
   let visible = true;
   let lastDecision = { candidates: engine.safeMoves(), probs: {}, p_null: null, sentence: engine.describe() };
-  const human = createHumanOverride(3000);
-  let score = { you: 0, model: 0 }; // "you vs model" HUD line — food eaten, reset on restart
 
   const scriptedMove = greedyPolicy; // the rule list applied literally (snake.js RULES)
 
@@ -79,28 +75,6 @@ export async function mount(el, { decide, mode, ctx } = {}) {
   }
 
   async function tick() {
-    // human override takes priority over everything, including the static-mode replay branch
-    // below — otherwise arrow keys would silently do nothing whenever policy is "Model" and
-    // there's no live server (the common static-hosted case).
-    if (human.active() && !engine.dead) {
-      const safe = engine.safeMoves();
-      if (safe.length === 0) {
-        engine.dead = true;
-        currState = engine.state();
-        flashDeath();
-        return;
-      }
-      const move = safe.includes(human.move) ? human.move : scriptedMove(engine);
-      prevState = engine.state();
-      engine.step(move);
-      currState = engine.state();
-      lastTickAt = performance.now();
-      lastDecision = { candidates: safe, probs: { [move]: 1 }, p_null: 0, sentence: engine.describe() };
-      if (currState.score > prevState.score) score.you++;
-      if (engine.dead) flashDeath();
-      return;
-    }
-
     if (policyName === 'model' && mode() !== 'live') {
       const f = replayFrame(replay, replayIndex);
       if (!f) return;
@@ -109,7 +83,6 @@ export async function mount(el, { decide, mode, ctx } = {}) {
       currState = f.state;
       lastTickAt = performance.now();
       lastDecision = { candidates: f.candidates, probs: f.probs, p_null: f.p_null, sentence: f.desc };
-      if (currState.score > prevState.score) score.model++;
       if (currState.dead) flashDeath();
       return;
     }
@@ -139,7 +112,6 @@ export async function mount(el, { decide, mode, ctx } = {}) {
     currState = engine.state();
     lastTickAt = performance.now();
     lastDecision = decision;
-    if (currState.score > prevState.score) score.model++;
     if (engine.dead) flashDeath();
   }
 
@@ -157,7 +129,6 @@ export async function mount(el, { decide, mode, ctx } = {}) {
     replayIndex = 0;
     lastTickAt = performance.now();
     lastDecision = { candidates: engine.safeMoves(), probs: {}, p_null: null, sentence: engine.describe() };
-    score = { you: 0, model: 0 };
     fading.clear();
     lastLit = new Map();
     lastPhosphorTick = -1;
@@ -353,8 +324,6 @@ export async function mount(el, { decide, mode, ctx } = {}) {
     const l2 = document.createElement('div');
     l2.textContent = `score ${currState.score} · steps ${currState.steps}`;
     refs.hud.append(l1, l2);
-    const scoreLine = scoreboardLine(score);
-    if (scoreLine) refs.hud.appendChild(document.createElement('div')).textContent = scoreLine;
     paintDecision(refs, lastDecision);
     rafId = requestAnimationFrame(frame);
   }
@@ -367,7 +336,6 @@ export async function mount(el, { decide, mode, ctx } = {}) {
     if (v) ticker.resume();
     else ticker.pause();
   });
-  const unbindKeys = bindKeys(el, KEYMAP, (action) => human.set(action));
 
   refs.policyBtn.textContent = 'Model';
   refs.policyBtn.classList.add('gc-on');
@@ -383,7 +351,6 @@ export async function mount(el, { decide, mode, ctx } = {}) {
       cancelAnimationFrame(rafId);
       ticker.stop();
       stopWatch();
-      unbindKeys();
     },
     restart,
     setPolicy(name) {

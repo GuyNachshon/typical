@@ -26,7 +26,9 @@ export const TOKENS = {
 // Builds the shared DOM inside `el`: canvas stage (fills the box) + HUD (top-right) + decision
 // strip/sentence (bottom-left, over a scrim) + hint/policy/restart controls (bottom-right).
 // Returns refs the renderer draws into every frame/tick.
-export function mountChrome(el, { label } = {}) {
+// `takeover: false` for a panel that is a demonstration, not a game: no take-over hint (and the
+// renderer binds no keys).
+export function mountChrome(el, { label, takeover = true } = {}) {
   el.innerHTML = '';
   el.classList.add('gc-root');
   el.tabIndex = 0;
@@ -69,7 +71,7 @@ export function mountChrome(el, { label } = {}) {
   restartBtn.textContent = 'Restart';
   controls.append(policyBtn, restartBtn);
   footTop.append(controls);
-  hud.appendChild(hint); // the hint lives under the HUD, never over the readout
+  if (takeover) hud.appendChild(hint); // the hint lives under the HUD, never over the readout
 
   el.append(stage, hud, foot, footTop);
 
