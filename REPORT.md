@@ -1395,12 +1395,61 @@ distribution (α·CE + β·KL, T = 2) on 63k labelled rows, checkpoint selected 
 JevBench standard .875 → **.931** (the best number this project has produced, level with `system-one-open` on the public
 ids) with knowledge, NLI and latency unchanged; the calibration collapse of §3ab is gone — held-out score NLL 2.87 →
 0.95, typed-decisions 1.96 → 1.04, JevBench hard Brier .85 → .66; long_policy tripled (.05 → .158) and multi_hop
-.44 → .611; level-7 composition reached **.620**, the first time any model has been clearly above chance there. What
-(the `ladder_14b` per-family values here are recomputed from `jev_native_ladder_14b/hard/results.jsonl`; an earlier draft of §3ab quoted .20/.40 for temporal/probability from a transcription error.) did not move: hard-tier *accuracy* (.468 → .450, within noise at n = 111) and the serial-symbolic families
+.44 → .611; level-7 composition reached **.620**, the first time any model has been clearly above chance there. What did not move: hard-tier *accuracy* (.468 → .450, within noise at n = 111) and the serial-symbolic families
 (temporal .20, probability .30, tradeoff .17). The pass rule (hard ≥ .559 or Brier ≤ .65; long_policy ≥ .35) is
 missed on both counts — narrowly on Brier (.656) — so **`tl1b` is not released as `typical-large` yet**; the frozen
 14B with three exemplars still leads it on hard (.559), which keeps §3ab's uncomfortable finding alive: our training
 buys standard-tier accuracy and calibration, and still costs hard-tier accuracy at 14B.
+(The `ladder_14b` per-family values in this table are recomputed from `jev_native_ladder_14b/hard/results.jsonl`;
+an earlier draft of §3ab quoted .20/.40 for temporal/probability from a transcription error.)
+
+## 3ai. `tl1b_nokd` — the KD control, and what it leaves confounded (H100, 2026-09-22, ~$30)
+
+`tl1b` bundled five changes at once (facts-first long corpus, `--drop_truncated`, a 3,072-token window,
+`--brier_lambda`, calibration-based `--best_on`) *plus* KD from the frozen 14B. `tl1b_nokd` is the matched control:
+identical recipe, `--distill_beta 0`, one flag different. All values below read from the artefacts on
+`guychuk/pcdm-runs` (`jev_native_*/hard/summary.json`, `.../original/summary.json`), not from run logs.
+
+| | `ladder_14b` (old recipe) | `tl1b` (KD) | **`tl1b_nokd`** (no KD) |
+|---|---|---|---|
+| JevBench standard | .875 | **.931** | .917 |
+| JevBench easy | 1.00 | 1.00 | 1.00 |
+| JevBench hard | .468 | .450 | **.477** |
+| JevBench Brier standard | .173 | .175 | **.127** |
+| JevBench Brier hard | .85 | **.656** | .682 |
+| hard: long_policy (n = 19) | .053 | .158 | **.211** |
+| val NLL | – | 0.438 | **0.410** |
+| CLINC-150 | .834 | .827 | .822 |
+| MMLU-Pro among-K | .514 | .498 | .498 |
+
+**The teacher contributed nothing measurable, and was slightly negative where it was supposed to help.** KD was
+added to buy hard-tier reasoning; removing it *improved* hard accuracy (.450 → .477), long_policy (.158 → .211),
+standard Brier (.175 → .127) and val NLL (0.438 → 0.410), at the cost of 1.4 points of standard accuracy
+(.931 → .917) — and both KD arms leave knowledge and intent untouched. Because `--distill_beta` is the only flag
+that differs, this is one of the few clean matched pairs in the record; the caveat is that it is a single seed, and
+the standard-tier gap is well inside what §3v's seed pair showed as run-to-run spread. Per-family hard for `nokd`:
+adversarial .833 (n=6), ambiguous .429 (n=7), judge_hard .588 (n=17), long_policy .211 (n=19), multi_hop .50 (n=18),
+probability .50 (n=10), routing_hard 1.00 (n=5), temporal_numeric .20 (n=15), tradeoff .167 (n=6), trap 1.00 (n=8).
+
+**What this does *not* establish.** With KD eliminated, the credit for the long_policy recovery (.053 → .211) falls to
+"the truncation fix" — but that is still four changes in a trenchcoat. Nothing in the record separates facts-first
+rendering from `--drop_truncated`, the wider window, the Brier term, or calibration-based checkpoint selection. §3ag
+states the mechanism (states right-truncate, so a `Case:` rendered last was dropped 98.8% of the time at
+`max_state` 1,024) and the mechanism is well-evidenced as a *description of the data*; it is not evidenced as the
+*cause* of the metric movement. The paper says so explicitly rather than claiming the stronger version.
+
+**The ablation that closes it (in flight, ~$12).** The counterfactual corpus was never deleted — `data_wf_long`
+retains both renders, and they are a genuinely matched pair: identical rows, identical labels, identical state
+lengths (p50 8,702 chars in both), differing only in where `Case:` sits (p50 0.000 vs 0.976 of the text). Two 1.7B
+arms, byte-identical flags, `--max_state 1024` with `--drop_truncated` deliberately **off** so truncation bites as it
+did in Release 1, differing only in which file is `data_wf_long/train.jsonl`
+(`wf/train_long_v2.jsonl` = facts-first, `wf/train_long.jsonl` = facts-last on `guychuk/pcdm-data`). Primary metric:
+JevBench hard `long_policy`. Pre-registered prediction, recorded before the runs land: facts-last should sit near
+`ladder_14b`'s floor while facts-first recovers most of the gap, with knowledge and intent matched. **If both arms
+land near .05, render order was not the cause and §3ag's mechanism paragraph is wrong and must be rewritten** — that
+outcome is more valuable than a confirmation, because the mechanism is currently load-bearing in both the report and
+the paper.
+
 
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
