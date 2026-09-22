@@ -81,7 +81,7 @@ export function describeDoom(state) {
 // closes it again), then walking into it until it is open. The two HMP zombiemen stand in
 // the raised alcove at (2272,-2432)/(2272,-2352) and come to the player once seen.
 export const ROUTE = [
-  { x: 1230, y: -3000 }, // north along the start room's east side (the pillar platform is west)
+  { x: 1290, y: -3000 }, // north along the start room's east side, in line with the corridor mouth (x=1230 snagged the corner for ~15 s of film)
   { x: 1300, y: -2650 }, // the corridor north-east
   { x: 1480, y: -2450 }, // corridor end, facing the door
   { x: 1620, y: -2448, door: true }, // past the door: blocked here -> use, then walk in
@@ -97,7 +97,7 @@ export const ROUTE = [
 const PATROL_FROM = 4; // once the route is done, patrol between ROUTE[4] (pillar room) and its end
 const WP_RADIUS = 80;
 const TURN_TOL_DEG = 12;
-const STUCK_TICKS = 8; // explore ticks without moving 8 units -> skip the waypoint
+const STUCK_TICKS = 4; // explore ticks (~1 s each, live) without moving 8 units -> skip the waypoint
 const DOOR_RETRY_MS = 8000; // a DR door takes ~4 s to open at the wasm build's tic rate
 const DEFAULT_TURN_DEG = 60;
 let wpIndex = 0;

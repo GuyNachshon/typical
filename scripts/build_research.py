@@ -30,13 +30,13 @@ TABLE_RE = re.compile(r"<table>.*?</table>", re.S)
 TH_RE = re.compile(r"<th>(.*?)</th>", re.S)
 TR_RE = re.compile(r"<tr>(.*?)</tr>", re.S)
 TD_RE = re.compile(r"<td>(.*?)</td>", re.S)
-CODE_RE = re.compile(r"<pre><code[^>]*>(.*?)</code></pre>", re.S)
+CODE_RE = re.compile(r'<pre><code(?: class="language-text-(wide|narrow)")?[^>]*>(.*?)</code></pre>', re.S)
 TAG_RE = re.compile(r"<[^>]+>")
 H2_SPLIT_RE = re.compile(r"(?=<h2)")
 H2_RE = re.compile(r'^<h2 id="([^"]*)">(.*?)</h2>', re.S)
 LI_RE = re.compile(r"<li>\s*(?:<p>)?(.*?)(?:</p>)?\s*</li>", re.S)
 BLOCK_START_RE = re.compile(r'(?=^<(?:h3|p|ul|ol|table|div)\b)', re.M)
-SETPIECE_PREFIXES = ('<table', '<div class="code"', '<div class="media"', '<div class="ucard')
+SETPIECE_PREFIXES = ('<table', '<div class="code', '<div class="media"', '<div class="ucard')
 
 NAV = """<nav class="nav"><a class="brand" href="index.html">Typical</a><span class="links"><a href="index.html#results">Results</a><a href="index.html#how">How it works</a><a href="index.html#demos">Demos</a><a href="research.html" aria-current="page">Research</a><a href="https://huggingface.co/OzLabs/typical-small/tree/main/inference">Code</a></span><a class="cta" href="index.html#tryit">Try it live</a></nav>"""
 
@@ -131,7 +131,8 @@ def add_data_labels(html):
 def unwrap_code_blocks(html):
     """.code (src.css) styles <pre> directly (dark 12px mono panel) — drop fenced_code's
     <code class="language-x"> wrapper and add the .code div."""
-    return CODE_RE.sub(lambda m: f'<div class="code"><pre>{m.group(1)}</pre></div>', html)
+    # ```text-wide / ```text-narrow: the same plate drawn twice; research.css shows one per viewport
+    return CODE_RE.sub(lambda m: f'<div class="code{" " + m.group(1) if m.group(1) else ""}"><pre>{m.group(2)}</pre></div>', html)
 
 
 BLOCKQUOTE_RE = re.compile(r"<blockquote>(.*?)</blockquote>", re.S)

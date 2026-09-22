@@ -20,6 +20,12 @@ function svgEl(tag, attrs = {}) {
   return n;
 }
 
+function svgText(x, y, str, attrs = {}) {
+  const t = svgEl('text', { x, y, 'font-size': 12, 'font-family': 'inherit', ...attrs });
+  t.textContent = str;
+  return t;
+}
+
 const _jsonCache = new Map(); // path -> Promise<data|null> - P4 and P5 both need runs-index.json etc; fetch once
 function loadJSON(path) {
   if (!_jsonCache.has(path)) {
@@ -328,10 +334,151 @@ async function mountCalibration() {
 }
 
 // ============================================================================
-// P3 — architecture trace ("trace one decision")
+// P3 — architecture trace ("trace one decision") — the six stages are drawn (SVG), reusing
+// the ASCII figure's own geometry: token boxes for state/cache/suffix, a 28-bar trunk with
+// the tap and LoRA range marked, a small candidates->scores->gate diagram for the head, and
+// the real bars() readout for probabilities. Scrubbing never redraws the boxes that don't
+// change; it only toggles .is-active/.is-dim (opacity + transform, CSS-transitioned).
 // ============================================================================
 const STAGES = ['state', 'trunk', 'cache', 'suffix', 'head', 'probs'];
 const STAGE_LABEL = { state: 'state tokens', trunk: 'trunk', cache: 'KV cache', suffix: 'suffix', head: 'head', probs: 'probabilities' };
+const BOX = 13, GAP = 3, BOXH = 16; // token-box geometry, shared by state/cache/suffix figures
+
+function tokenRow(g, n, x0, fill, dashed = false) {
+  for (let i = 0; i < n; i++) {
+    const attrs = { x: x0 + i * (BOX + GAP), y: 0, width: BOX, height: BOXH, rx: 2, fill };
+    if (dashed) { attrs.fill = 'none'; attrs.stroke = fill; attrs['stroke-width'] = 1.2; }
+    g.appendChild(svgEl('rect', attrs));
+  }
+  return x0 + n * (BOX + GAP);
+}
+
+function stageFigure(label) {
+  const wrap = document.createElement('div');
+  wrap.className = 'trace-stage';
+  const cap = document.createElement('p');
+  cap.className = 't-eyebrow muted trace-stage-label';
+  cap.textContent = label;
+  wrap.appendChild(cap);
+  return wrap;
+}
+
+function svgHost(w, h) {
+  const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, width: '100%', height: h, style: `max-width:${w}px` });
+  return svg;
+}
+
+function stateStage(d) {
+  const wrap = stageFigure('state tokens');
+  const w = Math.min(980, d.state.n_tokens * (BOX + GAP) + 40);
+  const svg = svgHost(w, BOXH + 4);
+  tokenRow(svg, d.state.n_tokens, 0, INK);
+  wrap.appendChild(svg);
+  wrap.appendChild(row(`"${d.state.text.slice(0, 96)}${d.state.text.length > 96 ? '…' : ''}"`, 't-mono trace-text'));
+  wrap.appendChild(row(`${d.state.n_tokens} tokens (+1 eos sink) → Ls = ${d.Ls}`));
+  return wrap;
+}
+
+function trunkStage(d) {
+  const wrap = stageFigure('trunk');
+  const m = d.trunk.tap_layer.match(/(\d+) of (\d+)/) || [null, '20', '28'];
+  const kept = Number(m[1]);
+  const total = Number(m[2]);
+  const loraM = d.trunk.lora.match(/\((\d+)-(\d+)\)/) || [null, '13', '20'];
+  const loraLo = Number(loraM[1]);
+  const loraHi = Number(loraM[2]);
+  const barW = 10, gap = 2, barH = 46;
+  const w = total * (barW + gap);
+  const svg = svgHost(w, barH + 14);
+  for (let i = 1; i <= total; i++) {
+    const on = i <= kept;
+    const x = (i - 1) * (barW + gap);
+    svg.appendChild(svgEl('rect', { x, y: 0, width: barW, height: barH, rx: 1.5, fill: on ? INK : 'none', stroke: on ? 'none' : STEEL, 'stroke-width': 1.2, 'fill-opacity': on ? (i >= loraLo && i <= loraHi ? 0.55 : 1) : 1 }));
+    if (i >= loraLo && i <= loraHi) svg.appendChild(svgEl('rect', { x, y: barH + 3, width: barW, height: 3, fill: INK }));
+  }
+  const ttl = svgEl('title');
+  ttl.textContent = `layers 1–${kept} of ${total} kept (frozen), LoRA r16 on ${loraLo}–${loraHi}, ${total - kept} dropped`;
+  svg.appendChild(ttl);
+  wrap.appendChild(svg);
+  wrap.appendChild(row(`${d.trunk.backbone}, layers 1–${kept} of ${total} kept · dark bar = frozen, faint = LoRA r16, outline = dropped past the tap`));
+  wrap.appendChild(row(`${d.trunk.h100_state_ms} ms (H100, one-off) — read once, before any question`, 'muted'));
+  return wrap;
+}
+
+function cacheStage(d) {
+  const wrap = stageFigure('KV cache');
+  const w = Math.min(980, d.state.n_tokens * (BOX + GAP) + 40);
+  const svg = svgHost(w, BOXH + 4);
+  tokenRow(svg, d.state.n_tokens, 0, MID);
+  wrap.appendChild(svg);
+  wrap.appendChild(row(`${d.Ls} positions, reused by every question below — grey = already computed, not recomputed per question`));
+  return wrap;
+}
+
+function suffixStage(q, Ls) {
+  const wrap = stageFigure('suffix (this question)');
+  const cacheN = Math.min(Ls, 60);
+  const w = Math.min(980, (cacheN + q.suffix_tokens) * (BOX + GAP) + 40);
+  const svg = svgHost(w, BOXH + 4);
+  const next = tokenRow(svg, cacheN, 0, MID);
+  tokenRow(svg, q.suffix_tokens, next, INK);
+  wrap.appendChild(svg);
+  wrap.appendChild(row(`"${q.suffix_text.trim()}"`, 't-mono trace-text'));
+  wrap.appendChild(row(`${q.suffix_tokens} new tokens appended to the cache, T=${q.T} · render: ${q.render}${q.is_bern ? ' (Bernoulli — candidates not rendered)' : ''}`));
+  return wrap;
+}
+
+function headStage(q, head, noulSwap) {
+  const wrap = stageFigure('head');
+  const K = Object.keys(q.probs).length;
+  const boxW = 26, gap = 8, rowH = 22;
+  const w = Math.min(980, K * (boxW + gap) + 220);
+  const svg = svgHost(w, rowH * 3 + 30);
+  const maxP = Math.max(...Object.values(q.probs));
+  Object.values(q.probs).forEach((pval, i) => {
+    const x = i * (boxW + gap);
+    // candidate box
+    svg.appendChild(svgEl('rect', { x, y: 0, width: boxW, height: 14, rx: 2, fill: 'none', stroke: INK, 'stroke-width': 1.2 }));
+    // arrow down
+    svg.appendChild(svgEl('line', { x1: x + boxW / 2, x2: x + boxW / 2, y1: 14, y2: rowH + 6, stroke: STEEL }));
+    // score bar (height ~ prob, a proxy for the head's relative candidate score)
+    const bh = Math.max(2, (pval / (maxP || 1)) * 26);
+    svg.appendChild(svgEl('rect', { x, y: rowH + 6 + (26 - bh), width: boxW, height: bh, rx: 2, fill: INK, 'fill-opacity': 0.75 }));
+  });
+  const gateX = K * (boxW + gap) + 20;
+  Object.values(q.probs).forEach((_, i) => {
+    const x = i * (boxW + gap) + boxW / 2;
+    svg.appendChild(svgEl('line', { x1: x, x2: gateX, y1: rowH + 32, y2: rowH * 2 + 10, stroke: STEEL, 'stroke-dasharray': '2,2' }));
+  });
+  svg.appendChild(svgEl('circle', { cx: gateX, cy: rowH * 2 + 18, r: 16, fill: 'none', stroke: INK, 'stroke-width': 1.6 }));
+  svg.appendChild(svgText(gateX, rowH * 2 + 22, '∅', { 'text-anchor': 'middle', fill: INK, 'font-size': 13 }));
+  svg.appendChild(svgText(gateX, rowH * 2 + 44, 'factored gate', { 'text-anchor': 'middle', fill: MID, 'font-size': 10, 'font-family': 'var(--font-mono)' }));
+  wrap.appendChild(svg);
+  wrap.appendChild(row(q.type === 'noul' ? head.noul_formula : head.choice_formula, 't-mono trace-text'));
+  if (q.type === 'noul' && noulSwap) {
+    wrap.appendChild(row(`label-swap: [${noulSwap.order_a.join(', ')}] vs [${noulSwap.order_b.join(', ')}] → identical suffix: ${noulSwap.suffix_identical}`, 'note'));
+  }
+  return wrap;
+}
+
+function probsStage(q, replay) {
+  const wrap = stageFigure('probabilities');
+  const rows = Object.entries(q.probs).map(([label, pval]) => ({ label, p: pval }));
+  rows.push({ label: '∅ none', p: q.p_null, isNull: true });
+  const barsEl = document.createElement('div');
+  wrap.appendChild(barsEl);
+  bars(barsEl, rows);
+  if (q.expected != null) wrap.appendChild(row(`E[index] = ${q.expected.toFixed(2)}`));
+  wrap.appendChild(row(`replayed from replays.json (${replay.model}, ${replay.device}, ${replay.ms} ms for all four questions)`, 'muted'));
+  return wrap;
+}
+
+function row(text, cls = '') {
+  const n = document.createElement('p');
+  if (cls) n.className = cls;
+  n.textContent = text;
+  return n;
+}
 
 async function mountTrace() {
   const el = document.getElementById('chart-trace');
@@ -352,7 +499,7 @@ async function mountTrace() {
 
   const qRow = document.createElement('div');
   qRow.className = 'explorable-row';
-  qRow.append(seg(qLabels.map((l, i) => ({ value: i, label: `${i + 1} ${l}` })), state.q, (v) => { state.q = v; render(); }, 'question'));
+  qRow.append(seg(qLabels.map((l, i) => ({ value: i, label: `${i + 1} ${l}` })), state.q, (v) => { state.q = v; buildFigure(); }, 'question'));
   root.appendChild(qRow);
 
   const rail = document.createElement('div');
@@ -364,7 +511,7 @@ async function mountTrace() {
     t.type = 'button';
     t.className = 'scrub-tick';
     t.textContent = STAGE_LABEL[s];
-    t.addEventListener('click', () => { state.stage = i; input.value = String(i); render(); });
+    t.addEventListener('click', () => { state.stage = i; input.value = String(i); applyActive(); });
     ticks.appendChild(t);
   });
   const input = document.createElement('input');
@@ -375,66 +522,50 @@ async function mountTrace() {
   input.step = '1';
   input.value = '0';
   input.setAttribute('aria-label', 'trace stage');
-  input.addEventListener('input', () => { state.stage = Number(input.value); render(); });
+  input.addEventListener('input', () => { state.stage = Number(input.value); applyActive(); });
   const nav = document.createElement('div');
   nav.className = 'scrub-nav';
   const prev = document.createElement('button');
   prev.type = 'button'; prev.className = 'btn ghost'; prev.textContent = '← previous';
   const next = document.createElement('button');
   next.type = 'button'; next.className = 'btn ghost'; next.textContent = 'next →';
-  prev.addEventListener('click', () => { state.stage = Math.max(0, state.stage - 1); input.value = String(state.stage); render(); });
-  next.addEventListener('click', () => { state.stage = Math.min(STAGES.length - 1, state.stage + 1); input.value = String(state.stage); render(); });
+  prev.addEventListener('click', () => { state.stage = Math.max(0, state.stage - 1); input.value = String(state.stage); applyActive(); });
+  next.addEventListener('click', () => { state.stage = Math.min(STAGES.length - 1, state.stage + 1); input.value = String(state.stage); applyActive(); });
   nav.append(prev, next);
   rail.append(ticks, input, nav);
   root.appendChild(rail);
 
-  const panel = document.createElement('div');
-  panel.className = 'explorable-body trace-panel';
-  root.appendChild(panel);
+  const figureHost = document.createElement('div');
+  figureHost.className = 'trace-figure';
+  root.appendChild(figureHost);
+  const srcHost = document.createElement('div');
+  root.appendChild(srcHost);
 
-  function render() {
-    ticks.querySelectorAll('.scrub-tick').forEach((t, i) => t.classList.toggle('is-on', i === state.stage));
+  function buildFigure() {
     const q = d.questions[state.q];
-    panel.innerHTML = '';
-    const stage = STAGES[state.stage];
-    if (stage === 'state') {
-      panel.appendChild(p(`"${d.state.text}"`, 't-mono trace-text'));
-      panel.appendChild(p(`${d.state.n_tokens} tokens (+1 eos sink) → Ls = ${d.Ls}`));
-    } else if (stage === 'trunk') {
-      panel.appendChild(p(`${d.trunk.backbone}, layers 1–${d.trunk.tap_layer.split(' ')[0]} of ${d.trunk.tap_layer.split(' ')[2]}`));
-      panel.appendChild(p(d.trunk.lora));
-      panel.appendChild(p(`${d.trunk.h100_state_ms} ms (H100, one-off) — read once, before any question`, 'muted'));
-    } else if (stage === 'cache') {
-      panel.appendChild(p(`KV cache: ${d.Ls} positions, reused by every question below`));
-    } else if (stage === 'suffix') {
-      panel.appendChild(p(`"${q.suffix_text.trim()}"`, 't-mono trace-text'));
-      panel.appendChild(p(`${q.suffix_tokens} tokens, T=${q.T} · render: ${q.render}${q.is_bern ? ' (Bernoulli — candidates not rendered)' : ''}`));
-      if (q.type === 'noul') {
-        const swap = d.noul_swap;
-        panel.appendChild(p(`label-swap: [${swap.order_a.join(', ')}] vs [${swap.order_b.join(', ')}] → identical suffix: ${swap.suffix_identical}`, 'note'));
-      }
-    } else if (stage === 'head') {
-      panel.appendChild(p(q.type === 'noul' ? d.head.noul_formula : d.head.choice_formula, 't-mono trace-text'));
-    } else if (stage === 'probs') {
-      const rows = Object.entries(q.probs).map(([label, pval]) => ({ label, p: pval }));
-      rows.push({ label: '∅ none', p: q.p_null, isNull: true });
-      const barsEl = document.createElement('div');
-      panel.appendChild(barsEl);
-      bars(barsEl, rows);
-      if (q.expected != null) panel.appendChild(p(`E[index] = ${q.expected.toFixed(2)}`));
-      panel.appendChild(p(`replayed from replays.json (${d.replay.model}, ${d.replay.device}, ${d.replay.ms} ms for all four questions)`, 'muted'));
-    }
-    sourceLine(panel, d.source);
+    figureHost.innerHTML = '';
+    figureHost.append(
+      stateStage(d),
+      trunkStage(d),
+      cacheStage(d),
+      suffixStage(q, d.Ls),
+      headStage(q, d.head, d.noul_swap),
+      probsStage(q, d.replay),
+    );
+    srcHost.innerHTML = '';
+    sourceLine(srcHost, d.source);
+    applyActive();
   }
 
-  function p(text, cls = '') {
-    const n = document.createElement('p');
-    if (cls) n.className = cls;
-    n.textContent = text;
-    return n;
+  function applyActive() {
+    ticks.querySelectorAll('.scrub-tick').forEach((t, i) => t.classList.toggle('is-on', i === state.stage));
+    [...figureHost.children].forEach((r, i) => {
+      r.classList.toggle('is-active', i === state.stage);
+      r.classList.toggle('is-dim', i !== state.stage);
+    });
   }
 
-  render();
+  buildFigure();
 }
 
 // ============================================================================
@@ -674,10 +805,12 @@ async function mountCurves() {
   const byName = new Map(runs.map((r) => [r.run, r]));
   const noCurve = runsIdx ? runsIdx.runs.filter((r) => !byName.has(r.name)).map((r) => r.name) : [];
 
+  const BROWSE_PAGE = 12;
   const state = {
     size: 'all', recipe: 'all',
-    pinned: ['ts1b', 'tm1b', 'ladder_4b', 'ladder_8b', 'ladder_14b'].filter((n) => byName.has(n)),
+    pinned: ['ts1b', 'tm1b'].filter((n) => byName.has(n)), // release only - ladder_4b/8b/14b are one click away in "more runs", not the hairball on first paint
     cache: new Map(), // run name -> fetched curve JSON
+    browseShown: BROWSE_PAGE,
   };
 
   el.innerHTML = '';
@@ -688,8 +821,8 @@ async function mountCurves() {
   const filterRow = document.createElement('div');
   filterRow.className = 'explorable-row';
   filterRow.append(
-    seg([{ value: 'all', label: 'all sizes' }, ...SIZES.map((v) => ({ value: v, label: v }))], state.size, (v) => { state.size = v; renderBrowse(); }, 'backbone size'),
-    seg([{ value: 'all', label: 'all recipes' }, ...RECIPES.map((v) => ({ value: v, label: v }))], state.recipe, (v) => { state.recipe = v; renderBrowse(); }, 'recipe tag'),
+    seg([{ value: 'all', label: 'all sizes' }, ...SIZES.map((v) => ({ value: v, label: v }))], state.size, (v) => { state.size = v; state.browseShown = BROWSE_PAGE; renderBrowse(); }, 'backbone size'),
+    seg([{ value: 'all', label: 'all recipes' }, ...RECIPES.map((v) => ({ value: v, label: v }))], state.recipe, (v) => { state.recipe = v; state.browseShown = BROWSE_PAGE; renderBrowse(); }, 'recipe tag'),
   );
   root.appendChild(filterRow);
 
@@ -735,7 +868,8 @@ async function mountCurves() {
   function renderBrowse() {
     browseHost.innerHTML = '';
     const candidates = runs.filter((r) => (state.size === 'all' || r.size === state.size) && (state.recipe === 'all' || r.recipe === state.recipe) && !state.pinned.includes(r.run));
-    candidates.forEach((r) => {
+    const visible = candidates.slice(0, state.browseShown);
+    visible.forEach((r) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'btn ghost';
@@ -745,6 +879,14 @@ async function mountCurves() {
       browseHost.appendChild(b);
     });
     if (!candidates.length) browseHost.appendChild(p('no unpinned runs match this filter', 'note'));
+    if (candidates.length > visible.length) {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'btn ghost';
+      more.textContent = `more runs (${candidates.length - visible.length} left) →`;
+      more.addEventListener('click', () => { state.browseShown += BROWSE_PAGE; renderBrowse(); });
+      browseHost.appendChild(more);
+    }
   }
 
   function render() {

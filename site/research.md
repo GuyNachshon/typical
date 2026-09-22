@@ -15,7 +15,7 @@ top 8 kept layers and a factored ∅ head. The state is read once and cached; ea
 short rendered suffix, and the label, the yes/no, and the level all come out of the same terminal
 decision state, with nothing generated.
 
-```text
+```text-wide
  state tokens (≤1,024 tok)
                                │
                                ▼
@@ -48,6 +48,60 @@ decision state, with nothing generated.
          │ line)             │      │ order-invariant      │      │                  │
          │                   │      │ by construction      │      │                  │
          └───────────────────┘      └──────────────────────┘      └──────────────────┘
+```
+```text-narrow
+ state tokens (≤1,024)
+          │
+          ▼
+ ┌──────────────────────────────┐
+ │ frozen Qwen3 trunk, cut at   │
+ │ the tap layer                │
+ │  small 1.7B: layer 20 / 28   │
+ │  medium 4B:  layer 26 / 36   │
+ │ LoRA r16 on the top 8 layers │
+ └──────────────────────────────┘
+          │
+          │  KV cache: state once,
+          │  reused per query
+          │
+          │  per query, a rendered
+          │  suffix is appended:
+          │  "<question> <letters>"
+          ▼
+ ┌──────────────────────────────┐
+ │ contextual readout (n3)      │
+ │ h_D + per-candidate states   │
+ └──────────────────────────────┘
+          │
+   ┌──────┴───────────────┐
+   ▼                      │
+ ┌──────────────────────┐ │
+ │ Choice               │ │
+ │ softmax over K       │ │
+ │ + factored ∅ (a head │ │
+ │ decision, not a      │ │
+ │ rendered line)       │ │
+ └──────────────────────┘ │
+   ┌──────────────────────┤
+   ▼                      │
+ ┌──────────────────────┐ │
+ │ Noul                 │ │
+ │ Bernoulli            │ │
+ │ P(yes) = σ(w·h_D)    │ │
+ │ query-only suffix,   │ │
+ │ order-invariant by   │ │
+ │ construction         │ │
+ └──────────────────────┘ │
+   ┌──────────────────────┘
+   ▼
+ ┌──────────────────────┐
+ │ Score                │
+ │ K-way softmax,       │
+ │ ordinal-smoothed     │
+ │ targets (τ = 0.7),   │
+ │ reports E[index]     │
+ │ + factored ∅         │
+ └──────────────────────┘
 ```
 
 *Fig. 1. Typical forward pass, state to probabilities.*
@@ -151,7 +205,7 @@ keeps the null calibrated across K.
 
 ## Pipeline
 
-```text
+```text-wide
 backbone: Qwen/Qwen3-1.7B-Base
 lora_layers: 8            lora_r: 16            lora_lr: 0.0001
 tap_layer: 20             zscore: false
@@ -165,6 +219,43 @@ family_weights: E:0.40,K:0.15,W:0.35,U:0.10
 bucket_map: data_wf_long=W,data_wh=W,data_u=U
 null_aug: W:0.20          max_state: 1024
 tower_d: 512              tower_layers: 2        tower_heads: 8
+seed: 0
+```
+```text-narrow
+backbone: Qwen/Qwen3-1.7B-Base
+lora_layers: 8
+lora_r: 16
+lora_lr: 0.0001
+tap_layer: 20
+zscore: false
+readout: native
+nc_head: n3
+nc_render: letters_nonull
+null: factored
+noul_head: bern
+score_head: choice
+ordinal_smooth: 0.0
+  # ^ eval-only rerun flag;
+  #   training used 0.7
+steps: 12000
+bs: 64
+grad_accum: 1
+eval_every: 4000
+val_every: 1000
+ckpt_every: 2000
+data: data_v5
+extra_data: data_kb, data_wf,
+  data_wf_hf, data_wf_long,
+  data_wh, data_u
+family_weights:
+  E:0.40 K:0.15 W:0.35 U:0.10
+bucket_map: data_wf_long=W,
+  data_wh=W, data_u=U
+null_aug: W:0.20
+max_state: 1024
+tower_d: 512
+tower_layers: 2
+tower_heads: 8
 seed: 0
 ```
 

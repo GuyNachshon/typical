@@ -41,9 +41,14 @@
 .timeline-legend .dim { color: var(--color-mid); }
 .timeline-legend-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.72px; text-transform: uppercase; margin-top: 20px; color: var(--color-mid); }
 
-/* ASCII plates never scroll: shrink the type until the widest line fits the column */
+/* ASCII plates never scroll and never shrink below 11px: the two wide plates have a narrow
+   twin (```text-narrow in research.md) that takes over under 760px. */
+.code.narrow { display: none; }
+.code.wide pre, .code.narrow pre { white-space: pre; line-height: 1.3; }
 @media (max-width: 760px) {
-  .code pre { font-size: clamp(6px, 1.55vw, 12px); line-height: 1.25; }
+  .code.wide { display: none; }
+  .code.narrow { display: block; }
+  .code pre { font-size: clamp(11px, 3vw, 12px); line-height: 1.3; }
 }
 
 /* ---- explorables (P1-P4, js/explorables.js): segmented steppers, tiles, scrub rail, dot
@@ -80,8 +85,17 @@
 .scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -4px; border-radius: 50%; background: var(--color-off); cursor: pointer; }
 .scrub::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--color-off); cursor: pointer; }
 .scrub-nav { display: flex; gap: 8px; }
-.trace-panel { background: var(--color-lgray); border-radius: var(--radius-card); padding: 24px; }
 .trace-text { overflow-wrap: anywhere; }
+
+/* P3 trace figure: six drawn stages, always visible, the scrub only shifts which one is
+   emphasized. Opacity + a small scale via transform - never width/height - so scrubbing is
+   one composited property change, not a relayout. */
+.trace-figure { display: grid; gap: 18px; }
+.trace-stage { background: var(--color-lgray); border-radius: var(--radius-card); padding: 18px 20px; display: grid; gap: 8px; transform-origin: left center; transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out), background 220ms var(--ease-out); opacity: 0.4; transform: scale(0.99); }
+.trace-stage.is-active { opacity: 1; transform: scale(1); background: var(--color-white); }
+.trace-stage-label { margin: 0; }
+.trace-stage svg rect, .trace-stage svg circle, .trace-stage svg line { transition: fill 220ms var(--ease-out), stroke 220ms var(--ease-out); }
+@media (prefers-reduced-motion: reduce) { .trace-stage { transition: none; } }
 
 /* P5 training-curve explorer: pinned-run chips (click = unpin) + unpinned browse list
    (click = pin) — same .btn.ghost, distinguished only by aria-pressed like every other seg. */

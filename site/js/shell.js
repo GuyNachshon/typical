@@ -349,7 +349,9 @@ async function mountHero(presets) {
   const qEl = document.createElement('p'); qEl.className = 't-ui'; qEl.style.marginBottom = '18px';
   const barsEl = document.createElement('div');
   const meta = document.createElement('p'); meta.className = 't-mono muted'; meta.style.marginTop = '18px';
-  read.append(qLab, qEl, barsEl, meta);
+  const gate = document.createElement('p'); gate.className = 't-mono muted';
+  gate.textContent = 'candidate bars sum to one · the dashed ∅ row is a separate gate (p that none apply), not part of that sum';
+  read.append(qLab, qEl, barsEl, meta, gate);
   const b = bars(barsEl, rowsFromResult(pool[0].r));
   const trunc = (t, n) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
   const show = (e, source) => {
