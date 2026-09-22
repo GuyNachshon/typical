@@ -10,6 +10,7 @@ typical-small-preview) trains with nc_head n2/n2n3.
 """
 import bisect
 import copy
+import functools
 import string
 
 import torch
@@ -263,20 +264,73 @@ def _pool_matrix(spans, offsets, base, Kmax, T, K=None):
     return pool / pool.sum(-1, keepdim=True).clamp_min(1.0)
 
 
-def _cache_batch_repeat_interleave(cache, repeats: int):
-    """cache.batch_repeat_interleave(repeats), generalised to Qwen3.5's hybrid cache -- see
-    native.py's copy for the long form (its Gated-DeltaNet linear-attention layers have no
-    batch_repeat_interleave of their own; Qwen3's cache is unaffected, every layer hits the
-    first branch)."""
+def _expand_state_cache(cache, repeats: int):
+    """Replaces the old `copy.deepcopy(state_cache)` + `_cache_batch_repeat_interleave`: a
+    new Cache whose K/V tensors are `repeats`-wide views of `cache`'s (batch=1) K/V via
+    `torch.Tensor.expand` -- stride-0 broadcast, zero bytes copied -- instead of a full deep
+    copy of the (up to 1024-token) prefix followed by a real repeat_interleave copy on top.
+    Safe because every attention layer's `.update()` (transformers' DynamicLayer et al.)
+    does `self.keys = torch.cat([self.keys, key_states], dim=-2)`: a rebind to a brand-new
+    tensor, never an in-place write to the old one, so the expanded view of the original
+    prefix is read (by torch.cat, which handles stride-0 inputs like any other tensor -- no
+    approximation, bit-identical to a materialised repeat) but never mutated. Only the outer
+    Cache object and each layer object are shallow-copied (cheap: Python attribute dicts,
+    not tensor storage).
+    ponytail: Gated-DeltaNet (Qwen3.5 hybrid cache) linear-attention layers have no K/V
+    tensors, only small conv_states/recurrent_states dicts (O(1) in sequence length) that
+    genuinely get mutated by the recurrent update -- those still get a real
+    repeat_interleave, just onto a copied dict so the write can't alias back into the
+    original state_cache. Only plain K/V (DynamicLayer-family) and this dict-state shape are
+    handled -- a future model with e.g. DynamicIndexedLayer's extra indexer_keys would need
+    its own expand branch here."""
+    new = copy.copy(cache)
+    new.layers = []
     for layer in cache.layers:
-        if hasattr(layer, "batch_repeat_interleave"):
-            layer.batch_repeat_interleave(repeats)
-            continue
-        for i in range(getattr(layer, "number_of_states", 1)):
-            if layer.is_conv_states_initialized[i]:
-                layer.conv_states[i] = layer.conv_states[i].repeat_interleave(repeats, dim=0)
-            if layer.is_recurrent_states_initialized[i]:
-                layer.recurrent_states[i] = layer.recurrent_states[i].repeat_interleave(repeats, dim=0)
+        nl = copy.copy(layer)
+        if hasattr(nl, "batch_repeat_interleave"):
+            if nl.keys is not None and nl.keys.numel() > 0:
+                nl.keys = nl.keys.expand(repeats, *nl.keys.shape[1:])
+                nl.values = nl.values.expand(repeats, *nl.values.shape[1:])
+        else:
+            nl.conv_states = dict(layer.conv_states)
+            nl.recurrent_states = dict(layer.recurrent_states)
+            for i in range(getattr(nl, "number_of_states", 1)):
+                if nl.is_conv_states_initialized[i]:
+                    nl.conv_states[i] = nl.conv_states[i].repeat_interleave(repeats, dim=0)
+                if nl.is_recurrent_states_initialized[i]:
+                    nl.recurrent_states[i] = nl.recurrent_states[i].repeat_interleave(repeats, dim=0)
+        new.layers.append(nl)
+    return new
+
+
+@functools.lru_cache(maxsize=64)
+def _causal_template(q_len: int, kv_len: int, device_str: str):
+    """[q_len, kv_len] boolean causal template (True = attend), cached per (q_len, kv_len,
+    device) -- a pure function of shape, so a repeat call at the same (prefix_len,
+    suffix_len) bucket reuses it instead of rebuilding the two arange()s + comparison."""
+    device = torch.device(device_str)
+    past_len = kv_len - q_len
+    q_idx = torch.arange(q_len, device=device).unsqueeze(1)
+    kv_idx = torch.arange(kv_len, device=device).unsqueeze(0)
+    return kv_idx <= (past_len + q_idx)
+
+
+@functools.lru_cache(maxsize=64)
+def _position_ids_row(T: int, Ls: int, device_str: str):
+    """[T] position ids (Ls, Ls+1, ..., Ls+T-1), cached per (T, Ls, device)."""
+    return torch.arange(T, device=torch.device(device_str)) + Ls
+
+
+@functools.lru_cache(maxsize=64)
+def _sink_ones(m: int, Ls: int, device_str: str):
+    """[m, Ls] all-ones long tensor (the cached prefix is always fully attended), cached per
+    (m, Ls, device) -- avoids a fresh CPU allocation on every decision."""
+    return torch.ones(m, Ls, dtype=torch.long, device=torch.device(device_str))
+
+
+@functools.lru_cache(maxsize=64)
+def _arange(n: int, device_str: str):
+    return torch.arange(n, device=torch.device(device_str))
 
 
 def _causal_pad_mask(attn2d, q_len, dtype):
@@ -284,10 +338,7 @@ def _causal_pad_mask(attn2d, q_len, dtype):
     past_key_values path mis-handles a right-padded batch sharing one KV cache; this
     reproduces the un-batched per-row computation exactly."""
     batch, kv_len = attn2d.shape
-    past_len = kv_len - q_len
-    q_idx = torch.arange(q_len, device=attn2d.device).unsqueeze(1)
-    kv_idx = torch.arange(kv_len, device=attn2d.device).unsqueeze(0)
-    causal = kv_idx <= (past_len + q_idx)
+    causal = _causal_template(q_len, kv_len, str(attn2d.device))
     allowed = causal.unsqueeze(0) & attn2d.bool().unsqueeze(1)
     mask = torch.zeros(batch, 1, q_len, kv_len, dtype=dtype, device=attn2d.device)
     return mask.masked_fill(~allowed.unsqueeze(1), torch.finfo(dtype).min)
@@ -317,10 +368,11 @@ def encode_state(head, model, state: str, max_state: int = 256):
     see native_kv_decide's `state_cache` param. Pure function of (backbone weights, state
     text): deterministic in eval/inference_mode, so a cached entry is bit-identical to a
     fresh encode, not just numerically close. @inference_mode here (not just relying on the
-    caller) because the resulting KV tensors get copy.deepcopy'd later (native_kv_decide's
-    per-chunk batch_repeat_interleave) -- a non-leaf, grad-tracked tensor can't be
-    deepcopy'd, so this must never run under regular autograd tracking, regardless of what
-    context the caller happens to be in."""
+    caller) because the resulting KV tensors get `.expand()`'d and read (never in-place
+    mutated) by every subsequent decision on this state (see `_expand_state_cache`) -- an
+    inference_mode tensor is a stable, non-grad-tracked view source, so this must never run
+    under regular autograd tracking, regardless of what context the caller happens to be
+    in."""
     tok, dev, lm = head.backbone.tokenizer, head.device, head.backbone.model
     with record_function("typical/tokenize_state"):
         prefix = torch.tensor([[tok.eos_token_id] + _ids(tok, [state], max_state)[0]], device=dev)
@@ -377,16 +429,15 @@ def native_kv_decide(head, model, state, queries, chunk: int = 32, max_state: in
             for i, (_, c) in enumerate(qs):
                 cmask[i, :len(c)] = True
 
-        with record_function("typical/state_cache_deepcopy"):
-            cache = copy.deepcopy(state_cache)
-            _cache_batch_repeat_interleave(cache, m)
+        with record_function("typical/state_cache_expand"):
+            cache = _expand_state_cache(state_cache, m)
         with record_function("typical/suffix_forward"):
-            attn = torch.cat([torch.ones(m, Ls, dtype=torch.long), am], dim=1).to(dev)
-            position_ids = (torch.arange(T) + Ls).expand(m, -1).to(dev)
+            attn = torch.cat([_sink_ones(m, Ls, "cpu"), am], dim=1).to(dev)
+            position_ids = _position_ids_row(T, Ls, str(dev)).expand(m, -1)
             H = lm(input_ids=input_ids.to(dev), attention_mask=_causal_pad_mask(attn, T, lm.dtype),
                    position_ids=position_ids, past_key_values=cache, use_cache=False).last_hidden_state.float()
         with record_function("typical/head_forward"):
-            h = H[torch.arange(m, device=dev), (lengths - 1).to(dev)]
+            h = H[_arange(m, str(dev)), (lengths - 1).to(dev)]
             C3 = torch.bmm(pool.to(dev), H)
             C2 = None  # n2 unsupported -- guarded above
             yi = _yes_idx([c for _, c in qs], dev) if model.noul_head == "bern" else None

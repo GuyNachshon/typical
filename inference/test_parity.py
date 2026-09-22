@@ -41,6 +41,49 @@ NOUL_ITEMS = [
 ]
 
 
+def test_expand_state_cache_matches_deepcopy_and_does_not_alias():
+    """Phase A (serving speedup): `_expand_state_cache` replaces `copy.deepcopy(state_cache)`
+    + `batch_repeat_interleave` with a zero-copy `.expand()`. No checkpoint needed -- this
+    exercises the cache mechanics directly against transformers' real DynamicCache/DynamicLayer
+    with random tensors, checking (a) bit-identical results to the old deepcopy+repeat
+    reference and (b) that expanding+updating the new cache never mutates the original."""
+    import torch
+    from transformers.cache_utils import DynamicCache
+
+    from typical.native import _expand_state_cache
+
+    torch.manual_seed(0)
+    B, H, Ls, D, m = 1, 4, 7, 8, 5
+    k0, v0 = torch.randn(B, H, Ls, D), torch.randn(B, H, Ls, D)
+    k1, v1 = torch.randn(B, H, Ls, D), torch.randn(B, H, Ls, D)
+    cache = DynamicCache(ddp_cache_data=[(k0, v0), (k1, v1)])
+    orig_keys = [layer.keys.clone() for layer in cache.layers]
+    orig_values = [layer.values.clone() for layer in cache.layers]
+
+    # ground truth: the old path (deepcopy, then the real repeat_interleave every layer used
+    # to get regardless of whether it holds K/V or Gated-DeltaNet conv/recurrent state)
+    import copy
+    ref = copy.deepcopy(cache)
+    ref.batch_repeat_interleave(m)
+
+    new = _expand_state_cache(cache, m)
+
+    q_len = 3
+    torch.manual_seed(1)
+    new_k = [torch.randn(m, H, q_len, D), torch.randn(m, H, q_len, D)]
+    new_v = [torch.randn(m, H, q_len, D), torch.randn(m, H, q_len, D)]
+    for i in range(2):
+        k_ref, v_ref = ref.update(new_k[i], new_v[i], i)
+        k_new, v_new = new.update(new_k[i], new_v[i], i)
+        assert torch.equal(k_ref, k_new) and torch.equal(v_ref, v_new), f"layer {i} mismatch"
+
+    # the original (batch=1) cache must be untouched by both the expand and the update above
+    for i, layer in enumerate(cache.layers):
+        assert torch.equal(layer.keys, orig_keys[i]) and torch.equal(layer.values, orig_values[i]), \
+            f"layer {i} of the original state_cache was mutated"
+    print("[expand_state_cache] matches deepcopy+repeat_interleave reference, no aliasing")
+
+
 @pytest.mark.skipif(not os.environ.get("RUN_SLOW"), reason="downloads the real typical-small "
                      "checkpoint (Qwen3-1.7B-Base + LoRA); set RUN_SLOW=1 to run")
 def test_typical_matches_pcdm_decider():
@@ -218,6 +261,7 @@ def test_max_option_tokens_is_noop_when_nothing_truncated():
 
 
 if __name__ == "__main__":
+    test_expand_state_cache_matches_deepcopy_and_does_not_alias()
     if not os.environ.get("RUN_SLOW"):
         os.environ["RUN_SLOW"] = "1"
     test_typical_matches_pcdm_decider()
