@@ -191,15 +191,23 @@ export async function mount(el, { decide, mode, ctx } = {}) {
     const state = currState;
     const now = performance.now();
 
-    // Layout: a 1-cell box-drawn frame around the w×h play field, plus one more cell of
-    // height below it for the terminal status line - all three read as one boxed screen.
+    // Layout: a 1-cell box-drawn frame around the w×h play field - the whole box, border
+    // included, sits clear of the HUD (top-right) and decision/controls (bottom) chrome that
+    // loop.js overlays on top, since those dock to the edges and this block is centered.
     const outerCols = state.w + 2;
     const outerRows = state.h + 2;
-    const cell = Math.min(w / outerCols, h / (outerRows + 1));
+    // .media-label (top-left, left/top:18px) and .gc-hud (top-right, top:18px or 46px under
+    // 48rem) are fixed-px DOM chrome outside our control - reserve real px clearance so the
+    // frame's own top border (and the status line embedded in it) never sits under that text,
+    // the way it did with a flat margin on wide/short panels where height was the binding
+    // constraint.
+    const topClear = 90;
+    const sideMargin = 10;
+    const cell = Math.min((w - sideMargin * 2) / outerCols, (h - topClear - sideMargin) / outerRows);
     const boardW = cell * outerCols;
     const boardH = cell * outerRows;
     const ox = (w - boardW) / 2;
-    const oy = (h - (boardH + cell)) / 2;
+    const oy = topClear + Math.max(0, h - topClear - sideMargin - boardH) / 2;
     const gx = ox + cell; // interior (play field) origin, inside the frame
     const gy = oy + cell;
 
@@ -208,12 +216,12 @@ export async function mount(el, { decide, mode, ctx } = {}) {
       const family = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
       font = `${Math.round(cell * 0.82)}px ${family}`;
       haloFont = `${Math.round(cell * 1.18)}px ${family}`;
-      statusFont = `${Math.round(cell * 0.5)}px ${family}`;
+      statusFont = `${Math.round(cell * 0.46)}px ${family}`;
     }
 
     // CRT glass - same near-black TOKENS.putty the other game cards sit on.
     dctx.fillStyle = TOKENS.putty;
-    dctx.fillRect(ox, oy, boardW, boardH + cell);
+    dctx.fillRect(ox, oy, boardW, boardH);
 
     dctx.textAlign = 'center';
     dctx.textBaseline = 'middle';
@@ -234,6 +242,29 @@ export async function mount(el, { decide, mode, ctx } = {}) {
       dctx.fillText(BORDER.v, ox + 0.5 * cell, cy);
       dctx.fillText(BORDER.v, ox + (outerCols - 0.5) * cell, cy);
     }
+
+    // terminal status line, set into the top border like a boxed terminal window's title bar -
+    // this is the one spot on the canvas neither the HUD (top-right) nor the decision/controls
+    // (bottom) chrome ever covers. Falls back to a shorter form, then drops entirely, on
+    // boards too narrow to fit it rather than spilling past the frame.
+    const pad = (n, digits) => String(n).padStart(digits, '0');
+    dctx.font = statusFont;
+    dctx.textAlign = 'left';
+    const titleAvail = boardW - 3 * cell;
+    let title = `SCORE ${pad(state.score, 3)}  LEN ${pad(state.body.length, 2)}  TICK ${pad(state.steps, 4)}`;
+    if (dctx.measureText(title).width > titleAvail) title = `S${pad(state.score, 3)} L${pad(state.body.length, 2)} T${pad(state.steps, 4)}`;
+    if (dctx.measureText(title).width > titleAvail) title = '';
+    if (title) {
+      const titleX = ox + 1.5 * cell;
+      const titleW = dctx.measureText(title).width;
+      dctx.fillStyle = TOKENS.putty; // cut the title out of the border dashes, like a real boxed title bar
+      dctx.fillRect(titleX - cell * 0.25, oy + cell * 0.12, titleW + cell * 0.5, cell * 0.76);
+      dctx.fillStyle = phos(0.75);
+      dctx.textBaseline = 'middle';
+      dctx.fillText(title, titleX, oy + 0.5 * cell);
+    }
+    dctx.textAlign = 'center';
+    dctx.font = font;
 
     // commit the tick→tick diff once per tick (not per frame) so a cell that just went dark
     // starts fading here rather than being recomputed every rAF
@@ -281,24 +312,11 @@ export async function mount(el, { decide, mode, ctx } = {}) {
       const dt = Math.min(1, (now - deathFlashAt) / 300);
       dctx.fillStyle = TOKENS.paper;
       dctx.globalAlpha = dt < 0.5 ? dt * 2 : (1 - dt) * 2;
-      dctx.fillRect(ox, oy, boardW, boardH + cell);
+      dctx.fillRect(ox, oy, boardW, boardH);
       dctx.globalAlpha = 1;
     }
 
-    // terminal status line - the same phosphor, inside the frame's own boxed screen
-    dctx.textAlign = 'left';
-    dctx.textBaseline = 'middle';
-    dctx.font = statusFont;
-    dctx.fillStyle = phos(0.75);
-    const pad = (n, digits) => String(n).padStart(digits, '0');
-    const cursor = reducedMotion || Math.floor(now / 500) % 2 === 0 ? '█' : ' ';
-    dctx.fillText(
-      `SCORE ${pad(state.score, 3)}  LEN ${pad(state.body.length, 2)}  TICK ${pad(state.steps, 4)} ${cursor}`,
-      ox + cell * 0.3,
-      oy + boardH + cell / 2
-    );
-
-    drawScanlines(dctx, ox, oy, boardW, boardH + cell);
+    drawScanlines(dctx, ox, oy, boardW, boardH);
     dctx.restore();
   }
 

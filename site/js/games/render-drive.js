@@ -245,20 +245,31 @@ function buildLight(pos) {
 }
 
 // Injected once (scoped to .gc-drive, this module's own root class - never leaks into the
-// snake/doom cards which share loop.js's .gc-root) for the one thing no existing class covers:
-// a crosshair cursor over the clickable road.
+// snake/doom cards which share loop.js's .gc-root). Two things no existing exhibits.css class
+// covers: a crosshair cursor over the clickable road, and a home for the hazard-chip row - it
+// docks above loop.js's Model/Restart row (same right edge, same small-button language) rather
+// than joining .gc-controls's own no-wrap flex line, and wraps + shrinks on narrow panels so it
+// never pushes past the panel edge (the "canvas must not overflow" constraint applies to this
+// overlay too, even though it isn't the canvas itself).
 function injectStyle() {
   if (document.getElementById('gc-drive-style')) return;
   const style = document.createElement('style');
   style.id = 'gc-drive-style';
-  style.textContent = '.gc-drive canvas { cursor: crosshair; touch-action: manipulation; }';
+  style.textContent = `
+    .gc-drive canvas { cursor: crosshair; touch-action: manipulation; }
+    .gc-drive .gc-hazards {
+      position: absolute; right: 18px; bottom: 54px; z-index: 4;
+      display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px;
+      max-width: min(220px, calc(100% - 36px));
+    }
+  `;
   document.head.appendChild(style);
 }
 
 const HAZARDS = [
-  { key: 'cone', label: 'Cone' },
-  { key: 'pedestrian', label: 'Pedestrian' },
-  { key: 'car', label: 'Stalled car' },
+  { key: 'cone', label: 'Cone', name: 'cone' },
+  { key: 'pedestrian', label: 'Ped', name: 'pedestrian' },
+  { key: 'car', label: 'Car', name: 'stopped car' },
 ];
 
 export async function mount(el, { decide, mode } = {}) {
@@ -483,12 +494,13 @@ export async function mount(el, { decide, mode } = {}) {
   hazardHint.className = 'gc-sentence';
   refs.sentence.parentElement.appendChild(hazardHint);
   function updateHazardHint() {
-    const label = HAZARDS.find((h) => h.key === hazardKind).label.toLowerCase();
-    hazardHint.textContent = `Click the road to place a ${label}.`;
+    const name = HAZARDS.find((h) => h.key === hazardKind).name;
+    hazardHint.textContent = `Click the road to place a ${name}.`;
   }
   updateHazardHint();
 
-  const hazardControls = el.querySelector('.gc-controls');
+  const hazardRow = document.createElement('div');
+  hazardRow.className = 'gc-hazards';
   const hazardBtns = HAZARDS.map(({ key, label }) => {
     const b = document.createElement('button');
     b.className = 'btn outline gc-btn';
@@ -499,10 +511,11 @@ export async function mount(el, { decide, mode } = {}) {
       hazardBtns.forEach((btn, i) => btn.classList.toggle('gc-on', HAZARDS[i].key === hazardKind));
       updateHazardHint();
     });
-    hazardControls?.insertBefore(b, hazardControls.firstChild);
+    hazardRow.appendChild(b);
     return b;
   });
-  hazardBtns[0]?.classList.add('gc-on');
+  hazardBtns[0].classList.add('gc-on');
+  el.appendChild(hazardRow);
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();

@@ -399,9 +399,23 @@ function pushDecision(res, state, queries) {
   heroLive = { state: String(state), q: queries[0], r: res.results[0], ms: res.ms, device: res.device, model: res.model };
 }
 
+// The hero film is shown as a character field, not a picture (js/ascii.js). Mounting is
+// best-effort: no iframe, no canvas or an unreadable buffer and the film just plays as itself.
+function mountFilmAscii(film) {
+  const stage = film?.closest('.stage');
+  if (!film || !stage) return;
+  import('./ascii.js').then(({ mountAscii }) => {
+    mountAscii(stage, () => {
+      const c = film.contentDocument?.getElementById('canvas');
+      return c && c.width ? c : null;
+    }, { cols: 112, after: film });
+  }).catch(() => {});
+}
+
 // ---- the film: real DOOM in the hero, driven by the model (live) or the rule list (recorded) ----
 function mountFilm(ctx) {
   const film = document.getElementById('film');
+  mountFilmAscii(film);
   const rowsEl = document.getElementById('hud-rows'), sentEl = document.getElementById('hud-sentence'), rec = document.getElementById('hud-rec');
   if (!film || !rowsEl) return;
   const labels = ['retreat', 'shoot', 'turn left', 'turn right', 'explore'];

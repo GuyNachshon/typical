@@ -15,7 +15,20 @@
 </style>
 </head>
 <body>
-<script>if (location.search.includes('film')) document.body.classList.add('film');</script>
+<script>if (location.search.includes('film')) document.body.classList.add('film');
+// The page draws an ASCII layer over this canvas (js/ascii.js) by sampling it with drawImage.
+// SDL asks for a WebGL context without preserveDrawingBuffer, so the buffer is empty by the time
+// anyone outside the draw call reads it. Force the flag on before the wasm boots; at 640x400 the
+// cost is not measurable next to the software renderer itself.
+(function () {
+  const get = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (type, attrs) {
+    if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+      attrs = Object.assign({}, attrs, { preserveDrawingBuffer: true });
+    }
+    return get.call(this, type, attrs);
+  };
+})();</script>
 <canvas id="canvas" width="640" height="400" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
 <pre id="state">booting…</pre>
 <script>
