@@ -1,0 +1,163 @@
+"""Pull every word the site shows into one markdown file, for review away from the design.
+
+    uv run --with markdown python scripts/extract_content.py   ->  CONTENT.md
+
+index.html is parsed straight out of the HTML so what lands here is what a visitor reads, not
+what a draft said. research.html is generated from site/research.md, so that file is quoted at
+source. Anything the page builds at runtime (the results table, chart captions, demo panels) is
+not in the HTML and is listed at the end from the JSON it is built from, with a note saying so.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from html.parser import HTMLParser
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SITE = ROOT / "site"
+OUT = ROOT / "CONTENT.md"
+
+SKIP_TAGS = {"script", "style", "iframe", "canvas", "svg", "noscript"}
+# tag -> how it should read in the extract
+BLOCK = {
+    "h1": "# ",
+    "h2": "## ",
+    "h3": "### ",
+    "h4": "#### ",
+    "p": "",
+    "li": "- ",
+    "figcaption": "*",
+    "blockquote": "> ",
+    "summary": "**",
+    "button": "`[button] ",
+    "a": "",
+}
+
+
+class Extract(HTMLParser):
+    """Collects block-level text in document order, tagged with the class it carried."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.out: list[tuple[str, str, str]] = []  # (tag, class, text)
+        self.stack: list[tuple[str, str]] = []
+        self.buf: list[str] = []
+        self.skip = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in SKIP_TAGS:
+            self.skip += 1
+            return
+        if self.skip:
+            return
+        cls = dict(attrs).get("class", "")
+        if tag in BLOCK:
+            self.flush()
+            self.stack.append((tag, cls))
+        elif tag == "br":
+            self.buf.append(" ")
+
+    def handle_endtag(self, tag):
+        if tag in SKIP_TAGS:
+            self.skip = max(0, self.skip - 1)
+            return
+        if self.skip:
+            return
+        if tag in BLOCK and self.stack:
+            self.flush()
+            self.stack.pop()
+
+    def handle_data(self, data):
+        if self.skip or not self.stack:
+            return
+        self.buf.append(data)
+
+    def flush(self):
+        text = re.sub(r"\s+", " ", "".join(self.buf)).strip()
+        self.buf = []
+        if not text or not self.stack:
+            return
+        tag, cls = self.stack[-1]
+        # nested inline anchors inside a paragraph are already part of its text
+        if tag == "a" and len(self.stack) > 1:
+            return
+        self.out.append((tag, cls, text))
+
+
+def clean(text: str) -> str:
+    """Undo the typographic glue so the extract is plain text again."""
+    return text.replace(" ", " ").replace("‑", "-").replace("⁠", "")
+
+
+def render(blocks: list[tuple[str, str, str]]) -> str:
+    lines: list[str] = []
+    seen: set[str] = set()
+    for tag, cls, text in blocks:
+        text = clean(text)
+        key = f"{tag}:{text}"
+        if key in seen:  # the nav repeats on both pages; print it once
+            continue
+        seen.add(key)
+        if "t-eyebrow" in cls and tag == "p":
+            lines.append(f"\n**{text}**")
+        elif tag in ("h1", "h2", "h3", "h4"):
+            lines.append(f"\n{BLOCK[tag]}{text}")
+        elif tag == "figcaption":
+            lines.append(f"*{text}*")
+        elif tag == "blockquote":
+            lines.append(f"> {text}")
+        elif tag == "li":
+            lines.append(f"- {text}")
+        elif tag == "button":
+            lines.append(f"`[button] {text}`")
+        elif tag == "a":
+            lines.append(f"`[link] {text}`")
+        else:
+            note = " _(fine print)_" if "note" in cls or "figure-src" in cls else ""
+            lines.append(f"{text}{note}")
+    return "\n".join(lines)
+
+
+def runtime_copy() -> str:
+    """Text the page assembles from JSON at load time, which is not in the HTML."""
+    out = ["\n## Built at runtime (not in the HTML)\n"]
+    models = json.loads((SITE / "data/models.json").read_text())  # a list of model records
+    released = [m for m in models if m.get("released")]
+    out.append("**Results table** — one row per released model:\n")
+    for m in released:
+        out.append(
+            f"- {m['id']}: JevBench std {m['jevbench']['std']['acc']:.3f}, hard {m['jevbench']['hard']['acc']:.3f}, "
+            f"CLINC-150 {m['topic_intent']['clinc']:.3f}, {m['latency']['single_ms']['k2']} ms at K=2"
+        )
+    frozen = json.loads((SITE / "data/frozen.json").read_text())
+    out.append(f"\n**In training box** — {clean(frozen['in_flight'])}")
+    return "\n".join(out)
+
+
+def main() -> None:
+    parser = Extract()
+    parser.feed((SITE / "index.html").read_text())
+    body = render(parser.out)
+
+    research = (SITE / "research.md").read_text()
+
+    OUT.write_text(
+        "# Typical — site content\n\n"
+        "Every word the site shows, pulled out of the built pages so it can be read without the\n"
+        "design around it. Generated by `scripts/extract_content.py`; edit the site, not this file.\n\n"
+        "---\n\n# Home (index.html)\n"
+        f"{body}\n\n"
+        f"{runtime_copy()}\n\n"
+        "---\n\n# Research (research.html)\n\n"
+        "_Generated from `site/research.md` by `scripts/build_research.py`; quoted here at source,\n"
+        "so the chart fences show where a figure sits._\n\n"
+        f"{research}\n"
+    )
+    words = len(OUT.read_text().split())
+    print(f"wrote {OUT.relative_to(ROOT)} ({words:,} words)")
+
+
+if __name__ == "__main__":
+    main()

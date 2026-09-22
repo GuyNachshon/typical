@@ -63,8 +63,8 @@
   <div class="chapter-head">
     <p class="t-eyebrow">02 — Results</p>
     <div>
-      <h2 class="t-section">Two sizes, one recipe, and a frozen backbone beside every number.</h2>
-      <p class="lede">Trained and frozen backbones on the same 231 public JevBench items. Training helps the standard tier at 1.7B (+17 points) far more than at 4B (+3); on the hard tier the frozen 4B is ahead. The hard tier is at chance and over-confident for both models.</p>
+      <h2 class="t-section">80.4% right on 150 intents. 45 ms a decision. Both with a control beside them.</h2>
+      <p class="lede">Every number below sits next to the same model before we trained it, so you can see what the training bought and what it cost. On the hard tier it bought nothing: both sizes sit at chance there, and say so too confidently.</p>
       <p class="note mt-18">Those JevBench figures come from a public-subset run (72 standard / 48 easy / 111 hard ids), not a ranked leaderboard entry; chance is 31.1% standard, and both models&rsquo; hard tier sits within one standard error of it. The full disclosure is under the table.</p>
     </div>
   </div>
@@ -99,8 +99,9 @@
   <div class="chapter-head">
     <p class="t-eyebrow">03 — How it works</p>
     <div>
-      <h2 class="t-section">Three question types, one head, one cached state.</h2>
-      <p class="lede">A frozen Qwen3 trunk cut at about 71% depth, LoRA on the top eight layers, and a small contextual readout with a separate abstain head. The state is read once; every question is a short suffix over that cache. Nothing is generated.</p>
+      <h2 class="t-section">Three kinds of question. One read of the text.</h2>
+      <p class="lede">Pick one of your options, answer yes or no, or place something on a scale you define. Ask all three about the same ticket and the ticket is read once: the first question pays for the text, the rest are a few milliseconds each.</p>
+      <p class="note mt-18">Under it: a Qwen3 trunk cut at about 71% depth, LoRA on the top eight layers, a small contextual readout, and a separate head for the abstain. Nothing is generated at any point.</p>
     </div>
   </div>
   <div class="ucard-grid">
@@ -121,8 +122,8 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
   <div class="chapter-head">
     <p class="t-eyebrow">04 — Demos</p>
     <div>
-      <h2 class="t-section">Real games, real transcripts, one forward pass per decision.</h2>
-      <p class="lede">Every demo runs the public <code>inference/typical</code> package, the same code behind the numbers above. With a local model server the demos are live and print their own measured latency and device; otherwise they replay recorded decisions. <span class="tag" data-mode-pill></span></p>
+      <h2 class="t-section">Watch it decide.</h2>
+      <p class="lede">Games make the decisions visible: every tick, the state is a sentence, the options are the legal moves, and you can read the probabilities as they land. The same package runs here as behind the numbers above. <span class="tag" data-mode-pill></span></p>
     </div>
   </div>
   <div class="media dark" style="margin-bottom:18px">
