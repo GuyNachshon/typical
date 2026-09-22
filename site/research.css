@@ -107,8 +107,10 @@
   .explorable-row { flex-direction: column; align-items: stretch; }
   .seg { width: 100%; }
   .seg .btn { flex: 1; text-align: center; justify-content: center; }
-  .scrub-ticks { flex-direction: column; gap: 2px; }
-  .scrub-tick { text-align: left; }
+  /* six stage names stacked as a list read as a menu, not a rail: show only where the scrub is */
+  .scrub-ticks { gap: 0; }
+  .scrub-tick { display: none; }
+  .scrub-tick.is-on { display: block; text-align: left; font-weight: 700; color: var(--color-off); }
 }
 
 /* findings cards: .ucard's space-between + equal grid heights left 120px holes between a short

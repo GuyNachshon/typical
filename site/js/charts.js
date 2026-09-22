@@ -81,18 +81,18 @@ function scheduleRedraw() {
 
 // Every chart calls this once it has drawn, so a later container resize (sidebar collapse,
 // viewport change, tab reveal) redraws it at the new width.
-function registerChart(container, redraw) {
+export function registerChart(container, redraw) {
   chartRedraws.set(container, redraw);
   lastWidths.set(container, container.clientWidth);
   if (!sharedRO) sharedRO = new ResizeObserver(scheduleRedraw);
   sharedRO.observe(container);
 }
 
-// The container's real rendered width, capped at the chart's design width and floored so
-// margins/labels still fit at extreme narrow widths.
-function fitWidth(el, designW, floor = 240) {
-  const cw = el.clientWidth || designW;
-  return Math.max(floor, Math.min(designW, cw));
+// The container's real rendered width, capped at the chart's design width. No floor: a floor
+// bigger than the real container would force the viewBox wider than the box CSS renders it at,
+// which is exactly the bug this fixes (the box gets scaled down to fit, taking the text with it).
+export function fitWidth(el, designW) {
+  return Math.min(designW, el.clientWidth || designW);
 }
 
 function baseSvg(container, w, h, titleStr) {
@@ -291,7 +291,7 @@ export function lineChart(container, opts) {
 // reliability(el, {bins:[{lo,hi,n,mean_confidence,accuracy}], ece})
 export function reliability(container, opts) {
   const { bins, ece, title = 'Reliability' } = opts;
-  const w = fitWidth(container, 400, 200);
+  const w = fitWidth(container, 400);
   const h = w; // square: axes are both 0..1
   const mm = { t: 20, r: 20, b: 50, l: 50 };
   const iw = w - mm.l - mm.r;
@@ -446,7 +446,7 @@ export function hbarFloor(container, opts) {
   const maxLabel = Math.max(...rows.map((r) => r.label.length), 10);
   const mm = { t: 10, r: 20, b: 40, l: Math.min(320, Math.max(150, maxLabel * 6.3 + 20)) };
   const barsDesign = 460;
-  const w = fitWidth(container, barsDesign + mm.l + mm.r, mm.l + mm.r + 160);
+  const w = fitWidth(container, barsDesign + mm.l + mm.r);
   const iw = w - mm.l - mm.r;
   const svg = baseSvg(container, w, h, title);
   const g = svgEl('g', { transform: `translate(${mm.l},${mm.t})` });
@@ -500,7 +500,7 @@ export function hbarFloor(container, opts) {
 // and verdicts render as ticks with hover titles above/below the line.
 export function timeline(container, opts) {
   const { lineage, bugs = [], verdicts = [], title = 'Decision-log timeline' } = opts;
-  const w = fitWidth(container, 1040, 320);
+  const w = fitWidth(container, 1040);
   const h = 460;
   const mm = { t: 34, r: 90, b: 130, l: 50 };
   const iw = w - mm.l - mm.r;
@@ -534,17 +534,49 @@ export function timeline(container, opts) {
   // but sometimes close y; rather than fight label collisions inline, each
   // dot gets a small index number and the full label lives in the legend
   // list below the chart (also satisfies "a legend is always present").
-  const pts = lineage.map((p) => `${x(toDay(p.date))},${y(p.std)}`).join(' ');
-  g.appendChild(svgEl('polyline', { points: pts, fill: 'none', stroke: INK, 'stroke-width': 2 }));
+  //
+  // An unreleased point (the 14B scaling-ladder probe) doesn't get to look like a release the
+  // lineage climbed to: its incoming segment and marker reuse ladder()'s own "hollow dashed
+  // outline" convention for an unreleased model (STYLE_UNRELEASED, see chart-g1) instead of a
+  // second ad hoc style, and it gets a direct mono label rather than just a number.
+  const isUnreleased = (label) => /unreleased|not released/i.test(label);
+  const unreleasedLabel = (label) => label.replace(/\s*\(unreleased\)\s*$/i, ' · not released');
+
+  for (let i = 1; i < lineage.length; i++) {
+    const p0 = lineage[i - 1];
+    const p1 = lineage[i];
+    const attrs = {
+      x1: x(toDay(p0.date)), y1: y(p0.std),
+      x2: x(toDay(p1.date)), y2: y(p1.std),
+      stroke: INK, 'stroke-width': 2,
+    };
+    if (isUnreleased(p1.label)) attrs['stroke-dasharray'] = STYLE_UNRELEASED.dash;
+    g.appendChild(svgEl('line', attrs));
+  }
   lineage.forEach((p, i) => {
     const cx = x(toDay(p.date));
     const cy = y(p.std);
-    const dot = svgEl('circle', { cx, cy, r: 8, fill: INK, stroke: WHITE, 'stroke-width': 2 });
+    const unreleased = isUnreleased(p.label);
+    const dot = unreleased
+      ? markerEl('circle', cx, cy, 8, INK, true)
+      : svgEl('circle', { cx, cy, r: 8, fill: INK, stroke: WHITE, 'stroke-width': 2 });
+    if (unreleased) dot.setAttribute('stroke-dasharray', '3,2'); // matches ladder()'s hollow-dot dash
     const ttl = svgEl('title');
     ttl.textContent = `${i + 1}. ${p.date} · ${p.label}: JevBench standard ${p.std.toFixed(3)} (${p.source})`;
     dot.appendChild(ttl);
     g.appendChild(dot);
-    g.appendChild(svgText(cx, cy + 3.5, String(i + 1), { fill: WHITE, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700 }));
+    if (unreleased) {
+      const flip = cx > iw * 0.8;
+      g.appendChild(
+        svgText(flip ? cx - 12 : cx + 12, cy + 3.5, unreleasedLabel(p.label), {
+          fill: MID,
+          'font-size': 11,
+          'text-anchor': flip ? 'end' : 'start',
+        })
+      );
+    } else {
+      g.appendChild(svgText(cx, cy + 3.5, String(i + 1), { fill: WHITE, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700 }));
+    }
   });
 
   // x-axis date ticks, one per day of the 6-day window. Below ~40px/day a "MM-DD" label no

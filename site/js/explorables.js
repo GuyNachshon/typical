@@ -2,7 +2,7 @@
 // no libraries. Reuses charts.js (scale/niceTicks/reliability) and bars.js (the candidate-bar
 // readout) where the shape matches; the scrub rail and the two run-explorer pivots are new SVG,
 // same v11 ink/mid-gray/steel vocabulary (see charts.js header comment).
-import { scale, niceTicks, reliability, fmtNum } from './charts.js';
+import { scale, niceTicks, reliability, fmtNum, fitWidth, registerChart } from './charts.js';
 import { bars } from './bars.js';
 
 const INK = '#292827';
@@ -343,6 +343,7 @@ async function mountCalibration() {
 const STAGES = ['state', 'trunk', 'cache', 'suffix', 'head', 'probs'];
 const STAGE_LABEL = { state: 'state tokens', trunk: 'trunk', cache: 'KV cache', suffix: 'suffix', head: 'head', probs: 'probabilities' };
 const BOX = 13, GAP = 3, BOXH = 16; // token-box geometry, shared by state/cache/suffix figures
+const STAGE_PAD = 40; // .trace-stage's own 20px side padding (research.css) — the figure's real room
 
 function tokenRow(g, n, x0, fill, dashed = false) {
   for (let i = 0; i < n; i++) {
@@ -363,10 +364,10 @@ function stageFigure(label) {
   return wrap;
 }
 
+// The figure is drawn to fit the column (see charts.js: scaling a fixed viewBox shrinks the text
+// with it — the head figure's 10px "factored gate" label rendered at 7px on a phone).
 function svgHost(w, h) {
-  // width 100% + height auto: a row wider than the column scales down whole instead of clipping
-  const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, style: `display:block;width:100%;max-width:${w}px;height:auto` });
-  return svg;
+  return svgEl('svg', { viewBox: `0 0 ${w} ${h}`, width: w, height: h, style: 'display:block;max-width:100%' });
 }
 
 function stateStage(d) {
@@ -429,11 +430,12 @@ function suffixStage(q, Ls) {
   return wrap;
 }
 
-function headStage(q, head, noulSwap) {
+function headStage(q, head, noulSwap, hostW = 980) {
   const wrap = stageFigure('head');
   const K = Object.keys(q.probs).length;
-  const boxW = 26, gap = 8, rowH = 22;
-  const w = Math.min(980, K * (boxW + gap) + 220);
+  const gate = 130; // the ∅ circle and its label need this much room whatever K is
+  const boxW = Math.max(12, Math.min(26, Math.floor((hostW - gate) / K) - 8)), gap = 8, rowH = 22;
+  const w = Math.min(hostW, K * (boxW + gap) + 220);
   const svg = svgHost(w, rowH * 3 + 30);
   const maxP = Math.max(...Object.values(q.probs));
   Object.values(q.probs).forEach((pval, i) => {
@@ -453,7 +455,7 @@ function headStage(q, head, noulSwap) {
   });
   svg.appendChild(svgEl('circle', { cx: gateX, cy: rowH * 2 + 18, r: 16, fill: 'none', stroke: INK, 'stroke-width': 1.6 }));
   svg.appendChild(svgText(gateX, rowH * 2 + 22, '∅', { 'text-anchor': 'middle', fill: INK, 'font-size': 13 }));
-  svg.appendChild(svgText(gateX, rowH * 2 + 44, 'factored gate', { 'text-anchor': 'middle', fill: MID, 'font-size': 10, 'font-family': 'var(--font-mono)' }));
+  svg.appendChild(svgText(gateX, rowH * 2 + 44, 'factored gate', { 'text-anchor': 'middle', fill: MID, 'font-size': 11, 'font-family': 'var(--font-mono)' }));
   wrap.appendChild(svg);
   wrap.appendChild(row(q.type === 'noul' ? head.noul_formula : head.choice_formula, 't-mono trace-text'));
   if (q.type === 'noul' && noulSwap) {
@@ -550,7 +552,7 @@ async function mountTrace() {
       trunkStage(d),
       cacheStage(d),
       suffixStage(q, d.Ls),
-      headStage(q, d.head, d.noul_swap),
+      headStage(q, d.head, d.noul_swap, (figureHost.clientWidth || 1020) - STAGE_PAD),
       probsStage(q, d.replay),
     );
     srcHost.innerHTML = '';
@@ -567,6 +569,8 @@ async function mountTrace() {
   }
 
   buildFigure();
+  registerChart(figureHost, buildFigure); // redraw at the new width, never scale the labels down
+  requestAnimationFrame(buildFigure); // the first build can run before the column has its final width
 }
 
 // ============================================================================
@@ -655,15 +659,16 @@ async function mountRunExplorer() {
   root.appendChild(body);
 
   function renderSetPivot() {
+    let releasedNote = false;
     const rows = runsWithDate.filter((r) => activeGroups.has(r.group) && r.eval[state.set]);
     body.innerHTML = '';
     body.dataset.dotCount = String(rows.filter((r) => isNum(r.eval[state.set][state.metric])).length); // Playwright hook
     if (!rows.length) { body.appendChild(p('no runs with this set in the selected groups', 'note')); return; }
-    const w = 1040, h = 380, mm = { t: 20, r: 24, b: 58, l: 50 };
+    const w = fitWidth(body, 1040), h = 380, mm = { t: 20, r: 24, b: 58, l: 50 };
     const iw = w - mm.l - mm.r, ih = h - mm.t - mm.b;
     const vals = rows.map((r) => r.eval[state.set][state.metric]).filter(isNum);
     const yMax = state.metric === 'nll' ? Math.max(...vals, 1) * 1.1 : 1;
-    const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, width: '100%', role: 'img' });
+    const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, width: w, height: h, role: 'img' });
     const container = document.createElement('div');
     container.style.background = '#fff';
     container.style.maxWidth = `${w}px`;
@@ -676,8 +681,10 @@ async function mountRunExplorer() {
       g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(t), y2: y(t), stroke: STEEL, 'stroke-dasharray': '2,3' }));
       g.appendChild(text(-8, y(t) + 3, fmtNum(t), { fill: MID, 'text-anchor': 'end' }));
     });
-    // index ticks every 10 runs, in lineage (creation) order
-    for (let i = 0; i < N; i += 10) {
+    // index ticks every 10 runs, in lineage (creation) order — every 20/40 when the column is too
+    // narrow for a label per 10 (each needs ~26px, mono 11px)
+    const tickStep = iw / (N / 10) >= 26 ? 10 : iw / (N / 20) >= 26 ? 20 : 40;
+    for (let i = 0; i < N; i += tickStep) {
       g.appendChild(svgEl('line', { x1: x(i), x2: x(i), y1: ih, y2: ih + 4, stroke: STEEL }));
       g.appendChild(text(x(i), ih + 16, String(i), { fill: MID, 'text-anchor': 'middle', 'font-size': 11 }));
     }
@@ -706,8 +713,14 @@ async function mountRunExplorer() {
       ttl.textContent = `${r.name} · ${r.date} · ${state.metric} ${val.toFixed(3)}${released ? ` · released as ${label}` : ' · (not released)'}`;
       dot.appendChild(ttl);
       g.appendChild(dot);
-      if (released) g.appendChild(text(cx, cy - 10, label, { fill: INK, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, 'font-family': 'var(--font-mono)' }));
+      // On a phone the three release names collide with each other and run off the plot; the
+      // filled dot plus the caption below carries the same information there.
+      if (released && iw > 460) {
+        const anchor = cx > iw - 70 ? 'end' : cx < 70 ? 'start' : 'middle';
+        g.appendChild(text(cx, cy - 10, label, { fill: INK, 'text-anchor': anchor, 'font-size': 11, 'font-weight': 700, 'font-family': 'var(--font-mono)' }));
+      }
     });
+    if (iw <= 460) releasedNote = true;
     (timeline?.bugs || []).forEach((b) => {
       const bx = x(indexForDate(b.date));
       g.appendChild(svgEl('line', { x1: bx, x2: bx, y1: 0, y2: ih, stroke: STEEL, 'stroke-dasharray': '1,3' }));
@@ -717,7 +730,7 @@ async function mountRunExplorer() {
     body.appendChild(container);
     const cap = p(floor ? `floor: ${floor.value.toFixed(3)} (${floor.source})` : 'no sourced floor for this set', 'note');
     body.appendChild(cap);
-    body.appendChild(p(`x = run index in lineage (creation) order, ${N} runs with a sourced date; ticks every 10, date at the first run of each day.`, 'note'));
+    body.appendChild(p(`x = run index in lineage (creation) order, ${N} runs with a sourced date; ticks every ${tickStep}, date at the first run of each day.${releasedNote ? ' Filled dots are the released checkpoints (name in the tooltip); hollow dots never shipped.' : ''}`, 'note'));
     sourceLine(body, idx.source);
   }
 
@@ -725,10 +738,10 @@ async function mountRunExplorer() {
     body.innerHTML = '';
     const run = idx.runs.find((r) => r.name === state.run);
     if (!run) return;
-    const w = 1040, h = 220, mm = { t: 20, r: 20, b: 40, l: 20 };
+    const w = fitWidth(body, 1040), h = 220, mm = { t: 20, r: 20, b: 40, l: 20 };
     const iw = w - mm.l - mm.r, ih = h - mm.t - mm.b;
     const sets = idx.sets.filter((s) => run.eval[s.key]);
-    const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, width: '100%', role: 'img' });
+    const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, width: w, height: h, role: 'img' });
     const container = document.createElement('div');
     container.style.background = '#fff';
     container.style.maxWidth = `${w}px`;
@@ -775,6 +788,7 @@ async function mountRunExplorer() {
     if (state.pivot === 'set') renderSetPivot(); else renderRunPivot();
   }
   render();
+  registerChart(body, render); // redraw at the new width instead of scaling the text down
 }
 
 // ============================================================================
@@ -905,7 +919,7 @@ async function mountCurves() {
       if (valKey) lines.push({ run: d.run, key: valKey, points: d.series[valKey], color: ink, dash: 'none', width: 2.5, opacity: 1 });
     });
 
-    const w = 1040, h = 400, mm = { t: 20, r: 24, b: 44, l: 50 };
+    const w = fitWidth(chartHost, 1040), h = 400, mm = { t: 20, r: 24, b: 44, l: 50 };
     const iw = w - mm.l - mm.r, ih = h - mm.t - mm.b;
     const allSteps = lines.flatMap((l) => l.points.map((pt) => pt[0]));
     const allVals = lines.flatMap((l) => l.points.map((pt) => pt[1]));
@@ -913,7 +927,7 @@ async function mountCurves() {
     const yMax = Math.max(...allVals, 1) * 1.05;
     const x = scale([0, xMax], [0, iw]);
     const y = scale([0, yMax], [ih, 0]);
-    const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, width: '100%', role: 'img' });
+    const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, width: w, height: h, role: 'img' });
     const container = document.createElement('div');
     container.style.background = '#fff';
     container.style.maxWidth = `${w}px`;
@@ -999,6 +1013,7 @@ async function mountCurves() {
 
   await Promise.all(state.pinned.map(ensureLoaded));
   render();
+  registerChart(chartHost, render);
 }
 
 export function mountExplorables() {
