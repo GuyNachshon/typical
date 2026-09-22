@@ -13,10 +13,14 @@ conditioned on non-$\nullsym$).
 
 \Cref{fig:deltaq} is the paper's central negative result and the reason for everything that follows.
 The $x$-axis is raw accuracy on a 1{,}200-item MMLU-Pro among-$\numcands$ knowledge probe; the $y$-axis
-is $\dqsh$ (\Cref{def:deltaq}). Every candidate-blind variant we trained lands in the $\pm.02$ band
-around zero, and four of the six are \emph{below} zero: the real question buys them nothing over a
-shuffled, unrelated one with the candidate set held fixed. Their above-chance accuracy of .12--.17 is
-candidate-set priors baked into the corpus.
+is $\dqsh$ (\Cref{def:deltaq}). Every candidate-blind variant we trained lands within $\pm.03$ of zero
+and four of the six are \emph{below} it, against $+.102$ for the teacher they were distilled from: the
+real question buys them nothing, or nearly nothing, over a shuffled unrelated one with the candidate
+set held fixed. Their above-chance accuracy of .12--.17 is candidate-set priors baked into the corpus.
+Two variants (\texttt{z1} at $+.023$, \texttt{zr} at $-.026$) fall just outside the $\pm.02$
+indistinguishable-from-zero band of \Cref{sec:experiments:deltaq} in opposite directions, which is what
+1{,}200 items buys; the claim the figure supports is the separation from the teacher, not that any
+individual student is exactly zero.
 
 \begin{figure}[t]
   \centering
@@ -24,8 +28,8 @@ candidate-set priors baked into the corpus.
   \caption{The candidate-blind negative. Raw MMLU-Pro among-$K$ accuracy against $\dqsh$, the drop in
   accuracy when the real question is replaced by a shuffled one with the candidate set held fixed
   ($n{=}1{,}200$ items; the shaded band is the $\pm.02$ indistinguishable-from-zero region of
-  \Cref{sec:experiments:deltaq}). All six candidate-blind variants sit in that band regardless of head
-  capacity, set conditioning, objective, or tap depth. The letter-logit readout, the
+  \Cref{sec:experiments:deltaq}). All six candidate-blind variants sit at or within .006 of that band
+  regardless of head capacity, set conditioning, objective, or tap depth. The letter-logit readout, the
   contextual-candidate readout, and the listwise teacher all carry a question-dependent signal of
   .09--.12. Raw accuracy alone cannot tell these two groups apart.}
   \label{fig:deltaq}

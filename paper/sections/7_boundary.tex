@@ -3,8 +3,9 @@
 
 The same recipe that improves standard bounded decisions does not solve hard compositional ones, and on
 that tier a frozen backbone with a few exemplars is not beaten by anything we trained. This section
-reports that boundary, the confounds attached to it, and one diagnosed data defect whose causal
-contribution we could not establish.
+reports that boundary, the rendering confound attached to every comparison in it, and one diagnosed
+data defect that our first ablation was too small to confirm and a completed $2{\times}2$ establishes
+at $p{=}5\mathrm{e}{-}10$.
 
 \subsection{The hard compositional tier}
 \label{sec:boundary:hard}
@@ -12,19 +13,36 @@ contribution we could not establish.
 Breaking JevBench's hard tier down by sub-family (\Cref{fig:hard_families}, \Cref{app:hard-families})
 localizes where training helps and where it does not. Held-out rubric styles, families, and grammars
 \emph{inside} our own generators' distributions move sharply under workflow training
-(\Cref{sec:train:mixture}, \Cref{app:decisionmix}), but none of it transfers to \emph{level-7}
+(\Cref{sec:train:mixture}, \Cref{app:decisionmix}), but almost none of it transfers to \emph{level-7}
 composition -- decisions requiring temporal arithmetic, unit conversion, expected-value reasoning, or
-multi-attribute trade-offs -- which sits at chance for every checkpoint trained on this project's data,
-including the 14B model that leads the standard tier. It matches the JevBench hard tier's own
-temporal/probability/trade-off families.
+multi-attribute trade-offs. On the 880-item level-7 set the uniform-guess rate is .441 (598 items at
+$\numcands{=}2$, 224 at 3, 58 at 4; the majority-class rate is .250), and the checkpoints score .495
+(\texttt{ts1b}), .544 (\texttt{tm1b}) and .620 (\texttt{tl1b}). Only the 14B is clearly clear of the
+guess rate, and all three sit 25--40 points below the same models' scores on the held-out families,
+grammars and styles \emph{inside} the generator's distribution (.84--.90). The gap, not the level, is
+the finding: the curriculum that moves every in-distribution family by 30-plus points moves this one
+by 5. It matches the JevBench hard tier's own temporal/probability/trade-off families.
 
-This is not obviously a capacity story: the frozen 14B backbone with three in-context exemplars does no
-better on these specific families either. The reading we favor is data coverage -- our generators
-produce boolean rule composition up to six levels deep and never produce the compositional operations
-level 7 and JevBench's long\_policy/temporal/probability/tradeoff sub-families require, and no model
-here acquires composition from data that does not contain it. We cannot exclude the alternative that a
-single constant-depth pass is the binding constraint; \Cref{sec:discussion} treats that as an open
-question rather than a conclusion.
+Two readings are available and the per-family data does not support the one we initially favored.
+\emph{Data coverage} would say our generators produce boolean rule composition up to six levels deep,
+never produce the operations level 7 and JevBench's long\_policy/temporal/probability/tradeoff
+sub-families require, and that no model acquires composition from data that does not contain it. That
+account predicts the frozen backbone should fail these families too. It does not: on the same 111 hard
+items the frozen 14B with three exemplars leads \texttt{tl1b} on \texttt{tradeoff} (.500 vs.\ .167),
+\texttt{long\_policy} (.421 vs.\ .158), \texttt{ambiguous} (.714 vs.\ .429), \texttt{probability}
+(.500 vs.\ .300) and \texttt{temporal\_numeric} (.333 vs.\ .200), and trails only on
+\texttt{multi\_hop} (.444 vs.\ .611); the sub-family counts are single digits and no individual cell
+separates, but the direction is uniform across every serial family
+(\Cref{fig:hard_families}, \Cref{app:hard-families}). The backbone therefore already carries some of
+the behavior these families need, and our fine-tuning does not preserve it --- which is the same
+conclusion the aggregate paired test reaches in \Cref{sec:boundary:frozen}, and it is about training,
+not about the representation being incapable in principle.
+
+Missing coverage is still the best explanation for why \emph{training} did not add the behavior; it is
+not an explanation for why training removed it. We cannot separate either from the alternative that a
+single constant-depth pass is the binding constraint, and the control that would decide it --- the
+same frozen backbone given a scratchpad on the same 111 items --- is one we have not run.
+\Cref{sec:discussion} treats it as an open question rather than a conclusion.
 
 \subsection{A frozen backbone with exemplars is not beaten on the hard tier}
 \label{sec:boundary:frozen}
@@ -51,10 +69,10 @@ with three exemplars and no training at all.
     JevBench std & .875 [.792, .944] & .931 [.861, .986] & .917 [.833, .986] & .819 [.708, .917] \\
     JevBench hard & .468 [.378, .559] & .450 [.360, .541] & .477 [.387, .568] & \textbf{.559} [.468, .649] \\
     JevBench Brier std (hard) & .173 (.85) & .175 (.66) & .127 (--) & .30 (.60) \\
-    \texttt{long\_policy} (hard subfamily) & .053 & .158 & .211 & -- \\
+    \texttt{long\_policy} (hard subfamily) & .053 & .158 & .211 & \textbf{.421} \\
     Training val NLL & -- & .438 & .410 & -- \\
     Held-out score NLL & 2.87 & \textbf{0.95} & -- & -- \\
-    Level-7 composition & -- & .620 & -- & -- \\
+    Level-7 composition (guess rate .441) & -- & .620 & -- & -- \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -152,7 +170,7 @@ something other than the architectures, and that our own frozen-vs-trained compa
 (\Cref{sec:boundary:frozen}) inherits exactly this weakness. It is also why the leaderboard context for
 JevBench lives in \Cref{app:leaderboard} rather than in the body.
 
-\subsection{A verified data defect, and an ablation underpowered to confirm its effect}
+\subsection{A verified data defect, a benchmark too small to see it, and a $2{\times}2$ that resolves it}
 \label{sec:boundary:truncation}
 
 The long-state generator originally rendered supporting facts \emph{after} the request text. Two facts
@@ -191,20 +209,59 @@ with \texttt{--drop\_truncated} off in both arms so that truncation bites exactl
   \end{tabular}
 \end{table}
 
-We report this as it is: the ablation is \emph{consistent with} the truncation mechanism on the
-subfamily it should affect, \emph{underpowered to confirm it} at 19 items, and \emph{contradicted} by
-the hard-tier aggregate. The mechanism is not demonstrated.
+On the benchmark subfamily, then, the ablation is \emph{consistent with} the truncation mechanism,
+\emph{underpowered to confirm it} at 19 items, and \emph{contradicted} by the hard-tier aggregate. Our
+first reading of that outcome was that the mechanism could not be demonstrated and that the
+render-mismatch effect of \Cref{sec:boundary:rendering}(ii) was what we had actually measured. The
+completed design shows that reading was an artifact of the metric.
 
-The better-powered result on the same question is the render-mismatch finding of
-\Cref{sec:boundary:rendering}(ii), on 605 held-out items with no truncation at evaluation at all. It
-says that a substantial part of what we had attributed to truncation is a train/test \emph{render
-mismatch}: a model trained on facts-last renders is 23 points worse on facts-first renders of the same
-items, with the facts fully visible either way. The two mechanisms are not exclusive -- facts-last
-training is what makes the model render-dependent in the first place, and truncation is what made
-facts-last training uninformative -- but only the render effect is established at usable power here.
-The transferable lesson is the one we can support twice over: a fixed-length window interacts with
-\emph{where} the load-bearing content sits and not only with how long the render is, so a
-truncation-length ablation alone would not surface this; and silent truncation can produce confidently
-wrong behavior by systematically removing the evidence while preserving the labels
-\citep{sambasivan2021datacascades}. Full distributions and the remaining cells are in
+\textbf{The full $2{\times}2$: the truncation fix is real, and JevBench was the wrong instrument.} The
+single-render comparison above confounds the variable under test with render compatibility, because
+each arm was scored only in the render its own training used. We therefore scored \emph{both} arms on
+the same 605 held-out long states under \emph{both} renders, with no truncation at evaluation
+(\Cref{tab:trunc2x2}).
+
+\begin{table}[t]
+  \centering
+  \caption{The completed $2{\times}2$. Both 1.7B arms of \Cref{tab:trunc}, scored on the same $n{=}605$
+  held-out long states (4{,}096-token window, nothing truncated) under both renders. The diagonal is
+  each model in its own matched condition, which removes the render-mismatch confound; the off-diagonal
+  is the mismatch effect. Majority-class floors: \texttt{policy\_permit} .612 ($n{=}330$, $\numcands{=}2$),
+  \texttt{action\_select} .233 ($n{=}275$, $\numcands{=}4$).}
+  \label{tab:trunc2x2}
+  \small
+  \setlength{\tabcolsep}{5pt}
+  \begin{tabular}{llrrr}
+    \toprule
+    Trained on & Scored on & Overall & \texttt{policy\_permit} & \texttt{action\_select} \\
+    \midrule
+    facts-first & facts-first \emph{(matched)} & \textbf{.942} & \textbf{.933} & \textbf{.953} \\
+    facts-first & facts-last & .797 & .788 & .807 \\
+    facts-last & facts-first & .640 & .615 \emph{(at floor)} & .669 \\
+    facts-last & facts-last \emph{(matched)} & .830 & .842 & .815 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Comparing each arm in its own matched condition, facts-first training is ahead by \textbf{11.2 points}
+(.942 vs.\ .830, 95\% CI $[+.077, +.147]$, $z{=}6.2$, $p{=}5\mathrm{e}{-}10$; \texttt{policy\_permit}
+$+.091$ $[+.043, +.139]$, \texttt{action\_select} $+.138$ $[+.086, +.190]$). The facts-first arm is also
+the more robust of the two: switching the render against it costs 14.5 points, against 19.0 for the
+facts-last arm.
+
+Three effects were stacked on top of each other, and the $2{\times}2$ separates them. \textbf{(1)} The
+truncation fix works, unambiguously at $n{=}605$. \textbf{(2)} Render mismatch is separately real and
+large; it is what put the facts-last arm exactly on its majority-class floor (.615) in the single-render
+comparison, and why that comparison read as a refutation. \textbf{(3)} JevBench's \texttt{long\_policy}
+subfamily could not resolve either effect at $n{=}19$. We record the sequence rather than only the
+conclusion, because the intermediate state of this experiment --- a pre-registered primary metric
+returning $p{=}.232$ on a mechanism that a better-powered measurement puts at $p{=}5\mathrm{e}{-}10$ ---
+is the failure mode we think is most worth publishing here: \emph{the metric was the problem, not the
+mechanism}, and a single-render ablation cannot tell those apart by construction.
+
+The transferable lessons are then two. A fixed-length window interacts with \emph{where} the
+load-bearing content sits and not only with how long the render is, so a truncation-length ablation
+alone would not surface this; and silent truncation can produce confidently wrong behavior by
+systematically removing the evidence while preserving the labels
+\citep{sambasivan2021datacascades}. Full distributions and per-family cells are in
 \Cref{app:truncation}.

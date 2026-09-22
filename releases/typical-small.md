@@ -124,7 +124,17 @@ below the preview.
 |---|---|---|---|
 | `ts1b`-shape recipe | 45 / 46 / 106 | 2.7 / 3.7 / 28.0 | 6.4 → 9.3 |
 
-A single decision costs 45 ms regardless of most of K (the KV-cached state and a short suffix
+**Two different latency numbers exist for this checkpoint and they measure different things. Do not
+present either without its protocol.** The table above is the §3ab *apples-to-apples ladder*: one
+pod, one torch build, L_s = 256, state encode included, on the pre-optimisation serving path. It is
+for comparing rungs of the size ladder against each other, not for quoting as the cost of a
+decision in production. The number the blog posts and the site quote is **warm p50 per decision,
+15.5–17 ms** (`runs/serve_bench2/results.json`, K = 2, 256-token state, prefix KV already cached,
+one stream, in process, model load excluded) — measured after the KV-cache deep copy was replaced
+with a stride-0 view (§3ag). Neither is comparable to a leaderboard latency measured serially over
+a network.
+
+A single decision on the ladder protocol costs 45 ms regardless of most of K (the KV-cached state and a short suffix
 dominate); batched marginal cost is 2.7 ms/query at K = 2, rising to 28 ms/query at K = 256. Capability
 per millisecond (JevBench standard / single-decision ms) puts the 4B at the knee (.833/56 vs 1.7B's
 .750/45 vs 14B's .875/60) — this checkpoint is the cheapest point on that ladder, not the highest-
@@ -138,10 +148,22 @@ capability one.
 - Mind2Web stays below its constant-prediction floor (.357 vs floor .427) — general web-agent
   candidate sets remain outside what this training distribution covers.
 - Level-7 composition (temporal / unit / expected-value / trade-off reasoning, `wh_level7`) sits at
-  ~.50 — chance — same as every other checkpoint on the ladder (§3ad); nothing trained so far moves
-  it, because the generator never produces this composition.
+  .495. The uniform-guess rate on that set is **.441** (598 items at K = 2, 224 at 3, 58 at 4;
+  majority-class .250), so this is marginally above guessing and 34-40 points below the same
+  checkpoint's held-out family / grammar / style scores (.836 / .898 / .896). Earlier versions of
+  this card said "chance"; the gap to the in-distribution families is the finding, not the level.
+  Nothing trained so far moves it, because the generator never produces this composition (§3ad).
 - Hard tier is .432 with Brier .79 — within 1 SE of the .336 chance baseline; probability quality on
   soft/ordinal gold is still the clearest open defect at this size (§3aa, §3ae).
+- **Do not describe this model as "calibrated", and don't threshold on hard-tier confidence.** The
+  supported claim is that probability quality is trainable and that good calibration is conditional
+  on decision type and family — not that the output is calibrated (paper §6.4; a single global
+  temperature/offset moves in opposite directions for the E/K and W regimes). Concretely, under
+  JevBench's sum-of-squares Brier a *uniform* predictor over the hard tier's candidate-set mix
+  scores .664, and this checkpoint scores .79 — worse than guessing evenly. On the standard tier
+  the same comparison is .689 uniform against .40 here, which is where P(∅) thresholding is worth
+  using. Any card, tag or post copy claiming calibrated probabilities without that tier split is
+  overstating this checkpoint.
 - Held-out rubric styles regress −4 vs the preview (.859 vs .901).
 - Very large candidate sets (K in the hundreds to thousands) still need the energy → top-r → native
   path, not this native head directly (unchanged from the preview).
@@ -149,9 +171,14 @@ capability one.
 ## License
 
 - Backbone (`Qwen/Qwen3-1.7B-Base`): Apache-2.0.
-- Training data: per-source licenses triaged in PLAN6.md's dataset-survey table (mostly MIT /
-  Apache-2.0 / CC-BY-4.0 for the trained sources; `jevlogs` is research-licensed and used only as a
-  caveated held-out sanity eval, never trained on).
+- Training data: per-source licenses triaged in PLAN6.md's dataset-survey table. **Two trained
+  sources are non-commercial and were previously mis-summarised here as permissive:
+  ANLI (`facebook/anli`, in the E mix) is CC BY-NC 4.0, and SciQ (11.7k rows of `data_kb`) is
+  CC BY-NC 3.0.** The rest of the trained mix is MIT / Apache-2.0 / CC-BY-4.0 or generated in-repo.
+  `jevlogs` is research-licensed and used only as a caveated held-out sanity eval, never trained
+  on. Whether non-commercially-licensed training data constrains use of the Apache-2.0 weights is
+  unsettled; this card states what went in and does not assert a conclusion. LogiQA2, MedMCQA and
+  AQuA have not yet been re-triaged to this standard.
 - New in this release (PLAN7 Track D, `data_wh` / `data_u`): `data_wh` is a programmatic rule-engine
   corpus generated in-repo (`scripts/decisionmix_v2.py`), no external license constraints. `data_u`'s
   UNLI validation split is MIT; `metaeval/ambient` (trained on, ambiguous rows) and
