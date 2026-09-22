@@ -1521,6 +1521,39 @@ to truncation is **train/test render mismatch**, and by the same argument `ladde
 `tl1b`'s .158 is partly a render-match effect too, since `ladder_14b` trained facts-last and was scored on
 JevBench's fixed render. (Arm A's two cells were still running at the time of writing.)
 
+### 3ak-a. The completed 2x2 — the truncation fix is real, and larger than JevBench could see
+
+Arm A's two cells landed after the section above was written and they **overturn its interim reading**. Both arms
+scored on the same 605 held-out long states, under both renders, with no truncation at eval:
+
+| trained on | scored on | overall | policy_permit (floor .612) | action_select (floor .233) |
+|---|---|---:|---:|---:|
+| facts-first | facts-first *(matched)* | **.942** | **.933** | **.953** |
+| facts-first | facts-last | .797 | .788 | .807 |
+| facts-last | facts-first | .640 | .615 *(at floor)* | .669 |
+| facts-last | facts-last *(matched)* | .830 | .842 | .815 |
+
+**Comparing each model in its own matched condition — which removes the render-mismatch confound entirely —
+facts-first training is ahead by 11.2 points: .942 vs .830, 95% CI [+.077, +.147], z = 6.2, p = 5e-10.**
+Per family: policy_permit +.091 [+.043, +.139], action_select +.138 [+.086, +.190]. The facts-first model is also
+the more robust of the two: it loses 14.5 points when the render is switched against it, the facts-last model
+loses 19.0.
+
+So all three effects are real and they were stacked on top of each other:
+1. **The truncation fix genuinely works**, and at n = 605 the effect is unambiguous (p = 5e-10).
+2. **Render mismatch is also real and large** — it is what dragged arm B to its majority-class floor (.615) in
+   the single-render comparison of §3ak, and it is why that comparison looked like it refuted the mechanism.
+3. **JevBench's long_policy could not resolve any of this** at n = 19 (p = .232). The metric was the problem, not
+   the mechanism.
+
+**Correction to §3ak.** That section, written when only arm B's two cells existed, concluded that "a substantial
+part of what §3ag attributes to truncation is train/test render mismatch". With the full 2x2 that is too strong:
+render mismatch is a genuine and separately-measurable effect, but it does **not** explain away the truncation
+effect, which survives at 11.2 points in the matched comparison. §3ag's mechanism stands. The honest summary is
+that the original single-render ablation design was inadequate — it confounded the thing being measured with
+render compatibility, and only the 2x2 separates them.
+
+
 ## 3ak-b. Cluster-bootstrap confidence intervals on the JevBench public subset
 
 `scripts/jev_ci.py`. The standard tier is 72 items but only **36 independent states** (each appears as two
