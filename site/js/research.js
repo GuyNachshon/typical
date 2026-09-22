@@ -5,6 +5,8 @@
 import { donut, barChart, hbarFloor, timeline, fmtPct } from './charts.js';
 import { glueSeparators, bindWidows, glued } from './typography.js';
 import { mountExplorables } from './explorables.js';
+import { mountFlow } from './arch.js';
+import { mountMotion } from './motion.js';
 
 async function loadJSON(path) {
   try {
@@ -99,6 +101,11 @@ if (typeof window !== 'undefined') {
     mountJevFamily();
     mountTimeline();
     mountExplorables();
+    const archEl = document.getElementById('chart-arch');
+    if (archEl) mountFlow(archEl);
+    // vendor scripts are plain <script defer> before this module script, so gsap/ScrollTrigger
+    // are already on window by DOMContentLoaded — no cold-start film to wait on like index.html.
+    mountMotion();
   });
   // again once the async mounts have put their captions and legends in (glue is idempotent)
   window.addEventListener('load', () => setTimeout(() => { glueSeparators(); bindWidows(); }, 600));

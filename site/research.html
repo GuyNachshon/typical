@@ -30,7 +30,7 @@ reproduce the tables cited here.</p>
 
 <section class="page chapter" id="one-trunk-read-at-71-depth">
   <div class="chapter-head">
-    <p class="t-eyebrow">01 — One trunk, read at 71% depth</p>
+    <p class="t-eyebrow">01 — ARCHITECTURE</p>
     <div><h2 class="t-section">One trunk, read at 71% depth</h2></div>
   </div>
   <div class="chapter-body"><div class="body">
@@ -38,92 +38,7 @@ reproduce the tables cited here.</p>
 top 8 kept layers and a factored ∅ head. The state is read once and cached; each query appends a
 short rendered suffix, and the label, the yes/no, and the level all come out of the same terminal
 decision state, with nothing generated.</p></div>
-<div class="code wide"><pre> state tokens (≤1,024 tok)
-                               │
-                               ▼
- ┌─────────────────────────────────────────────────────┐
- │ frozen Qwen3 trunk, truncated at the tap layer      │
- │   typical-small (1.7B): layer 20 / 28               │
- │   typical-medium (4B):  layer 26 / 36  (≈71% depth) │
- │ LoRA r16 on the top 8 kept layers, rest frozen      │
- └─────────────────────────────────────────────────────┘
-                               │
-                               │   KV cache — the state is computed once, reused per query
-                               │
-                               │   per query: a short rendered suffix is appended to the cache
-                               │   &quot;&lt;question&gt;  &lt;letters_nonull candidates&gt;&quot;
-                               ▼
- ┌───────────────────────────────────────────────────────────────┐
- │ contextual readout (nc_head = n3)                             │
- │ terminal decision state h_D + per-candidate contextual states │
- └───────────────────────────────────────────────────────────────┘
-                               │
-                   ┌────────────────────────────│───────────────────────────┐
-                   ▼                            ▼                           ▼
-         ┌───────────────────┐      ┌──────────────────────┐      ┌──────────────────┐
-         │ Choice            │      │ Noul                 │      │ Score            │
-         │ softmax over K    │      │ Bernoulli            │      │ K-way softmax,   │
-         │ candidates        │      │ P(yes)=σ(w·h_D)      │      │ ordinal-smoothed │
-         │ + factored ∅      │      │ query-only suffix,   │      │ targets (τ=0.7), │
-         │ (a head decision, │      │ no rendered          │      │ reports E[index] │
-         │ not a rendered    │      │ candidates — exactly │      │ + factored ∅     │
-         │ line)             │      │ order-invariant      │      │                  │
-         │                   │      │ by construction      │      │                  │
-         └───────────────────┘      └──────────────────────┘      └──────────────────┘
-</pre></div>
-<div class="code narrow"><pre> state tokens (≤1,024)
-          │
-          ▼
- ┌──────────────────────────────┐
- │ frozen Qwen3 trunk, cut at   │
- │ the tap layer                │
- │  small 1.7B: layer 20 / 28   │
- │  medium 4B:  layer 26 / 36   │
- │ LoRA r16 on the top 8 layers │
- └──────────────────────────────┘
-          │
-          │  KV cache: state once,
-          │  reused per query
-          │
-          │  per query, a rendered
-          │  suffix is appended:
-          │  &quot;&lt;question&gt; &lt;letters&gt;&quot;
-          ▼
- ┌──────────────────────────────┐
- │ contextual readout (n3)      │
- │ h_D + per-candidate states   │
- └──────────────────────────────┘
-          │
-   ┌──────┴───────────────┐
-   ▼                      │
- ┌──────────────────────┐ │
- │ Choice               │ │
- │ softmax over K       │ │
- │ + factored ∅ (a head │ │
- │ decision, not a      │ │
- │ rendered line)       │ │
- └──────────────────────┘ │
-   ┌──────────────────────┤
-   ▼                      │
- ┌──────────────────────┐ │
- │ Noul                 │ │
- │ Bernoulli            │ │
- │ P(yes) = σ(w·h_D)    │ │
- │ query-only suffix,   │ │
- │ order-invariant by   │ │
- │ construction         │ │
- └──────────────────────┘ │
-   ┌──────────────────────┘
-   ▼
- ┌──────────────────────┐
- │ Score                │
- │ K-way softmax,       │
- │ ordinal-smoothed     │
- │ targets (τ = 0.7),   │
- │ reports E[index]     │
- │ + factored ∅         │
- └──────────────────────┘
-</pre></div>
+<div class="media dark"><div class="chart" id="chart-arch"></div></div>
 <div class="prose"><p><em>Fig. 1. Typical forward pass, state to probabilities.</em></p>
 <p>One support ticket runs through a recorded pass of typical-small below, from tokens to
 probabilities.</p></div>
@@ -174,7 +89,7 @@ drifted by up to .1 across shape buckets.</p></div>
 
 <section class="page chapter" id="four-buckets-weighted-against-memorising">
   <div class="chapter-head">
-    <p class="t-eyebrow">02 — Four buckets, weighted against memorising</p>
+    <p class="t-eyebrow">02 — DATA</p>
     <div><h2 class="t-section">Four buckets, weighted against memorising</h2></div>
   </div>
   <div class="chapter-body"><div class="body">
@@ -211,7 +126,7 @@ keeps the null calibrated across K.</p></div>
 
 <section class="page chapter" id="twelve-thousand-steps-under-20">
   <div class="chapter-head">
-    <p class="t-eyebrow">03 — Twelve thousand steps, under $20</p>
+    <p class="t-eyebrow">03 — TRAINING</p>
     <div><h2 class="t-section">Twelve thousand steps, under $20</h2></div>
   </div>
   <div class="chapter-body"><div class="body">
@@ -228,42 +143,6 @@ family_weights: E:0.40,K:0.15,W:0.35,U:0.10
 bucket_map: data_wf_long=W,data_wh=W,data_u=U
 null_aug: W:0.20          max_state: 1024
 tower_d: 512              tower_layers: 2        tower_heads: 8
-seed: 0
-</pre></div>
-<div class="code narrow"><pre>backbone: Qwen/Qwen3-1.7B-Base
-lora_layers: 8
-lora_r: 16
-lora_lr: 0.0001
-tap_layer: 20
-zscore: false
-readout: native
-nc_head: n3
-nc_render: letters_nonull
-null: factored
-noul_head: bern
-score_head: choice
-ordinal_smooth: 0.0
-  # ^ eval-only rerun flag;
-  #   training used 0.7
-steps: 12000
-bs: 64
-grad_accum: 1
-eval_every: 4000
-val_every: 1000
-ckpt_every: 2000
-data: data_v5
-extra_data: data_kb, data_wf,
-  data_wf_hf, data_wf_long,
-  data_wh, data_u
-family_weights:
-  E:0.40 K:0.15 W:0.35 U:0.10
-bucket_map: data_wf_long=W,
-  data_wh=W, data_u=U
-null_aug: W:0.20
-max_state: 1024
-tower_d: 512
-tower_layers: 2
-tower_heads: 8
 seed: 0
 </pre></div>
 <div class="prose"><p><em>Specimen: typical-small training args.</em></p>
@@ -298,7 +177,7 @@ JevBench (231-item public subset; see the D1 disclosure in Findings).</p></div>
 
 <section class="page chapter" id="the-line-dips-before-it-climbs">
   <div class="chapter-head">
-    <p class="t-eyebrow">04 — The line dips before it climbs</p>
+    <p class="t-eyebrow">04 — TIMELINE</p>
     <div><h2 class="t-section">The line dips before it climbs</h2></div>
   </div>
   <div class="chapter-body"><div class="body">
@@ -331,7 +210,7 @@ against the constant-prediction floor where one exists.</p></div>
 
 <section class="page chapter" id="eight-results-each-with-a-control">
   <div class="chapter-head">
-    <p class="t-eyebrow">05 — Eight results, each with a control</p>
+    <p class="t-eyebrow">05 — FINDINGS</p>
     <div><h2 class="t-section">Eight results, each with a control</h2></div>
   </div>
   <div class="chapter-body"><div class="body">
@@ -399,7 +278,7 @@ the training data, stays at chance at every size.</p></div>
 
 <section class="page chapter" id="the-long-state-bug-and-what-comes-next">
   <div class="chapter-head">
-    <p class="t-eyebrow">06 — The long-state bug and what comes next</p>
+    <p class="t-eyebrow">06 — IN FLIGHT</p>
     <div><h2 class="t-section">The long-state bug and what comes next</h2></div>
   </div>
   <div class="chapter-body"><div class="body">
@@ -503,7 +382,7 @@ hard ≥ .559 or hard Brier ≤ .65, long_policy ≥ .35, and CLINC-150 / MMLU a
 
 <section class="page chapter" id="limitations">
   <div class="chapter-head">
-    <p class="t-eyebrow">07 — Limitations</p>
+    <p class="t-eyebrow">07 — SCOPE</p>
     <div><h2 class="t-section">Limitations</h2></div>
   </div>
   <div class="chapter-body"><div class="body">
@@ -553,7 +432,7 @@ which declare no license on their HF cards.</p></div>
 
 <section class="page chapter" id="pip-install-three-lines-of-code">
   <div class="chapter-head">
-    <p class="t-eyebrow">08 — Pip install, three lines of code</p>
+    <p class="t-eyebrow">08 — INSTALL</p>
     <div><h2 class="t-section">Pip install, three lines of code</h2></div>
   </div>
   <div class="chapter-body"><div class="body">
@@ -689,6 +568,8 @@ predates workflow training on our side. Chance/majority baselines are .311 stand
   <div class="rule t-eyebrow" style="color:var(--color-mid)">Every number on this page traces to a file under site/data</div>
 </div></footer>
 
+<script src="js/vendor/gsap.min.js" defer></script>
+<script src="js/vendor/ScrollTrigger.min.js" defer></script>
 <script type="module" src="js/research.js"></script>
 </body>
 </html>

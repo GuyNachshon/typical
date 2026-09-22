@@ -7,12 +7,16 @@
 /* ---- chapter body: 64ch prose column, offset right in the chapter-head's grid ---- */
 
 .chapter-body { display: grid; grid-template-columns: 220px 1fr; gap: 30px; }
-.chapter-body .body { grid-column: 2; display: grid; gap: 30px; }
+/* .body's own single implicit column defaults to "auto" sizing, which grows to the max-content
+   width of its widest child (the .code ASCII plate) regardless of min-width:0 on that child —
+   min-width:0 only stops a track from refusing to shrink, it doesn't stop one from growing past
+   the container. minmax(0, 1fr) pins the column to the available width instead. */
+.chapter-body .body { grid-column: 2; display: grid; grid-template-columns: minmax(0, 1fr); gap: 30px; min-width: 0; }
 @media (max-width: 64rem) {
   .chapter-body { grid-template-columns: 1fr; }
   .chapter-body .body { grid-column: 1; }
 }
-.chapter-body .prose { overflow-wrap: break-word; /* non-breaking hyphens keep identifiers whole; one too long for the column must still break rather than push the page sideways */ max-width: 64ch; display: grid; gap: 16px; font-size: 15px; line-height: 1.5; }
+.chapter-body .prose { overflow-wrap: break-word; /* non-breaking hyphens keep identifiers whole; one too long for the column must still break rather than push the page sideways */ max-width: 64ch; min-width: 0; display: grid; gap: 16px; font-size: 15px; line-height: 1.5; }
 .chapter-body .prose ul, .chapter-body .prose ol { margin: 0; padding-left: 20px; display: grid; gap: 10px; }
 .chapter-body .prose a { border-bottom: 1px solid var(--color-steel); }
 .chapter-body .prose a:hover { border-color: var(--color-off); }
@@ -41,22 +45,19 @@
 .timeline-legend .dim { color: var(--color-mid); }
 .timeline-legend-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.72px; text-transform: uppercase; margin-top: 20px; color: var(--color-mid); }
 
-/* ASCII plates never scroll and never shrink below 11px: the two wide plates have a narrow
-   twin (```text-narrow in research.md) that takes over under 760px. */
-.code.narrow { display: none; }
-.code.wide pre, .code.narrow pre { white-space: pre; line-height: 1.3; }
-@media (max-width: 760px) {
-  .code.wide { display: none; }
-  .code.narrow { display: block; }
-  .code pre { font-size: clamp(11px, 3vw, 12px); line-height: 1.3; }
-}
+/* ASCII plates never shrink below 11px; instead of a hand-maintained narrow twin, the pre just
+   scrolls horizontally under its own min-content width rather than widening the page. */
+.code pre { white-space: pre; line-height: 1.3; overflow-x: auto; }
 
 /* ---- explorables (P1-P4, js/explorables.js): segmented steppers, tiles, scrub rail, dot
    charts — everything else (.bars/.bar, .media, .note, .btn.ghost) is src.css as-is. ---- */
-.explorable { display: grid; gap: 18px; }
-.explorable-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
-.explorable-controls { display: grid; gap: 10px; }
-.explorable-body { display: grid; gap: 14px; }
+/* same auto-track blowout as .chapter-body .body above, one level deeper: an explorable is
+   itself a single-column grid inside the prose column, and flex rows default to min-width:auto
+   too, so both need the same pin-to-available-width treatment. */
+.explorable { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-width: 0; }
+.explorable-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; min-width: 0; }
+.explorable-controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
+.explorable-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
 .explorable-label { min-width: 96px; }
 .explorable-skeleton { font-family: var(--font-mono); }
 
@@ -90,8 +91,8 @@
 /* P3 trace figure: six drawn stages, always visible, the scrub only shifts which one is
    emphasized. Opacity + a small scale via transform - never width/height - so scrubbing is
    one composited property change, not a relayout. */
-.trace-figure { display: grid; gap: 18px; }
-.trace-stage { background: var(--color-lgray); border-radius: var(--radius-card); padding: 18px 20px; display: grid; gap: 8px; transform-origin: left center; transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out), background 220ms var(--ease-out); opacity: 0.4; transform: scale(0.99); }
+.trace-figure { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-width: 0; }
+.trace-stage { background: var(--color-lgray); border-radius: var(--radius-card); padding: 18px 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; transform-origin: left center; transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out), background 220ms var(--ease-out); opacity: 0.4; transform: scale(0.99); }
 .trace-stage.is-active { opacity: 1; transform: scale(1); background: var(--color-white); }
 .trace-stage-label { margin: 0; }
 .trace-stage svg rect, .trace-stage svg circle, .trace-stage svg line { transition: fill 220ms var(--ease-out), stroke 220ms var(--ease-out); }
@@ -116,13 +117,16 @@
 /* .ucard moved here from src.css when index.html stopped using it. research.html still has nine,
    and they were styled by a rule the home page's cut pass deleted. The 88px top padding is not
    reproduced: it existed to push three home-page card titles down and left a hole here. */
-.ucard { background: var(--color-lgray); border-radius: var(--radius-card); padding: 40px 18px 18px; min-height: 300px; display: flex; flex-direction: column; justify-content: space-between; gap: 30px; }
+.ucard { background: var(--color-lgray); border-radius: var(--radius-card); padding: 40px 18px 18px; min-height: 300px; display: flex; flex-direction: column; justify-content: flex-start; gap: 30px; }
 .ucard .t-card { margin-bottom: 10px; }
 .ucard p { max-width: 32ch; }
 .ucard .figure-src { max-width: none; } /* .ucard p caps prose at 32ch = 211px, narrower than the paths this line carries */
 .ucard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
 @media (max-width: 64rem) { .ucard-grid { grid-template-columns: 1fr; } .ucard { min-height: 0; } }
 
-/* findings cards: .ucard's space-between + equal grid heights left 120px holes between a short
-   title and its body. These cards are prose, not figures — pack them from the top. */
-#findings .ucard { justify-content: flex-start; gap: 12px; min-height: 0; }
+/* findings cards: equal grid row heights left 120px holes below a short title and its body.
+   #findings doesn't exist on the page (build_research.py ids the section from its h2 slug) — the
+   real id is #eight-results-each-with-a-control, which also covers the D1 disclosure card in the
+   same section. These cards are prose, not figures — tighten the gap on top of the site-wide
+   flex-start fix above. */
+#eight-results-each-with-a-control .ucard { gap: 12px; min-height: 0; }

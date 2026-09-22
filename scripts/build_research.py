@@ -36,7 +36,20 @@ H2_SPLIT_RE = re.compile(r"(?=<h2)")
 H2_RE = re.compile(r'^<h2 id="([^"]*)">(.*?)</h2>', re.S)
 LI_RE = re.compile(r"<li>\s*(?:<p>)?(.*?)(?:</p>)?\s*</li>", re.S)
 BLOCK_START_RE = re.compile(r'(?=^<(?:h3|p|ul|ol|table|div)\b)', re.M)
-SETPIECE_PREFIXES = ('<table', '<div class="code', '<div class="media"', '<div class="ucard')
+SETPIECE_PREFIXES = ('<table', '<div class="code', '<div class="media', '<div class="ucard')
+
+# Eyebrow category word per chapter (keyed by the h2's slug id): short and never the title itself
+# (the eyebrow used to fall back to the full title, printing every chapter head twice).
+EYEBROW_CATEGORY = {
+    "one-trunk-read-at-71-depth": "ARCHITECTURE",
+    "four-buckets-weighted-against-memorising": "DATA",
+    "twelve-thousand-steps-under-20": "TRAINING",
+    "the-line-dips-before-it-climbs": "TIMELINE",
+    "eight-results-each-with-a-control": "FINDINGS",
+    "the-long-state-bug-and-what-comes-next": "IN FLIGHT",
+    "limitations": "SCOPE",
+    "pip-install-three-lines-of-code": "INSTALL",
+}
 
 NAV = """<nav class="nav"><a class="brand" href="index.html">Typical</a><span class="links"><a href="index.html#results">Results</a><a href="index.html#how">How it works</a><a href="index.html#demos">Demos</a><a href="research.html" aria-current="page">Research</a><a href="https://huggingface.co/OzLabs/typical-small">Weights</a></span><a class="cta" href="index.html#tryit">Try it live</a></nav>"""
 
@@ -86,6 +99,8 @@ TEMPLATE = """<!doctype html>
 
 {footer}
 
+<script src="js/vendor/gsap.min.js" defer></script>
+<script src="js/vendor/ScrollTrigger.min.js" defer></script>
 <script type="module" src="js/research.js"></script>
 </body>
 </html>
@@ -130,8 +145,8 @@ def add_data_labels(html):
 
 def unwrap_code_blocks(html):
     """.code (src.css) styles <pre> directly (dark 12px mono panel) — drop fenced_code's
-    <code class="language-x"> wrapper and add the .code div."""
-    # ```text-wide / ```text-narrow: the same plate drawn twice; research.css shows one per viewport
+    <code class="language-x"> wrapper and add the .code div. ```text-wide is the only ASCII-plate
+    fence left; research.css scrolls it horizontally rather than maintaining a narrow twin."""
     return CODE_RE.sub(lambda m: f'<div class="code{" " + m.group(1) if m.group(1) else ""}"><pre>{m.group(2)}</pre></div>', html)
 
 
@@ -216,10 +231,11 @@ def build_chapters(article_html):
             headline = title
 
         body = layout_body(rest.strip())
+        category = EYEBROW_CATEGORY.get(hm.group(1), title.split()[0].upper())
         chapters.append(
             f'<section class="page chapter" id="{hm.group(1)}">\n'
             f'  <div class="chapter-head">\n'
-            f'    <p class="t-eyebrow">{i:02d} — {title}</p>\n'
+            f'    <p class="t-eyebrow">{i:02d} — {category}</p>\n'
             f'    <div><h2 class="t-section">{headline}</h2></div>\n'
             f"  </div>\n"
             f'  <div class="chapter-body"><div class="body">\n{body}\n</div></div>\n'
