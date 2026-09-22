@@ -89,7 +89,7 @@ def prompt_for(state: str, questions: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def call_llm(client: httpx.Client, provider: str, model: str, state: str, questions: list[dict]) -> float:
+def call_llm(client: httpx.Client, provider: str, model: str, state: str, questions: list[dict], effort: str = "low") -> float:
     """One request, timed from just before the send to just after the answer parses."""
     url, key_env = PROVIDERS[provider]
     key = os.environ[key_env]
@@ -113,21 +113,65 @@ def call_llm(client: httpx.Client, provider: str, model: str, state: str, questi
                 "type": "json_schema",
                 "json_schema": {"name": "answer", "strict": True, "schema": schema},
             },
+            # A reasoning model left on its default setting spends seconds thinking about which of
+            # four teams owns a ticket. At "low" it gets its fast path, which is the setting that
+            # makes this comparison hardest for us and the one anybody would actually ship; the
+            # run is repeated at "high" because that is what the same model costs when you let it
+            # think, and a reader deciding between the two should see both. Providers with no such
+            # knob ignore the field.
+            "reasoning": {"effort": effort},
         }
-    t0 = time.perf_counter()
-    res = client.post(url, json=body, headers=headers, timeout=180)
-    res.raise_for_status()
-    data = res.json()
-    if provider == "anthropic":
-        answer = next(b["input"] for b in data["content"] if b["type"] == "tool_use")
+    # A 429 is the provider queueing us, not the model thinking, so a rate-limited attempt is
+    # retried and only the attempt that produced an answer is timed. Counting the backoff would
+    # inflate the hosted number with our own account limits, which is not what this measures.
+    for attempt in range(6):
+        t0 = time.perf_counter()
+        res = client.post(url, json=body, headers=headers, timeout=600)
+        if res.status_code == 429:
+            time.sleep(2 ** attempt)
+            continue
+        res.raise_for_status()
+        data = res.json()
+        err = ((data.get("choices") or [{}])[0].get("error") or {}).get("code")
+        if err == 429:
+            time.sleep(2 ** attempt)
+            continue
+        break
     else:
-        answer = json.loads(data["choices"][0]["message"]["content"])
+        raise RuntimeError(f"{provider}/{model} rate-limited through six retries")
+    answer = extract(provider, data)
     ms = (time.perf_counter() - t0) * 1000
     # a timing that did not produce every answer is not a timing of the task
     missing = [k for k in schema["required"] if k not in answer]
     if missing:
         raise RuntimeError(f"{provider}/{model} left {len(missing)} field(s) unanswered: {missing[:3]}")
     return ms
+
+
+def extract(provider: str, data: dict) -> dict:
+    """Pull the structured answer out, whichever shape the provider returned it in.
+
+    Gemini through OpenRouter returns `content: null` and puts the object in a tool call, so a
+    straight json.loads on the content field crashes on one provider and not the others. Anything
+    this cannot parse raises with the payload attached rather than being counted as a fast trial.
+    """
+    if provider == "anthropic":
+        blocks = data.get("content") or []
+        for b in blocks:
+            if b.get("type") == "tool_use":
+                return b["input"]
+        raise RuntimeError(f"no tool_use block in {json.dumps(data)[:400]}")
+    msg = (data.get("choices") or [{}])[0].get("message") or {}
+    content = msg.get("content")
+    if isinstance(content, list):  # some providers return content parts
+        content = "".join(part.get("text", "") for part in content)
+    if content:
+        return json.loads(content)
+    for call in msg.get("tool_calls") or []:
+        args = (call.get("function") or {}).get("arguments")
+        if args:
+            return json.loads(args) if isinstance(args, str) else args
+    raise RuntimeError(f"no answer in {json.dumps(data)[:400]}")
 
 
 def call_typical(client: httpx.Client, state: str, questions: list[dict]) -> float:
@@ -173,6 +217,7 @@ def main() -> None:
     ap.add_argument("--trials", type=int, default=30)
     ap.add_argument("--warmup", type=int, default=3)
     ap.add_argument("--many", type=int, default=8, help="questions in the batched arm")
+    ap.add_argument("--reasoning", default="low", choices=["low", "high"], help="reasoning effort asked of the hosted model")
     args = ap.parse_args()
 
     key_env = PROVIDERS[args.provider][1]
@@ -192,35 +237,44 @@ def main() -> None:
         except Exception:
             raise SystemExit("the local Typical server is not answering on :8787 -- start it first")
 
-        print(f"typical ({device}) vs {args.provider}/{args.model}, {args.trials} trials")
+        print(f"typical ({device}) vs {args.provider}/{args.model} @ {args.reasoning} reasoning, {args.trials} trials")
         out = {
             "method": (
                 "Wall clock from a client process: request sent to answer parsed, both arms, same "
                 "ticket and same four options, the hosted model constrained to the same label set "
-                "by JSON schema. Medians over the stated trial count, warmups discarded. Typical "
+                "by JSON schema. Each hosted model is run twice, at its lowest and its highest reasoning "
+                "effort. Medians over the stated "
+                "trial count, warmups discarded. Typical "
                 f"runs locally on {device}, not the H100 the 45 ms ladder was measured on."
             ),
             "typical_device": device,
             "llm": f"{args.provider}/{args.model}",
+            "reasoning": args.reasoning,
             "trials": args.trials,
             "measured_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "arms": {},
         }
         out["arms"]["typical_1"] = run("typical  ×1 ", lambda: call_typical(client, state, one), args.trials, args.warmup)
         out["arms"][f"typical_{args.many}"] = run(f"typical  ×{args.many} ", lambda: call_typical(client, state, many), args.trials, args.warmup)
-        out["arms"]["llm_1"] = run("llm      ×1 ", lambda: call_llm(client, args.provider, args.model, state, one), args.trials, args.warmup)
+        out["arms"]["llm_1"] = run("llm      ×1 ", lambda: call_llm(client, args.provider, args.model, state, one, args.reasoning), args.trials, args.warmup)
         # best case for the hosted model: every question in one request
-        out["arms"][f"llm_{args.many}_batched"] = run(f"llm      ×{args.many} batched", lambda: call_llm(client, args.provider, args.model, state, many), args.trials, args.warmup)
+        out["arms"][f"llm_{args.many}_batched"] = run(f"llm      ×{args.many} batched", lambda: call_llm(client, args.provider, args.model, state, many, args.reasoning), args.trials, args.warmup)
         # and the case the cached prefix is actually for: questions arriving one at a time
         out["arms"][f"llm_{args.many}_serial"] = run(
             f"llm      ×{args.many} serial ",
-            lambda: sum(call_llm(client, args.provider, args.model, state, [q]) for q in many),
+            lambda: sum(call_llm(client, args.provider, args.model, state, [q], args.reasoning) for q in many),
             max(4, args.trials // 4),
             1,
         )
 
-    OUT.write_text(json.dumps(out, indent=2) + "\n")
-    print(f"wrote {OUT.relative_to(ROOT)}")
+    # merge rather than overwrite: the file holds one entry per hosted model, so a second run adds
+    # a row instead of erasing the first one
+    doc = json.loads(OUT.read_text()) if OUT.exists() else {"method": out["method"], "runs": {}}
+    doc["method"] = out["method"]
+    doc["typical_device"] = out["typical_device"]
+    doc.setdefault("runs", {})[f'{out["llm"]} ({args.reasoning} reasoning)'] = {k: out[k] for k in ("trials", "reasoning", "measured_utc", "arms")}
+    OUT.write_text(json.dumps(doc, indent=2) + "\n")
+    print(f"wrote {OUT.relative_to(ROOT)} ({len(doc['runs'])} hosted model(s))")
 
 
 def demo() -> None:
@@ -234,6 +288,16 @@ def demo() -> None:
     d = summarise([10.0, 20.0, 30.0, 40.0, 50.0])
     assert d["median_ms"] == 30.0 and d["p10_ms"] == 10.0 and d["p90_ms"] == 40.0
     assert summarise([5.0])["median_ms"] == 5.0, "a single sample does not index out of range"
+    got = extract("openrouter", {"choices": [{"message": {"content": '{"q0": "billing"}'}}]})
+    assert got == {"q0": "billing"}, "plain JSON content parses"
+    got = extract("openrouter", {"choices": [{"message": {"content": None, "tool_calls": [{"function": {"name": "answer", "arguments": '{"q0": "shipping"}'}}]}}]})
+    assert got == {"q0": "shipping"}, "a null content with a tool call still yields the answer"
+    try:
+        extract("openrouter", {"choices": [{"message": {"content": None}}]})
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("an empty answer must raise, not count as a fast trial")
     print("bench_llm.py self-test OK")
 
 

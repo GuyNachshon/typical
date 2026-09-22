@@ -124,17 +124,7 @@
   </div>
   <p class="note mt-30" style="max-width:72ch">Purpose&#8209;built decision models from other groups score higher than this on JevBench &mdash; up to .986 standard, some of them on typical&#8209;medium&rsquo;s own base checkpoint. Our report attributes that to their rendering and method and is replicating it as a probe; until that probe lands, the gap stands as measured. <a class="ul" href="research.html#jevbench-context-report-3q-same-231-public-ids">The whole field, on the same 231 ids &rarr;</a></p>
   <p class="note mt-18"><a class="ul" href="research.html#eval-suite">Every table, every source and the calibration curves &rarr;</a></p>
-  <div class="note mt-18 results-disclosure"><blockquote class="disclosure-box">
-      <strong>JevBench disclosure.</strong> JevBench numbers are a public-subset run against
-      <code>fstandhartinger/jevbench</code> v1.2.1 (72 standard / 48 easy / 111 hard public ids), not a
-      submitted or ranked leaderboard entry (the leaderboard requires &ge;95% coverage including 146
-      non-public judge items). Probabilities are the head's softmax conditioned on non-&empty; (mean p_null
-      &asymp; .03). Latency is in-process on one H100, one decision at a time, model load excluded. Option
-      order is the harness's label order; a reversed-order control on a related checkpoint moved standard
-      accuracy &plusmn;4 points, larger than the differences between our own checkpoints. Chance/majority
-      baselines are 31.1% standard / 28.4% easy / 33.6% hard (n = 72 standard, SE &asymp; 5.8 points) &mdash; the hard
-      tier of both released models is within 1 SE of chance.
-    </blockquote></div>
+  <p class="note mt-18" style="max-width:72ch">JevBench figures here are a public&#8209;subset run (72&nbsp;standard / 48&nbsp;easy / 111&nbsp;hard public ids), not a ranked leaderboard entry, and chance is 31.1% standard. <a class="ul" href="research.html#jevbench-per-family-typical-small">The disclosure in full &rarr;</a></p>
 </section>
 
 <section class="page chapter" id="demos">
@@ -142,26 +132,26 @@
     <p class="t-eyebrow">Decisions you can watch</p>
     <div>
       <h2 class="t-section">Watch it decide.</h2>
-      <p class="lede">Games make the decisions visible: every tick, the state is a sentence, the options are the legal moves, and you can read the probabilities as they land. The same package runs here as behind the numbers above. <span class="tag" data-mode-pill></span></p>
+      <p class="lede">Every tick, the state is a sentence and the options are the legal moves. <span class="tag" data-mode-pill></span></p>
     </div>
   </div>
   <div class="media dark" style="margin-bottom:18px">
     <p class="media-label t-eyebrow">The road · Three.js</p>
     <div class="media-split">
       <div class="media-scene"><div class="game-mount" data-game="drive"></div></div>
-      <div class="media-read"><p class="t-eyebrow muted">The model picks each manoeuvre · 123 of 127 matched the rule list</p><p class="t-ui" style="max-width:40ch">Each tick the road is rendered as the situations that apply, in a fixed order; seven one-condition rules are in the question; the model picks one manoeuvre from the legal set. Over 862 m of the recorded run it stopped at all eight red lights, overtook three times, and disagreed with the rule list four times — once badly enough to clip the car ahead. Click the road to drop a cone, a pedestrian or a stopped car in its path and watch the probabilities move. It still cannot take a rule with an “or” in it.</p></div>
+      <div class="media-read"><p class="t-eyebrow muted">The model picks each manoeuvre · 123 of 127 matched the rule list</p><p class="t-ui" style="max-width:40ch">Click the road to drop a cone, a pedestrian or a stopped car in its path and watch the model pick a new manoeuvre.</p></div>
     </div>
   </div>
   <div class="grid gap-18 lg:grid-cols-2" style="margin-bottom:55px">
-    <div><div class="media dark"><p class="media-label t-eyebrow">Snake · canvas</p><div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="snake"></div></div></div><p class="note mt-18">One sentence per tick; the candidate set is the safe moves. 98.4% of moves on 62 boards (chance 48%); 24 food in the recorded run.</p></div>
-    <div><div class="media dark" style="min-height:520px"><p class="media-label t-eyebrow">DOOM · E1M1 · live</p><div class="media-scene"><iframe class="card-film" id="film-card" src="games/doom/index.html?film=1" title="DOOM played by typical-small" loading="lazy"></iframe></div><div class="card-hud t-mono"><p class="rec"><i></i><span id="card-rec">REC · typical-small · E1M1</span></p><p class="rec-sub" id="card-rec2">booting</p><div id="card-rows"></div><p class="sentence" id="card-sentence"></p></div></div><p class="note mt-18">Chocolate Doom, shareware 1.9, the frame exactly as the engine draws it. Two facts per tick (badly hurt? an enemy in sight?), the model picks retreat, engage or explore, and aims from &ldquo;the player must turn left to face the imp&rdquo;. The pipeline is engine &rarr; text state &rarr; Typical &rarr; action: it never receives a pixel. Over a recorded 200-decision run on E1M1 it matched the rule list every time, fired 12 shots and finished on 11 health — most of its calls near the end were retreat (site/data/replays/realdoom.json). The kill counter that run reported does not reconcile with the shots fired, so it is not quoted here.</p></div>
+    <div><div class="media dark"><p class="media-label t-eyebrow">Snake · canvas</p><div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="snake"></div></div></div><p class="note mt-18">One sentence per tick, the candidate set is the safe moves, and the recorded run matched 98.4% of moves on 62 boards (chance 48%).</p></div>
+    <div><div class="media dark" style="min-height:520px"><p class="media-label t-eyebrow">DOOM · E1M1 · live</p><div class="media-scene"><iframe class="card-film" id="film-card" src="games/doom/index.html?film=1" title="DOOM played by typical-small" loading="lazy"></iframe></div><div class="card-hud t-mono"><p class="rec"><i></i><span id="card-rec">REC · typical-small · E1M1</span></p><p class="rec-sub" id="card-rec2">booting</p><div id="card-rows"></div><p class="sentence" id="card-sentence"></p></div></div><p class="note mt-18">Two facts per tick, badly hurt or not and an enemy in sight or not, decide retreat, engage or explore, straight from the text state, never a pixel.</p></div>
   </div>
   <div id="tryit">
     <div class="exrow" data-exhibit-card>
       <div class="exrow-head">
         <span class="tag">Recorded</span>
         <h3 class="t-feature">Try it</h3>
-        <p>Your own state, question and options, decided in one forward pass. Needs the local model server; without it the prefilled example replays.</p>
+        <p>Your own state, question and options, decided in one forward pass, or the prefilled example if the local model server isn't running.</p>
         <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
       </div>
       <div class="exrow-body" data-exhibit-body hidden><div data-demo="tryit"></div></div>
@@ -170,7 +160,7 @@
       <div class="exrow-head">
         <span class="tag">Recorded</span>
         <h3 class="t-feature">SQL over judgment</h3>
-        <p><code>SELECT * FROM tickets WHERE typical(body, 'the customer mentions a duplicate charge')</code>. 129 rows, one forward pass each, no embeddings; four conditions against hand labels.</p>
+        <p><code>SELECT * FROM tickets WHERE typical(body, 'the customer mentions a duplicate charge')</code>, 129 rows, one forward pass each, no embeddings, checked against hand labels on four conditions.</p>
         <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
       </div>
       <div class="exrow-body" data-exhibit-body hidden><div data-demo="sql"></div></div>
