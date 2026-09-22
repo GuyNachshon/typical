@@ -5,6 +5,7 @@
 // decide() call — never an invented one.
 import { decide, mode, probeHealth } from './api.js';
 import { bars, inkBars, rowsFromResult } from './bars.js';
+import { glueSeparators, glued } from './typography.js';
 import { describeDoom, candidatesFor, resolveIntent, keyPress, scriptedPolicy, resetNav } from './games/realdoom-logic.js';
 import { QUESTION as DOOM_QUESTION } from './games/doom.js';
 import { hashKey } from './api.js';
@@ -367,7 +368,7 @@ async function mountHero(presets) {
   const barsEl = document.createElement('div');
   const meta = document.createElement('p'); meta.className = 't-mono muted'; meta.style.marginTop = '18px';
   const gate = document.createElement('p'); gate.className = 't-mono muted';
-  gate.textContent = 'candidate bars sum to one · the dashed ∅ row is a separate gate (p that none apply), not part of that sum';
+  gate.textContent = glued('candidate bars sum to one · the dashed ∅ row is a separate gate (p that none apply), not part of that sum');
   read.append(qLab, qEl, barsEl, meta, gate);
   const b = bars(barsEl, rowsFromResult(pool[0].r));
   const trunc = (t, n) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
@@ -375,7 +376,7 @@ async function mountHero(presets) {
     stateEl.textContent = trunc(e.state, 220);
     qEl.textContent = trunc(e.q.question, 170);
     b.update(rowsFromResult(e.r));
-    meta.textContent = `${e.q.type} · ${source} · ${Math.round(e.ms)} ms · ${e.device || 'mps'} · ${e.model || 'typical-small'} · ${pool.length} recorded decisions`;
+    meta.textContent = glued(`${e.q.type} · ${source} · ${Math.round(e.ms)} ms · ${e.device || 'mps'} · ${e.model || 'typical-small'} · ${pool.length} recorded decisions`);
   };
   let i = 0;
   show(pool[0], 'recorded');
@@ -438,7 +439,7 @@ function mountFilm(ctx) {
         if (r) { probs = r.probs; move = cands.reduce((a, c) => ((r.probs[c] ?? 0) > (r.probs[a] ?? 0) ? c : a), cands[0]); source = `model · ${Math.round(res.ms)} ms on ${res.device || 'mps'}`; }
       } catch {}
     }
-    rec.textContent = `${source.startsWith('model') ? 'LIVE' : 'REC'} · typical-small · E1M1 · ${source}`;
+    rec.textContent = glued(`${source.startsWith('model') ? 'LIVE' : 'REC'} · typical-small · E1M1 · ${source}`);
     sentEl.textContent = sentence;
     rowsEl.innerHTML = '';
     labels.forEach((l) => {
@@ -487,6 +488,7 @@ function mountTryit(ctx) {
 // ---- boot -------------------------------------------------------------------------
 
 async function boot() {
+  glueSeparators(); // static prose, before anything awaits
   await probeHealth();
 
   const [presets, models, reliabilityDoc, chanceDoc, frozenDoc] = await Promise.all([
@@ -507,6 +509,8 @@ async function boot() {
   mountResults(models, reliabilityDoc, chanceDoc, frozenDoc);
   mountTryit(ctx);
   wireExhibits(ctx);
+  glueSeparators();
+  setTimeout(glueSeparators, 800); // the table, charts and captions mount async
   // The exhibit tags say what this visitor will actually get: every one of them decides live
   // against a reachable server and replays a recorded run otherwise, so the markup ships the
   // pessimistic label and only the live case upgrades it.
