@@ -4,11 +4,11 @@ Two public posts, meant to publish together.
 
 - `typical-launch.md` — **"Typical: Models That Decide, Not Generate."** The launch. Leads with the
   decision primitive, shows the API, the two released models, where they break, and what is open.
-  ~1,950 words.
+  ~2,400 words (excluding code blocks and figure markup).
 - `technical-deep-dive.md` — **"We Removed Generation from an LLM. Here's What Broke."** The
   archaeology: the candidate-blind architecture that failed, the wrong tap layer, the "none of the
   above" pathology, the long-state data defect, the calibration results, the KV-cache deep copy.
-  ~4,400 words. The launch links to it three times.
+  ~4,700 words (excluding tables and figure markup). The launch links to it three times.
 
 Every number in both traces to `REPORT.md`, `RESULTS.md`, `COMPARE.md`, or a `releases/*.md` card.
 Check the cited section before changing a number, not just the number.
