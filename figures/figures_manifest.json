@@ -1,0 +1,67 @@
+{
+  "figures": {
+    "fig_architecture": {
+      "description": "Schematic of the decision pass: KV-cached state prefix, per-query suffix, native head reading pooled option spans + terminal token, three typed primitives (Choice / Score / Noul) on one readout.",
+      "sources": [
+        "native.py:1-40 (docstring, class NativeHead)",
+        "PROJECT.md:8-15"
+      ]
+    },
+    "fig_ladder": {
+      "description": "JevBench standard and hard accuracy vs backbone size for Qwen3 (1.7/4/8/14B) and Qwen3.5 (2/4/9B); frozen-with-3-shots dashed, trained solid; open-field references as horizontal markers.",
+      "sources": [
+        "runs/jev_zs3_{1p7b,4b,8b,14b}/summary.json .original/.hard.accuracy (Qwen3 frozen 3-shot)",
+        "runs/jev_native_{ts1b,tm1b,ladder_8b,tl1b}/summary.json .original/.hard.accuracy (Qwen3 trained)",
+        "runs/jev_zs3_q35_{2b,4b,9b}/summary.json (Qwen3.5 frozen 3-shot, pulled from HF hub guychuk/pcdm-runs)",
+        "runs/jev_native_tm2/summary.json (Qwen3.5-4B trained, pulled from HF hub)",
+        "REPORT.md 3q reference table (Laya/jeff/open-alt-jev/system-one-open/SemIf/Jev-1.13, per-item on public 231 ids)"
+      ]
+    },
+    "fig_latency_quality": {
+      "description": "JevBench standard accuracy vs measured single-decision latency (ms, log scale) for our trained models, with generative-LLM decode-latency comparison bands.",
+      "sources": [
+        "jev_native_ts1b/summary.json + bench_ts1c/bench.json (K=32, state=256, m=1 total_ms) [ts1b has no bench.json; latency proxy = bench_ts1c, same backbone/tap-20 re-run]",
+        "jev_native_tm1b/summary.json + bench_tm1b/bench.json (K=32, state=256, m=1 total_ms)",
+        "jev_native_ladder_8b/summary.json + bench_ladder_8b/bench.json (K=32, state=256, m=1 total_ms)",
+        "jev_native_tl1b/summary.json + bench_tl1b/bench.json (K=32, state=256, m=1 total_ms)",
+        "generative-LLM comparison bands are the ranges specified in the figure task (one-letter decode ~25-40ms, JSON/label decode ~60-200ms, CoT ~3-60s), not a measured artefact"
+      ]
+    },
+    "fig_calibration": {
+      "description": "Held-out score NLL and typed-decisions NLL across the calibration-fix sequence (ladder_14b \u2192 tl1b/tl1b_nokd/ts1b/tm1b/tm2), showing the 2.87 \u2192 ~0.95 collapse fix.",
+      "sources": [
+        "runs/ladder_14b/results.json eval.wf_heldout_score.scaled.nll, eval.typed_decisions_test.scaled.nll",
+        "runs/tl1b/results.json eval.wf_heldout_score.scaled.nll, eval.typed_decisions_test.scaled.nll",
+        "runs/tl1b_nokd/results.json eval.wf_heldout_score.scaled.nll, eval.typed_decisions_test.scaled.nll",
+        "runs/ts1b/results.json eval.wf_heldout_score.scaled.nll, eval.typed_decisions_test.scaled.nll",
+        "runs/tm1b/results.json eval.wf_heldout_score.scaled.nll, eval.typed_decisions_test.scaled.nll",
+        "runs/tm2/results.json eval.wf_heldout_score.scaled.nll, eval.typed_decisions_test.scaled.nll"
+      ]
+    },
+    "fig_hard_families": {
+      "description": "Per-family JevBench-hard accuracy (10 families) for ladder_14b, tl1b, and the frozen-14B 3-shot control, sorted by tl1b's value, with the chance line at .336. Note: ladder_14b's temporal_numeric/probability values here (.333/.50, re-derived from hard/results.jsonl) differ from REPORT.md 3ah's prose (.20/.40) -- the JSON artefact is used as the source of truth.",
+      "sources": [
+        "runs/jev_native_ladder_14b/summary.json hard.per_family.<family>.accuracy",
+        "runs/jev_native_tl1b/summary.json hard.per_family.<family>.accuracy",
+        "runs/jev_zs3_14b/summary.json hard.per_family.<family>.accuracy (pulled from HF hub)"
+      ]
+    },
+    "fig_truncation": {
+      "description": "Left: histogram of data_wf_long state token lengths with truncation fractions at 256/1024/2048/3072 tokens. Right: long_policy (hard-tier) accuracy across the long-state bug/fix sequence.",
+      "sources": [
+        "data_wf_long/train.jsonl (state field, 2000/23318 rows sampled, tokenized with Qwen/Qwen3-1.7B-Base)",
+        "runs/jev_native_ladder_14b/summary.json hard.per_family.long_policy.accuracy",
+        "runs/jev_native_tm1b/summary.json hard.per_family.long_policy.accuracy",
+        "runs/jev_native_tl1b/summary.json hard.per_family.long_policy.accuracy",
+        "runs/jev_zs3_14b/summary.json hard.per_family.long_policy.accuracy"
+      ]
+    },
+    "fig_serving": {
+      "description": "Per-decision p50 latency before/after the zero-copy prefix fix, cold vs warm, for typical-small (1.7B), typical-medium (4B) and tm2 (Qwen3.5-4B), at K=2, state_tokens=256.",
+      "sources": [
+        "runs/serve_bench2/before.json and results.json (== after.json), configs[K=2, state_tokens=256].{cold,warm}.p50_ms"
+      ]
+    }
+  },
+  "omitted_series": []
+}
