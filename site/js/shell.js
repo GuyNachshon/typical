@@ -350,49 +350,24 @@ function heroPool(presets, replays) {
 
 let heroLive = null; // set by pushDecision in live mode
 async function mountHero(presets) {
-  const read = document.getElementById('hero-decision');
-  const scene = document.getElementById('hero-decision-scene');
-  if (!read || !presets) return;
+  const host = document.getElementById('hero-decision');
+  if (!host || !presets?.playground) return;
   const replays = (await loadJSON('data/replays.json')) || {};
-  const pool = heroPool(presets, replays);
-  if (!pool.length) return;
-  // scene: the state as a typographic still; read: question + bars + meta
-  scene.innerHTML = '';
-  scene.style.cssText = 'padding:60px 50px;display:flex;flex-direction:column;justify-content:flex-end;gap:18px';
-  const stateEl = document.createElement('p'); stateEl.className = 't-card'; stateEl.style.maxWidth = '22ch';
-  const stateLab = document.createElement('p'); stateLab.className = 't-eyebrow muted'; stateLab.textContent = 'the state';
-  scene.append(stateLab, stateEl);
-  read.innerHTML = '';
-  const qLab = document.createElement('p'); qLab.className = 't-eyebrow muted'; qLab.textContent = 'the question';
-  const qEl = document.createElement('p'); qEl.className = 't-ui'; qEl.style.marginBottom = '18px';
-  const barsEl = document.createElement('div');
-  const meta = document.createElement('p'); meta.className = 't-mono muted'; meta.style.marginTop = '18px';
-  const gate = document.createElement('p'); gate.className = 't-mono muted';
-  gate.textContent = glued('candidate bars sum to one · the dashed ∅ row is a separate gate (p that none apply), not part of that sum');
-  read.append(qLab, qEl, barsEl, meta, gate);
-  const b = bars(barsEl, rowsFromResult(pool[0].r));
-  const trunc = (t, n) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
-  const show = (e, source) => {
-    stateEl.textContent = trunc(e.state, 220);
-    qEl.textContent = trunc(e.q.question, 170);
-    b.update(rowsFromResult(e.r));
-    meta.textContent = glued(`${e.q.type} · ${source} · ${Math.round(e.ms)} ms · ${e.device || 'mps'} · ${e.model || 'typical-small'} · ${pool.length} recorded decisions`);
-  };
-  let i = 0;
-  show(pool[0], 'recorded');
-  // 8 s, not 3.2: at the old pace the state paragraph changed while it was being read. Hovering
-  // or focusing the panel holds the current decision; a click advances it immediately.
-  let hold = false;
-  const panel = read.closest('.media') || read;
-  panel.addEventListener('pointerenter', () => { hold = true; });
-  panel.addEventListener('pointerleave', () => { hold = false; });
-  const next = () => {
-    if (heroLive) { show(heroLive, 'live'); heroLive = null; return; }
-    i = (i + 1) % pool.length;
-    show(pool[i], 'recorded');
-  };
-  panel.addEventListener('click', next);
-  setInterval(() => { if (!hold) next(); }, 8000);
+  const pg = presets.playground;
+  // One state, its four typed questions. Each is recorded on its own (scripts/record_replays.py)
+  // so the instrument cycles even with no server, and upgrades itself to live when there is one.
+  const entries = pg.queries
+    .map((q) => ({ q, result: replays[hashKey(pg.state, [q])]?.results?.[0], ms: 0 }))
+    .filter((e) => e.result)
+    .map((e) => ({ ...e, result: { ...e.result, ms: replays[hashKey(pg.state, [e.q])]?.ms ?? 0 } }));
+  if (!entries.length) return;
+  const { mountInstrument } = await import('./instrument.js');
+  mountInstrument(host, {
+    state: pg.state,
+    entries,
+    decide: mode() === 'live' ? decide : null,
+    onLive: pushDecision,
+  });
 }
 // live decide() results flow into the decision panel
 function pushDecision(res, state, queries) {

@@ -33,8 +33,6 @@ On screen: Typical playing DOOM, reading one sentence a tick and picking one of 
 ## Generation is the wrong interface for a decision.
 A language model can tell you what it thinks. Typical hands your program a distribution over the actions it can actually take, and the odds that none of them are right.
 
-**The same job, as a decision**
-
 **Choice · Noul · Score**
 
 ## Not tokens. Probabilities.

@@ -65,6 +65,10 @@ def build_pairs() -> list[tuple[str, str, list]]:
     pairs.append(("playground", pg["state"], pg["queries"]))
     # single-question call the page makes first, to show M=1 vs M=4-in-one-pass (H2)
     pairs.append(("playground[single]", pg["state"], pg["queries"][:1]))
+    # the hero instrument holds this state fixed and cycles the question, so each one is also
+    # recorded on its own - otherwise only the first cycles offline
+    for i, query in enumerate(pg["queries"]):
+        pairs.append((f"playground[q{i}]", pg["state"], [query]))
 
     flip = PRESETS["flip"]
     for i, order in enumerate(flip["orders"]):

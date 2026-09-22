@@ -196,6 +196,54 @@
   .media-read { padding: 60px 50px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
   @media (max-width: 48rem) { .media-read { padding: 30px 20px; } }
 
+  /* ---- the instrument -----------------------------------------------------------------------
+     The claim of this panel is that one state supports many typed decisions, so the questions are
+     a visible stack against a fixed specimen rather than something that only happens over time.
+     Left: what goes in, and everything being asked of it. Right: the readout. The rows are
+     typographic — a hairline whose length is the probability, the decision set as the only large
+     thing on the panel, ∅ dashed and held out of the sum. */
+  .instrument { display: grid; grid-template-columns: minmax(0, 360px) 112px minmax(0, 1fr); gap: 0; padding: 44px 48px 40px; align-items: start; }
+  @media (max-width: 64rem) { .instrument { grid-template-columns: 1fr; gap: 22px; padding: 28px 20px 24px; } }
+  .inst-tag { font-size: 10px; letter-spacing: 0.72px; text-transform: uppercase; color: rgba(240, 238, 235, 0.3); }
+  .inst-state-text { margin: 12px 0 34px; padding-left: 16px; border-left: 1px solid rgba(240, 238, 235, 0.22); font-size: 16px; line-height: 1.45; color: rgba(240, 238, 235, 0.8); }
+
+  /* the stack: every question this one state answers, the live one marked */
+  .inst-list { display: grid; gap: 2px; margin-top: 12px; }
+  .inst-qbtn { display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: baseline; width: 100%; padding: 9px 10px 9px 12px; border: 0; border-left: 1px solid rgba(240, 238, 235, 0.14); background: none; color: inherit; text-align: left; cursor: pointer; transition: border-color var(--duration-tap) var(--ease-out), background var(--duration-tap) var(--ease-out); }
+  .inst-qbtn:hover { background: rgba(240, 238, 235, 0.04); }
+  .inst-qtype { font-size: 10px; letter-spacing: 0.72px; text-transform: uppercase; color: rgba(240, 238, 235, 0.28); }
+  .inst-qtext { font-size: 13px; line-height: 1.35; color: rgba(240, 238, 235, 0.42); }
+  .inst-qbtn.is-on { border-left-color: var(--color-warm); background: rgba(240, 238, 235, 0.05); }
+  .inst-qbtn.is-on .inst-qtext { color: var(--color-warm); }
+  .inst-qbtn.is-on .inst-qtype { color: rgba(240, 238, 235, 0.6); }
+
+  .inst-flow { height: 100%; min-height: 200px; }
+  .inst-flow canvas { display: block; width: 100%; height: 100%; }
+  @media (max-width: 64rem) { .inst-flow { height: 24px; min-height: 0; } }
+
+  .inst-out { padding-top: 26px; } /* the first row sits on the state's first line, not above it */
+  .inst-rows { display: grid; gap: 15px; }
+  .inst-row { display: grid; grid-template-columns: minmax(56px, 300px) 1fr 62px; align-items: center; gap: 20px; animation: instIn 420ms var(--ease-out) backwards; animation-delay: calc(var(--n) * 45ms); }
+  @keyframes instIn { from { opacity: 0; transform: translateX(-6px); } }
+  @media (prefers-reduced-motion: reduce) { .inst-row { animation: none; } }
+  .inst-label { font-size: 15px; color: rgba(240, 238, 235, 0.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .inst-track { position: relative; height: 1px; background: rgba(240, 238, 235, 0.1); }
+  .inst-rule { position: absolute; left: 0; top: 50%; height: 1px; margin-top: -0.5px; background: rgba(240, 238, 235, 0.5); transition: width 520ms var(--ease-out); }
+  .inst-value { font-family: var(--font-mono); font-size: 13px; text-align: right; color: rgba(240, 238, 235, 0.4); font-variant-numeric: tabular-nums; }
+  /* the decision: the only large thing here */
+  .inst-row.is-win .inst-label { color: var(--color-warm); font-size: 24px; line-height: 1.15; white-space: normal; }
+  .inst-row.is-win .inst-rule { height: 3px; margin-top: -1.5px; background: var(--color-warm); }
+  .inst-row.is-win .inst-value { color: var(--color-warm); font-size: 24px; }
+  .inst-row.is-none { opacity: 0.45; }
+  .inst-row.is-none .inst-label { font-style: italic; }
+  .inst-row.is-none .inst-track { background: none; border-top: 1px dashed rgba(240, 238, 235, 0.28); height: 0; }
+  .inst-row.is-none .inst-rule { display: none; }
+  @media (max-width: 64rem) {
+    .inst-row { grid-template-columns: minmax(44px, 38%) 1fr 44px; gap: 12px; }
+    .inst-row.is-win .inst-label, .inst-row.is-win .inst-value { font-size: 17px; }
+  }
+  .inst-foot { margin-top: 30px; font-size: 10px; letter-spacing: 0.72px; text-transform: uppercase; color: rgba(240, 238, 235, 0.26); }
+
   /* ---- utility cards ---- */
   .ucard { background: var(--color-lgray); border-radius: var(--radius-card); padding: 88px 18px 18px; min-height: 300px; display: flex; flex-direction: column; justify-content: space-between; gap: 30px; }
   .ucard .t-card { margin-bottom: 10px; }
