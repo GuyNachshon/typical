@@ -58,9 +58,8 @@ const BOOT_WORD_MS = 1100; // the word rasterises in over this
 const BOOT_HOLD = 750; // after the last character, before the game fades up
 const BOOT_FADE = 700;
 const FILL_CHAR = '·';
-const ON_CHAR = '█';
-const MID_CHAR = '▓';
-const EDGE_CHAR = '▒';
+const FRONT_CHAR = '▓'; // the face of the word
+const SIDE_CHAR = '▒'; // the sides of the extrusion
 
 // Where the cold start is at a given moment: how much of the word has rasterised, how much of
 // the text under it has been typed, and how far into the hand-over to the game we are.
@@ -203,53 +202,118 @@ export function mountFilmFx(host, getSource, opts = {}) {
     c.filter = 'none';
   }
 
-  // The word, rasterised into a character grid: the letterforms are drawn once into a small
-  // offscreen canvas, then read back so each cell knows whether it is inside a letter, on its
-  // edge, or in the field around it. Rebuilt only when the grid changes size.
-  let raster = null;
-  function buildRaster(cols, rows) {
-    if (raster && raster.cols === cols && raster.rows === rows) return raster;
-    const { el, ctx: c } = canvas2d(cols, rows);
+  // The wordmark is a solid: the letterforms are rasterised to a bitmap, every filled cell is
+  // extruded into a box, and the faces that face open air become the model. It is then turned on
+  // a slow turntable and z-buffered back down into the character grid, so the front of the word
+  // and the sides of the extrusion get different characters. Geometry is built once; only the
+  // projection runs per frame.
+  let mesh = null;
+  function buildMesh() {
+    if (mesh) return mesh;
+    const RES = 13; // bitmap rows — the whole solid is built from this, so keep it small
+    const probe = canvas2d(8, 8).ctx;
+    let size = RES;
+    const track = (px) => px * 0.16;
+    const widthAt = (px) => {
+      probe.font = `700 ${px}px "Geist Mono", ui-monospace, monospace`;
+      return [...BOOT_WORD].reduce((w, ch) => w + probe.measureText(ch).width, 0) + track(px) * (BOOT_WORD.length - 1);
+    };
+    const cols = Math.ceil(widthAt(size)) + 2;
+    const { ctx: c } = canvas2d(cols, RES);
     c.fillStyle = '#000';
-    c.fillRect(0, 0, cols, rows);
-    let size = rows * 0.92;
-    c.textAlign = 'center';
+    c.fillRect(0, 0, cols, RES);
+    c.font = `700 ${size}px "Geist Mono", ui-monospace, monospace`;
     c.textBaseline = 'middle';
     c.fillStyle = '#fff';
-    // shrink to fit the width, letter-spaced by hand since canvas has no tracking
-    const spacing = () => size * 0.14;
-    const widthAt = (px) => {
-      c.font = `700 ${px}px "Geist Mono", ui-monospace, monospace`;
-      return [...BOOT_WORD].reduce((w, ch) => w + c.measureText(ch).width, 0) + spacing() * (BOOT_WORD.length - 1);
-    };
-    while (size > 4 && widthAt(size) > cols * 0.86) size *= 0.94;
-    c.font = `700 ${size}px "Geist Mono", ui-monospace, monospace`;
-    const total = widthAt(size);
-    let x = (cols - total) / 2;
+    let x = (cols - widthAt(size)) / 2;
     for (const ch of BOOT_WORD) {
-      const w = c.measureText(ch).width;
-      c.fillText(ch, x + w / 2, rows / 2);
-      x += w + spacing();
+      c.fillText(ch, x, RES / 2);
+      x += c.measureText(ch).width + track(size);
     }
-    const px = c.getImageData(0, 0, cols, rows).data;
-    const on = new Uint8Array(cols * rows);
-    for (let i = 0, n = 0; n < on.length; i += 4, n++) on[n] = px[i] > 110 ? 1 : 0;
-    // edge cells: inside the letter but next to something that is not
-    const edge = new Uint8Array(cols * rows);
-    for (let y = 0; y < rows; y++) {
-      for (let cx = 0; cx < cols; cx++) {
-        const n = y * cols + cx;
-        if (!on[n]) continue;
-        const nb = (dx, dy) => {
-          const yy = y + dy;
-          const xx = cx + dx;
-          return yy < 0 || yy >= rows || xx < 0 || xx >= cols ? 0 : on[yy * cols + xx];
-        };
-        if (!nb(1, 0) || !nb(-1, 0) || !nb(0, 1) || !nb(0, -1)) edge[n] = 1;
+    const px = c.getImageData(0, 0, cols, RES).data;
+    const on = [];
+    for (let y = 0; y < RES; y++) {
+      on[y] = new Uint8Array(cols);
+      for (let cx = 0; cx < cols; cx++) on[y][cx] = px[(y * cols + cx) * 4] > 110 ? 1 : 0;
+    }
+    const halfD = 2.6; // extrusion depth, in bitmap cells
+    const faces = [];
+    const at = (yy, xx) => (yy < 0 || yy >= RES || xx < 0 || xx >= cols ? 0 : on[yy][xx]);
+    for (let by = 0; by < RES; by++) {
+      for (let bx = 0; bx < cols; bx++) {
+        if (!on[by][bx]) continue;
+        const x0 = bx - cols / 2;
+        const y0 = RES / 2 - by;
+        // front face, then a side face wherever this cell borders open air
+        faces.push({ v: [[x0, y0, -halfD], [x0 + 1, y0, -halfD], [x0 + 1, y0 - 1, -halfD], [x0, y0 - 1, -halfD]], n: [0, 0, -1], t: 0 });
+        if (!at(by - 1, bx)) faces.push({ v: [[x0, y0, halfD], [x0, y0, -halfD], [x0 + 1, y0, -halfD], [x0 + 1, y0, halfD]], n: [0, 1, 0], t: 1 });
+        if (!at(by + 1, bx)) faces.push({ v: [[x0, y0 - 1, -halfD], [x0, y0 - 1, halfD], [x0 + 1, y0 - 1, halfD], [x0 + 1, y0 - 1, -halfD]], n: [0, -1, 0], t: 1 });
+        if (!at(by, bx - 1)) faces.push({ v: [[x0, y0, -halfD], [x0, y0, halfD], [x0, y0 - 1, halfD], [x0, y0 - 1, -halfD]], n: [-1, 0, 0], t: 1 });
+        if (!at(by, bx + 1)) faces.push({ v: [[x0 + 1, y0, halfD], [x0 + 1, y0, -halfD], [x0 + 1, y0 - 1, -halfD], [x0 + 1, y0 - 1, halfD]], n: [1, 0, 0], t: 1 });
       }
     }
-    raster = { cols, rows, on, edge, el };
-    return raster;
+    mesh = { faces, cols, rows: RES };
+    return mesh;
+  }
+
+  // luminance + which kind of face won, per character cell
+  let buf = null;
+  function renderMesh(gCols, gRows, ry, scale, offY) {
+    if (!buf || buf.cols !== gCols || buf.rows !== gRows) {
+      buf = { cols: gCols, rows: gRows, lum: new Float32Array(gCols * gRows), face: new Uint8Array(gCols * gRows), z: new Float32Array(gCols * gRows) };
+    }
+    buf.lum.fill(0);
+    buf.z.fill(-Infinity);
+    const rx = -0.42; // a fixed tilt, so the turntable reads as a solid and not a flat card
+    const cosX = Math.cos(rx), sinX = Math.sin(rx), cosY = Math.cos(ry), sinY = Math.sin(ry);
+    const fov = 400;
+    const camZ = 135; // gentler than the reference's 80: at this size it was collapsing the last letter
+    const light = [0.6, 0.5, -0.62];
+    const rot = ([x, y, z]) => {
+      const y1 = y * cosX - z * sinX;
+      const z1 = y * sinX + z * cosX;
+      const x2 = x * cosY + z1 * sinY;
+      const z2 = -x * sinY + z1 * cosY;
+      return [x2, y1, z2];
+    };
+    const tri = (a, b, cc, lum, t) => {
+      const minX = Math.max(0, Math.floor(Math.min(a[0], b[0], cc[0])));
+      const maxX = Math.min(gCols - 1, Math.ceil(Math.max(a[0], b[0], cc[0])));
+      const minY = Math.max(0, Math.floor(Math.min(a[1], b[1], cc[1])));
+      const maxY = Math.min(gRows - 1, Math.ceil(Math.max(a[1], b[1], cc[1])));
+      const dx01 = b[0] - a[0], dy01 = b[1] - a[1], dx02 = cc[0] - a[0], dy02 = cc[1] - a[1];
+      const den = dx01 * dy02 - dx02 * dy01;
+      if (Math.abs(den) < 1e-4) return;
+      const inv = 1 / den;
+      for (let py = minY; py <= maxY; py++) {
+        for (let pxx = minX; pxx <= maxX; pxx++) {
+          const dpx = pxx + 0.5 - a[0];
+          const dpy = py + 0.5 - a[1];
+          const u = (dpx * dy02 - dx02 * dpy) * inv;
+          const v = (dx01 * dpy - dpx * dy01) * inv;
+          if (u < 0 || v < 0 || u + v > 1) continue;
+          const z = a[2] + u * (b[2] - a[2]) + v * (cc[2] - a[2]);
+          const n = py * gCols + pxx;
+          if (z <= buf.z[n]) continue;
+          buf.z[n] = z;
+          buf.lum[n] = lum;
+          buf.face[n] = t;
+        }
+      }
+    };
+    for (const f of mesh.faces) {
+      const n = rot(f.n);
+      if (n[2] > 0.05) continue; // back faces: the camera looks down -z
+      const lum = Math.max(0.15, -(n[0] * light[0] + n[1] * light[1] + n[2] * light[2]) * 0.7 + 0.35);
+      const p = f.v.map((v) => {
+        const r = rot([v[0] * scale, v[1] * scale, v[2] * scale]);
+        const pz = Math.max(1, camZ - r[2]);
+        return [(r[0] * fov) / pz + gCols / 2, (-r[1] * fov) / pz + gRows / 2 + offY, r[2]];
+      });
+      tri(p[0], p[1], p[2], lum, f.t);
+      tri(p[0], p[2], p[3], lum, f.t);
+    }
+    return buf;
   }
 
   function drawBoot(W, H, b) {
@@ -257,50 +321,52 @@ export function mountFilmFx(host, getSource, opts = {}) {
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.fillStyle = '#06080a';
     c.fillRect(0, 0, W, H);
-    const cell = Math.max(6, Math.round(H * 0.0135));
-    const cols = Math.floor(W / (cell * 0.62));
-    const rows = Math.round((H * 0.26) / cell);
-    const r = buildRaster(cols, rows);
+    const cell = Math.max(7, Math.round(H * 0.0155));
+    const cw = cell * 0.62;
+    const gCols = Math.floor(W / cw);
+    const gRows = Math.floor(H / cell);
+    buildMesh();
+    // It turns in from three-quarters, then keeps rocking on a slow turntable: held face-on the
+    // extrusion disappears and the word reads as flat type, which is the whole point of building
+    // it as a solid.
+    const spin = (1 - b.word) ** 2;
+    const t = performance.now() / 1000;
+    const ry = -1.25 * spin + (1 - spin) * -0.34 * Math.cos(t * 0.75);
+    const scale = 0.27 + 0.04 * b.word;
+    const grid = renderMesh(gCols, gRows, ry, scale, -gRows * 0.06);
     c.font = `${cell}px "Geist Mono", ui-monospace, monospace`;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    const cw = W / cols;
-    const top = Math.round(H * 0.16);
-    // the field fills column by column, so the word arrives left to right
-    const front = b.word * (cols + 8);
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < cols; x++) {
-        const n = y * cols + x;
-        const here = front - x;
-        if (here <= 0) continue;
+    for (let y = 0; y < gRows; y++) {
+      for (let x = 0; x < gCols; x++) {
+        const n = y * gCols + x;
         const cx = (x + 0.5) * cw;
-        const cy = top + (y + 0.5) * cell;
-        if (r.on[n]) {
-          // the leading column burns brighter as it lands, then settles
-          const fresh = Math.max(0, 1 - here / 7);
-          c.fillStyle = `rgba(${175 + 60 * fresh | 0},255,${205 + 40 * fresh | 0},${(0.8 + 0.2 * fresh).toFixed(2)})`;
-          // a hint of texture across the letterform: solid in the middle, lighter at the edge
-          const ch = r.edge[n] ? EDGE_CHAR : ((x + y) % 5 === 0 ? MID_CHAR : ON_CHAR);
-          c.fillText(ch, cx, cy);
+        const cy = (y + 0.5) * cell;
+        const lum = grid.lum[n];
+        if (lum > 0.01) {
+          const front = grid.face[n] === 0;
+          const a = front ? 0.7 + 0.3 * lum : 0.35 + 0.45 * lum;
+          c.fillStyle = `rgba(190,255,215,${a.toFixed(2)})`;
+          c.fillText(front ? FRONT_CHAR : SIDE_CHAR, cx, cy);
         } else {
-          c.fillStyle = 'rgba(120,200,160,0.1)';
+          c.fillStyle = 'rgba(120,200,160,0.085)';
           c.fillText(FILL_CHAR, cx, cy);
         }
       }
     }
     // the lines under it, typed
-    const size = Math.max(11, Math.round(H * 0.022));
+    const size = Math.max(11, Math.round(H * 0.021));
     c.font = `${size}px "Geist Mono", ui-monospace, monospace`;
     c.textAlign = 'left';
     c.textBaseline = 'top';
-    c.fillStyle = 'rgba(175,255,205,0.88)';
-    const x0 = Math.round(W * 0.5 - (cols * cw * 0.43) / 2);
-    let y = top + rows * cell + Math.round(H * 0.06);
+    const x0 = Math.round(W * 0.085);
+    let y = Math.round(H * 0.72);
     let left = b.typed;
     for (const line of BOOT_LINES) {
       if (left <= 0) break;
       const shown = line.slice(0, left);
       left -= line.length + 1;
+      c.fillStyle = 'rgba(190,255,215,0.9)';
       if (shown) c.fillText(shown, x0, y);
       if (left <= 0) c.fillRect(x0 + c.measureText(shown).width + 4, y + 2, size * 0.5, size);
       y += Math.round(size * 1.7);
