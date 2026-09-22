@@ -110,21 +110,31 @@ worth quoting:
 `tl2` vs `tm2` are both exactly 55/111 but are *not* the same model: zero of 111 probability vectors match and
 they disagree on 26 items (13 each way). The benchmark cannot resolve 4B vs 9B here; that is not a tie.
 
-## 5b. Render sensitivity of the released checkpoints — a deployment caveat
+## 5b. Long-state performance — the axis JevBench cannot see (2026-09-22)
 
-Both public checkpoints were trained before the facts-first corpus fix (REPORT §3ag), so they inherit its
-positional bias. Scored on 605 held-out long states (`scripts/make_long_eval.py`), identical items, differing only
-in where the `Case:` block sits, no truncation at eval:
+605 held-out long states (`scripts/make_long_eval.py`), identical items in both columns, differing only in where
+the `Case:` block sits. No truncation at eval (window 4,096; state p50 1,965 tokens). Majority-class floors:
+.334 overall, .612 on the `policy_permit` (K=2) family.
 
-| released model | facts-**first** state | facts-**last** state | cost of facts-first |
-|---|---:|---:|---:|
-| `typical-small` | .598 | .798 | **−20.0** |
-| `typical-medium` | .612 | .866 | **−25.5** |
+| checkpoint | recipe | facts-**first** | facts-**last** | policy_permit (first) |
+|---|---|---:|---:|---:|
+| `typical-small` (**released**) | pre-fix | **.598** | .798 | .536 |
+| `ts1c` (1.7B) | post-fix | **.947** | .790 | .948 |
+| `typical-medium` (**released**) | pre-fix | **.612** | .866 | .555 |
+| `tm2` (Qwen3.5-4B) | post-fix | **.950** | .879 | .967 |
+| `ladder_14b` | pre-fix | .851 | .919 | .839 |
+| `tl1b_nokd` (14B) | post-fix | **.997** | .921 | .997 |
 
-Callers write their own state text. On long documents these checkpoints want the case facts **after** the policy
-body; putting them first costs 20–25 points, and `typical-small` then sits at the majority-class floor on the
-yes/no family. Retrained checkpoints on the fixed corpus do not show this (REPORT §3ak-a/§3ak-c: the facts-first
-14B reaches .997 on the same set). This belongs on the model cards.
+**Both public checkpoints carry a 20–25 point deployment trap, and both already have a fixed replacement.**
+Callers write their own state text; if the case facts go *before* the policy body — the natural ordering — the
+released models lose 20–25 points and land at or near the majority-class floor on the yes/no family. The post-fix
+checkpoints do not: `ts1c` is +34.9 over `typical-small` and `tm2` is +33.8 over `typical-medium` on facts-first,
+while giving up nothing on facts-last (−0.8 and +1.3 respectively). They are strictly better or equal.
+
+**None of this is visible on JevBench.** `ts1c` reads .708/.432 there against `ts1b`'s .694/.432 — statistically
+indistinguishable — while being 35 points better on the axis the fix targeted. `ladder_14b` reads .053 on the
+JevBench `long_policy` family and .919 here in its own matched render. Treat JevBench as one suite among several,
+not as the release gate; see §5a for why its intervals cannot support the comparisons it was being used for.
 
 ## 5. JevBench (public-subset, 72 standard / 48 easy / 111 hard; see "how to read this")
 
@@ -167,3 +177,15 @@ comparable to the in-process numbers above, which use a different harness.
 | `typical-small-preview` | `OzLabs/typical-small-preview` | Qwen3-1.7B-Base | .750 / .387 | `inference/` | `demo/app.py` |
 | `typical-small` | `OzLabs/typical-small` | Qwen3-1.7B-Base | .694 / .432 | `inference/` | `demo/app.py` |
 | `typical-medium` | `OzLabs/typical-medium` | Qwen3-4B-Base | .806 / .423 | `inference/` | `demo/app.py` |
+
+**Both public checkpoints predate the facts-first corpus fix and should be superseded (§5b).** They lose 20–25
+points on long states when the caller puts case facts before the policy body. Drop-in replacements already exist
+and need no further training — only a card and an upload:
+
+| supersedes | replacement checkpoint | long-state facts-first | gain |
+|---|---|---:|---:|
+| `typical-small` | `ts1c` (1.7B, post-fix recipe) | .947 vs .598 | **+34.9** |
+| `typical-medium` | `tm2` (Qwen3.5-4B, post-fix recipe) | .950 vs .612 | **+33.8** |
+
+Until those ship, the model cards must state the ordering caveat: on long documents, put the case facts **after**
+the policy body.
