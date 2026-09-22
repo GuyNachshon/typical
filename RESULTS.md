@@ -188,4 +188,19 @@ and need no further training — only a card and an upload:
 | `typical-medium` | `tm2` (Qwen3.5-4B, post-fix recipe) | .950 vs .612 | **+33.8** |
 
 Until those ship, the model cards must state the ordering caveat: on long documents, put the case facts **after**
-the policy body.
+the policy body. (Added to all three cards, README and the launch post on 2026-09-23.)
+
+**Release prerequisite, checked 2026-09-23.** The two candidates are not symmetric:
+
+| candidate | backbone | ships with the current public inference package? |
+|---|---|---|
+| `ts1c` → `typical-small` v2 | Qwen3-1.7B-Base (unchanged) | **yes**, no code change needed |
+| `tm2` → `typical-medium` v2 | **Qwen3.5**-4B-Base (generation change) | **no** — needs `inference/typical/backbone.py` refreshed first |
+
+The published `inference/` package is current except for `backbone.py`, which predates the Qwen3.5 port: it lacks
+the VL-wrapper unwrap, the Gated-DeltaNet LoRA target names and the `linear_attn` parent walk, so a Qwen3.5
+checkpoint fails to load. `native.py`, `core.py`, `__init__.py`, `example.py` and `requirements.txt` are byte-identical
+to local, so the serving optimisations are already public and the shipped Qwen3 models are not running stale code.
+The `backbone.py` change is purely additive — every new branch is `hasattr`-guarded, so no Qwen3 path changes — but
+it must be published alongside (or before) any Qwen3.5-backed release or users get a load failure on first call.
+Both backbones are Apache-2.0; there is no licensing blocker either way.
