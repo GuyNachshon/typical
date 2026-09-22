@@ -7,9 +7,14 @@
   body { background:#111; color:#ddd; font:12px/1.4 ui-monospace, monospace; margin:0; padding:12px; }
   canvas { display:block; width:640px; height:400px; background:#000; }
   pre { white-space:pre-wrap; max-width:640px; }
+  body.film { padding:0; overflow:hidden; background:#000; }
+  /* film: scale the 4:3 frame to the viewport width and centre the 3D viewport (top 84% of the frame); the status bar falls below the fold */
+  body.film canvas { width:100vw; height:75vw; margin-top: calc((100vh - 63vw) / 2); image-rendering:pixelated; }
+  body.film pre { display:none; }
 </style>
 </head>
 <body>
+<script>if (location.search.includes('film')) document.body.classList.add('film');</script>
 <canvas id="canvas" width="640" height="400" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
 <pre id="state">booting…</pre>
 <script>
@@ -18,7 +23,7 @@ const KEYS = {
   forward: 0xad, back: 0xaf, left: 0xac, right: 0xae,
   strafeleft: 44, straferight: 46,
   fire: 0x80 + 0x1d, use: 32, run: 0x80 + 0x36,
-  enter: 13, escape: 27, y: 121, n: 110,
+  enter: 13, escape: 27, y: 121, n: 110, equals: 61,
   '1': 49, '2': 50, '3': 51, '4': 52, '5': 53, '6': 54, '7': 55,
 };
 const held = {};
@@ -67,6 +72,8 @@ var Module = {
     Doom.ready = true;
     // Give the title loop a second to come up, then start E1M1 (skill 3 = hurt me plenty).
     setTimeout(() => Doom.newGame(3), 1500);
+    // film mode: enlarge the view to full screen (Doom's '=' key, KEY_EQUALS = 61) so the bezel goes away
+    if (document.body.classList.contains('film')) [3200, 3700, 4200].forEach((t) => setTimeout(() => Doom.press(61, 120), t));
   },
   canvas: document.getElementById('canvas'),
   print: t => console.log(t),

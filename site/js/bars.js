@@ -1,38 +1,37 @@
-// bars.js — the one probability readout: label + violet bar + value, ∅ as a dashed outline row.
-// Used by the hero card, every demo, Try-it and the game chrome. DOM-only, no canvas.
+// bars.js — the one readout: label · ink bar on a light-gray track · value. ∅ last, dashed.
 //
-//   bars(el, rows, {compact})  rows: [{label, p, isNull}]  -> { update(rows) }
-//   inkBars(el, {rows, nullP}) legacy adapter for the demo modules -> { update(rows, nullP) }
+//   bars(el, rows)                      rows: [{label, p, isNull}]  -> { update(rows) }
+//   inkBars(el, {rows, nullP})          legacy adapter for the demo modules
+//   rowsFromResult(result)              /api/decide result -> rows (∅ appended)
 
-function row(r, compact) {
+function row(r) {
   const el = document.createElement('div');
-  el.className = 'bar' + (r.isNull ? ' is-null' : '') + (compact ? ' is-compact' : '');
+  el.className = 'bar' + (r.isNull ? ' is-null' : '');
   const label = document.createElement('span');
-  label.className = 'bar-label';
+  label.className = 'label';
   label.textContent = r.label; // may be user-typed (Try it): text only
   label.title = r.label;
   const track = document.createElement('div');
-  track.className = 'bar-track';
+  track.className = 'track';
   const fill = document.createElement('div');
-  fill.className = 'bar-fill';
+  fill.className = 'fill';
   const pct = Math.max(0, Math.min(1, r.p));
   fill.style.width = (pct * 100).toFixed(1) + '%';
+  track.appendChild(fill);
   const val = document.createElement('span');
-  val.className = 'bar-val' + (pct < 0.15 ? ' is-outside' : '');
+  val.className = 'v';
   val.textContent = pct.toFixed(2);
-  if (pct < 0.15) val.style.left = `calc(${(pct * 100).toFixed(1)}% + 8px)`;
-  track.append(fill, val);
-  el.append(label, track);
+  el.append(label, track, val);
   return el;
 }
 
-export function bars(el, rows, { compact = false } = {}) {
+export function bars(el, rows) {
   el.classList.add('bars');
   const render = (rs) => {
     el.innerHTML = '';
-    const max = Math.max(...rs.filter((r) => !r.isNull).map((r) => r.p), -1);
+    const max = Math.max(-1, ...rs.filter((r) => !r.isNull).map((r) => r.p));
     rs.forEach((r) => {
-      const node = row(r, compact);
+      const node = row(r);
       if (!r.isNull && r.p === max) node.classList.add('is-winner');
       el.appendChild(node);
     });
@@ -42,17 +41,11 @@ export function bars(el, rows, { compact = false } = {}) {
 }
 
 export function inkBars(el, { rows = [], nullP = null } = {}) {
-  const toRows = (rs, np) => [
-    ...rs.map((r) => ({ label: r.label, p: r.p })),
-    ...(np != null ? [{ label: '∅', p: np, isNull: true }] : []),
-  ];
-  const h = bars(el, toRows(rows, nullP));
-  return { update: (rs, np) => h.update(toRows(rs, np)) };
+  const to = (rs, np) => [...rs.map((r) => ({ label: r.label, p: r.p })), ...(np != null ? [{ label: '∅ none', p: np, isNull: true }] : [])];
+  const h = bars(el, to(rows, nullP));
+  return { update: (rs, np) => h.update(to(rs, np)) };
 }
 
-// Turn an /api/decide result into rows for one query.
 export function rowsFromResult(result) {
-  return Object.entries(result.probs || {})
-    .map(([label, p]) => ({ label, p }))
-    .concat([{ label: '∅', p: result.p_null ?? 0, isNull: true }]);
+  return Object.entries(result.probs || {}).map(([label, p]) => ({ label, p })).concat([{ label: '∅ none', p: result.p_null ?? 0, isNull: true }]);
 }

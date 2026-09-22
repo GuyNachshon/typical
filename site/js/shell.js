@@ -5,6 +5,8 @@
 // decide() call — never an invented one.
 import { decide, mode, probeHealth } from './api.js';
 import { bars, inkBars, rowsFromResult } from './bars.js';
+import { describeDoom, candidatesFor, resolveIntent, keyPress, scriptedPolicy, resetNav } from './games/realdoom-logic.js';
+import { QUESTION as DOOM_QUESTION } from './games/doom.js';
 import { hashKey } from './api.js';
 import { lineChart, reliability, ladder } from './charts.js';
 
@@ -310,35 +312,86 @@ function heroPool(presets, replays) {
 
 let heroLive = null; // set by pushDecision in live mode
 async function mountHero(presets) {
-  const card = document.getElementById('hero-decision');
-  if (!card || !presets) return;
+  const read = document.getElementById('hero-decision');
+  const scene = document.getElementById('hero-decision-scene');
+  if (!read || !presets) return;
   const replays = (await loadJSON('data/replays.json')) || {};
   const pool = heroPool(presets, replays);
   if (!pool.length) return;
-  const $ = (k) => card.querySelector(`[data-${k}]`);
+  // scene: the state as a typographic still; read: question + bars + meta
+  scene.innerHTML = '';
+  scene.style.cssText = 'padding:60px 50px;display:flex;flex-direction:column;justify-content:flex-end;gap:18px';
+  const stateEl = document.createElement('p'); stateEl.className = 't-card'; stateEl.style.maxWidth = '22ch';
+  const stateLab = document.createElement('p'); stateLab.className = 't-eyebrow muted'; stateLab.textContent = 'the state';
+  scene.append(stateLab, stateEl);
+  read.innerHTML = '';
+  const qLab = document.createElement('p'); qLab.className = 't-eyebrow muted'; qLab.textContent = 'the question';
+  const qEl = document.createElement('p'); qEl.className = 't-ui'; qEl.style.marginBottom = '18px';
+  const barsEl = document.createElement('div');
+  const meta = document.createElement('p'); meta.className = 't-mono muted'; meta.style.marginTop = '18px';
+  read.append(qLab, qEl, barsEl, meta);
+  const b = bars(barsEl, rowsFromResult(pool[0].r));
   const trunc = (t, n) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
-  let i = 0;
-  let barsEl = bars($('bars'), rowsFromResult(pool[0].r));
   const show = (e, source) => {
-    $('kind').textContent = `${e.q.type} · ${source}`;
-    $('ms').textContent = `${Math.round(e.ms)} ms · ${e.device || 'mps'}`;
-    $('state').textContent = trunc(e.state, 260);
-    $('q').textContent = trunc(e.q.question, 170);
-    $('model').textContent = e.model || 'typical-small';
-    barsEl.update(rowsFromResult(e.r));
+    stateEl.textContent = trunc(e.state, 220);
+    qEl.textContent = trunc(e.q.question, 170);
+    b.update(rowsFromResult(e.r));
+    meta.textContent = `${e.q.type} · ${source} · ${Math.round(e.ms)} ms · ${e.device || 'mps'} · ${e.model || 'typical-small'} · ${pool.length} recorded decisions`;
   };
-  $('count').textContent = `${pool.length} recorded decisions`;
+  let i = 0;
   show(pool[0], 'recorded');
   setInterval(() => {
     if (heroLive) { show(heroLive, 'live'); heroLive = null; return; }
     i = (i + 1) % pool.length;
     show(pool[i], 'recorded');
-  }, 2600);
+  }, 3200);
 }
-// live decide() results flow into the hero card
+// live decide() results flow into the decision panel
 function pushDecision(res, state, queries) {
   if (!res?.results?.[0] || !queries?.[0] || queries[0].labels.length > 6 || !state) return;
   heroLive = { state: String(state), q: queries[0], r: res.results[0], ms: res.ms, device: res.device, model: res.model };
+}
+
+// ---- the film: real DOOM in the hero, driven by the model (live) or the rule list (recorded) ----
+function mountFilm(ctx) {
+  const film = document.getElementById('film');
+  const rowsEl = document.getElementById('hud-rows'), sentEl = document.getElementById('hud-sentence'), rec = document.getElementById('hud-rec');
+  if (!film || !rowsEl) return;
+  const labels = ['retreat', 'shoot', 'turn left', 'turn right', 'explore'];
+  let stopped = false;
+  const io = new IntersectionObserver((es) => { stopped = !es[0].isIntersecting; });
+  io.observe(film);
+  async function loop() {
+    if (stopped) return setTimeout(loop, 800); // do not drive the game (or the model) while the hero is off screen
+    const D = film.contentWindow?.Doom;
+    if (!D || !D.ready) return setTimeout(loop, 500);
+    const st = D.state();
+    if (!st.in_level) return setTimeout(loop, 500);
+    const cands = candidatesFor(st);
+    const sentence = describeDoom(st);
+    let move = scriptedPolicy(st), probs = null, source = 'rule list';
+    if (ctx.mode() === 'live' && cands.length >= 2) {
+      try {
+        const res = await decide(sentence, [{ type: 'choice', question: DOOM_QUESTION, labels: cands }]);
+        const r = res?.results?.[0];
+        if (r) { probs = r.probs; move = cands.reduce((a, c) => ((r.probs[c] ?? 0) > (r.probs[a] ?? 0) ? c : a), cands[0]); source = `model · ${Math.round(res.ms)} ms`; }
+      } catch {}
+    }
+    rec.textContent = `REC · typical-small · E1M1 · ${source}`;
+    sentEl.textContent = sentence;
+    rowsEl.innerHTML = '';
+    labels.forEach((l) => {
+      const d = document.createElement('div'); d.className = 'line' + (l === move ? ' on' : '');
+      const a = document.createElement('span'); a.textContent = l;
+      const v = document.createElement('span'); v.textContent = probs ? (probs[l] != null ? probs[l].toFixed(2) : '') : cands.includes(l) ? (l === move ? '●' : '·') : '';
+      d.append(a, v); rowsEl.appendChild(d);
+    });
+    const action = resolveIntent(st, move);
+    const spec = keyPress(st, move, action);
+    try { if (typeof spec[1] === 'object') await D.turnBy(spec[0], spec[1].deg); else await D.press(spec[0], spec[1]); } catch {}
+    setTimeout(loop, 380);
+  }
+  resetNav(); loop();
 }
 
 async function mountFindings() {
@@ -384,6 +437,7 @@ async function boot() {
   const ctx = { decide: liveDecide, mode, readout, presets, inkBars };
 
   mountHero(presets);
+  mountFilm(ctx);
   mountFindings();
   mountResults(models, reliabilityDoc, chanceDoc, frozenDoc);
   mountTryit(ctx);
