@@ -163,7 +163,12 @@ result predicts (REPORT §3s).</p>
 same cached state, native head versus prompting the same backbone.</p></div>
 <div class="media" style="padding:30px"><div class="chart" id="chart-latency" data-chart="latency"></div></div>
 <div class="prose"><p>Takeaway: one decision costs about 45 ms whatever K is, and each extra question costs a few
-milliseconds because the state is read once.</p></div>
+milliseconds because the state is read once. The served path in the public package is faster
+still once the state is cached: the serving code used to deep-copy the whole prefix KV cache per
+decision, and replacing that with a zero-byte view brought the warm p50 to 15.5–17 ms at 1.7B and
+19–21 ms at 4B, unchanged from K = 2 to K = 32 (<code>runs/serve_bench2/results.json</code>, REPORT §3ag).
+No quantisation; <code>torch.compile</code> and CUDA graphs were tried and rejected because probabilities
+drifted by up to .1 across shape buckets.</p></div>
 </div></div>
 </section>
 
