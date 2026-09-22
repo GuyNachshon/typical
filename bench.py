@@ -26,7 +26,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from encode import Backbone, FeatureCache, pick_device, EmbedEncoder, VecCache, TokenCandCache, CAND_RENDER, EMBED_DIM
 from model import DecisionModel, decide
 from mcq import MCQHead
-from native import NativeHead, RENDERS, native_kv_decide, _causal_pad_mask, \
+from native import NativeHead, RENDERS, _render_row, native_kv_decide, _causal_pad_mask, \
     _cache_batch_repeat_interleave, _cache_select_rows
 from baselines import b_prompt, score_example_kv
 
@@ -515,7 +515,9 @@ def native_grid(args, device, tok, lm, head, nhead, energy):
     Ls = [args.state_tokens] if args.state_tokens else ([256] if args.quick else [256, 1000, 2000])
     warmup, reps = 2, (3 if args.quick else 5)
     max_state = max(Ls) + 16
-    render = RENDERS[nhead.render]
+    # _render_row, not RENDERS[...] directly: the semif render needs the tokenizer's
+    # chat-template tail as a third argument, which the bare RENDERS entry does not take.
+    render = lambda q, c: _render_row(tok, nhead.render, q, c)
     results, crossover = {}, {}
     for L in Ls:
         state_text, n_tok = state_with_tokens(tok, L)

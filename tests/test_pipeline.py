@@ -2272,6 +2272,19 @@ def test_bern_out_of_domain_kway_row_degrades_instead_of_crashing():
 from native import _render_semif, _render_row, _semif_head_tail, native_kv_decide  # noqa: E402
 
 
+def test_every_render_dispatches_through_render_row(tied_mcq_head):
+    """bench.py called RENDERS[name](query, cands) directly and crashed the ts1b_semif
+    latency bench with "TypeError: _render_semif() missing 1 required positional argument:
+    'tail_text'" -- semif is the one render needing the tokenizer's chat-template tail, which
+    is exactly why _render_row exists. Any caller reaching RENDERS directly breaks on semif
+    only, so it survives every letters/tags smoke test."""
+    tok = tied_mcq_head.backbone.tokenizer
+    for name in RENDERS:
+        text, spans = _render_row(tok, name, "Which one?", ["alpha", "beta", "gamma"])
+        assert isinstance(text, str) and text, name
+        assert isinstance(spans, (list, tuple)), name
+
+
 def test_semif_render_two_examples_json_shape_and_spans(tied_mcq_head):
     """_render_semif's suffix continues the "evidence" string opened in the cached prefix:
     closing quote, criterion, then K lettered {"letter","description"} options (no null line)
