@@ -2,7 +2,7 @@
 // JevBench-per-family bars, and the timeline chart from data/research-*.json into the .chart
 // mounts scripts/build_research.py wraps in white .media panels. Charts are js/charts.js as-is
 // (hand-rolled SVG, no animation). No sticky TOC on this page (the Agility lane has none).
-import { donut, barChart, hbarFloor, timeline } from './charts.js';
+import { donut, barChart, hbarFloor, timeline, fmtPct } from './charts.js';
 import { mountExplorables } from './explorables.js';
 
 async function loadJSON(path) {
@@ -72,7 +72,7 @@ async function mountJevFamily() {
     series: [{ label: 'typical-small', values: Object.entries(fam).map(([k, v]) => ({ x: k, y: v.acc })) }],
     yLabel: 'JevBench standard accuracy',
     title: 'JevBench standard, per family (typical-small)',
-    fmt: (v) => v.toFixed(2),
+    fmt: fmtPct,
   });
   sourceNote(el, d.source);
 }

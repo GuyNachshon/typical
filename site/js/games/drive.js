@@ -9,6 +9,7 @@
 export const RULES = {
   stop: "applies when a pedestrian is crossing the car's lane",
   brake: 'applies when the traffic light ahead is red',
+  'swerve left': "applies when a cone blocks the car's lane ahead", // visitor-placed hazard (site interactivity)
   'change lane right': 'applies when the car must take the exit on the right',
   accelerate: 'applies when the road ahead is clear for 50 m', // speeds up to the limit; no-op at it
   'change lane left': 'applies when the car is closing on a slower vehicle ahead',
@@ -85,6 +86,7 @@ export class Drive {
       });
     }
     this.pedestrians = [];
+    this.cones = [];
     this.distance = 0;
     this.violations = 0;
     this.collisions = 0;
@@ -101,6 +103,7 @@ export class Drive {
       lights: this.lights.map((l) => ({ ...l })),
       traffic: this.traffic.map((c) => ({ ...c })),
       pedestrians: this.pedestrians.map((p) => ({ ...p })),
+      cones: this.cones.map((c) => ({ ...c })),
       distance: this.distance,
       violations: this.violations,
       collisions: this.collisions,
@@ -128,13 +131,16 @@ export class Drive {
     const lead = this._lead();
     const light = this.lights.find((l) => l.pos >= e.position && l.pos - e.position <= LIGHT_RANGE);
     const ped = this.pedestrians.find((p) => p.lane === e.lane && p.pos >= e.position && p.pos - e.position <= PED_RANGE);
+    const cone = this.cones.find((c) => c.lane === e.lane && c.pos >= e.position && c.pos - e.position <= PED_RANGE);
     const exitIn = DEST_POS - e.position;
     return {
       lead,
       light,
       ped,
+      cone,
       exitIn,
       red: Boolean(light && light.state === 'red'),
+      coneAhead: Boolean(cone),
       closing: Boolean(lead && lead.speed < e.speed && lead.position - e.position <= CLOSING_RANGE),
       exitNear: exitIn > 0 && exitIn <= EXIT_RANGE,
       mustExit: exitIn > 0 && exitIn <= EXIT_RANGE && e.lane < LANES,
@@ -155,12 +161,28 @@ export class Drive {
     return ACTIONS.filter((a) => {
       if (a === 'change lane right') return sit.rightClear;
       if (a === 'change lane left') return sit.leftClear && !sit.exitNear;
+      if (a === 'swerve left') return sit.leftClear;
       return true;
     });
   }
 
   safeMoves() {
     return this.candidates();
+  }
+
+  // Visitor-placed hazard (site interactivity): validated on-road, ahead-of-the-car placement
+  // that lands in the same arrays procedurally spawned objects use, so it flows through the
+  // existing situations()/describe() pipeline - the model always reads one of the pre-computed
+  // sentences above, never a raw coordinate. Rejects (returns false, no mutation) anything the
+  // engine can't represent: off-road lane, or behind/at the car.
+  placeHazard(kind, lane, pos) {
+    if (this.done || lane < 1 || lane > LANES || pos <= this.ego.position || pos >= ROAD_LENGTH) return false;
+    if (kind === 'pedestrian') this.pedestrians.push({ pos, lane, ticksLeft: 20 }); // longer-lived than a
+    // spawned pedestrian's 4 ticks - a visitor-placed one should stick around long enough to watch.
+    else if (kind === 'cone') this.cones.push({ pos, lane });
+    else if (kind === 'car') this.traffic.push({ lane, position: pos, speed: 0, cruise: 0 });
+    else return false;
+    return true;
   }
 
   _applyAction(action) {
@@ -171,7 +193,7 @@ export class Drive {
     else if (action === 'follow') {
       const lead = this._lead();
       if (lead) e.speed = Math.max(0, Math.min(e.speed, lead.speed));
-    } else if (action === 'change lane left') e.lane -= 1;
+    } else if (action === 'change lane left' || action === 'swerve left') e.lane -= 1;
     else if (action === 'change lane right') e.lane += 1;
     // 'hold speed' and unrecognised/illegal actions: no-op.
   }
@@ -248,6 +270,7 @@ export class Drive {
     ];
     if (sit.ped) sentences.push(`A pedestrian is crossing the car's lane ${Math.round(sit.ped.pos - e.position)} m ahead.`);
     if (sit.red) sentences.push(`The traffic light ${Math.round(sit.light.pos - e.position)} m ahead is red.`);
+    if (sit.coneAhead) sentences.push(`A cone blocks the car's lane ${Math.round(sit.cone.pos - e.position)} m ahead.`);
     if (sit.closing) sentences.push(`The car is closing on a slower vehicle ${Math.round(sit.lead.position - e.position)} m ahead.`);
     else if (sit.lead) sentences.push(`The lead vehicle is ${Math.round(sit.lead.position - e.position)} m ahead at ${sit.lead.speed} km/h.`);
     if (sit.mustExit) sentences.push(`The car must take the exit on the right in ${Math.round(sit.exitIn)} m.`);
@@ -303,6 +326,11 @@ export class Drive {
       if (row < 0 || row >= ROWS || lightRow[row]) continue;
       lanes[row][p.lane - 1] = cell('☺');
     }
+    for (const c of this.cones) {
+      const row = rowFor(c.pos);
+      if (row < 0 || row >= ROWS || lightRow[row]) continue;
+      lanes[row][c.lane - 1] = cell('▲');
+    }
     if (e.position < DEST_POS) {
       for (let row = 0; row < ROWS; row++) {
         const pos = e.position - (row - EGO_ROW) * METERS_PER_ROW;
@@ -332,6 +360,7 @@ export function greedyPolicy(engine) {
   const fires = {
     stop: Boolean(sit.ped),
     brake: sit.red,
+    'swerve left': sit.coneAhead,
     'change lane right': sit.mustExit,
     accelerate: sit.roadClear,
     'change lane left': sit.closing,
@@ -403,6 +432,23 @@ function selfTest() {
   console.assert(!d3.candidates().includes('change lane left'), 'cannot change lane left off the road');
   d3.ego.lane = 3;
   console.assert(!d3.candidates().includes('change lane right'), 'cannot change lane right off the road');
+
+  // visitor-placed hazards flow through the same pipeline as spawned ones
+  const d6 = new Drive({ seed: 1 });
+  d6.ego = { lane: 2, speed: 40, position: 500 };
+  d6.traffic = [];
+  d6.lights = [];
+  d6.pedestrians = [];
+  d6.cones = [];
+  console.assert(!d6.placeHazard('cone', 2, 480), 'hazard behind the car is rejected');
+  console.assert(!d6.placeHazard('cone', 4, 520), 'hazard off-road is rejected');
+  console.assert(d6.placeHazard('cone', 2, 515), 'on-road hazard ahead of the car is accepted');
+  console.assert(d6.describe().includes("A cone blocks the car's lane 15 m ahead."), 'placed cone renders the same sentence style as a spawned hazard');
+  console.assert(d6.candidates().includes('swerve left'), 'swerve left is offered with the left lane clear');
+  console.assert(greedyPolicy(d6) === 'swerve left', 'cone in the lane outranks the default');
+  console.assert(d6.placeHazard('pedestrian', 1, 510), 'pedestrian hazard accepted ahead in a different lane');
+  console.assert(d6.placeHazard('car', 3, 530), 'stopped-car hazard accepted (reuses the traffic array)');
+  console.assert(d6.traffic.length === 1 && d6.traffic[0].speed === 0, 'stopped-car hazard has zero speed');
 
   // determinism
   function run(seed) {

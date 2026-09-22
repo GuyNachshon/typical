@@ -58,9 +58,50 @@ function wedgeGeometry(hw, hl, height) {
   return geo;
 }
 
+// Radial vignette + horizon band, drawn once into a CanvasTexture and set as scene.background -
+// a background render pass is always behind every scene object (z-order guaranteed, not a DOM
+// overlay), so it can never sit over the HUD, which is a separate absolutely-positioned element.
+function buildSkyTexture() {
+  const size = 512;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(size / 2, size * 0.42, size * 0.05, size / 2, size * 0.42, size * 0.75);
+  g.addColorStop(0, '#141414');
+  g.addColorStop(1, TOKENS.putty);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// Soft dark disc (contact shadow / cheap AO) reused across every ego/traffic instance.
+function buildShadowTexture() {
+  const size = 64;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, 'rgba(0,0,0,0.45)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(c);
+}
+
+function buildShadow(shadowTex, w, d) {
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, d),
+    new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
+  );
+  mesh.rotation.x = -Math.PI / 2;
+  return mesh;
+}
+
 function buildScene() {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(TOKENS.putty);
+  scene.background = buildSkyTexture();
 
   scene.add(new THREE.AmbientLight(TOKENS.bone, 0.75));
   const sun = new THREE.DirectionalLight(TOKENS.paper, 0.7);
@@ -75,6 +116,17 @@ function buildScene() {
   ground.position.set(0, 0, ROAD_LENGTH / 2);
   scene.add(ground);
 
+  // shoulder: a strip either side of the road, between road and putty ground
+  const roadHalfW = (LANE_W * LANES) / 2;
+  const shoulderW = 1.4;
+  const shoulderMat = new THREE.MeshLambertMaterial({ color: TOKENS.vellum });
+  for (const side of [-1, 1]) {
+    const shoulder = new THREE.Mesh(new THREE.PlaneGeometry(shoulderW, ROAD_LENGTH + 100), shoulderMat);
+    shoulder.rotation.x = -Math.PI / 2;
+    shoulder.position.set(side * (roadHalfW + shoulderW / 2), 0.008, ROAD_LENGTH / 2);
+    scene.add(shoulder);
+  }
+
   const road = new THREE.Mesh(
     new THREE.PlaneGeometry(LANE_W * LANES, ROAD_LENGTH + 100),
     new THREE.MeshLambertMaterial({ color: TOKENS.graphite })
@@ -82,6 +134,16 @@ function buildScene() {
   road.rotation.x = -Math.PI / 2;
   road.position.set(0, 0.01, ROAD_LENGTH / 2);
   scene.add(road);
+
+  // solid edge lines (road/shoulder boundary) - ponytail: a one-way 3-lane road has no true
+  // centre line (that's for opposing traffic); the internal lane boundaries stay dashed below.
+  const edgeMat = new THREE.MeshLambertMaterial({ color: TOKENS.bone });
+  for (const x of [-roadHalfW, roadHalfW]) {
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.12, ROAD_LENGTH + 100), edgeMat);
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(x, 0.015, ROAD_LENGTH / 2);
+    scene.add(line);
+  }
 
   // exit ramp: a widening wedge peeling off the right shoulder near DEST_POS
   const rightEdge = laneToX(LANES) + LANE_W / 2;
@@ -115,9 +177,11 @@ function buildScene() {
   dashes.instanceMatrix.needsUpdate = true;
   scene.add(dashes);
 
-  return { scene, sun };
+  return { scene, sun, road };
 }
 
+// Returns { group, brakeLights } - brakeLights is the material shared by both rear lamps, toggled
+// between an unlit ink dot and a lit paper one whenever the engine's speed drops between ticks.
 function buildEgo() {
   const group = new THREE.Group();
   const body = new THREE.Mesh(
@@ -130,13 +194,28 @@ function buildEgo() {
   windshield.rotation.x = -Math.PI / 2;
   windshield.position.set(0, 0.71, 0.3);
   group.add(windshield);
-  return group;
+
+  const brakeMat = new THREE.MeshBasicMaterial({ color: TOKENS.ink });
+  const lampGeo = new THREE.BoxGeometry(0.2, 0.12, 0.06);
+  for (const x of [-0.6, 0.6]) {
+    const lamp = new THREE.Mesh(lampGeo, brakeMat);
+    lamp.position.set(x, 0.4, -1.88);
+    group.add(lamp);
+  }
+  return { group, brakeMat };
 }
 
 function buildTrafficCar() {
   return new THREE.Mesh(
     new THREE.BoxGeometry(1.7, 1.1, 3.4),
     new THREE.MeshLambertMaterial({ color: TOKENS.bone, flatShading: true })
+  );
+}
+
+function buildCone() {
+  return new THREE.Mesh(
+    new THREE.ConeGeometry(0.35, 0.8, 6),
+    new THREE.MeshLambertMaterial({ color: TOKENS.ink, flatShading: true })
   );
 }
 
@@ -165,9 +244,29 @@ function buildLight(pos) {
   return { group, lamp };
 }
 
+// Injected once (scoped to .gc-drive, this module's own root class - never leaks into the
+// snake/doom cards which share loop.js's .gc-root) for the one thing no existing class covers:
+// a crosshair cursor over the clickable road.
+function injectStyle() {
+  if (document.getElementById('gc-drive-style')) return;
+  const style = document.createElement('style');
+  style.id = 'gc-drive-style';
+  style.textContent = '.gc-drive canvas { cursor: crosshair; touch-action: manipulation; }';
+  document.head.appendChild(style);
+}
+
+const HAZARDS = [
+  { key: 'cone', label: 'Cone' },
+  { key: 'pedestrian', label: 'Pedestrian' },
+  { key: 'car', label: 'Stalled car' },
+];
+
 export async function mount(el, { decide, mode } = {}) {
+  injectStyle();
   const refs = mountChrome(el, { label: 'Drive · 3-lane road' });
+  el.classList.add('gc-drive');
   const canvas = refs.canvas;
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
   // data/replays/drive.json is {frames, summary} (scripts/record_games.mjs) - replayFrame()
   // wants the bare frames array.
@@ -176,18 +275,24 @@ export async function mount(el, { decide, mode } = {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
 
-  const { scene } = buildScene();
+  const { scene, road } = buildScene();
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 300);
 
-  const egoMesh = buildEgo();
+  const { group: egoMesh, brakeMat } = buildEgo();
   scene.add(egoMesh);
+
+  const shadowTex = buildShadowTexture();
+  const egoShadow = buildShadow(shadowTex, 2.2, 4.4);
+  scene.add(egoShadow);
 
   let engine = new Drive({ seed: Math.floor(Math.random() * 1e9) });
   const lightMeshes = engine.lights.map((l) => buildLight(l.pos));
   lightMeshes.forEach(({ group }) => scene.add(group));
 
   const trafficPool = [];
+  const trafficShadowPool = [];
   const pedPool = [];
+  const conePool = [];
   function ensurePool(pool, builder, count) {
     while (pool.length < count) {
       const mesh = builder();
@@ -294,29 +399,41 @@ export async function mount(el, { decide, mode } = {}) {
   resize();
 
   function draw() {
-    const t = Math.max(0, Math.min(1, (performance.now() - lastTickAt) / TICK_MS));
+    // prefers-reduced-motion: skip the sub-tick interpolation (camera/road jump straight to the
+    // current tick instead of easing) rather than turning off ticking itself.
+    const t = reducedMotion ? 1 : Math.max(0, Math.min(1, (performance.now() - lastTickAt) / TICK_MS));
     const pe = prevState.ego;
     const ce = currState.ego;
     const egoX = lerp(laneToX(pe.lane), laneToX(ce.lane), t);
     const egoZ = lerp(pe.position, ce.position, t);
     egoMesh.position.set(egoX, 0, egoZ);
+    egoShadow.position.set(egoX, 0.006, egoZ);
+    brakeMat.color.set(ce.speed < pe.speed ? TOKENS.paper : TOKENS.ink);
 
     camera.position.set(egoX, CAM_HEIGHT, egoZ - CAM_BACK);
     camera.lookAt(egoX, 0, egoZ + CAM_AHEAD);
 
     const traffic = ensurePool(trafficPool, buildTrafficCar, currState.traffic.length);
+    const trafficShadows = ensurePool(trafficShadowPool, () => buildShadow(shadowTex, 2, 4), currState.traffic.length);
     currState.traffic.forEach((car, i) => {
       const prev = prevState.traffic[i] ?? car;
       const x = lerp(laneToX(prev.lane), laneToX(car.lane), t);
       const z = lerp(prev.position, car.position, t);
       traffic[i].position.set(x, 0.55, z);
+      trafficShadows[i].position.set(x, 0.006, z);
     });
 
-    // ponytail: pedestrians spawn/despawn irregularly (no stable index to interpolate against)
-    // - snap to the current frame's positions rather than tracking identity across ticks.
+    // ponytail: pedestrians and placed cones spawn/despawn irregularly (no stable index to
+    // interpolate against) - snap to the current frame's positions rather than tracking identity
+    // across ticks, same call already made for pedestrians.
     const peds = ensurePool(pedPool, buildPedestrian, currState.pedestrians.length);
     currState.pedestrians.forEach((p, i) => {
       peds[i].position.set(laneToX(p.lane), 0.7, p.pos);
+    });
+
+    const cones = ensurePool(conePool, buildCone, currState.cones.length);
+    currState.cones.forEach((c, i) => {
+      cones[i].position.set(laneToX(c.lane), 0.4, c.pos);
     });
 
     lightMeshes.forEach(({ lamp }, i) => {
@@ -354,6 +471,52 @@ export async function mount(el, { decide, mode } = {}) {
     refs.policyBtn.classList.toggle('gc-on', policyName === 'model');
   });
   refs.restartBtn.addEventListener('click', restart);
+
+  // (a) Interactivity: click/tap the road to place a hazard. The clicked point is raycast onto
+  // the `road` mesh (its extent is exactly lanes 1..LANES, so a hit off the road never happens)
+  // and converted to a lane + world position, then handed to Drive.placeHazard() - the engine
+  // decides legality (on-road, ahead of the car) and, once accepted, the hazard flows through
+  // the same describe() sentence used for procedurally spawned pedestrians/traffic, so the next
+  // tick's model call sees one of the pre-computed sentences and the decision bars move.
+  let hazardKind = HAZARDS[0].key;
+  const hazardHint = document.createElement('div');
+  hazardHint.className = 'gc-sentence';
+  refs.sentence.parentElement.appendChild(hazardHint);
+  function updateHazardHint() {
+    const label = HAZARDS.find((h) => h.key === hazardKind).label.toLowerCase();
+    hazardHint.textContent = `Click the road to place a ${label}.`;
+  }
+  updateHazardHint();
+
+  const hazardControls = el.querySelector('.gc-controls');
+  const hazardBtns = HAZARDS.map(({ key, label }) => {
+    const b = document.createElement('button');
+    b.className = 'btn outline gc-btn';
+    b.type = 'button';
+    b.textContent = label;
+    b.addEventListener('click', () => {
+      hazardKind = key;
+      hazardBtns.forEach((btn, i) => btn.classList.toggle('gc-on', HAZARDS[i].key === hazardKind));
+      updateHazardHint();
+    });
+    hazardControls?.insertBefore(b, hazardControls.firstChild);
+    return b;
+  });
+  hazardBtns[0]?.classList.add('gc-on');
+
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  function placeAt(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hit = raycaster.intersectObject(road)[0];
+    if (!hit) return; // off-road click - ignored, per spec
+    const lane = Math.round(hit.point.x / LANE_W + (LANES + 1) / 2);
+    engine.placeHazard(hazardKind, lane, Math.round(hit.point.z)); // no-ops (returns false) behind the car
+  }
+  canvas.addEventListener('click', (e) => placeAt(e.clientX, e.clientY));
 
   return {
     stop() {

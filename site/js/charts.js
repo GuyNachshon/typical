@@ -114,6 +114,8 @@ function baseSvg(container, w, h, titleStr) {
 
 // Default tick formatter: at most 2 decimals, no float noise.
 export const fmtNum = (v) => (Number.isInteger(v) ? String(v) : Number(v.toFixed(2)).toString());
+// Accuracy axes are labelled in percent (see shell.js pct): 80% reads, .804 has to be decoded.
+export const fmtPct = (v) => `${Number((v * 100).toFixed(1))}%`;
 
 // Legend key: a 10px square swatch (solid fill, or a hollow ring for an unreleased model) + the
 // series label in 11px mono mid-gray — plain inline styles, this chart doesn't depend on any
@@ -306,8 +308,8 @@ export function reliability(container, opts) {
   [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
     g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(t), y2: y(t), stroke: STEEL, 'stroke-dasharray': '2,3' }));
     g.appendChild(svgEl('line', { x1: x(t), x2: x(t), y1: 0, y2: ih, stroke: STEEL, 'stroke-dasharray': '2,3' }));
-    g.appendChild(svgText(-8, y(t) + 3, t.toFixed(2), { fill: MID, 'font-size': 12, 'text-anchor': 'end' }));
-    g.appendChild(svgText(x(t), ih + 16, t.toFixed(2), { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
+    g.appendChild(svgText(-8, y(t) + 3, fmtPct(t), { fill: MID, 'font-size': 12, 'text-anchor': 'end' }));
+    g.appendChild(svgText(x(t), ih + 16, fmtPct(t), { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
   });
   // ideal-calibration diagonal: steel dashed
   g.appendChild(svgEl('line', { x1: x(0), y1: y(0), x2: x(1), y2: y(1), stroke: STEEL, 'stroke-width': 1.5, 'stroke-dasharray': '4,3' }));
@@ -320,7 +322,7 @@ export function reliability(container, opts) {
     const by = y(b.accuracy);
     const rect = bar(g, bx, by, bw, ih - by, INK, 0.85);
     const ttl = svgEl('title');
-    ttl.textContent = `[${b.lo.toFixed(2)}–${b.hi.toFixed(2)}] n=${b.n} acc=${b.accuracy.toFixed(3)} conf=${b.mean_confidence.toFixed(3)}`;
+    ttl.textContent = `[${b.lo.toFixed(2)}–${b.hi.toFixed(2)}] n=${b.n} acc=${fmtPct(b.accuracy)} conf=${fmtPct(b.mean_confidence)}`;
     rect.appendChild(ttl);
     g.appendChild(rect);
     if (b.n > 0) g.appendChild(svgText(i * slot + slot / 2, by - 4, `n=${b.n}`, { fill: MID, 'text-anchor': 'middle', 'font-size': 11 }));
@@ -455,7 +457,7 @@ export function hbarFloor(container, opts) {
 
   [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
     g.appendChild(svgEl('line', { x1: x(t), x2: x(t), y1: 0, y2: rows.length * rowH, stroke: STEEL, 'stroke-dasharray': '2,3' }));
-    g.appendChild(svgText(x(t), rows.length * rowH + 16, t.toFixed(2), { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
+    g.appendChild(svgText(x(t), rows.length * rowH + 16, fmtPct(t), { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
   });
 
   rows.forEach((row, i) => {
@@ -471,7 +473,7 @@ export function hbarFloor(container, opts) {
       const vw = Math.max(0, x(v));
       const rect = bar(g, 0, y0 + dy, vw, barH, fill);
       const ttl = svgEl('title');
-      ttl.textContent = `${label} · ${row.label}: ${v.toFixed(3)}${row.floor != null ? ` (floor ${row.floor.toFixed(3)})` : ''}`;
+      ttl.textContent = `${label} · ${row.label}: ${fmtPct(v)}${row.floor != null ? ` (floor ${fmtPct(row.floor)})` : ''}`;
       rect.appendChild(ttl);
       g.appendChild(rect);
     });
@@ -479,7 +481,7 @@ export function hbarFloor(container, opts) {
       const fx = x(row.floor);
       const line = svgEl('line', { x1: fx, x2: fx, y1: y0 + 1, y2: y0 + rowH - 5, stroke: INK, 'stroke-width': 2 });
       const ttl = svgEl('title');
-      ttl.textContent = `floor (majority/constant-prediction) · ${row.label}: ${row.floor.toFixed(3)}`;
+      ttl.textContent = `floor (majority/constant-prediction) · ${row.label}: ${fmtPct(row.floor)}`;
       line.appendChild(ttl);
       g.appendChild(line);
     }
@@ -526,7 +528,7 @@ export function timeline(container, opts) {
 
   [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
     g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(t), y2: y(t), stroke: STEEL, 'stroke-dasharray': '2,3' }));
-    g.appendChild(svgText(-8, y(t) + 3, t.toFixed(2), { fill: MID, 'font-size': 12, 'text-anchor': 'end' }));
+    g.appendChild(svgText(-8, y(t) + 3, fmtPct(t), { fill: MID, 'font-size': 12, 'text-anchor': 'end' }));
   });
   refLine(g, iw, y(0.311), 'chance (.311)');
 
@@ -562,7 +564,7 @@ export function timeline(container, opts) {
       : svgEl('circle', { cx, cy, r: 8, fill: INK, stroke: WHITE, 'stroke-width': 2 });
     if (unreleased) dot.setAttribute('stroke-dasharray', '3,2'); // matches ladder()'s hollow-dot dash
     const ttl = svgEl('title');
-    ttl.textContent = `${i + 1}. ${p.date} · ${p.label}: JevBench standard ${p.std.toFixed(3)} (${p.source})`;
+    ttl.textContent = `${i + 1}. ${p.date} · ${p.label}: JevBench standard ${fmtPct(p.std)} (${p.source})`;
     dot.appendChild(ttl);
     g.appendChild(dot);
     if (unreleased) {
@@ -621,7 +623,7 @@ export function timeline(container, opts) {
   const leg = document.createElement('ol');
   leg.className = 'timeline-legend';
   leg.innerHTML = lineage
-    .map((p) => `<li><b>${p.date}</b> — ${p.label}: <b>${p.std.toFixed(3)}</b> <span class="dim">(${p.source})</span></li>`)
+    .map((p) => `<li><b>${p.date}</b> — ${p.label}: <b>${fmtPct(p.std)}</b> <span class="dim">(${p.source})</span></li>`)
     .join('');
   leg.style.cssText = `color:${INK};`;
   leg.querySelectorAll('.dim').forEach((el) => (el.style.color = MID));

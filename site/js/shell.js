@@ -8,7 +8,7 @@ import { bars, inkBars, rowsFromResult } from './bars.js';
 import { describeDoom, candidatesFor, resolveIntent, keyPress, scriptedPolicy, resetNav } from './games/realdoom-logic.js';
 import { QUESTION as DOOM_QUESTION } from './games/doom.js';
 import { hashKey } from './api.js';
-import { lineChart, reliability, ladder } from './charts.js';
+import { lineChart, reliability, ladder, fmtPct } from './charts.js';
 
 async function loadJSON(path) {
   try {
@@ -29,10 +29,17 @@ function fmt3(v) {
   return v == null ? '—' : v.toFixed(3);
 }
 
+// Accuracies and recalls are printed as percentages on this page: ".804" is a figure only a
+// reader of the report recognises. Probabilities the model emits (the candidate bars, p(∅)) stay
+// in probability units — those are the model's output, not a score — and so do ECE and NLL.
+function pct(v, dp = 1) {
+  return v == null ? '—' : `${(v * 100).toFixed(dp)}%`;
+}
+
 // .register already sets tabular-nums on the whole table (src.css) — no per-cell class needed.
 function tdAcc(value) {
   const td = document.createElement('td');
-  td.textContent = fmt3(value);
+  td.textContent = pct(value);
   return td;
 }
 
@@ -115,7 +122,7 @@ function buildResultsTable(container, models, frozenDoc) {
     ])
   );
   row.appendChild(
-    buildTable('Evidence / intent', ['model', 'CLINC-150', 'SNLI', 'MNLI', 'BoolQ', 'PagerDuty (floor .792)'], (m) => [
+    buildTable('Evidence / intent', ['model', 'CLINC-150', 'SNLI', 'MNLI', 'BoolQ', 'PagerDuty (floor 79.2%)'], (m) => [
       td(m.id),
       tdAcc(m.topic_intent.clinc),
       tdAcc(m.nlu.snli),
@@ -130,7 +137,7 @@ function buildResultsTable(container, models, frozenDoc) {
   footnote.className = 'note';
   footnote.style.marginTop = '18px';
   footnote.textContent =
-    'JevBench easy is 1.000 for every model and is omitted. typical-small-preview → typical-small is .750 → .694 on JevBench standard (about 1 SE at n = 72, SE ≈ .058), traded for typed heads and calibration (held-out score NLL 2.03 → 1.01).';
+    'JevBench easy is 100% for every model and is omitted. typical-small-preview → typical-small is 75.0% → 69.4% on JevBench standard (about 1 SE at n = 72, SE ≈ 5.8 points), traded for typed heads and calibration (held-out score NLL 2.03 → 1.01).';
   container.appendChild(footnote);
 
   if (frozenByTrained.size) {
@@ -138,7 +145,7 @@ function buildResultsTable(container, models, frozenDoc) {
     frozenNote.className = 'note';
     frozenNote.style.marginTop = '8px';
     frozenNote.textContent =
-      'On the hard tier the frozen 4B (.441) beats the trained 4B (.423); training helps the standard tier at 1.7B (+.17) far more than at 4B (+.03).';
+      'On the hard tier the frozen 4B (44.1%) beats the trained 4B (42.3%); training helps the standard tier at 1.7B (+17 points) far more than at 4B (+3).';
     container.appendChild(frozenNote);
   }
 }
@@ -187,10 +194,11 @@ async function mountResults(models, reliabilityDoc, chanceDoc, frozenDoc) {
       xLabel: 'params (B)',
       yLabel: 'JevBench standard accuracy',
       title: 'scaling ladder',
-      refLines: chanceDoc ? [{ y: chanceDoc.std.acc, label: `chance ${chanceDoc.std.acc}` }] : [],
+      fmt: fmtPct,
+      refLines: chanceDoc ? [{ y: chanceDoc.std.acc, label: `chance ${fmtPct(chanceDoc.std.acc)}` }] : [],
     });
     const chanceTxt = chanceDoc
-      ? ` Chance baseline: ${chanceDoc.std.acc} standard / ${chanceDoc.easy.acc} easy / ${chanceDoc.hard.acc} hard, n=${chanceDoc.std.n} (${chanceDoc.source}).`
+      ? ` Chance baseline: ${fmtPct(chanceDoc.std.acc)} standard / ${fmtPct(chanceDoc.easy.acc)} easy / ${fmtPct(chanceDoc.hard.acc)} hard, n=${chanceDoc.std.n} (${chanceDoc.source}).`
       : '';
     caption(g1.parentElement, `Source: ${uniqueSources(models.map((m) => m.sources.jevbench))} (accuracy); ${uniqueSources(models.map((m) => m.sources.latency))} (ms).${chanceTxt}`);
   }
@@ -426,6 +434,9 @@ function mountFilm(ctx) {
       d.append(a, v); rowsEl.appendChild(d);
     });
     const action = resolveIntent(st, move);
+    // The decision and the keystroke are not the same thing: "shoot" at nine cells means centre
+    // the target and walk in first. Print both so the film doesn't look like it fires blindly.
+    if (action !== move) sentEl.textContent = `${sentence}  →  ${move} · engine: ${action}`;
     const spec = keyPress(st, move, action);
     try { if (typeof spec[1] === 'object') await D.turnBy(spec[0], spec[1].deg); else await D.press(spec[0], spec[1]); } catch {}
     setTimeout(loop, 380);

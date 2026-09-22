@@ -2,7 +2,7 @@
 // no libraries. Reuses charts.js (scale/niceTicks/reliability) and bars.js (the candidate-bar
 // readout) where the shape matches; the scrub rail and the two run-explorer pivots are new SVG,
 // same v11 ink/mid-gray/steel vocabulary (see charts.js header comment).
-import { scale, niceTicks, reliability, fmtNum, fitWidth, registerChart } from './charts.js';
+import { scale, niceTicks, reliability, fmtNum, fmtPct, fitWidth, registerChart } from './charts.js';
 import { bars } from './bars.js';
 
 const INK = '#292827';
@@ -679,7 +679,7 @@ async function mountRunExplorer() {
     const y = scale([0, yMax], [ih, 0]);
     niceTicks(0, yMax, 5).forEach((t) => {
       g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(t), y2: y(t), stroke: STEEL, 'stroke-dasharray': '2,3' }));
-      g.appendChild(text(-8, y(t) + 3, fmtNum(t), { fill: MID, 'text-anchor': 'end' }));
+      g.appendChild(text(-8, y(t) + 3, state.metric === 'acc' ? fmtPct(t) : fmtNum(t), { fill: MID, 'text-anchor': 'end' }));
     });
     // index ticks every 10 runs, in lineage (creation) order — every 20/40 when the column is too
     // narrow for a label per 10 (each needs ~26px, mono 11px)
@@ -699,7 +699,7 @@ async function mountRunExplorer() {
     const floor = idx.floors[state.set];
     if (floor && state.metric === 'acc') {
       g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(floor.value), y2: y(floor.value), stroke: MID, 'stroke-dasharray': '4,3' }));
-      g.appendChild(text(iw - 4, y(floor.value) - 5, `floor ${floor.value.toFixed(3)}`, { fill: MID, 'text-anchor': 'end', 'font-size': 11 }));
+      g.appendChild(text(iw - 4, y(floor.value) - 5, `floor ${fmtPct(floor.value)}`, { fill: MID, 'text-anchor': 'end', 'font-size': 11 }));
     }
     rows.forEach((r) => {
       const val = r.eval[state.set][state.metric];
@@ -710,7 +710,7 @@ async function mountRunExplorer() {
       const released = !!label;
       const dot = svgEl('circle', { cx, cy, r: released ? 6 : 4, fill: released ? INK : 'none', stroke: INK, 'stroke-width': released ? 0 : 1.4, ...(released ? {} : { 'stroke-dasharray': '2,1.5' }) });
       const ttl = svgEl('title');
-      ttl.textContent = `${r.name} · ${r.date} · ${state.metric} ${val.toFixed(3)}${released ? ` · released as ${label}` : ' · (not released)'}`;
+      ttl.textContent = `${r.name} · ${r.date} · ${state.metric} ${state.metric === 'acc' ? fmtPct(val) : val.toFixed(3)}${released ? ` · released as ${label}` : ' · (not released)'}`;
       dot.appendChild(ttl);
       g.appendChild(dot);
       // On a phone the three release names collide with each other and run off the plot; the
@@ -728,7 +728,7 @@ async function mountRunExplorer() {
     g.appendChild(svgEl('line', { x1: 0, x2: 0, y1: 0, y2: ih, stroke: STEEL }));
     g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: ih, y2: ih, stroke: STEEL }));
     body.appendChild(container);
-    const cap = p(floor ? `floor: ${floor.value.toFixed(3)} (${floor.source})` : 'no sourced floor for this set', 'note');
+    const cap = p(floor ? `floor: ${fmtPct(floor.value)} (${floor.source})` : 'no sourced floor for this set', 'note');
     body.appendChild(cap);
     body.appendChild(p(`x = run index in lineage (creation) order, ${N} runs with a sourced date; ticks every ${tickStep}, date at the first run of each day.${releasedNote ? ' Filled dots are the released checkpoints (name in the tooltip); hollow dots never shipped.' : ''}`, 'note'));
     sourceLine(body, idx.source);
@@ -760,7 +760,7 @@ async function mountRunExplorer() {
       const cy = y(acc);
       const dot = svgEl('circle', { cx, cy, r: 4, fill: INK });
       const ttl = svgEl('title');
-      ttl.textContent = `${s.key} (${s.family}) · acc ${acc.toFixed(3)}${floor ? ` · floor ${floor.value.toFixed(3)}` : ''}`;
+      ttl.textContent = `${s.key} (${s.family}) · acc ${fmtPct(acc)}${floor ? ` · floor ${fmtPct(floor.value)}` : ''}`;
       dot.appendChild(ttl);
       g.appendChild(dot);
     });

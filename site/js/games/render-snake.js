@@ -1,13 +1,28 @@
-// Real canvas Snake renderer over js/snake.js's pure engine. 10x10 board, ink cells on putty,
-// bone grid gaps, smooth interpolation between ticks, paper death flash.
+// Real canvas Snake renderer over js/snake.js's pure engine. 10x10 board drawn as a green
+// phosphor terminal: a monospace glyph grid inside a box-drawn frame, scanlines + a cheap
+// glyph bloom (crt.js), ~2-tick phosphor persistence on cells that just went dark, and a
+// terminal status line baked into the same canvas so the panel reads as one machine.
 import { Snake, greedyPolicy } from '../snake.js';
 import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, replayFrame, loadJSON, scoreboardLine } from './loop.js';
+import { drawScanlines, drawGlyphBloom, phosphorDecay, prefersReducedMotion } from './crt.js';
 
 const TICK_MS = 200;
+const FADE_MS = TICK_MS * 2; // phosphor persistence window
 const KEYMAP = {
   ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
   w: 'up', s: 'down', a: 'left', d: 'right',
 };
+
+// Green P1 phosphor (VT100/Apple II/IBM 5151 terminals) rather than amber: it's the more
+// common "terminal" association, and a single hue read against near-black lets brightness
+// alone carry head/body/food/wall hierarchy - the monochrome-CRT way, no extra hues to manage.
+const P = [77, 255, 136];
+const phos = (a) => `rgba(${P[0]},${P[1]},${P[2]},${a})`;
+const HEAD_GLYPH = { up: '^', down: 'v', left: '<', right: '>' };
+const BODY_GLYPH = 'o';
+const FOOD_GLYPH = '*';
+const DOT_GLYPH = '·';
+const BORDER = { tl: '┌', tr: '┐', bl: '└', br: '┘', h: '─', v: '│' };
 
 export async function mount(el, { decide, mode, ctx } = {}) {
   const refs = mountChrome(el, { label: 'Snake · 10×10 board' });
@@ -34,6 +49,33 @@ export async function mount(el, { decide, mode, ctx } = {}) {
   let score = { you: 0, model: 0 }; // "you vs model" HUD line — food eaten, reset on restart
 
   const scriptedMove = greedyPolicy; // the rule list applied literally (snake.js RULES)
+
+  // Phosphor persistence: `lastLit` is what was on as of the most recently *committed* tick;
+  // `fading` holds cells that just went dark, keyed "x,y", so draw() can afterglow them for
+  // FADE_MS without re-deriving a diff every frame. Both mutated in place - no per-frame
+  // allocation in the draw loop itself (commit only runs once per tick, gated below).
+  let lastLit = new Map();
+  const fading = new Map();
+  let lastPhosphorTick = -1;
+  const reducedMotion = prefersReducedMotion();
+
+  function litCellsOf(state) {
+    const m = new Map();
+    state.body.forEach((seg, i) => {
+      m.set(`${seg.x},${seg.y}`, { ch: i === 0 ? HEAD_GLYPH[state.dir] : BODY_GLYPH, hot: i === 0 });
+    });
+    m.set(`${state.food.x},${state.food.y}`, { ch: FOOD_GLYPH, hot: true });
+    return m;
+  }
+
+  function commitPhosphorTick(state, now) {
+    const lit = litCellsOf(state);
+    for (const [key, info] of lastLit) {
+      if (!lit.has(key)) fading.set(key, { ...info, offAt: now });
+    }
+    for (const key of lit.keys()) fading.delete(key);
+    lastLit = lit;
+  }
 
   async function tick() {
     // human override takes priority over everything, including the static-mode replay branch
@@ -115,6 +157,9 @@ export async function mount(el, { decide, mode, ctx } = {}) {
     lastTickAt = performance.now();
     lastDecision = { candidates: engine.safeMoves(), probs: {}, p_null: null, sentence: engine.describe() };
     score = { you: 0, model: 0 };
+    fading.clear();
+    lastLit = new Map();
+    lastPhosphorTick = -1;
   }
 
   function resize() {
@@ -128,9 +173,12 @@ export async function mount(el, { decide, mode, ctx } = {}) {
   ro.observe(refs.stage);
   resize();
 
-  function lerp(a, b, t) {
-    return a + (b - a) * t;
-  }
+  // Font strings are rebuilt only when the cell size actually changes (resize), not every
+  // frame - the draw loop below just swaps between these cached strings.
+  let cachedCell = 0;
+  let font = '';
+  let haloFont = '';
+  let statusFont = '';
 
   function draw() {
     const dpr = Number(canvas.dataset.dpr || 1);
@@ -141,69 +189,116 @@ export async function mount(el, { decide, mode, ctx } = {}) {
     dctx.clearRect(0, 0, w, h);
 
     const state = currState;
-    const cell = Math.min(w, h) / state.w;
-    const boardW = cell * state.w;
-    const boardH = cell * state.h;
+    const now = performance.now();
+
+    // Layout: a 1-cell box-drawn frame around the w×h play field, plus one more cell of
+    // height below it for the terminal status line - all three read as one boxed screen.
+    const outerCols = state.w + 2;
+    const outerRows = state.h + 2;
+    const cell = Math.min(w / outerCols, h / (outerRows + 1));
+    const boardW = cell * outerCols;
+    const boardH = cell * outerRows;
     const ox = (w - boardW) / 2;
-    const oy = (h - boardH) / 2;
+    const oy = (h - (boardH + cell)) / 2;
+    const gx = ox + cell; // interior (play field) origin, inside the frame
+    const gy = oy + cell;
 
+    if (cell !== cachedCell) {
+      cachedCell = cell;
+      const family = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+      font = `${Math.round(cell * 0.82)}px ${family}`;
+      haloFont = `${Math.round(cell * 1.18)}px ${family}`;
+      statusFont = `${Math.round(cell * 0.5)}px ${family}`;
+    }
+
+    // CRT glass - same near-black TOKENS.putty the other game cards sit on.
     dctx.fillStyle = TOKENS.putty;
-    dctx.fillRect(ox, oy, boardW, boardH);
+    dctx.fillRect(ox, oy, boardW, boardH + cell);
 
-    dctx.strokeStyle = TOKENS.vellum;
-    dctx.lineWidth = 1;
-    for (let x = 0; x <= state.w; x++) {
-      dctx.beginPath();
-      dctx.moveTo(ox + x * cell, oy);
-      dctx.lineTo(ox + x * cell, oy + boardH);
-      dctx.stroke();
+    dctx.textAlign = 'center';
+    dctx.textBaseline = 'middle';
+    dctx.font = font;
+
+    // border ring - the "wall" glyph, box-drawing characters at mid brightness so the living
+    // snake still reads as the brightest thing on screen
+    dctx.fillStyle = phos(0.55);
+    for (let x = 0; x < outerCols; x++) {
+      const cx = ox + (x + 0.5) * cell;
+      const top = x === 0 ? BORDER.tl : x === outerCols - 1 ? BORDER.tr : BORDER.h;
+      const bot = x === 0 ? BORDER.bl : x === outerCols - 1 ? BORDER.br : BORDER.h;
+      dctx.fillText(top, cx, oy + 0.5 * cell);
+      dctx.fillText(bot, cx, oy + (outerRows - 0.5) * cell);
     }
-    for (let y = 0; y <= state.h; y++) {
-      dctx.beginPath();
-      dctx.moveTo(ox, oy + y * cell);
-      dctx.lineTo(ox + boardW, oy + y * cell);
-      dctx.stroke();
+    for (let y = 1; y < outerRows - 1; y++) {
+      const cy = oy + (y + 0.5) * cell;
+      dctx.fillText(BORDER.v, ox + 0.5 * cell, cy);
+      dctx.fillText(BORDER.v, ox + (outerCols - 0.5) * cell, cy);
     }
 
-    const t = Math.max(0, Math.min(1, (performance.now() - lastTickAt) / TICK_MS));
-    const gap = 2;
+    // commit the tick→tick diff once per tick (not per frame) so a cell that just went dark
+    // starts fading here rather than being recomputed every rAF
+    if (lastTickAt !== lastPhosphorTick) {
+      commitPhosphorTick(state, lastTickAt);
+      lastPhosphorTick = lastTickAt;
+    }
+    for (const [key, info] of fading) {
+      if (reducedMotion || now - info.offAt > FADE_MS) fading.delete(key);
+    }
 
-    // food
-    dctx.fillStyle = TOKENS.ink;
-    dctx.beginPath();
-    const fx = ox + (state.food.x + 0.5) * cell;
-    const fy = oy + (state.food.y + 0.5) * cell;
-    dctx.arc(fx, fy, cell * 0.28, 0, Math.PI * 2);
-    dctx.fill();
-
-    // body segments, tail-first so the head paints on top
-    const body = state.body;
-    const prevBody = prevState.body;
-    for (let i = body.length - 1; i >= 0; i--) {
-      const cur = body[i];
-      const prev = prevBody[i] ?? cur;
-      const bx = ox + (lerp(prev.x, cur.x, t) + 0.5) * cell;
-      const by = oy + (lerp(prev.y, cur.y, t) + 0.5) * cell;
-      const isHead = i === 0;
-      const size = (isHead ? cell * 0.92 : cell * 0.82) - gap;
-      dctx.fillStyle = TOKENS.ink;
-      dctx.fillRect(bx - size / 2, by - size / 2, size, size);
-      if (isHead) {
-        dctx.fillStyle = TOKENS.paper;
-        dctx.beginPath();
-        dctx.arc(bx + size * 0.18, by - size * 0.18, cell * 0.07, 0, Math.PI * 2);
-        dctx.fill();
+    // play field: lit (head/body/food) > fading (phosphor afterglow) > dim dot-matrix rest
+    for (let x = 0; x < state.w; x++) {
+      for (let y = 0; y < state.h; y++) {
+        const key = `${x},${y}`;
+        const cx = gx + (x + 0.5) * cell;
+        const cy = gy + (y + 0.5) * cell;
+        const lit = lastLit.get(key);
+        if (lit) {
+          const color = phos(lit.hot ? 1 : 0.85);
+          if (lit.hot) {
+            drawGlyphBloom(dctx, lit.ch, cx, cy, { font, haloFont, color, haloColor: phos(0.28) });
+          } else {
+            dctx.font = font;
+            dctx.fillStyle = color;
+            dctx.fillText(lit.ch, cx, cy);
+          }
+          continue;
+        }
+        const fade = fading.get(key);
+        if (fade) {
+          const a = phosphorDecay(now - fade.offAt, FADE_MS);
+          dctx.font = font;
+          dctx.fillStyle = phos((fade.hot ? 0.9 : 0.6) * a);
+          dctx.fillText(fade.ch, cx, cy);
+          continue;
+        }
+        dctx.font = font;
+        dctx.fillStyle = phos(0.12);
+        dctx.fillText(DOT_GLYPH, cx, cy);
       }
     }
 
     if (dying) {
-      const dt = Math.min(1, (performance.now() - deathFlashAt) / 300);
+      const dt = Math.min(1, (now - deathFlashAt) / 300);
       dctx.fillStyle = TOKENS.paper;
       dctx.globalAlpha = dt < 0.5 ? dt * 2 : (1 - dt) * 2;
-      dctx.fillRect(ox, oy, boardW, boardH);
+      dctx.fillRect(ox, oy, boardW, boardH + cell);
       dctx.globalAlpha = 1;
     }
 
+    // terminal status line - the same phosphor, inside the frame's own boxed screen
+    dctx.textAlign = 'left';
+    dctx.textBaseline = 'middle';
+    dctx.font = statusFont;
+    dctx.fillStyle = phos(0.75);
+    const pad = (n, digits) => String(n).padStart(digits, '0');
+    const cursor = reducedMotion || Math.floor(now / 500) % 2 === 0 ? '█' : ' ';
+    dctx.fillText(
+      `SCORE ${pad(state.score, 3)}  LEN ${pad(state.body.length, 2)}  TICK ${pad(state.steps, 4)} ${cursor}`,
+      ox + cell * 0.3,
+      oy + boardH + cell / 2
+    );
+
+    drawScanlines(dctx, ox, oy, boardW, boardH + cell);
     dctx.restore();
   }
 

@@ -162,7 +162,28 @@ function exploreAction(state, now = Date.now()) {
 
 // Label -> key action. The model aims (shoot / turn left / turn right are its own labels); the
 // engine walks for retreat/explore. Raw actions pass through for the human override.
+// The model decides *what* to do; the engine carries it out, and "engage that enemy" is not one
+// key press. A pistol shot at 9 cells is a pixel-wide sprite and a coin-flip hitscan, which is
+// what "it shoots without aiming" looks like from the outside. So a `shoot` decision first
+// centres the target (a closed-loop turn by its bearing, to 3 degrees rather than the 8 the
+// crosshair test allows), then closes to inside FIRE_CELLS, and only then fires. Same split as
+// retreat -> move back and explore -> navigate: the label is the decision, not the keystroke.
+const FINE_AIM_DEG = 3;
+const FIRE_CELLS = 6;
+
 export function resolveIntent(state, move) {
+  if (move === 'shoot') {
+    const lead = inSight(state)[0];
+    if (lead) {
+      const off = lead.bearing ?? 0;
+      if (Math.abs(off) > FINE_AIM_DEG) {
+        navTurnDeg = Math.abs(off);
+        return off > 0 ? 'turn right' : 'turn left';
+      }
+      if (cellsOf(lead.dist) > FIRE_CELLS && !state.blocked_ahead) return 'move forward';
+    }
+    return 'shoot';
+  }
   if (move === 'retreat') {
     // move back, unless the last retreat did not move the player (a wall behind: a recorded run
     // died in nukage backing into a wall 80 ticks running) - then turn to find another way out.
@@ -185,7 +206,7 @@ export function resolveIntent(state, move) {
 export function keyPress(state, move, action) {
   if (action !== 'turn left' && action !== 'turn right') return KEY_FOR_MOVE[action];
   const key = action === 'turn left' ? 'left' : 'right';
-  if (move === 'explore' || move === 'retreat') return [key, { deg: navTurnDeg }];
+  if (move === 'explore' || move === 'retreat' || move === 'shoot') return [key, { deg: navTurnDeg }];
   const lead = inSight(state)[0];
   return [key, { deg: lead ? Math.min(120, Math.max(8, Math.abs(lead.bearing ?? 0))) : DEFAULT_TURN_DEG }];
 }
@@ -204,7 +225,11 @@ function selfTest() {
   const s1 = { health: 84, ammo: 40, blocked_ahead: false, monsters: [{ type: 'zombieman', dist: 320, bearing: 3, in_crosshair: true }] };
   console.assert(describeDoom(s1) === 'The player has a zombieman in the crosshair, 5 cells ahead.', 'crosshair sentence');
   console.assert(candidatesFor(s1).join() === 'retreat,shoot,turn left,turn right,explore', 'candidates are the five labels in rule order');
-  console.assert(scriptedPolicy(s1) === 'shoot' && resolveIntent(s1, 'shoot') === 'shoot' && keyPress(s1, 'shoot', 'shoot')[0] === 'fire', 'crosshair target -> shoot');
+  console.assert(scriptedPolicy(s1) === 'shoot' && resolveIntent(s1, 'shoot') === 'shoot' && keyPress(s1, 'shoot', 'shoot')[0] === 'fire', 'crosshair target, centred and close -> fire');
+  const far = { ...s1, monsters: [{ type: 'zombieman', dist: 600, bearing: 1, in_crosshair: true }] };
+  console.assert(resolveIntent(far, 'shoot') === 'move forward', 'a shoot decision 9 cells out closes the distance first');
+  const wide = { ...s1, monsters: [{ type: 'zombieman', dist: 320, bearing: 6, in_crosshair: true }] };
+  console.assert(resolveIntent(wide, 'shoot') === 'turn right' && keyPress(wide, 'shoot', 'turn right')[1].deg === 6, 'a shoot decision 6 degrees off centres the target first');
 
   const s2 = { health: 20, ammo: 0, blocked_ahead: true, monsters: [{ type: 'imp', dist: 700, bearing: -40, in_crosshair: false }, { type: 'demon', dist: 3000, bearing: 10, in_crosshair: false }, { type: 'zombieman', dist: 500, bearing: 2, in_crosshair: true, visible: false }] };
   console.assert(describeDoom(s2) === 'The player is badly hurt. The player must turn left to face the imp. A wall is ahead.', 'hurt + pre-computed turn side + far monster and wall-hidden monster dropped + wall');
