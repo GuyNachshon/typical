@@ -1580,6 +1580,34 @@ Two further readings:
   tolerance, which the 1.7B pair alone would have missed.
 
 
+### 3ak-d. `ts1c` is already the fixed `typical-small` — no retrain needed
+
+The released `typical-small` (`ts1b`) predates the facts-first fix. `ts1c` — the tap-20 control from the §3aj tap
+sweep, trained on the updated defaults (`max_state` 2048, `--drop_truncated`, `--best_on`, tap 20, 8k steps) after
+the fix — was never scored on long states, because at the time nobody knew that was the axis that mattered. It is:
+
+| 1.7B checkpoint | facts-first | facts-last | policy_permit (facts-first) |
+|---|---:|---:|---:|
+| **`ts1c`** (fixed recipe) | **.947** | .790 | **.948** |
+| `typical-small` = `ts1b` (released) | .598 | .798 | .536 |
+| arm A `trunc_first` (facts-first) | .942 | .797 | .933 |
+| arm B `trunc_last` (facts-last) | .640 | .830 | .615 |
+
+`ts1c` reproduces arm A almost exactly (.947 vs .942) and beats the released checkpoint by **+34.9 points** on
+facts-first long states (+41.2 on the policy_permit family), while giving up nothing measurable on facts-last
+(.790 vs .798). It is strictly the better model for any caller who puts case facts before the policy body, and no
+worse for callers who do not.
+
+**Consequences.**
+1. The `typical-small` v2 release is a card-and-upload job, not a training run — the checkpoint exists.
+2. This is the second time a checkpoint's real improvement was invisible on JevBench: `ts1c` scores .708/.432
+   there against `ts1b`'s .694/.432, i.e. indistinguishable, while being 35 points better on the axis the fix
+   targeted. §3aj filed `ts1c`'s tap sweep as a negative on exactly those JevBench-shaped grounds.
+3. It also means the three tap-sweep checkpoints inherited the fix, so §3aj's comparison against the `ts1b`
+   baseline was mismatched on the corpus as well as on the recipe — a second reason its table is a shape
+   reference rather than a matched baseline.
+
+
 ## 3ak-b. Cluster-bootstrap confidence intervals on the JevBench public subset
 
 `scripts/jev_ci.py`. The standard tier is 72 items but only **36 independent states** (each appears as two
