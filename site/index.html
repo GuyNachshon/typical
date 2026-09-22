@@ -38,7 +38,7 @@
     </div>
   </div>
   <div class="media dark">
-    <p class="media-label t-eyebrow">A decision, as recorded · typical-small · Apple silicon</p>
+    <p class="media-label t-eyebrow">A decision, as recorded</p>
     <div class="media-split">
       <div class="media-scene"><div id="hero-decision-scene"></div></div>
       <div class="media-read" id="hero-decision"></div>
@@ -112,15 +112,15 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
     </div>
   </div>
   <div class="media dark" style="margin-bottom:18px">
-    <p class="media-label t-eyebrow">The road · Three.js · the model picks each manoeuvre · 70 / 70 scripted situations</p>
+    <p class="media-label t-eyebrow">The road · Three.js</p>
     <div class="media-split">
       <div class="media-scene"><div class="game-mount" data-game="drive"></div></div>
-      <div class="media-read"><p class="t-eyebrow muted">how it reads the road</p><p class="t-ui" style="max-width:40ch">Each tick the road is rendered as the situations that apply, in a fixed order; seven one-condition rules are in the question; the model picks one manoeuvre from the legal set. It matched the rule list on every tick of the recorded run: 18 of 18 red lights, 3 lane changes, exit taken. It cannot take a rule with an “or” in it.</p></div>
+      <div class="media-read"><p class="t-eyebrow muted">The model picks each manoeuvre · 70 / 70 scripted situations</p><p class="t-ui" style="max-width:40ch">Each tick the road is rendered as the situations that apply, in a fixed order; seven one-condition rules are in the question; the model picks one manoeuvre from the legal set. It matched the rule list on every tick of the recorded run: 18 of 18 red lights, 3 lane changes, exit taken. It cannot take a rule with an “or” in it.</p></div>
     </div>
   </div>
   <div class="grid gap-18 lg:grid-cols-2" style="margin-bottom:55px">
-    <div class="media dark"><p class="media-label t-eyebrow">Snake · canvas · .984 on 62 boards, chance .48</p><div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="snake"></div></div></div>
-    <div class="media dark"><p class="media-label t-eyebrow">DOOM · shareware in WebAssembly · 200 / 200 decisions, 4 kills</p><div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="realdoom" data-game-fallback="doom"></div></div></div>
+    <div><div class="media dark"><p class="media-label t-eyebrow">Snake · canvas</p><div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="snake"></div></div></div><p class="note mt-18">One sentence per tick; the candidate set is the safe moves. .984 on 62 boards (chance .48); 24 food in the recorded run. Arrow keys take over.</p></div>
+    <div><div class="media dark"><p class="media-label t-eyebrow">DOOM · WebAssembly</p><div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="realdoom" data-game-fallback="doom"></div></div></div><p class="note mt-18">Chocolate Doom, shareware 1.9. Two facts per tick (badly hurt? an enemy in sight?), the model picks retreat, engage or explore, and now aims from "the player must turn left to face the imp". 200 / 200 decisions matched the rule list, 4 kills, on E1M1.</p></div>
   </div>
   <div id="tryit">
     <div class="exrow" data-exhibit-card>

@@ -68,7 +68,8 @@ export function mountChrome(el, { label } = {}) {
   restartBtn.type = 'button';
   restartBtn.textContent = 'Restart';
   controls.append(policyBtn, restartBtn);
-  footTop.append(hint, controls);
+  footTop.append(controls);
+  hud.appendChild(hint); // the hint lives under the HUD, never over the readout
 
   el.append(stage, hud, foot, footTop);
 
