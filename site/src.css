@@ -125,7 +125,7 @@
   .stage-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0.82) 100%); }
   .stage-hint { position: absolute; left: 50px; top: 40px; font-size: 11px; letter-spacing: 0.36px; text-transform: uppercase; color: rgba(240, 238, 235, 0.5); transition: opacity 420ms var(--ease-out); max-width: 34ch; }
   .stage:hover .stage-hint { opacity: 0; }
-  @media (max-width: 64rem) { .stage-hint { display: none; } }
+  @media (max-width: 64rem) { .stage-hint { left: 20px; top: 84px; font-size: 10px; max-width: 26ch; } }
   .stage-copy { position: absolute; left: 50px; right: 50px; bottom: 60px; max-width: 780px; }
   .stage-copy .t-hero { margin: 18px 0 22px; max-width: 12ch; }
   .stage-copy .sub { font-size: var(--text-ui); line-height: 1.2; letter-spacing: -0.19px; max-width: 46ch; color: rgba(240, 238, 235, 0.85); margin-bottom: 26px; }

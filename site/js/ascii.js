@@ -21,7 +21,11 @@ function reduced() {
 }
 
 export function mountAscii(host, getSource, opts = {}) {
-  const cols = opts.cols ?? 150;
+  // Columns follow the panel's real width: a fixed count that reads as a transcription on a
+  // desktop hero is 3px-per-glyph mud on a phone. ~13 CSS px per column keeps a glyph a glyph.
+  const maxCols = opts.cols ?? 150;
+  const colsFor = (w) => Math.max(36, Math.min(maxCols, Math.round(w / 13)));
+  let cols = colsFor(host.clientWidth || 1200);
   const fps = reduced() ? 4 : opts.fps ?? 15;
 
   const layer = document.createElement('canvas');
@@ -49,6 +53,7 @@ export function mountAscii(host, getSource, opts = {}) {
     const h = host.clientHeight;
     if (!w || !h || !src?.width) return false;
     dpr = Math.min(2, devicePixelRatio || 1);
+    cols = colsFor(w);
     cell = w / cols;
     rows = Math.max(1, Math.round(h / (cell * 1.8))); // glyph cells are ~1.8x taller than wide
     if (layer.width !== Math.round(w * dpr) || layer.height !== Math.round(h * dpr)) {
@@ -123,13 +128,17 @@ export function mountAscii(host, getSource, opts = {}) {
 
   raf = requestAnimationFrame(frame);
 
-  // reveal on hover / touch / keyboard focus of the host's own controls
+  // Reveal the frame underneath: hover on a pointer device, tap-to-toggle where there is no
+  // hover (on a phone a pointerenter that never gets a matching leave would strand the layer).
   const reveal = (on) => layer.classList.toggle('is-open', on);
-  host.addEventListener('pointerenter', () => reveal(true));
-  host.addEventListener('pointerleave', () => reveal(false));
-  host.addEventListener('pointerdown', () => reveal(true));
-  host.addEventListener('focusin', () => reveal(true));
-  host.addEventListener('focusout', () => reveal(false));
+  if (matchMedia('(hover: hover)').matches) {
+    host.addEventListener('pointerenter', () => reveal(true));
+    host.addEventListener('pointerleave', () => reveal(false));
+    host.addEventListener('focusin', () => reveal(true));
+    host.addEventListener('focusout', () => reveal(false));
+  } else {
+    host.addEventListener('pointerup', () => reveal(!layer.classList.contains('is-open')));
+  }
 
   return { stop };
 }
