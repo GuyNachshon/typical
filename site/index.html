@@ -85,14 +85,11 @@
     <p class="t-eyebrow">One read, many questions</p>
     <div>
       <h2 class="t-section">The state is read once.</h2>
-      <p class="lede">Typical encodes the state, keeps the cache, and asks every question against it as a short suffix. Instead of decoding an answer token, it reads the model&rsquo;s hidden state directly and turns it into probabilities.</p>
+      <p class="lede">Encoding the state is the expensive part, so Typical pays it once and keeps the cache. Every question after that is a short suffix appended to it, carrying its own candidates.</p>
     </div>
   </div>
-  <div class="code"><pre>                        ┌─ Which tool?      → search .82  code .13  ∅ .05
- STATE → encode once ───┼─ Is this allowed? → yes .97
-                        ├─ How urgent?      → low .02  med .18  high .80
-                        └─ Next action?     → …</pre></div>
-  <p class="note mt-18">Cached causal prefix · candidate-aware suffix · contextual hidden-state readout. A Qwen3 trunk cut at about 71% depth, LoRA on the top eight layers, and a separate head for the abstain.</p>
+  <div class="media" style="padding:34px 40px"><div class="chart" id="chart-flow"></div></div>
+  <p class="note mt-18">A Qwen3 trunk cut at about 71% depth, LoRA on the top eight layers, and a separate head for the abstain.</p>
 </section>
 
 <section class="page chapter" id="latency">

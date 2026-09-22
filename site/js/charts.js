@@ -5,11 +5,11 @@
 // the model name in the label: typical-small solid, typical-medium dashed+square, preview
 // dotted+mid-gray, an unreleased model (14B) a hollow dashed outline.
 const NS = 'http://www.w3.org/2000/svg';
-const INK = '#292827'; // off-black — primary marks, primary text
-const MID = '#938f89'; // mid-gray — axis/legend text, secondary series
-const STEEL = '#c2bfba'; // steel — gridlines, axis rules, reference lines... except ref lines are mid-gray per spec
+export const INK = '#292827'; // off-black — primary marks, primary text
+export const MID = '#938f89'; // mid-gray — axis/legend text, secondary series
+export const STEEL = '#c2bfba'; // steel — gridlines, axis rules, reference lines... except ref lines are mid-gray per spec
 const WHITE = '#ffffff';
-const FONT_MONO = '"Geist Mono", ui-monospace, "SF Mono", Menlo, monospace';
+export const FONT_MONO = '"Geist Mono", ui-monospace, "SF Mono", Menlo, monospace';
 
 // Fixed style slots (never cycled by data order) plus a name-keyed lookup so the same model
 // always gets the same treatment across every chart on the page.
@@ -39,13 +39,13 @@ function markerEl(shape, cx, cy, r, fill, hollow = false) {
   return svgEl('circle', { cx, cy, r, ...style });
 }
 
-function svgEl(tag, attrs = {}) {
+export function svgEl(tag, attrs = {}) {
   const n = document.createElementNS(NS, tag);
   for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
   return n;
 }
 
-function svgText(x, y, str, attrs = {}) {
+export function svgText(x, y, str, attrs = {}) {
   const t = svgEl('text', { x, y, fill: INK, 'font-size': 12, 'font-family': FONT_MONO, ...attrs });
   t.textContent = str;
   return t;

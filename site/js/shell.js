@@ -348,6 +348,13 @@ function heroPool(presets, replays) {
   return pool;
 }
 
+// The read path (js/arch.js), replacing a box-drawing diagram whose probabilities were invented.
+async function mountFlow() {
+  const host = document.getElementById('chart-flow');
+  if (!host) return;
+  (await import('./arch.js')).mountFlow(host);
+}
+
 let heroLive = null; // set by pushDecision in live mode
 // One state, three questions, resolving together (js/primitives.js).
 async function mountPrimitives(presets) {
@@ -620,6 +627,7 @@ async function boot() {
 
   mountHero(presets);
   mountPrimitives(presets);
+  mountFlow();
   // set before the film mounts; filmfx clears it the moment the cold start is over (or at once,
   // if it is skipped for a repeat visit or for reduced motion)
   document.documentElement.classList.add('booting');
