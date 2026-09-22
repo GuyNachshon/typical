@@ -5,7 +5,7 @@
 // decide() call — never an invented one.
 import { decide, mode, probeHealth } from './api.js';
 import { bars, inkBars, rowsFromResult } from './bars.js';
-import { glueSeparators, glued } from './typography.js';
+import { glueSeparators, glued, bindWidows } from './typography.js';
 import { describeDoom, candidatesFor, resolveIntent, keyPress, scriptedPolicy, resetNav } from './games/realdoom-logic.js';
 import { QUESTION as DOOM_QUESTION } from './games/doom.js';
 import { hashKey } from './api.js';
@@ -77,7 +77,7 @@ function buildResultsTable(container, models, frozenDoc) {
     a.href = m.hf_url;
     a.target = '_blank';
     a.rel = 'noopener';
-    a.textContent = 'weights →';
+    a.textContent = 'weights\u00A0→';
     const cell = document.createElement('td');
     cell.appendChild(a);
     return cell;
@@ -113,7 +113,7 @@ function buildResultsTable(container, models, frozenDoc) {
   row.className = 'results-tables';
   row.appendChild(
     buildTable('JevBench', ['model', 'std', 'hard', 'ECE std', 'frozen 3-shot', 'ms K2→K256', 'HF'], (m) => [
-      td(m.id),
+      td(m.id.replace(/-/g, '\u2011')), // a model id is one token; plain hyphens let it split across lines
       tdAcc(m.jevbench.std.acc),
       tdAcc(m.jevbench.hard.acc),
       td(fmt3(m.jevbench.std.ece)),
@@ -124,7 +124,7 @@ function buildResultsTable(container, models, frozenDoc) {
   );
   row.appendChild(
     buildTable('Evidence / intent', ['model', 'CLINC-150', 'SNLI', 'MNLI', 'BoolQ', 'PagerDuty (floor 79.2%)'], (m) => [
-      td(m.id),
+      td(m.id.replace(/-/g, '\u2011')), // a model id is one token; plain hyphens let it split across lines
       tdAcc(m.topic_intent.clinc),
       tdAcc(m.nlu.snli),
       tdAcc(m.nlu.mnli),
@@ -159,7 +159,7 @@ function caption(el, text) {
   if (!el) return;
   const p = document.createElement('p');
   p.className = 'note';
-  p.textContent = text;
+  p.textContent = glued(text); // captions mount after the document-wide pass has run
   el.appendChild(p);
 }
 
@@ -538,6 +538,7 @@ function mountTryit(ctx) {
 
 async function boot() {
   glueSeparators(); // static prose, before anything awaits
+  bindWidows();
   await probeHealth();
 
   const [presets, models, reliabilityDoc, chanceDoc, frozenDoc] = await Promise.all([
@@ -562,7 +563,8 @@ async function boot() {
   mountTryit(ctx);
   wireExhibits(ctx);
   glueSeparators();
-  setTimeout(glueSeparators, 800); // the table, charts and captions mount async
+  bindWidows();
+  setTimeout(() => { glueSeparators(); bindWidows(); }, 800); // the table, charts and captions mount async
   // The exhibit tags say what this visitor will actually get: every one of them decides live
   // against a reachable server and replays a recorded run otherwise, so the markup ships the
   // pessimistic label and only the live case upgrades it.

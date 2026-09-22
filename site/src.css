@@ -49,7 +49,9 @@
 
 @layer base {
   html { background: var(--color-warm); scroll-behavior: smooth; scroll-padding-top: 86px; }
-  body { margin: 0; color: var(--color-off); background: var(--color-warm); font-family: var(--font-sans); font-size: var(--text-body); line-height: 1.5; letter-spacing: -0.195px; -webkit-font-smoothing: antialiased; text-wrap: pretty; }
+  /* last-resort breaking everywhere: identifiers are kept whole with non-breaking hyphens
+     (js/typography.js), and one too long for its column must break rather than widen the page */
+  body { overflow-wrap: break-word; margin: 0; color: var(--color-off); background: var(--color-warm); font-family: var(--font-sans); font-size: var(--text-body); line-height: 1.5; letter-spacing: -0.195px; -webkit-font-smoothing: antialiased; text-wrap: pretty; }
   h1, h2, h3, h4, p { margin: 0; }
   h1, h2, h3 { font-weight: 400; } /* text-wrap: pretty inherits from body — headings included, per the client's rule */
   /* Headings that sit in a narrow column are the one place pretty can't help: with 240px to work
@@ -127,7 +129,7 @@
      it — every word needs its own surface, the way a frame-transcription hero always ends up. */
   .stage-copy .t-mono { text-wrap: balance; }
   .stage-copy { position: absolute; left: 40px; right: auto; bottom: 44px; max-width: 585px; padding: 30px 32px; border-radius: var(--radius-card); background: rgba(9, 9, 10, 0.88); backdrop-filter: blur(2px); }
-  .stage-copy .t-hero { margin: 18px 0 22px; max-width: 12ch; }
+  .stage-copy .t-hero { margin: 18px 0 22px; max-width: 20ch; font-size: clamp(34px, 3.6vw, 52px); letter-spacing: -1.5px; text-wrap: balance; } /* 62px in a 585px card fits ~11 characters, which stranded "generate." on its own line */
   .stage-copy .sub { text-wrap: balance; font-size: var(--text-ui); line-height: 1.2; letter-spacing: -0.19px; max-width: 40ch; color: rgba(240, 238, 235, 0.85); margin-bottom: 26px; }
   .stage-hud { position: absolute; right: 40px; bottom: 44px; width: 300px; padding: 22px 24px; border-radius: var(--radius-card); background: rgba(9, 9, 10, 0.88); backdrop-filter: blur(2px); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.36px; line-height: 1.5; }
   .stage-hud .rec { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; }
@@ -161,6 +163,7 @@
   .ucard { background: var(--color-lgray); border-radius: var(--radius-card); padding: 88px 18px 18px; min-height: 300px; display: flex; flex-direction: column; justify-content: space-between; gap: 30px; }
   .ucard .t-card { margin-bottom: 10px; }
   .ucard p { max-width: 32ch; }
+  .ucard .figure-src { max-width: none; } /* .ucard p caps prose at 32ch = 211px, narrower than the paths this line carries */
   .ucard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
   @media (max-width: 64rem) { .ucard-grid { grid-template-columns: 1fr; } .ucard { padding-top: 40px; min-height: 0; } }
   .diagram { display: flex; gap: 6px; align-items: flex-end; }
@@ -196,13 +199,13 @@
 
   /* ---- figures (results) ---- */
   .figure-floor { font-size: var(--text-body); color: var(--color-off); max-width: 34ch; }
-  .figure-src { font-family: var(--font-mono); font-size: 11px; color: var(--color-mid); margin-top: 8px; overflow-wrap: anywhere; letter-spacing: 0.2px; }
+  .figure-src { font-family: var(--font-mono); font-size: 11px; color: var(--color-mid); margin-top: 8px; overflow-wrap: break-word; letter-spacing: 0.2px; }  /* break-word, not anywhere: a path splits only when it cannot fit a line of its own */
 
   /* ---- register table ---- */
   .register { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
-  .register th { text-align: left; font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--color-off); }
+  .register th { white-space: nowrap; /* "ECE std", "ms K2→K256": short pairs, never split */ text-align: left; font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--color-off); }
   .register td { padding: 12px 12px 12px 0; border-bottom: 1px solid var(--color-steel); vertical-align: top; }
-  .register td:first-child { font-weight: 700; }
+  .register td:first-child { font-weight: 700; } /* no nowrap here: it set the grid track's min-content width and pushed the research page sideways — model ids are kept whole with non-breaking hyphens instead (js/typography.js) */
   @media (max-width: 40rem) {
     .register thead { display: none; }
     .register tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--color-steel); }

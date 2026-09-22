@@ -3,7 +3,7 @@
 // mounts scripts/build_research.py wraps in white .media panels. Charts are js/charts.js as-is
 // (hand-rolled SVG, no animation). No sticky TOC on this page (the Agility lane has none).
 import { donut, barChart, hbarFloor, timeline, fmtPct } from './charts.js';
-import { glueSeparators } from './typography.js';
+import { glueSeparators, bindWidows, glued } from './typography.js';
 import { mountExplorables } from './explorables.js';
 
 async function loadJSON(path) {
@@ -19,7 +19,7 @@ async function loadJSON(path) {
 function sourceNote(el, text) {
   const p = document.createElement('div');
   p.className = 'chart-source';
-  p.textContent = `source: ${text}`;
+  p.textContent = glued(`source: ${text}`); // mounts after the document-wide pass
   el.appendChild(p);
 }
 
@@ -101,5 +101,5 @@ if (typeof window !== 'undefined') {
     mountExplorables();
   });
   // again once the async mounts have put their captions and legends in (glue is idempotent)
-  window.addEventListener('load', () => setTimeout(() => glueSeparators(), 600));
+  window.addEventListener('load', () => setTimeout(() => { glueSeparators(); bindWidows(); }, 600));
 }

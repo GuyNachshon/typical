@@ -346,7 +346,7 @@ re-evaluation (REPORT §6).
 D1 — JevBench: public subset (231 ids), unranked, n = 72 standard (SE ≈ .058); probabilities
 conditioned on non-∅; hard tier at chance for both models.
 
-1. **Candidate-blind states carry priors and calibration, not question-dependent knowledge**, at
+1. **A candidate-blind state carries priors and calibration, not question-dependent knowledge**, at
    tap 20 and at full depth. A candidate-aware suffix computation keeps the knowledge; so does a
    direct contextual readout, with a quarter of the letter interface's order fragility.
    (REPORT §3j, §3l, §3s, §3v)

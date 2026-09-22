@@ -46,7 +46,7 @@
 /* hairline table (RULES 6x2 outcomes) — same recipe as .register (style.css) */
 .ex-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-variant-numeric: tabular-nums; }
 .ex-table th { text-align: left; font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); border-bottom: 1px solid var(--color-off); padding: 10px 10px 10px 0; }
-.ex-table td { font-size: 14px; color: var(--color-off); border-bottom: 1px solid var(--color-steel); padding: 10px 10px 10px 0; vertical-align: top; overflow-wrap: anywhere; }
+.ex-table td { font-size: 14px; color: var(--color-off); border-bottom: 1px solid var(--color-steel); padding: 10px 10px 10px 0; vertical-align: top; overflow-wrap: break-word; }
 .ex-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .ex-cell-word { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
 
@@ -54,7 +54,7 @@
    SQL / DOC-20 / RULES — thin layout wrappers only, no card chrome. Every probability row
    here is a real bars() mount (js/bars.js), one candidate wide, restyled compact below.
    ================================================================================ */
-.sql-query { font-family: var(--font-mono); font-size: 13px; color: var(--color-mid); margin: 0; overflow-wrap: anywhere; }
+.sql-query { font-family: var(--font-mono); font-size: 13px; color: var(--color-mid); margin: 0; overflow-wrap: break-word; }
 .sql-query .cond { color: var(--color-off); font-weight: 700; }
 .sql-register { display: flex; flex-direction: column; }
 .doc20-register { display: flex; flex-direction: column; }
