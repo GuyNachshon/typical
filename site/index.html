@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="exhibits.css">
 </head>
 <body>
-<nav class="nav"><a class="brand" href="#top">Typical</a><span class="links"><a href="#results">Results</a><a href="#how">How it works</a><a href="#demos">Demos</a><a href="research.html">Research</a><a href="https://huggingface.co/OzLabs/typical-small">Weights</a></span><a class="cta" href="#tryit">Try it live</a></nav>
+<nav class="nav"><a class="brand" href="#top">Typical</a><span class="links"><a href="#results">Results</a><a href="#arch">How it works</a><a href="#demos">Demos</a><a href="research.html">Research</a><a href="https://huggingface.co/OzLabs/typical-small">Weights</a></span><a class="cta" href="#tryit">Try it live</a></nav>
 
 <div class="stage-track"><header class="stage" id="top">
   <iframe class="stage-film" id="film" src="games/doom/index.html?film=1" title="DOOM, played by the model" loading="eager"></iframe>
@@ -122,7 +122,8 @@
     <p class="t-eyebrow muted" style="margin-bottom:22px">Against general models, prompted</p>
     <div id="results-compare"></div>
   </div>
-  <p class="note mt-30"><a class="ul" href="research.html#results">Every table, every source, the scaling ladder and the calibration curves &rarr;</a></p>
+  <p class="note mt-30" style="max-width:72ch">Purpose&#8209;built decision models from other groups score higher than this on JevBench &mdash; up to .986 standard, some of them on typical&#8209;medium&rsquo;s own base checkpoint. Our report attributes that to their rendering and method and is replicating it as a probe; until that probe lands, the gap stands as measured. <a class="ul" href="research.html#jevbench-context-report-3q-same-231-public-ids">The whole field, on the same 231 ids &rarr;</a></p>
+  <p class="note mt-18"><a class="ul" href="research.html#eval-suite">Every table, every source and the calibration curves &rarr;</a></p>
   <div class="note mt-18 results-disclosure"><blockquote class="disclosure-box">
       <strong>JevBench disclosure.</strong> JevBench numbers are a public-subset run against
       <code>fstandhartinger/jevbench</code> v1.2.1 (72 standard / 48 easy / 111 hard public ids), not a
@@ -212,7 +213,7 @@
   <div class="code"><pre >pip install huggingface_hub
 hf download OzLabs/typical-small --include "inference/*" --local-dir typical
 pip install -r typical/inference/requirements.txt</pre></div>
-  <p class="note mt-18">The three calls themselves are the six lines shown above under <a href="#how">How it works</a>: <code>choice</code>, <code>noul</code>, <code>score</code>, each taking the same state.</p>
+  <p class="note mt-18">The three calls themselves are the six lines shown above under <a href="#arch">How it works</a>: <code>choice</code>, <code>noul</code>, <code>score</code>, each taking the same state.</p>
   <div class="dest mt-55">
     <a href="research.html"><span class="t-card">Read the research: architecture, data, 130 runs.</span><span class="t-eyebrow">Research →</span></a>
     <a href="https://huggingface.co/OzLabs/typical-small"><span class="t-card">Get the weights: 1.7B and 4B, open.</span><span class="t-eyebrow">Hugging Face →</span></a>
