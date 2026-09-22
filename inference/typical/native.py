@@ -11,6 +11,7 @@ typical-small-preview) trains with nc_head n2/n2n3.
 import bisect
 import copy
 import functools
+import json
 import string
 
 import torch
@@ -69,8 +70,55 @@ def _render_query_only(query: str, cand_texts: list[str]):
     return query + "\n", []
 
 
+# Verbatim from pcdm_jev.decider.SEMIF_SYSTEM / native.SEMIF_SYSTEM (SemIf's core.py DIRECT_SYSTEM).
+SEMIF_SYSTEM = ("Apply the supplied criterion to the supplied evidence. Choose exactly one listed option. "
+                "Respond with only its uppercase letter, with no explanation or reasoning.")
+
+
+@functools.lru_cache(maxsize=4)
+def _semif_head_tail(tok):
+    """(pre_head, tail): chat-template text around a sentinel "evidence" value -- pre_head =
+    system turn + user-turn opening + `{"evidence": "` (prepended to the state text to form the
+    KV-cached prefix), tail = end of user turn + assistant-turn opening (appended after the rest
+    of the JSON, see _render_semif). Verbatim port of native._semif_head_tail."""
+    sentinel = "\x00SEMIF_STATE\x00"
+    messages = [{"role": "system", "content": SEMIF_SYSTEM}, {"role": "user", "content": sentinel}]
+    try:
+        full = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+    except TypeError:
+        full = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    before, after = full.split(sentinel)
+    return before + '{"evidence": "', after
+
+
+def _render_semif(query: str, cand_texts: list[str], tail_text: str):
+    """native_v4 (--nc_render semif): closes the "evidence" string opened in the cached prefix,
+    then criterion + lettered options (json.dumps-escaped) + tail_text. spans[k] = (start, end)
+    of option k's description text -- K spans, no null line. Verbatim port of native._render_semif."""
+    text = '", "criterion": ' + json.dumps(query) + ', "options": ['
+    spans = []
+    for i, c in enumerate(cand_texts):
+        if i:
+            text += ", "
+        text += '{"letter": "' + _label(i) + '", "description": "'
+        esc = json.dumps(c)[1:-1]
+        spans.append((len(text), len(text) + len(esc)))
+        text += esc + '"}'
+    text += ']}' + tail_text
+    return text, spans
+
+
 RENDERS = {"letters": _render, "tags": _render_tags, "letters_nonull": _render_letters_nonull,
-           "query_only": _render_query_only}
+           "query_only": _render_query_only, "semif": _render_semif}
+
+
+def _render_row(tok, render: str, query: str, cand_texts: list[str]):
+    """Dispatch RENDERS[render](query, cand_texts) for every render except "semif", which also
+    needs the tokenizer's chat-template tail text (_semif_head_tail). Verbatim port of
+    native._render_row."""
+    if render == "semif":
+        return _render_semif(query, cand_texts, _semif_head_tail(tok)[1])
+    return RENDERS[render](query, cand_texts)
 
 
 def _is_bern_row(cand_texts, meta=None):
@@ -361,21 +409,30 @@ def _truncate_options(tok, cand_texts: list[str], max_tokens: int | None) -> lis
 
 
 @torch.inference_mode()
-def encode_state(head, model, state: str, max_state: int = 256):
-    """[eos] + state -> (past_key_values, Ls), the once-per-state prefix encode that used to
+def encode_state(head, model, state: str, max_state: int = 256, semif: bool | None = None):
+    """[eos] + state (or, --nc_render semif, the SemIf chat-template wrapper + state -- see
+    _semif_head_tail) -> (past_key_values, Ls), the once-per-state prefix encode that used to
     run inside native_kv_decide on every call. Split out so a caller (Typical's state LRU)
     can compute it once and reuse the KV cache across many decisions on the same state --
     see native_kv_decide's `state_cache` param. Pure function of (backbone weights, state
-    text): deterministic in eval/inference_mode, so a cached entry is bit-identical to a
+    text, semif): deterministic in eval/inference_mode, so a cached entry is bit-identical to a
     fresh encode, not just numerically close. @inference_mode here (not just relying on the
     caller) because the resulting KV tensors get `.expand()`'d and read (never in-place
     mutated) by every subsequent decision on this state (see `_expand_state_cache`) -- an
     inference_mode tensor is a stable, non-grad-tracked view source, so this must never run
-    under regular autograd tracking, regardless of what context the caller happens to be
-    in."""
+    under regular autograd tracking, regardless of what context the caller happens to be in.
+    semif=None defaults to `model.render == "semif"`; native_kv_decide passes semif=False
+    explicitly for a bern (yes/no) row's own prefix, since those always use the plain eos+state
+    sink regardless of nc_render (see native.py's module docstring)."""
+    if semif is None:
+        semif = getattr(model, "render", "letters") == "semif"
     tok, dev, lm = head.backbone.tokenizer, head.device, head.backbone.model
     with record_function("typical/tokenize_state"):
-        prefix = torch.tensor([[tok.eos_token_id] + _ids(tok, [state], max_state)[0]], device=dev)
+        if semif:
+            prefix_ids = _ids(tok, [_semif_head_tail(tok)[0] + state], max_state)[0]
+        else:
+            prefix_ids = [tok.eos_token_id] + _ids(tok, [state], max_state)[0]
+        prefix = torch.tensor([prefix_ids], device=dev)
     with record_function("typical/state_prefix_forward"):
         cache = lm(input_ids=prefix, use_cache=True).past_key_values
     return cache, prefix.shape[1]
@@ -385,17 +442,25 @@ def encode_state(head, model, state: str, max_state: int = 256):
 def native_kv_decide(head, model, state, queries, chunk: int = 32, max_state: int = 256,
                      max_suffix: int = MAX_SUFFIX, vec_cache=None, state_cache=None,
                      max_option_tokens: int | None = DEFAULT_MAX_OPTION_TOKENS):
-    """Serving path: [eos] + state encoded ONCE into a KV cache on head.backbone.model; every
-    query's suffix runs against that cached prefix, `chunk` queries per forward. queries =
-    [(query, candidates)] -> list of [K_i + 1] probability vectors (null last). Verbatim port
-    of native.native_kv_decide (head/model contract unchanged -- head needs only .backbone
-    (tokenizer + model) and .device; model is a NativeHead), plus two additions: `state_cache`,
-    an optional (past_key_values, Ls) pair from encode_state -- pass it to skip re-encoding
-    the state prefix (Typical.choice/score/noul/decide do this automatically via an LRU; see
-    core.py) -- and `max_option_tokens` ("suffix diet": caps each rendered option's length,
-    see _truncate_options; None/0 disables, matching the training repo's untruncated
-    behaviour exactly). No hierarchical fallback: a suffix longer than max_suffix raises
-    (raise max_suffix instead)."""
+    """Serving path: [eos] + state (or, --nc_render semif, the SemIf chat-template wrapper +
+    state) encoded ONCE into a KV cache on head.backbone.model; every query's suffix runs
+    against that cached prefix, `chunk` queries per forward. queries = [(query, candidates)] ->
+    list of [K_i + 1] probability vectors (null last). Verbatim port of native.native_kv_decide
+    (head/model contract unchanged -- head needs only .backbone (tokenizer + model) and .device;
+    model is a NativeHead), plus two additions: `state_cache`, an optional (past_key_values, Ls)
+    pair from encode_state -- pass it to skip re-encoding the state prefix (Typical.choice/
+    score/noul/decide do this automatically via an LRU; see core.py) -- and `max_option_tokens`
+    ("suffix diet": caps each rendered option's length, see _truncate_options; None/0 disables,
+    matching the training repo's untruncated behaviour exactly). No hierarchical fallback: a
+    suffix longer than max_suffix raises (raise max_suffix instead).
+
+    --nc_render semif: a bern (yes/no) row always renders query_only against the PLAIN eos+state
+    prefix, never the semif JSON wrapper (see native.py's module docstring), so it can't share
+    `state_cache` when one is supplied (Typical's per-state LRU key/encode_state default to
+    building the semif-wrapped cache whenever model.render=="semif" -- see encode_state). A
+    call that mixes bern and non-bern queries under a semif checkpoint therefore builds a
+    second, plain prefix on demand for the bern rows only; every other render (incl. no bern
+    rows present) is the original single-cache loop, unchanged."""
     if model.use2:
         raise NotImplementedError(
             "nc_head n2/n2n3 (Qwen3-Embedding candidate vectors) isn't ported to the "
@@ -404,46 +469,63 @@ def native_kv_decide(head, model, state, queries, chunk: int = 32, max_state: in
             "checkpoint requires it."
         )
     tok, dev, lm = head.backbone.tokenizer, head.device, head.backbone.model
-    state_cache, Ls = state_cache if state_cache is not None else encode_state(head, model, state, max_state)
-    out = []
-    for start in range(0, len(queries), chunk):
-        qs = queries[start:start + chunk]
-        m = len(qs)
-        with record_function("typical/tokenize_suffix"):
-            # is_bern/yes-idx/cmask all key off candidate COUNT and the literal "yes"/"no"
-            # text (never truncated -- 1 token), so they read the original `c`; only the
-            # rendered text is diet'd.
-            is_bern = [model.noul_head == "bern" and _is_bern_row(c) for _, c in qs]
-            rendered = [RENDERS["query_only" if b else getattr(model, "render", "letters")]
-                        (q, _truncate_options(tok, c, max_option_tokens))
-                        for b, (q, c) in zip(is_bern, qs)]
-            enc = tok([r[0] for r in rendered], add_special_tokens=False, return_offsets_mapping=True)
-            x_ids, offs = enc["input_ids"], enc["offset_mapping"]
-            assert max(len(x) for x in x_ids) <= max_suffix, f"suffix > max_suffix={max_suffix}; raise it"
-            input_ids, am, lengths = _pack(tok, [[]] * m, x_ids, tail=[tok.eos_token_id], sink=False)
-        with record_function("typical/mask_build"):
-            T = input_ids.shape[1]
-            Kmax = max(len(c) for _, c in qs)
-            pool = torch.stack([_pool_matrix(r[1], o, 0, Kmax, T, K=len(c)) for r, o, (_, c) in zip(rendered, offs, qs)])
-            cmask = torch.zeros(m, Kmax, dtype=torch.bool)
-            for i, (_, c) in enumerate(qs):
-                cmask[i, :len(c)] = True
+    base_render = getattr(model, "render", "letters")
+    # is_bern/yes-idx/cmask all key off candidate COUNT and the literal "yes"/"no" text (never
+    # truncated -- 1 token), so they read the original `c`; only the rendered text is diet'd.
+    is_bern = [model.noul_head == "bern" and _is_bern_row(c) for _, c in queries]
+    renders = ["query_only" if b else base_render for b in is_bern]
+    out = [None] * len(queries)
 
-        with record_function("typical/state_cache_expand"):
-            cache = _expand_state_cache(state_cache, m)
-        with record_function("typical/suffix_forward"):
-            attn = torch.cat([_sink_ones(m, Ls, "cpu"), am], dim=1).to(dev)
-            position_ids = _position_ids_row(T, Ls, str(dev)).expand(m, -1)
-            H = lm(input_ids=input_ids.to(dev), attention_mask=_causal_pad_mask(attn, T, lm.dtype),
-                   position_ids=position_ids, past_key_values=cache, use_cache=False).last_hidden_state.float()
-        with record_function("typical/head_forward"):
-            h = H[_arange(m, str(dev)), (lengths - 1).to(dev)]
-            C3 = torch.bmm(pool.to(dev), H)
-            C2 = None  # n2 unsupported -- guarded above
-            yi = _yes_idx([c for _, c in qs], dev) if model.noul_head == "bern" else None
-            bm = torch.tensor(is_bern, dtype=torch.bool, device=dev) if model.noul_head == "bern" else None
-            probs = torch.softmax(model(h, cmask.to(dev), C3, C2, yes_idx=yi, bern_mask=bm), dim=-1)
-        with record_function("typical/cpu_sync"):
-            for i, (_, c) in enumerate(qs):
-                out.append(torch.cat([probs[i, :len(c)], probs[i, -1:]]))
+    def run_group(idxs, cache, Ls, tail_ids):
+        if not idxs:
+            return
+        for start in range(0, len(idxs), chunk):
+            grp = idxs[start:start + chunk]
+            qs = [queries[i] for i in grp]
+            rnds = [renders[i] for i in grp]
+            m = len(qs)
+            with record_function("typical/tokenize_suffix"):
+                rendered = [_render_row(tok, r, q, _truncate_options(tok, c, max_option_tokens))
+                            for r, (q, c) in zip(rnds, qs)]
+                enc = tok([r[0] for r in rendered], add_special_tokens=False, return_offsets_mapping=True)
+                x_ids, offs = enc["input_ids"], enc["offset_mapping"]
+                assert max(len(x) for x in x_ids) <= max_suffix, f"suffix > max_suffix={max_suffix}; raise it"
+                input_ids, am, lengths = _pack(tok, [[]] * m, x_ids, tail=tail_ids, sink=False)
+            with record_function("typical/mask_build"):
+                T = input_ids.shape[1]
+                Kmax = max(len(c) for _, c in qs)
+                pool = torch.stack([_pool_matrix(r[1], o, 0, Kmax, T, K=len(c)) for r, o, (_, c) in zip(rendered, offs, qs)])
+                cmask = torch.zeros(m, Kmax, dtype=torch.bool)
+                for i, (_, c) in enumerate(qs):
+                    cmask[i, :len(c)] = True
+
+            with record_function("typical/state_cache_expand"):
+                exp_cache = _expand_state_cache(cache, m)
+            with record_function("typical/suffix_forward"):
+                attn = torch.cat([_sink_ones(m, Ls, "cpu"), am], dim=1).to(dev)
+                position_ids = _position_ids_row(T, Ls, str(dev)).expand(m, -1)
+                H = lm(input_ids=input_ids.to(dev), attention_mask=_causal_pad_mask(attn, T, lm.dtype),
+                       position_ids=position_ids, past_key_values=exp_cache, use_cache=False).last_hidden_state.float()
+            with record_function("typical/head_forward"):
+                h = H[_arange(m, str(dev)), (lengths - 1).to(dev)]
+                C3 = torch.bmm(pool.to(dev), H)
+                C2 = None  # n2 unsupported -- guarded above
+                yi = _yes_idx([c for _, c in qs], dev) if model.noul_head == "bern" else None
+                bm = (torch.tensor([r == "query_only" for r in rnds], dtype=torch.bool, device=dev)
+                      if model.noul_head == "bern" else None)
+                probs = torch.softmax(model(h, cmask.to(dev), C3, C2, yes_idx=yi, bern_mask=bm), dim=-1)
+            with record_function("typical/cpu_sync"):
+                for row, i in enumerate(grp):
+                    _, c = qs[row]
+                    out[i] = torch.cat([probs[row, :len(c)], probs[row, -1:]])
+
+    non_bern, bern = [i for i, b in enumerate(is_bern) if not b], [i for i, b in enumerate(is_bern) if b]
+    if base_render != "semif" or not bern:
+        cache, Ls = state_cache if state_cache is not None else encode_state(head, model, state, max_state)
+        run_group(list(range(len(queries))), cache, Ls, [tok.eos_token_id])
+    else:
+        semif_cache, semif_Ls = state_cache if state_cache is not None else encode_state(head, model, state, max_state)
+        run_group(non_bern, semif_cache, semif_Ls, [])
+        plain_cache, plain_Ls = encode_state(head, model, state, max_state, semif=False)
+        run_group(bern, plain_cache, plain_Ls, [tok.eos_token_id])
     return out

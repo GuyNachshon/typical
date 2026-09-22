@@ -2265,6 +2265,158 @@ def test_bern_out_of_domain_kway_row_degrades_instead_of_crashing():
 
 
 # ---------------------------------------------------------------------------
+# 15c. --nc_render semif: SemIf-structured native head (native.py module docstring,
+# pcdm_jev.decider --prompt_style semif's frozen-probe +8 JevBench-standard result)
+# ---------------------------------------------------------------------------
+
+from native import _render_semif, _render_row, _semif_head_tail, native_kv_decide  # noqa: E402
+
+
+def test_semif_render_two_examples_json_shape_and_spans(tied_mcq_head):
+    """_render_semif's suffix continues the "evidence" string opened in the cached prefix:
+    closing quote, criterion, then K lettered {"letter","description"} options (no null line)
+    ending in tail_text -- spans[k] must point at exactly option k's description text."""
+    tok = tied_mcq_head.backbone.tokenizer
+    tail = _semif_head_tail(tok)[1]
+    for query, cands in [("is this eligible?", ["yes", "no"]),
+                          ("pick the best category", ["billing", "support", "a \"quoted\" one"])]:
+        text, spans = _render_semif(query, cands, tail)
+        assert text.startswith('", "criterion": ') and text.endswith(tail)
+        assert len(spans) == len(cands)
+        for (cs, ce), c in zip(spans, cands):
+            assert text[cs:ce] == json.dumps(c)[1:-1]  # escaped exactly like the rendered JSON
+
+
+def test_semif_head_tail_wraps_system_and_json_opening(tied_mcq_head):
+    """pre_head = system turn + user-turn opening + the "evidence" field's opening quote (goes
+    at the START of the KV-cached prefix, before the state text); tail = end of user turn +
+    assistant-turn opening (appended after _render_semif's JSON close)."""
+    from native import SEMIF_SYSTEM
+    tok = tied_mcq_head.backbone.tokenizer
+    pre_head, tail = _semif_head_tail(tok)
+    assert SEMIF_SYSTEM in pre_head and pre_head.endswith('{"evidence": "')
+    assert tail.startswith(tok.eos_token) or "assistant" in tail  # end-of-turn then assistant-turn opening
+    assert _semif_head_tail(tok) is _semif_head_tail(tok)  # lru_cache: same tokenizer -> same object
+
+
+def test_semif_n3_span_pooling_matches_manual_mean(tied_mcq_head):
+    """C3[i, k] under --nc_render semif must equal the plain mean of the last-layer states over
+    exactly the tokens whose char offsets overlap option k's description text, with the prefix
+    = pre_head + state (no eos sink) and the suffix ending in tail_text (no extra eos tail) --
+    the same manual-reconstruction check as letters' test_native_n3_span_pooling_matches_manual_mean."""
+    head = tied_mcq_head
+    tok = head.backbone.tokenizer
+    examples = _mcq_examples(ks=(3, 2))
+    examples[0]["candidates"] = ["Paris.", "New York", "a \"quoted\" one"]
+    states, queries, cands = [ex["state"] for ex in examples], [ex["query"] for ex in examples], [ex["candidates"] for ex in examples]
+    with torch.inference_mode():
+        h, C3, cmask, _ = native_features(head, states, queries, cands, render="semif")
+        pre_head, tail = _semif_head_tail(tok)
+        for i in range(len(examples)):
+            suffix, spans = _render_semif(queries[i], cands[i], tail)
+            s_ids = tok(pre_head + states[i], add_special_tokens=False)["input_ids"]
+            enc = tok(suffix, add_special_tokens=False, return_offsets_mapping=True)
+            ids = s_ids + enc["input_ids"]  # no leading eos sink, no trailing eos tail
+            H = head.backbone.model(input_ids=torch.tensor([ids])).last_hidden_state[0].float()
+            assert torch.allclose(h[i], H[-1], atol=1e-4)  # h_D = last token of the assistant-turn opening
+            for k, (cs, ce) in enumerate(spans):
+                pos = [len(s_ids) + j for j, (ts, te) in enumerate(enc["offset_mapping"]) if te > cs and ts < ce]
+                assert torch.allclose(C3[i, k], H[pos].mean(0), atol=1e-4), (i, k)
+
+
+def test_semif_bern_row_routing_unaffected(tied_mcq_head):
+    """PLAN7 track C mixed-type fix must hold under --nc_render semif too: a yes/no row still
+    renders query_only against the PLAIN eos+state prefix (native._is_bern_row), so a --noul_head
+    bern model gives BIT-IDENTICAL logits to the choice control on every non-yes/no row --
+    exactly test_bern_mixed_batch_matches_choice_on_non_yesno_rows, with nc_render=semif."""
+    torch.manual_seed(0)
+    head = tied_mcq_head
+    examples = [
+        {"state": "s1", "query": "eligible?", "candidates": ["no", "yes"],
+         "target": [1.0, 0.0], "p_null": 0.0, "task": "t", "meta": {"qtype": "noul"}},
+        {"state": "s2", "query": "which team?", "candidates": ["billing", "support", "logistics"],
+         "target": [0.0, 1.0, 0.0], "p_null": 0.0, "task": "t", "meta": {"qtype": "choice"}},
+    ]
+    batch = collate_mcq(examples)
+    model_bern = NativeHead(head.backbone.d, nc_head="n3", null="factored", render="semif", noul_head="bern")
+    model_choice = NativeHead(head.backbone.d, nc_head="n3", null="factored", render="semif", noul_head="choice")
+    model_choice.load_state_dict(model_bern.state_dict(), strict=False)
+
+    logits_bern = run_batch_native(head, model_bern, batch, examples)
+    logits_choice = run_batch_native(head, model_choice, batch, examples)
+    k = len(examples[1]["candidates"])
+    assert torch.allclose(logits_bern[1, :k], logits_choice[1, :k], atol=1e-6)
+    assert torch.allclose(logits_bern[1, -1], logits_choice[1, -1], atol=1e-6)
+    probs0 = torch.softmax(logits_bern[0], dim=-1)
+    assert torch.isfinite(probs0).all() and torch.allclose(probs0.sum(), torch.tensor(1.0), atol=1e-5)
+
+
+def test_semif_smoke_trains(tied_mcq_head):
+    """--nc_render semif end to end: a few SGD steps on run_batch_native's logits must lower
+    decision_loss and reach every trainable parameter, same contract as the other renders'
+    test_grad_ckpt_lora_grads_and_loss_decreases."""
+    torch.manual_seed(0)
+    head = tied_mcq_head
+    model = NativeHead(head.backbone.d, nc_head="n3", null="factored", render="semif")
+    examples = _mcq_examples(ks=(2, 3, 2))
+    batch = collate_mcq(examples)
+    opt = torch.optim.SGD(list(model.parameters()) + head.trainable_parameters(), lr=0.5)
+
+    def step():
+        opt.zero_grad()
+        logits = run_batch_native(head, model, batch, examples)
+        loss = decision_loss(logits, batch["target"], batch["p_null"], batch["cmask"])
+        loss.backward()
+        assert all(p.grad is not None for p in head.trainable_parameters())
+        opt.step()
+        return loss.item()
+
+    losses = [step() for _ in range(6)]
+    assert losses[-1] < losses[0]
+
+
+@pytest.mark.parametrize("null", ["softmax", "factored"])
+def test_semif_kv_decide_matches_run_batch(tied_mcq_head, null):
+    """native_kv_decide's semif prefix/suffix split must reproduce run_batch_native's full-row
+    probabilities, exactly like test_native_kv_decide_matches_run_batch for the other renders."""
+    torch.manual_seed(0)
+    head = tied_mcq_head.eval()
+    model = NativeHead(head.backbone.d, nc_head="n3", null=null, render="semif").eval()
+    state = "a shared state text used for every query below"
+    queries = [(f"query number {i}", [f"option {j}" for j in range(k)]) for i, k in enumerate((2, 5, 9))]
+    examples = [{"state": state, "query": q, "candidates": c, "target": [1.0] + [0.0] * (len(c) - 1),
+                 "p_null": 0.0, "task": "smoke"} for q, c in queries]
+    batch = collate_mcq(examples)
+    with torch.inference_mode():
+        probs = torch.softmax(run_batch_native(head, model, batch, examples), dim=-1)
+    dists = native_kv_decide(head, model, state, queries, chunk=2)
+    assert len(dists) == 3
+    for i, (_, c) in enumerate(queries):
+        expected = torch.cat([probs[i, :len(c)], probs[i, -1:]])
+        assert torch.allclose(dists[i], expected, atol=1e-3), (i, (dists[i] - expected).abs().max())
+
+
+def test_semif_kv_decide_mixed_bern_matches_run_batch(tied_mcq_head):
+    """A state whose queries mix a bern (yes/no) row with ordinary semif-rendered rows needs two
+    KV caches (native_kv_decide's non_bern/bern split) -- both must still match run_batch_native
+    row for row, exercising the dual-cache bucketing this render forces."""
+    torch.manual_seed(0)
+    head = tied_mcq_head.eval()
+    model = NativeHead(head.backbone.d, nc_head="n3", render="semif", noul_head="bern").eval()
+    state = "a shared state text for the mixed bern/non-bern check"
+    queries = [("eligible?", ["no", "yes"]), ("which team?", ["billing", "support", "logistics"])]
+    examples = [{"state": state, "query": q, "candidates": c, "target": [1.0] + [0.0] * (len(c) - 1),
+                 "p_null": 0.0, "task": "smoke"} for q, c in queries]
+    batch = collate_mcq(examples)
+    with torch.inference_mode():
+        probs = torch.softmax(run_batch_native(head, model, batch, examples), dim=-1)
+    dists = native_kv_decide(head, model, state, queries, chunk=8)
+    for i, (_, c) in enumerate(queries):
+        expected = torch.cat([probs[i, :len(c)], probs[i, -1:]])
+        assert torch.allclose(dists[i], expected, atol=1e-3), (i, (dists[i] - expected).abs().max())
+
+
+# ---------------------------------------------------------------------------
 # 16. native_v2 (PLAN5 sec 2): --nc_render tags + --perm_lambda
 # ---------------------------------------------------------------------------
 

@@ -8,7 +8,7 @@ uv run train.py --name X [--backbone Qwen/Qwen3-1.7B-Base] [--lora_layers 8] [--
                  [--smoke] [--eval_only] [--dump_logits DIR]
                  [--head mlp|z1|zr|zr_set] [--z_dim 128] [--z_probes 8] [--tiny_layers 2]
                  [--cand_encoder backbone|qwen3emb|tiny]
-                 [--readout energy|mcq|native] [--nc_head n2|n3|n2n3] [--nc_render letters|tags] [--perm_lambda L] [--no_shuffle]
+                 [--readout energy|mcq|native] [--nc_head n2|n3|n2n3] [--nc_render letters|tags|letters_nonull|semif] [--perm_lambda L] [--no_shuffle]
                  [--score_head choice|cumlink] [--noul_head choice|bern] [--qtype_filter choice|score|noul] [--ordinal_smooth TAU]
 """
 import argparse
@@ -1048,9 +1048,10 @@ def parse_args():
     p.add_argument("--nc_head", choices=["n2", "n3", "n2n3"], default="n2n3",
                     help="--readout native candidates: n2 = Qwen3-Embedding vectors, n3 = pooled option spans "
                          "from the suffix, n2n3 = both (PLAN4 sec 12)")
-    p.add_argument("--nc_render", choices=["letters", "tags", "letters_nonull"], default="letters",
+    p.add_argument("--nc_render", choices=["letters", "tags", "letters_nonull", "semif"], default="letters",
                     help="--readout native suffix: letters = mcq's 'A. opt' lines + null line + 'Answer:' (unchanged); "
-                         "tags = native_v2 (PLAN5 sec 2) letter-free '<choice>\\n opt \\n</choice>' blocks, no null line")
+                         "tags = native_v2 (PLAN5 sec 2) letter-free '<choice>\\n opt \\n</choice>' blocks, no null line; "
+                         "semif = SemIf-structured chat-template prefix/suffix around the state (native.py module docstring)")
     p.add_argument("--score_head", choices=["choice", "cumlink"], default="choice",
                     help="PLAN7 track C: score_C_cumlink -- cumulative-link ordinal head over the rendered "
                          "levels instead of the K-way Choice scorer (choice = today's default, unchanged)")
