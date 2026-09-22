@@ -32,11 +32,17 @@ every number in this paper is a single training run; noise-floor measurements el
 put NLI/BoolQ variation at $\pm0.7$ points and held-out label-space variation at $\pm3$--5 points between
 identically configured seeds. JevBench intervals are $\pm6$--13 points (standard, $n_{\mathrm{eff}}{=}36$)
 and $\pm9$ points (hard, $n{=}111$). Several differences we report, including the frozen-teacher
-distillation control and the truncation ablation, are inside those intervals and are reported as such.
+distillation control and the JevBench-scored truncation ablation, are inside those intervals and are
+reported as such.
 The 1.7B/4B/8B/14B ladder is entirely within the Qwen3 family, with a single Qwen3.5-4B checkpoint as a
 second-family data point, not a second ladder; Qwen3-8B is an outlier in both frozen and trained form and
-we did not find a configuration that recovers it within budget. Three checkpoints were still training or
-awaiting evaluation at the time of writing and are omitted rather than reported provisionally.
+we did not find a configuration that recovers it within budget. Two checkpoints were still training at
+the time of writing and are omitted rather than reported provisionally, and a Qwen3.5-9B checkpoint has
+hard-tier results only. We also note the converse of low power: neighbouring rungs of the ladder are not
+separable on JevBench's hard tier at $n{=}111$ (\Cref{sec:train:ladder}), so the ladder's value is its
+trend, not any pairwise ordering within it. Where a question mattered enough, the fix was to build an
+evaluation set large enough to answer it rather than to argue about the benchmark
+(\Cref{sec:boundary:truncation}).
 
 \paragraph{Evaluation.} Every JevBench number is the public 231-item subset and is not a ranked
 leaderboard entry; the 146 judge-scored items required for ranking are not public, so we cannot rule out

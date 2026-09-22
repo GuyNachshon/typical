@@ -402,9 +402,11 @@ null augmentation; (5) the size ladder across Qwen3 1.7B/4B/8B/14B with frozen c
 bundle (facts-first long-state rendering, \texttt{--drop\_truncated}, DecisionMix v2, typed heads,
 calibration-shaped checkpoint selection, frozen-teacher KD) and its matched no-KD control; (7) the
 Qwen3.5 port; and (8) the post-hoc statistical work -- cluster bootstraps, the matched truncation
-ablation, and the held-out long-state render-mismatch set -- which is what weakened several claims in
-the earlier drafts of this paper to the form they now take in
-\Cref{sec:boundary:frozen,sec:boundary:truncation}.
+ablation, and the purpose-built held-out long-state set -- which changed several claims in earlier
+drafts of this paper in both directions: it weakened the frozen-teacher distillation and standard-tier
+bundle results to the form they now take in \Cref{sec:boundary:frozen}, and it turned the long-state
+truncation diagnosis from an unsupported attribution into the measured $2\times2$ of
+\Cref{sec:boundary:truncation}.
 
 A closure worth recording: the candidate-blind branch was not abandoned because a metric was
 disappointing. Each student closed 20--55\% of the chance-to-teacher accuracy gap, which looked like
@@ -450,7 +452,7 @@ place our numbers, and we draw no capability ranking from it.
   \end{tabular}
 \end{table}
 
-\subsection{Long-state truncation: distributions and the render-mismatch set}
+\subsection{Long-state truncation: distributions and the held-out evaluation set}
 \label{app:truncation}
 
 \Cref{fig:truncation} gives the \texttt{data\_wf\_long} state-length histogram with truncation fractions
@@ -460,28 +462,15 @@ sequence. The tokenizer's \texttt{truncation\_side} is \texttt{'right'}, verifie
 released tokenizer rather than assumed from configuration.
 
 The held-out long-state evaluation set (\texttt{scripts/make\_long\_eval.py}, $n{=}605$) was built for
-the render-mismatch measurement: it has zero exact-state overlap with either training corpus, with
+the $2\times2$ of \Cref{tab:twobytwo}. It has zero exact-state overlap with either training corpus, with
 \texttt{Case}-stem overlaps dropped, and is scored at a 4{,}096-token window against states with
-$p50 = 1{,}965$ and $\max = 2{,}843$ tokens, so no item is truncated at evaluation in either rendering.
-The two renderings differ only in whether the evidence block precedes or follows the request text.
-\Cref{tab:app-rendermismatch} gives the per-subset breakdown summarized in
-\Cref{sec:boundary:rendering}.
-
-\begin{table}[h]
-  \centering
-  \caption{Train/test render mismatch on the held-out long-state set ($n{=}605$, no truncation at
-  evaluation). The model is trained on facts-last renders; only the evaluation rendering changes.}
-  \label{tab:app-rendermismatch}
-  \small
-  \begin{tabular}{lrrr}
-    \toprule
-    Evaluation rendering & overall & \texttt{policy\_permit} ($n{=}330$, $\numcands{=}2$, floor .612) & \texttt{action\_select} \\
-    \midrule
-    facts-last (matches training) & .830 & .842 & .815 \\
-    facts-first (mismatched) & .640 & .615 & .669 \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+$p50 = 1{,}965$ and $\max = 2{,}843$ tokens, so no item is truncated at evaluation in any of the eight
+cells. The two renderings differ only in whether the evidence block precedes or follows the request
+text; the items, labels, and candidate sets are identical. It shares a generator family with training
+data, which is why \Cref{sec:boundary:truncation} scopes its conclusion to the training defect rather
+than to long-context capability in general. Significance for the matched-vs-matched comparison is a
+two-proportion test over the 605 paired items ($z = 6.2$, $p = 5\times10^{-10}$ at 1.7B;
+$p = 7\times10^{-12}$ at 14B).
 
 \subsection{Operations and reproducibility notes}
 \label{app:ops}

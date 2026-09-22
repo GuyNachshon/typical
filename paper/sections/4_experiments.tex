@@ -229,6 +229,10 @@ development log, which is how these experiments were actually run, is in \Cref{a
     Hard composition is unresolved &
     Frozen-backbone paired comparison, per-family breakdown (\Cref{sec:boundary}) &
     Rendering not controlled in the frozen comparison; data coverage not excluded \\
+    Truncating the evidence out of training data costs capability &
+    $2\times2$ train-render $\times$ eval-render ablation, 605 held-out states, replicated at 1.7B and
+    14B (\Cref{sec:boundary:truncation}) &
+    Single-variable only at 1.7B; evaluation set shares a generator with training \\
     \bottomrule
   \end{tabular}
 \end{table}

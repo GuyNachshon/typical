@@ -4,9 +4,10 @@
 Having established what the representation must contain, this section asks how the interface behaves
 when it is trained and scaled: typed objectives (\Cref{sec:train:typed}), the training distribution
 (\Cref{sec:train:mixture}), the size ladder (\Cref{sec:train:ladder}), probability quality
-(\Cref{sec:train:calibration}), and cost (\Cref{sec:train:latency}). Three runs remained in flight at
-the time of writing (\texttt{ts1b\_semif}, \texttt{tl1b\_semif}, and a Qwen3.5-9B checkpoint
-\texttt{tl2}) and are omitted rather than reported provisionally.
+(\Cref{sec:train:calibration}), and cost (\Cref{sec:train:latency}). Two runs remained in flight at
+the time of writing (\texttt{ts1b\_semif}, \texttt{tl1b\_semif}) and are omitted rather than reported
+provisionally; a Qwen3.5-9B checkpoint (\texttt{tl2}) has hard-tier results only and appears solely in
+the resolution argument below, not in \Cref{tab:headline}.
 
 \subsection{Typed objectives are contracts on the output distribution}
 \label{sec:train:typed}
@@ -116,7 +117,15 @@ interval, and a paired bootstrap at 14B gives $-.111$ $[-.250, +.014]$ for froze
 1.7B/4B/14B), because a decision's cost is dominated by the cached-state pass and a short suffix rather
 than by backbone depth (\Cref{sec:train:latency}).
 
-The hard tier moves in the opposite direction from the standard tier and is the subject of
+\textbf{The hard tier cannot resolve neighbouring rungs at all.} A Qwen3.5-9B checkpoint trained with
+the same recipe scores exactly 55/111 on the hard tier, the same count as the Qwen3.5-4B checkpoint in
+\Cref{tab:headline}. This is not a tie between equal models: the two disagree on 26 individual items
+(13 in each direction) and not one of their 111 probability vectors matches. McNemar's exact test gives
+$p = 1.000$ with a paired 95\% interval on the difference of $[-.090, +.090]$. The correct reading is
+that \emph{this benchmark is uninformative about 4B-vs-9B at this sample size}, not that the two models
+perform equally, and the same caution applies to any adjacent pair of rungs in \Cref{tab:headline}.
+
+The hard tier also moves in the opposite direction from the standard tier, which is the subject of
 \Cref{sec:boundary}.
 
 \subsection{Probability quality is trainable, and task-conditional}

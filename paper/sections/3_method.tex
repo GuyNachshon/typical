@@ -151,11 +151,10 @@ Null augmentation fixes this at the data level.
 \textbf{Long-state handling.} Long-policy workflow rows train at a longer window (up to 1{,}024 tokens
 for the release recipe, 3{,}072 for the 14B long-state candidate). An earlier version of the generator
 rendered supporting facts \emph{after} the request text; because training right-truncates at the
-window, a 1{,}024-token window silently dropped the facts on 98.8\% of long-policy rows. We report this
-as a verified data defect and separate it carefully from its downstream causal effect, which our
-ablation is consistent with but underpowered to confirm (\Cref{sec:boundary:truncation}). The fix
+window, a 1{,}024-token window silently dropped the facts on 98.8\% of long-policy rows. The fix
 re-renders \textbf{facts-first} and adds \texttt{--drop\_truncated} to discard, rather than silently
-cut, any still-over-length row.
+cut, any still-over-length row. \Cref{sec:boundary:truncation} reports the matched ablation that
+isolates this from the render-compatibility effect it was confounded with, and measures what it cost.
 
 \subsection{Checkpoint selection}
 \label{sec:method:selection}
