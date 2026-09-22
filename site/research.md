@@ -8,7 +8,7 @@ the full result set, including the numbers that did not move.
 § references point to the internal `REPORT.md` (not yet public); the Hugging Face model cards
 reproduce the tables cited here.
 
-## Architecture
+## One trunk, read at 71% depth
 
 A frozen Qwen3 trunk, cut at roughly 71% depth, feeds a small contextual readout with LoRA on the
 top 8 kept layers and a factored ∅ head. The state is read once and cached; each query appends a
@@ -106,14 +106,14 @@ decision state, with nothing generated.
 
 *Fig. 1. Typical forward pass, state to probabilities.*
 
-Looking at: the real forward pass on one support ticket, from tokens to probabilities, replayed
-from a recorded run of typical-small.
+One support ticket runs through a recorded pass of typical-small below, from tokens to
+probabilities.
 
 ```chart trace
 ```
 
-Takeaway: the state is encoded once, each question is a short suffix, and abstain is a gate in the
-head rather than a candidate in the list.
+The state is encoded once, each question after it is a short suffix, and abstain sits inside the
+head as a gate rather than as a candidate in the list.
 
 ### a) Why mid-depth, not the last layer
 
@@ -152,13 +152,13 @@ result predicts (REPORT §3s).
 
 ### d) What reading the state once costs
 
-Looking at: measured milliseconds on one H100 for one decision and for each extra question on the
-same cached state, native head versus prompting the same backbone.
+On one H100, the chart below times a single decision and each extra question on the same cached
+state, comparing the native head with prompting the same backbone.
 
 ```chart latency
 ```
 
-Takeaway: one decision costs about 45 ms whatever K is, and each extra question costs a few
+One decision costs about 45 ms whatever K is, and each extra question costs a few
 milliseconds because the state is read once. The served path in the public package is faster
 still once the state is cached: the serving code used to deep-copy the whole prefix KV cache per
 decision, and replacing that with a zero-byte view brought the warm p50 to 15.5–17 ms at 1.7B and
@@ -166,7 +166,7 @@ decision, and replacing that with a zero-byte view brought the warm p50 to 15.5�
 No quantisation; `torch.compile` and CUDA graphs were tried and rejected because probabilities
 drifted by up to .1 across shape buckets.
 
-## Data
+## Four buckets, weighted against memorising
 
 Four buckets per batch, E .40 / K .15 / W .35 / U .10. The workflow corpora are ours and
 programmatic; held-out families, grammars, styles, and an untrained level-7 tier measure transfer
@@ -208,7 +208,7 @@ parameter range. Also 0/231 JevBench leak hits.
 target becomes ∅ on rows that would otherwise always have an answer. With the factored-∅ head, this
 keeps the null calibrated across K.
 
-## Pipeline
+## Twelve thousand steps, under $20
 
 ```text-wide
 backbone: Qwen/Qwen3-1.7B-Base
@@ -266,22 +266,24 @@ seed: 0
 
 *Specimen: typical-small training args.*
 
-130 run directories sit under `runs/` on the source branch (88 of them training, baseline and ablation runs; the rest probes, benches and zero-shot controls), across
-six days (2026-09-16 → 09-21), most under $20 of H100 time. The line moves because of bugs found
-and controls run rather than scale (decision log below). typical-medium (4B) uses the same recipe on `Qwen3-4B-Base`, tap 26/36, effective batch 64 via
+130 run directories sit under `runs/` on the source branch. Of those, 128 carry a dated commit;
+88 of the dated runs are training runs, baseline and ablation runs included, and the rest are
+probes, benches, and zero-shot controls. That spans six days (2026-09-16 → 09-21), most of it under
+$20 of H100 time. The line moves because of bugs found and controls run rather than scale (decision
+log below). typical-medium (4B) uses the same recipe on `Qwen3-4B-Base`, tap 26/36, effective batch 64 via
 `--grad_accum 4` (releases/typical-medium.md). Final val NLL 0.376, temperature T = 1.124,
 null_offset 0.0 (typical-small; fit post-hoc on the val split, applied at eval).
 
 ### Training curves
 
-Looking at: training loss and validation NLL against step for the runs logged to W&B, selectable
-by size and recipe.
+Training loss and validation NLL against step, for every run logged to W&B, are charted below,
+filterable by size and recipe.
 
 ```chart curves
 ```
 
-Takeaway: the released models are twelve thousand steps at batch 64, and the failed runs are
-visible as curves rather than as footnotes.
+Both released models trained for twelve thousand steps at batch 64, and the failed runs stay
+visible here as curves rather than disappearing into a footnote.
 
 ### Cost, where REPORT states it
 
@@ -300,13 +302,16 @@ Uncertainty: ChaosNLI plus real and synthetic held-out sets from the U corpus. E
 trained on: PagerDuty, jevlogs, Mind2Web, tree-choice (K=320), typed-decisions. Public benchmark:
 JevBench (231-item public subset; see the D1 disclosure in Findings).
 
-## Timeline
+## The line dips before it climbs
 
 JevBench-standard accuracy for the lineage that became typical-small and typical-medium, from the
 first energy checkpoint to the frozen releases, annotated with the bugs found on the way and each
 phase's verdict. Hover a marker for its number and REPORT section. Six days,
-<span id="timeline-run-count">88</span> runs (`runs/` minus
-probe/jev/bench/zero-shot/smoke/dump/leak/kb-audit, so baselines and ablations are included).
+<span id="timeline-run-count">90</span> runs, counted straight from the source branch's git tree
+rather than the local run index used in Pipeline above (`runs/` minus
+probe/jev/bench/zero-shot/smoke/dump/leak/kb-audit entries and result files, so baselines and
+ablations are included); the two counts disagree by a couple of runs because they filter by
+different rules.
 
 D1 — JevBench: public subset (231 ids), unranked, n = 72 standard (SE ≈ .058); probabilities
 conditioned on non-∅; hard tier at chance for both models.
@@ -314,23 +319,26 @@ conditioned on non-∅; hard tier at chance for both models.
 ```chart timeline
 ```
 
-The JevBench line dips before it climbs. The .750 → .694 drop at the typical-small step is a real trade
-([§3ae](https://huggingface.co/OzLabs/typical-small)): DecisionMix v2 and the typed heads raise
-held-out noul/score/flip and clear the PagerDuty floor for both models (.817 / .838 vs .792), at the
-cost of about 1 SE of JevBench standard. jevlogs (research-licensed, caveated) is marginal for small
-(.710 vs floor .697) and below floor for medium (.673).
+Standard accuracy on this chart dips before it climbs, and its last point is not a release: the 14B
+ladder mark at .875 is an unreleased scaling-ladder probe, run once on the pre-DecisionMix-v2
+recipe as an upper-bound check rather than a shipped checkpoint (REPORT §3ab). The .750 → .694 drop
+at the typical-small step is a real trade ([§3ae](https://huggingface.co/OzLabs/typical-small)):
+DecisionMix v2 and the typed heads raise held-out noul/score/flip and clear the PagerDuty floor for
+both models (.817 / .838 vs .792), at the cost of about 1 SE of JevBench standard. jevlogs
+(research-licensed, caveated) is marginal for small (.710 vs floor .697) and below floor for medium
+(.673).
 
 ### Every run, every set
 
-Looking at: every evaluation set for every run of this project, ordered by date, with the
-constant-prediction floor where one exists.
+Every evaluation set for each of the 128 dated runs in the project appears below, ordered by date
+against the constant-prediction floor where one exists.
 
 ```chart runs
 ```
 
-Takeaway: a handful of fixes moved the numbers and most runs were controls that did not.
+A handful of fixes moved the numbers; most runs were controls that did not.
 
-## Findings
+## Eight results, each with a control
 
 Eight results, each with a matched control and, where it mattered, a seed pair or a full-row
 re-evaluation (REPORT §6).
@@ -418,14 +426,14 @@ constant-prediction floor).
 
 ### Calibration, bin by bin
 
-Looking at: the accuracy of each confidence bin on the JevBench public subset, with the weighted
-gap that makes up the ECE.
+The accuracy of each confidence bin on the JevBench public subset sits in the chart below, next to
+the weighted gap between them that makes up the ECE.
 
 ```chart calibration
 ```
 
-Takeaway: calibration holds on the standard tier and breaks on the hard tier, where both models are
-also at chance.
+Calibration holds on the standard tier and breaks on the hard tier, where both models are also at
+chance.
 
 ### Knowledge retained from the backbone
 
@@ -544,7 +552,7 @@ licenses: `facebook/anli` (CC BY-NC 4.0, loaded for train_r1–r3), which an ear
 flagged as a non-commercial blocker, and `metaeval/ambient` and `metaeval/chaos-mnli-ambiguity`,
 which declare no license on their HF cards.
 
-## Reproduce
+## Pip install, three lines of code
 
 The public inference package ships inside the model repos on Hugging Face; there is no separate
 GitHub repo yet.
@@ -597,11 +605,9 @@ Findings.
 
 ### JevBench context ([REPORT §3q](https://huggingface.co/OzLabs/typical-small), same 231 public ids)
 
-Neutral context only: a public-subset run against an unranked leaderboard, not a comparison we make
-a claim from (see D1 above).
-
-D1 — JevBench: public subset (231 ids), unranked, n = 72 standard (SE ≈ .058); probabilities
-conditioned on non-∅; hard tier at chance for both models.
+This table is a neutral, public-subset comparison against an unranked leaderboard — D1: 231 public
+ids, n = 72 standard (SE ≈ .058), probabilities conditioned on non-∅, hard tier at chance for both
+models — and not a comparison we draw any claim from.
 
 | entry | standard | easy | hard |
 | --- | --- | --- | --- |

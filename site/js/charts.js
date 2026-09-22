@@ -51,6 +51,50 @@ function svgText(x, y, str, attrs = {}) {
   return t;
 }
 
+// Charts used to draw at a fixed-width viewBox and let CSS (`width:100%`) scale the whole
+// coordinate system — including text, declared in absolute px — down to fit the container. At a
+// 390px container that shrank 12px labels to 2.8-5.4px. Fix: draw at the container's real width
+// (fitWidth) so the viewBox always matches the rendered size 1:1 and text renders at its
+// declared size. One shared, debounced ResizeObserver redraws every mounted chart on width
+// change instead of one observer per chart.
+const chartRedraws = new Map(); // container -> redraw fn
+const lastWidths = new WeakMap(); // container -> last-drawn clientWidth
+let resizeTimer = null;
+let sharedRO = null;
+
+function scheduleRedraw() {
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    resizeTimer = null;
+    for (const [el, redraw] of chartRedraws) {
+      if (!el.isConnected) {
+        chartRedraws.delete(el);
+        continue;
+      }
+      const w = el.clientWidth;
+      if (w === lastWidths.get(el)) continue; // skip when the width is unchanged
+      lastWidths.set(el, w);
+      redraw();
+    }
+  }, 120);
+}
+
+// Every chart calls this once it has drawn, so a later container resize (sidebar collapse,
+// viewport change, tab reveal) redraws it at the new width.
+function registerChart(container, redraw) {
+  chartRedraws.set(container, redraw);
+  lastWidths.set(container, container.clientWidth);
+  if (!sharedRO) sharedRO = new ResizeObserver(scheduleRedraw);
+  sharedRO.observe(container);
+}
+
+// The container's real rendered width, capped at the chart's design width and floored so
+// margins/labels still fit at extreme narrow widths.
+function fitWidth(el, designW, floor = 240) {
+  const cw = el.clientWidth || designW;
+  return Math.max(floor, Math.min(designW, cw));
+}
+
 function baseSvg(container, w, h, titleStr) {
   container.innerHTML = '';
   container.style.background = WHITE;
@@ -149,14 +193,16 @@ function bar(g, x, y, w, h, fill, opacity = 1) {
 }
 
 const M = { t: 20, r: 24, b: 50, l: 56 };
-const W = 640;
+const W_DESIGN = 640;
 const H = 360;
 
 // barChart(el, {series:[{label, values:[{x,y}]}], yLabel, fmt})
-export function barChart(container, { series, yLabel = '', fmt = fmtNum, title = '' }) {
-  const iw = W - M.l - M.r;
+export function barChart(container, opts) {
+  const { series, yLabel = '', fmt = fmtNum, title = '' } = opts;
+  const w = fitWidth(container, W_DESIGN);
+  const iw = w - M.l - M.r;
   const ih = H - M.t - M.b;
-  const svg = baseSvg(container, W, H, title || yLabel);
+  const svg = baseSvg(container, w, H, title || yLabel);
   const cats = series[0]?.values.map((v) => v.x) ?? [];
   const allY = series.flatMap((s) => s.values.map((v) => v.y));
   const yMax = Math.max(...allY, 0) * 1.1 || 1;
@@ -169,6 +215,10 @@ export function barChart(container, { series, yLabel = '', fmt = fmtNum, title =
 
   const groupW = iw / Math.max(cats.length, 1);
   const barW = groupW / (series.length + 1);
+  // Thin category labels when the group is narrower than the longest label needs (11px mono
+  // ≈ 6.5px/char) — at 390px this stops 6-8 category names from overlapping into mud.
+  const maxLabelLen = Math.max(...cats.map((c) => String(c).length), 1);
+  const labelStep = Math.max(1, Math.ceil((maxLabelLen * 6.5 + 6) / groupW));
   cats.forEach((cat, ci) => {
     series.forEach((s, si) => {
       const v = s.values[ci]?.y ?? 0;
@@ -182,19 +232,24 @@ export function barChart(container, { series, yLabel = '', fmt = fmtNum, title =
       rect.appendChild(ttl);
       g.appendChild(rect);
     });
-    g.appendChild(svgText(ci * groupW + groupW / 2, ih + 18, String(cat), { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
+    if (ci % labelStep === 0) {
+      g.appendChild(svgText(ci * groupW + groupW / 2, ih + 18, String(cat), { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
+    }
   });
 
   if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: MID, 'font-size': 12 }));
   legend(container, series);
+  registerChart(container, () => barChart(container, opts));
   return svg;
 }
 
 // lineChart(el, {series, xLabel, yLabel, logX?})
-export function lineChart(container, { series, xLabel = '', yLabel = '', logX = false, fmt = fmtNum, title = '' }) {
-  const iw = W - M.l - M.r;
+export function lineChart(container, opts) {
+  const { series, xLabel = '', yLabel = '', logX = false, fmt = fmtNum, title = '' } = opts;
+  const w = fitWidth(container, W_DESIGN);
+  const iw = w - M.l - M.r;
   const ih = H - M.t - M.b;
-  const svg = baseSvg(container, W, H, title || yLabel);
+  const svg = baseSvg(container, w, H, title || yLabel);
   const allX = series.flatMap((s) => s.values.map((v) => v.x));
   const allY = series.flatMap((s) => s.values.map((v) => v.y));
   const xMin = Math.min(...allX);
@@ -229,13 +284,15 @@ export function lineChart(container, { series, xLabel = '', yLabel = '', logX = 
   if (xLabel) g.appendChild(svgText(iw / 2, ih + 38, xLabel, { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
   if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: MID, 'font-size': 12 }));
   legend(container, series);
+  registerChart(container, () => lineChart(container, opts));
   return svg;
 }
 
 // reliability(el, {bins:[{lo,hi,n,mean_confidence,accuracy}], ece})
-export function reliability(container, { bins, ece, title = 'Reliability' }) {
-  const w = 400;
-  const h = 400;
+export function reliability(container, opts) {
+  const { bins, ece, title = 'Reliability' } = opts;
+  const w = fitWidth(container, 400, 200);
+  const h = w; // square: axes are both 0..1
   const mm = { t: 20, r: 20, b: 50, l: 50 };
   const iw = w - mm.l - mm.r;
   const ih = h - mm.t - mm.b;
@@ -272,14 +329,17 @@ export function reliability(container, { bins, ece, title = 'Reliability' }) {
   axisPair(g, iw, ih);
   g.appendChild(svgText(iw / 2, ih + 36, 'confidence', { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
   g.appendChild(svgText(-mm.l + 4, -8, 'accuracy', { fill: MID, 'font-size': 12 }));
+  registerChart(container, () => reliability(container, opts));
   return svg;
 }
 
 // ladder(el, {points:[{label, x: ms, y: acc, size}]})
-export function ladder(container, { points, xLabel = 'latency (ms)', yLabel = 'accuracy', fmt = fmtNum, title = 'Ladder', refLines = [] }) {
-  const iw = W - M.l - M.r;
+export function ladder(container, opts) {
+  const { points, xLabel = 'latency (ms)', yLabel = 'accuracy', fmt = fmtNum, title = 'Ladder', refLines = [] } = opts;
+  const w = fitWidth(container, W_DESIGN);
+  const iw = w - M.l - M.r;
   const ih = H - M.t - M.b;
-  const svg = baseSvg(container, W, H, title);
+  const svg = baseSvg(container, w, H, title);
   const xs = points.map((p) => p.x);
   const ys = points.map((p) => p.y);
   const refYs = refLines.map((r) => r.y);
@@ -317,6 +377,7 @@ export function ladder(container, { points, xLabel = 'latency (ms)', yLabel = 'a
 
   if (xLabel) g.appendChild(svgText(iw / 2, ih + 38, xLabel, { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
   if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: MID, 'font-size': 12 }));
+  registerChart(container, () => ladder(container, opts));
   return svg;
 }
 
@@ -378,13 +439,15 @@ export function donut(container, { segments, title = 'Mix' }) {
 // hbarFloor(el, {rows:[{label, small, medium, floor}], xLabel, title})
 // horizontal grouped bars (small vs medium) with a floor tick per row. Solid off-black
 // (typical-small) / mid-gray (typical-medium) bars at 4px radius — no dot meters.
-export function hbarFloor(container, { rows, xLabel = 'accuracy', title = '' }) {
+export function hbarFloor(container, opts) {
+  const { rows, xLabel = 'accuracy', title = '' } = opts;
   const rowH = 34;
   const h = rows.length * rowH + 50;
   const maxLabel = Math.max(...rows.map((r) => r.label.length), 10);
   const mm = { t: 10, r: 20, b: 40, l: Math.min(320, Math.max(150, maxLabel * 6.3 + 20)) };
-  const iw = 460;
-  const w = iw + mm.l + mm.r;
+  const barsDesign = 460;
+  const w = fitWidth(container, barsDesign + mm.l + mm.r, mm.l + mm.r + 160);
+  const iw = w - mm.l - mm.r;
   const svg = baseSvg(container, w, h, title);
   const g = svgEl('g', { transform: `translate(${mm.l},${mm.t})` });
   svg.appendChild(g);
@@ -428,14 +491,16 @@ export function hbarFloor(container, { rows, xLabel = 'accuracy', title = '' }) 
   leg.style.cssText = `font-family:${FONT_MONO};font-size:11px;color:${MID};margin-top:8px;`;
   leg.textContent = 'upper bar = typical-small (off-black)   ·   lower bar = typical-medium (mid-gray)   ·   | tick = floor (majority / constant-prediction baseline)';
   container.appendChild(leg);
+  registerChart(container, () => hbarFloor(container, opts));
   return svg;
 }
 
 // timeline(el, {lineage:[{date,label,std}], bugs:[{date,label}], verdicts:[{date,label}], xDomain:[d0,d1]})
 // x = date (day offset), y = JevBench standard accuracy of the lineage; bugs
 // and verdicts render as ticks with hover titles above/below the line.
-export function timeline(container, { lineage, bugs = [], verdicts = [], title = 'Decision-log timeline' }) {
-  const w = 1040;
+export function timeline(container, opts) {
+  const { lineage, bugs = [], verdicts = [], title = 'Decision-log timeline' } = opts;
+  const w = fitWidth(container, 1040, 320);
   const h = 460;
   const mm = { t: 34, r: 90, b: 130, l: 50 };
   const iw = w - mm.l - mm.r;
@@ -482,11 +547,13 @@ export function timeline(container, { lineage, bugs = [], verdicts = [], title =
     g.appendChild(svgText(cx, cy + 3.5, String(i + 1), { fill: WHITE, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700 }));
   });
 
-  // x-axis date ticks, one per day of the 6-day window
+  // x-axis date ticks, one per day of the 6-day window. Below ~40px/day a "MM-DD" label no
+  // longer fits without crowding its neighbour, so thin to every other day (tick lines stay).
+  const dayStep = iw / 6 < 40 ? 2 : 1;
   for (let day = 0; day <= 5; day++) {
     const tx = x(day);
     g.appendChild(svgEl('line', { x1: tx, x2: tx, y1: ih, y2: ih + 5, stroke: STEEL }));
-    g.appendChild(svgText(tx, ih + 17, fmtDay(day), { fill: MID, 'text-anchor': 'middle', 'font-size': 12 }));
+    if (day % dayStep === 0) g.appendChild(svgText(tx, ih + 17, fmtDay(day), { fill: MID, 'text-anchor': 'middle', 'font-size': 12 }));
   }
 
   // bug ticks below axis (square marker), verdict ticks further below (triangle-free, circle
@@ -502,7 +569,7 @@ export function timeline(container, { lineage, bugs = [], verdicts = [], title =
     dot.appendChild(ttl);
     g.appendChild(dot);
   });
-  g.appendChild(svgText(0, bugY + 14, 'bugs found (square ticks)', { fill: MID, 'font-size': 11 }));
+  g.appendChild(svgText(0, bugY + 14, w < 700 ? 'bugs found' : 'bugs found (square ticks)', { fill: MID, 'font-size': 11 }));
 
   const verdictY = bugY + 34;
   verdicts.forEach((v) => {
@@ -514,7 +581,7 @@ export function timeline(container, { lineage, bugs = [], verdicts = [], title =
     dot.appendChild(ttl);
     g.appendChild(dot);
   });
-  g.appendChild(svgText(0, verdictY + 14, 'section verdicts (round ticks, mid-gray)', { fill: MID, 'font-size': 11 }));
+  g.appendChild(svgText(0, verdictY + 14, w < 700 ? 'section verdicts' : 'section verdicts (round ticks, mid-gray)', { fill: MID, 'font-size': 11 }));
 
   axisPair(g, iw, ih);
   g.appendChild(svgText(-mm.l + 4, -10, 'JevBench standard', { fill: MID, 'font-size': 12 }));
@@ -541,6 +608,7 @@ export function timeline(container, { lineage, bugs = [], verdicts = [], title =
     bugLeg.querySelectorAll('.dim').forEach((el) => (el.style.color = MID));
     container.appendChild(bugLeg);
   }
+  registerChart(container, () => timeline(container, opts));
   return svg;
 }
 

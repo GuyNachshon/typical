@@ -110,3 +110,7 @@
   .scrub-ticks { flex-direction: column; gap: 2px; }
   .scrub-tick { text-align: left; }
 }
+
+/* findings cards: .ucard's space-between + equal grid heights left 120px holes between a short
+   title and its body. These cards are prose, not figures — pack them from the top. */
+#findings .ucard { justify-content: flex-start; gap: 12px; min-height: 0; }

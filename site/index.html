@@ -35,7 +35,7 @@
     <p class="t-eyebrow">01 — What it is</p>
     <div>
       <h2 class="t-section">One pass over the text. Your candidates. A probability for each, and ∅ when none of them apply.</h2>
-      <p class="lede">Typical is an open family of decision models built on Qwen3 (1.7B and 4B). It does not write. It reads a state once and answers typed questions from the cached state: a Choice over candidates you define at runtime, a yes or no, an ordered level. Every number on this site is published next to its control.</p>
+      <p class="lede">Typical is an open family of decision models built on Qwen3 (1.7B and 4B). It does not write. It reads a state once and answers typed questions from the cached state: a Choice over candidates you define at runtime, a yes or no, an ordered level. Ask it four questions about the same ticket and it reads the ticket once.</p>
     </div>
   </div>
   <div class="media dark">
@@ -51,18 +51,19 @@
   <div class="chapter-head">
     <p class="t-eyebrow">02 — Results</p>
     <div>
-      <h2 class="t-section">Two sizes, one recipe, a control beside every number.</h2>
-      <p class="lede">Trained and frozen backbones on the same 231 public JevBench items. Training helps the standard tier at 1.7B (+.17) far more than at 4B (+.03); on the hard tier the frozen 4B is ahead. The hard tier is at chance and over-confident for both models, and we say so before the table.</p>
+      <h2 class="t-section">Two sizes, one recipe, and a frozen backbone beside every number.</h2>
+      <p class="lede">Trained and frozen backbones on the same 231 public JevBench items. Training helps the standard tier at 1.7B (+.17) far more than at 4B (+.03); on the hard tier the frozen 4B is ahead. The hard tier is at chance and over-confident for both models.</p>
+      <p class="note mt-18">Those JevBench figures come from a public-subset run (72 standard / 48 easy / 111 hard ids), not a ranked leaderboard entry; chance is .311 standard, and both models&rsquo; hard tier sits within one standard error of it. The full disclosure is under the table.</p>
     </div>
   </div>
   <div class="ucard-grid" style="margin-bottom:18px">
     <div class="ucard"><div><p class="t-eyebrow muted">Latency · 1.7B · H100 · K = 2</p><p class="t-figure" style="margin:30px 0 18px">45<span class="t-card" style="letter-spacing:-.5px"> ms</span></p><p class="figure-floor">per decision, in-process. 2.7 ms per extra question on a cached state (M = 32). Served warm from the public package: 15.5–17 ms p50 at 1.7B, 19–21 ms at 4B.</p><p class="figure-src">releases/typical-small.md#latency · REPORT §3ab ladder · runs/serve_bench2 (§3ag)</p></div><div class="diagram"><i class="on" style="flex:0 0 18%"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i></div></div>
-    <div class="ucard"><div><p class="t-eyebrow muted">CLINC-150 · small / medium</p><p class="t-figure" style="margin:30px 0 18px">.804</p><p class="figure-floor">intent accuracy over 150 runtime labels (medium .847). Out-of-scope abstain recall .827 (small). The same trunk scored .845 before rule-family training; those four points paid for the tile to the right.</p><p class="figure-src">runs/ts1b/results.json · runs/tm1b/results.json</p></div><div class="diagram"><i class="on" style="flex:0 0 80.4%"></i><i class="dot"></i></div></div>
+    <div class="ucard"><div><p class="t-eyebrow muted">CLINC-150 · small / medium</p><p class="t-figure" style="margin:30px 0 18px">.804</p><p class="figure-floor">intent accuracy over 150 runtime labels (medium .847). Out-of-scope abstain recall .827 (small). The same trunk scored .845 before rule-family training; those four points bought the rule-family accuracy in the next tile.</p><p class="figure-src">runs/ts1b/results.json · runs/tm1b/results.json</p></div><div class="diagram"><i class="on" style="flex:0 0 80.4%"></i><i class="dot"></i></div></div>
     <div class="ucard"><div><p class="t-eyebrow muted">Held-out rule families · small / medium</p><p class="t-figure" style="margin:30px 0 18px">.836</p><p class="figure-floor">same facts, different rule order, different answer (medium .874). Rubric flip both-correct .718 / .743.</p><p class="figure-src">runs/ts1b/eval_wf_full.json · runs/tm1b/eval_wf.json</p></div><div class="diagram"><i class="on" style="flex:0 0 83.6%"></i><i class="dot"></i></div></div>
   </div>
-  <div class="media" style="padding:30px">
+  <div class="media results-panel" style="padding:30px">
     <div id="results-table"></div>
-    <div class="note mt-18"><blockquote class="disclosure-box">
+    <div class="note mt-18 results-disclosure"><blockquote class="disclosure-box">
         <strong>JevBench disclosure.</strong> JevBench numbers are a public-subset run against
         <code>fstandhartinger/jevbench</code> v1.2.1 (72 standard / 48 easy / 111 hard public ids), not a
         submitted or ranked leaderboard entry (the leaderboard requires &ge;95% coverage including 146
@@ -120,13 +121,13 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
     </div>
   </div>
   <div class="grid gap-18 lg:grid-cols-2" style="margin-bottom:55px">
-    <div><div class="media dark"><p class="media-label t-eyebrow">Snake · canvas</p><div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="snake"></div></div></div><p class="note mt-18">One sentence per tick; the candidate set is the safe moves. .984 on 62 boards (chance .48); 24 food in the recorded run. Arrow keys take over.</p></div>
+    <div><div class="media dark"><p class="media-label t-eyebrow">Snake · canvas</p><div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="snake"></div></div></div><p class="note mt-18">One sentence per tick; the candidate set is the safe moves. .984 on 62 boards (chance .48); 24 food in the recorded run. On a keyboard, the arrow keys take it off the model.</p></div>
     <div><div class="media dark" style="min-height:520px;display:flex;flex-direction:column;justify-content:space-between;padding:30px"><p class="t-eyebrow">DOOM · recorded run · E1M1</p><div><p class="t-figure" style="font-size:96px;letter-spacing:-3.6px">200<span class="t-card" style="letter-spacing:-.5px"> / 200</span></p><p class="t-ui" style="max-width:26ch;margin-top:18px">decisions matched the rule list. 64 shots, 4 kills, health 86 at the end.</p></div><p class="t-mono muted">The live game is the film at the top of this page. site/data/replays/realdoom.json</p></div><p class="note mt-18">Chocolate Doom, shareware 1.9. Two facts per tick (badly hurt? an enemy in sight?), the model picks retreat, engage or explore, and aims from "the player must turn left to face the imp". Recorded against the local model.</p></div>
   </div>
   <div id="tryit">
     <div class="exrow" data-exhibit-card>
       <div class="exrow-head">
-        <span class="tag">Live</span>
+        <span class="tag">Recorded</span>
         <h3 class="t-feature">Try it</h3>
         <p>Your own state, question and options, decided in one forward pass. Needs the local model server; without it the prefilled example replays.</p>
         <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
@@ -135,7 +136,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
     </div>
     <div class="exrow" data-exhibit-card>
       <div class="exrow-head">
-        <span class="tag">Works</span>
+        <span class="tag">Recorded</span>
         <h3 class="t-feature">Rules are the program</h3>
         <p>Five fixed facts about a loan applicant and four rules with a stated precedence. Reorder the rules and the model re-decides live on the same facts; a second panel runs six applicants under both orders and flags each flip.</p>
         <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
@@ -144,7 +145,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
     </div>
     <div class="exrow" data-exhibit-card>
       <div class="exrow-head">
-        <span class="tag">Works</span>
+        <span class="tag">Recorded</span>
         <h3 class="t-feature">SQL over judgment</h3>
         <p><code>SELECT * FROM tickets WHERE typical(body, 'the customer mentions a duplicate charge')</code>. 129 rows, one forward pass each, no embeddings; four conditions against hand labels.</p>
         <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
@@ -153,7 +154,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
     </div>
     <div class="exrow" data-exhibit-card>
       <div class="exrow-head">
-        <span class="tag">Works</span>
+        <span class="tag">Recorded</span>
         <h3 class="t-feature">One document, twenty questions</h3>
         <p>A short handbook is read once into the KV cache, then twenty typed questions (12 yes/no, 5 choice, 3 score) are answered from that cached state in one call, timed against twenty one-at-a-time calls and marked against a hand label.</p>
         <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
@@ -167,7 +168,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
   <div class="chapter-head">
     <p class="t-eyebrow">05 — What does not work</p>
     <div>
-      <h2 class="t-section">The failures are on the page, with their numbers.</h2>
+      <h2 class="t-section">Five things it gets wrong, and why.</h2>
     </div>
   </div>
   <div class="ucard" style="padding-top:30px;min-height:0;max-width:72ch"><ul style="margin:0;padding-left:18px;display:grid;gap:12px"><li>Object-location sentences. Doom’s “the enemy is 5 cells to the left” never fired a turn (0 of 12); the model aims only once the state says “the player must turn left to face the enemy”. Numbers it must compare itself (“41 health”) leak into the decision: with them, an enemy in the crosshair at mid health read as retreat. Snake and Doom both need the engine to pre-compute the comparison.</li><li>Rules with "or" in them, negated conditions, or more than four rules before the default. Drive's 70/70 holds only with the state sentences in a fixed order; shuffled, it drops to .89–.93.</li><li>Compaction: P(keep) never crosses .5, so there is no usable keep/drop threshold, only a ranking.</li><li>Level-7 composition (temporal, units, expected value, trade-off): at chance on every checkpoint.</li><li>Long documents: states above ~1k tokens. The cause is a truncation bug in the training data; a fix is in training.</li></ul></div>
@@ -177,19 +178,14 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
   <div class="chapter-head">
     <p class="t-eyebrow">06 — Get started</p>
     <div>
-      <h2 class="t-section">Three commands, six lines.</h2>
-      <p class="lede">The public inference package ships inside the model repos on Hugging Face. Download the <code>inference/</code> folder, install its requirements, then six lines of Python. <code>state</code> is a string or a dict; candidates are whatever you pass.</p>
+      <h2 class="t-section">Three commands and you are running it locally.</h2>
+      <p class="lede">The public inference package ships inside the model repos on Hugging Face. Download the <code>inference/</code> folder, install its requirements, and call it. <code>state</code> is a string or a dict; candidates are whatever you pass, per call, with no retraining.</p>
     </div>
   </div>
   <div class="code"><pre >pip install huggingface_hub
 hf download OzLabs/typical-small --include "inference/*" --local-dir typical
 pip install -r typical/inference/requirements.txt</pre></div>
-  <div class="code"><pre>from typical import Typical
-
-m = Typical.from_pretrained("OzLabs/typical-small")
-m.choice(state, "What does the customer want?", ["refund", "replacement", "repair"])
-m.noul(state, "Is the order still under warranty?")
-m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
+  <p class="note mt-18">The three calls themselves are the six lines shown above under <a href="#how">How it works</a>: <code>choice</code>, <code>noul</code>, <code>score</code>, each taking the same state.</p>
   <div class="dest mt-55">
     <a href="research.html"><span class="t-card">Read the research: architecture, data, 130 runs.</span><span class="t-eyebrow">Research →</span></a>
     <a href="https://huggingface.co/OzLabs/typical-small"><span class="t-card">Get the weights: 1.7B and 4B, open.</span><span class="t-eyebrow">Hugging Face →</span></a>

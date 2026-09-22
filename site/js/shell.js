@@ -269,6 +269,15 @@ function wireExhibits(ctx) {
       }
     });
   });
+  // #tryit (the nav's CTA) points at a card that starts collapsed: open it on arrival, or the
+  // visitor lands on a one-line summary and a Run button and has to guess.
+  const openHash = () => {
+    const target = location.hash.length > 1 ? document.querySelector(location.hash) : null;
+    const card = target && (target.matches('[data-exhibit-card]') ? target : target.querySelector('[data-exhibit-card]')); // null, never false: ?. does not short-circuit on false
+    if (card?.querySelector('[data-exhibit-body]')?.hidden) card.querySelector('[data-exhibit-toggle]')?.click();
+  };
+  addEventListener('hashchange', openHash);
+  openHash();
 }
 
 // ---- lazy mount: js/games/render-<name>.js (games row) ------------------------------
@@ -362,11 +371,19 @@ async function mountHero(presets) {
   };
   let i = 0;
   show(pool[0], 'recorded');
-  setInterval(() => {
+  // 8 s, not 3.2: at the old pace the state paragraph changed while it was being read. Hovering
+  // or focusing the panel holds the current decision; a click advances it immediately.
+  let hold = false;
+  const panel = read.closest('.media') || read;
+  panel.addEventListener('pointerenter', () => { hold = true; });
+  panel.addEventListener('pointerleave', () => { hold = false; });
+  const next = () => {
     if (heroLive) { show(heroLive, 'live'); heroLive = null; return; }
     i = (i + 1) % pool.length;
     show(pool[i], 'recorded');
-  }, 3200);
+  };
+  panel.addEventListener('click', next);
+  setInterval(() => { if (!hold) next(); }, 8000);
 }
 // live decide() results flow into the decision panel
 function pushDecision(res, state, queries) {
@@ -396,7 +413,7 @@ function mountFilm(ctx) {
       try {
         const res = await decide(sentence, [{ type: 'choice', question: DOOM_QUESTION, labels: cands }]);
         const r = res?.results?.[0];
-        if (r) { probs = r.probs; move = cands.reduce((a, c) => ((r.probs[c] ?? 0) > (r.probs[a] ?? 0) ? c : a), cands[0]); source = `model · ${Math.round(res.ms)} ms`; }
+        if (r) { probs = r.probs; move = cands.reduce((a, c) => ((r.probs[c] ?? 0) > (r.probs[a] ?? 0) ? c : a), cands[0]); source = `model · ${Math.round(res.ms)} ms on ${res.device || 'mps'}`; }
       } catch {}
     }
     rec.textContent = `${source.startsWith('model') ? 'LIVE' : 'REC'} · typical-small · E1M1 · ${source}`;
@@ -465,6 +482,10 @@ async function boot() {
   mountResults(models, reliabilityDoc, chanceDoc, frozenDoc);
   mountTryit(ctx);
   wireExhibits(ctx);
+  // The exhibit tags say what this visitor will actually get: every one of them decides live
+  // against a reachable server and replays a recorded run otherwise, so the markup ships the
+  // pessimistic label and only the live case upgrades it.
+  if (mode() === 'live') document.querySelectorAll('.exrow-head .tag').forEach((t) => { t.textContent = 'Live'; });
   mountGameScreens(ctx);
 }
 

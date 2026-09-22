@@ -48,7 +48,7 @@
 }
 
 @layer base {
-  html { background: var(--color-warm); scroll-behavior: smooth; }
+  html { background: var(--color-warm); scroll-behavior: smooth; scroll-padding-top: 86px; }
   body { margin: 0; color: var(--color-off); background: var(--color-warm); font-family: var(--font-sans); font-size: var(--text-body); line-height: 1.5; letter-spacing: -0.195px; -webkit-font-smoothing: antialiased; text-wrap: pretty; }
   h1, h2, h3, h4, p { margin: 0; }
   h1, h2, h3 { font-weight: 400; text-wrap: balance; }
@@ -108,6 +108,7 @@
   .btns { display: flex; gap: 8px; flex-wrap: wrap; }
   .tag { display: inline-block; font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; padding: 5px 8px; border-radius: var(--radius-icon); border: 1px solid var(--color-off); line-height: 1; }
   .tag.fill { background: var(--color-off); color: var(--color-warm); }
+  .exrow-head .tag { justify-self: start; } /* grid stretch made it read as an empty input */
 
   /* ---- hero media stage ---- */
   .stage { position: relative; height: 100vh; min-height: 640px; background: var(--color-black); overflow: hidden; color: var(--color-warm); }
@@ -173,14 +174,20 @@
   @media (max-width: 40rem) {
     .register thead { display: none; }
     .register tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--color-steel); }
-    .register td { display: flex; justify-content: space-between; gap: 16px; border: 0; padding: 3px 0; }
-    .register td::before { content: attr(data-label); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--color-mid); }
+    .register td { display: block; text-align: right; border: 0; padding: 3px 0; }
+    .register td::before { content: attr(data-label); float: left; margin-right: 16px; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--color-mid); }
   }
   .note { font-size: 14px; color: var(--color-mid); max-width: 90ch; }
+  /* stacked, the results table runs two viewports; the disclosure has to precede the numbers it
+     qualifies rather than sit at the far end of them. */
+  @media (max-width: 64rem) {
+    .results-panel { display: flex; flex-direction: column; }
+    .results-disclosure { order: -1; margin: 0 0 18px; }
+  }
 
   /* ---- code card ---- */
   .code { background: var(--color-off); color: var(--color-warm); border-radius: var(--radius-card); padding: 30px; }
-  .code pre { margin: 0; font-family: var(--font-mono); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .code pre { margin: 0; font-family: var(--font-mono); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; }
   .code + .code { margin-top: 18px; }
 
   /* ---- destination panels ---- */

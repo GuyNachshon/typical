@@ -142,6 +142,8 @@
   pointer-events: none;
 }
 .gc-hud div { margin-top: 2px; }
+/* under 48rem the panel's own .media-label sits top-left at the same height — drop the HUD below it */
+@media (max-width: 48rem) { .gc-hud { top: 46px; } }
 .gc-hud .gc-hint { font-weight: 400; text-transform: uppercase; }
 
 /* bottom-left: scrim (photographic overlay, not decorative — the readout needs a legible
