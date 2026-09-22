@@ -48,10 +48,14 @@ export function inSight(state) {
     });
 }
 
-// The model's candidates: the five labels, minus `shoot` without ammo (the only real illegality).
+// The model's candidates are the legality guardrail: `shoot` is only offered when there is
+// something to shoot at and ammo to do it with. Offering it with nothing in sight meant the model
+// occasionally picked it and the engine fired into a wall while the state sentence — correctly —
+// said the player saw no enemy.
 export function candidatesFor(state) {
   if (state.in_level === false) return [];
-  return LABELS.filter((l) => l !== 'shoot' || (state.ammo ?? 0) > 0);
+  const canShoot = (state.ammo ?? 0) > 0 && inSight(state).length > 0;
+  return LABELS.filter((l) => l !== 'shoot' || canShoot);
 }
 
 // state -> the sentence the model reads: only the situations that apply, worded exactly as the
@@ -224,7 +228,9 @@ export function scriptedPolicy(state) {
 function selfTest() {
   const s1 = { health: 84, ammo: 40, blocked_ahead: false, monsters: [{ type: 'zombieman', dist: 320, bearing: 3, in_crosshair: true }] };
   console.assert(describeDoom(s1) === 'The player has a zombieman in the crosshair, 5 cells ahead.', 'crosshair sentence');
-  console.assert(candidatesFor(s1).join() === 'retreat,shoot,turn left,turn right,explore', 'candidates are the five labels in rule order');
+  console.assert(candidatesFor(s1).join() === 'retreat,shoot,turn left,turn right,explore', 'with a target and ammo, all five labels are offered');
+  console.assert(!candidatesFor({ ...s1, monsters: [] }).includes('shoot'), 'nothing in sight: shoot is not on the table');
+  console.assert(!candidatesFor({ ...s1, monsters: [{ type: 'imp', dist: 400, bearing: 20, visible: false }] }).includes('shoot'), 'a monster behind a wall is not a target');
   console.assert(scriptedPolicy(s1) === 'shoot' && resolveIntent(s1, 'shoot') === 'shoot' && keyPress(s1, 'shoot', 'shoot')[0] === 'fire', 'crosshair target, centred and close -> fire');
   const far = { ...s1, monsters: [{ type: 'zombieman', dist: 600, bearing: 1, in_crosshair: true }] };
   console.assert(resolveIntent(far, 'shoot') === 'move forward', 'a shoot decision 9 cells out closes the distance first');
