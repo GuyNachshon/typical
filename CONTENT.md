@@ -28,44 +28,17 @@ On screen: Typical playing DOOM, reading one sentence a tick and picking one of 
 - 80.4% across 150 labels you define
 - Choice · Noul · Score
 
-**01 — What it is**
+**State + question + options → distribution**
 
-## State in. A typed decision out.
-Typical is a decision model. Your code gives it state, a question, and a set of possible answers defined at runtime. Typical returns a probability for each, plus the probability that none apply. It never generates an answer, so there is nothing to parse and it cannot invent an option your program does not support.
-The output space belongs to your program, not the model. One call, about 16 ms warm, the same shape every time.
+## Generation is the wrong interface for a decision.
+A language model can tell you what it thinks. Typical hands your program a distribution over the actions it can actually take, and the odds that none of them are right.
 
 **The same job, as a decision**
 
-**02 — Results**
+**Choice · Noul · Score**
 
-## Small enough to sit inside the loop.
-Change the rule and the same facts get a different decision, because the rules arrive with the question rather than in the weights. Every number below sits next to the same model before training, so you can see what the training bought and what it cost. On the hard tier it bought nothing: both sizes are at chance there, and say so too confidently.
-Those JevBench figures come from a public-subset run (72 standard / 48 easy / 111 hard ids), not a ranked leaderboard entry; chance is 31.1% standard, and both models’ hard tier sits within one standard error of it. The full disclosure is under the table. _(fine print)_
-
-**Latency · 1.7B · H100 · K = 2**
-45 ms
-per decision, in-process. 2.7 ms per extra question on a cached state (M = 32). Served warm from the public package: 15.5–17 ms p50 at 1.7B, 19–21 ms at 4B.
-releases/typical-small.md#latency · REPORT §3ab ladder · runs/serve_bench2 (§3ag) _(fine print)_
-
-**CLINC-150 · small / medium**
-80.4%
-intent accuracy over 150 runtime labels (medium 84.7%). Out-of-scope abstain recall 82.7% (small). The same trunk scored 84.5% before rule-family training; those four points bought the rule-family accuracy in the next tile.
-runs/ts1b/results.json · runs/tm1b/results.json _(fine print)_
-
-**Held-out rule families · small / medium**
-83.6%
-same facts, different rule order, different answer (medium 87.4%). Rubric flip both-correct 71.8% / 74.3%.
-runs/ts1b/eval_wf_full.json · runs/tm1b/eval_wf.json _(fine print)_
-> JevBench disclosure. JevBench numbers are a public-subset run against fstandhartinger/jevbench v1.2.1 (72 standard / 48 easy / 111 hard public ids), not a submitted or ranked leaderboard entry (the leaderboard requires ≥95% coverage including 146 non-public judge items). Probabilities are the head's softmax conditioned on non-∅ (mean p_null ≈ .03). Latency is in-process on one H100, one decision at a time, model load excluded. Option order is the harness's label order; a reversed-order control on a related checkpoint moved standard accuracy ±4 points, larger than the differences between our own checkpoints. Chance/majority baselines are 31.1% standard / 28.4% easy / 33.6% hard (n = 72 standard, SE ≈ 5.8 points) — the hard tier of both released models is within 1 SE of chance.
-*Scaling ladder*
-*Single-decision latency vs K*
-*Reliability, JevBench standard and hard*
-
-**03 — How it works**
-
-## Three kinds of question. One read of the text.
-Pick one of your options, answer yes or no, or place something on a scale you define. Ask all three about the same ticket and the ticket is read once: the first question pays for the text, the rest are a few milliseconds each.
-Under it: a Qwen3 trunk cut at about 71% depth, LoRA on the top eight layers, a small contextual readout, and a separate head for the abstain. Nothing is generated at any point. _(fine print)_
+## Not tokens. Probabilities.
+Three shapes of question, all read off the same state: pick one of your options, answer a yes-or-no proposition, or place something on a scale you define.
 
 ### Choice
 Pick one of K candidates you define at runtime. A probability for each, and for ∅.
@@ -75,9 +48,39 @@ P(yes) for a proposition, off the same cached state. The only question type whos
 
 ### Score
 An ordered level, 0 through N, with the expected level under the candidates.
+
+**Runtime label space**
+
+## The choices are yours.
+The options arrive with the question, not in the weights. Reorder the rules a loan is judged by and the same five facts get a different answer, with no retraining and no new prompt to tune.
+
+### Rules are the program
+Five fixed facts about a loan applicant and four rules with a stated precedence. Reorder the rules and the model re-decides live on the same facts; a second panel runs six applicants under both orders and flags each flip.
+`[button] Run →`
+
+**One read, many questions**
+
+## The state is read once.
+Typical encodes the state, keeps the cache, and asks every question against it as a short suffix. Instead of decoding an answer token, it reads the model’s hidden state directly and turns it into probabilities.
+Cached causal prefix · candidate-aware suffix · contextual hidden-state readout. A Qwen3 trunk cut at about 71% depth, LoRA on the top eight layers, and a separate head for the abstain. _(fine print)_
+
+**Latency**
+
+## So decisions stay cheap.
+About 16 ms warm for a decision, and a couple of milliseconds for each extra question on a state already read. Cheap enough to sit in the loop rather than at the edges of it.
+*Single-decision latency vs K*
 Typical is built for bounded decisions, not open-ended generation or multi-step planning. The released models work on states up to about 1k tokens; serial arithmetic, temporal composition and long-horizon reasoning are still weak.
 
-**04 — Demos**
+**Measured, with controls**
+
+## Small models make useful decision engines.
+Every number here sits beside the same model before training, so you can see what the training bought and what it cost. On the hard tier it bought nothing: both sizes are at chance there, and say so too confidently.
+Those JevBench figures come from a public-subset run (72 standard / 48 easy / 111 hard ids), not a ranked leaderboard entry; chance is 31.1% standard, and both models’ hard tier sits within one standard error of it. The full disclosure is under the table. _(fine print)_
+> JevBench disclosure. JevBench numbers are a public-subset run against fstandhartinger/jevbench v1.2.1 (72 standard / 48 easy / 111 hard public ids), not a submitted or ranked leaderboard entry (the leaderboard requires ≥95% coverage including 146 non-public judge items). Probabilities are the head's softmax conditioned on non-∅ (mean p_null ≈ .03). Latency is in-process on one H100, one decision at a time, model load excluded. Option order is the harness's label order; a reversed-order control on a related checkpoint moved standard accuracy ±4 points, larger than the differences between our own checkpoints. Chance/majority baselines are 31.1% standard / 28.4% easy / 33.6% hard (n = 72 standard, SE ≈ 5.8 points) — the hard tier of both released models is within 1 SE of chance.
+*Scaling ladder*
+*Reliability, JevBench standard and hard*
+
+**Decisions you can watch**
 
 ## Watch it decide.
 Games make the decisions visible: every tick, the state is a sentence, the options are the legal moves, and you can read the probabilities as they land. The same package runs here as behind the numbers above.
@@ -97,10 +100,6 @@ Chocolate Doom, shareware 1.9, the frame exactly as the engine draws it. Two fac
 
 ### Try it
 Your own state, question and options, decided in one forward pass. Needs the local model server; without it the prefilled example replays.
-`[button] Run →`
-
-### Rules are the program
-Five fixed facts about a loan applicant and four rules with a stated precedence. Reorder the rules and the model re-decides live on the same facts; a second panel runs six applicants under both orders and flags each flip.
 
 ### SQL over judgment
 SELECT * FROM tickets WHERE typical(body, 'the customer mentions a duplicate charge'). 129 rows, one forward pass each, no embeddings; four conditions against hand labels.
@@ -108,7 +107,7 @@ SELECT * FROM tickets WHERE typical(body, 'the customer mentions a duplicate cha
 ### One document, twenty questions
 A short handbook is read once into the KV cache, then twenty typed questions (12 yes/no, 5 choice, 3 score) are answered from that cached state in one call, timed against twenty one-at-a-time calls and marked against a hand label.
 
-**05 — Fit**
+**Fit**
 
 ## Where it works, and where it does not.
 Bounded decisions over text you already have. Anything that needs several steps of reasoning, or a document longer than the state window, is outside what these two models do today.
@@ -131,7 +130,7 @@ Bounded decisions over text you already have. Anything that needs several steps 
 ### How we know
 Each of these has a measured failure behind it, including the ones that surprised us: object-location phrasing, rules with an “or” in them, a compaction threshold that never crosses .5, and a truncation bug that taught confident answers without evidence.
 
-**06 — Get started**
+**Install**
 
 ## Three commands and you are running it locally.
 Open weights and inference code today. The full training recipe is documented; training code comes next. Download the inference/ folder from the model repo, install its requirements, and call it. state is a string or a dict; the options are whatever you pass, per call, with no retraining.
