@@ -1622,6 +1622,27 @@ worse for callers who do not.
    reference rather than a matched baseline.
 
 
+### 3ak-e. Seed-1 replicate (arm A in; arm B running)
+
+A second independent seed of the render-order pair, byte-identical flags apart from `--seed 1`, run to settle
+whether the single-seed result was noise. Arm A is complete; arm B is still training.
+
+| run | JevBench std | hard | `long_policy` | long-605 facts-first | facts-last |
+|---|---:|---:|---:|---:|---:|
+| seed-0 arm A (`trunc_first`) | .750 | .378 | 6/19 | **.942** | .797 |
+| seed-0 arm B (`trunc_last`) | .736 | .396 | 2/19 | .640 | .830 |
+| seed-1 arm A (`trunc_first_s1`) | .792 | .405 | 5/19 | **.937** | .777 |
+
+**The well-powered measurement replicates almost exactly: .942 → .937 across an independent seed**, a 0.5-point
+difference on the metric the truncation conclusion rests on. That is the reassurance the n=605 set needed.
+
+**And `long_policy` demonstrates its own inadequacy under replication.** Facts-first gives 6/19 then 5/19; the
+seed-to-seed wobble (1 item) is the same order as the entire effect it is meant to detect (6 vs 2 items). No
+amount of care in analysing a 19-item metric fixes that — the sample size, not the statistics, was the binding
+constraint. This is the empirical version of the argument in §3ak: where a question mattered, the fix was to build
+an eval set large enough to answer it, not to test the small one harder.
+
+
 ## 3ak-b. Cluster-bootstrap confidence intervals on the JevBench public subset
 
 `scripts/jev_ci.py`. The standard tier is 72 items but only **36 independent states** (each appears as two
