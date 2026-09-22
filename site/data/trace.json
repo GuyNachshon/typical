@@ -1,0 +1,190 @@
+{
+  "state": {
+    "text": "Ticket #7734: A customer writes: 'I was charged twice for my last order and the tracking number you sent doesn't work. I need this fixed today.'",
+    "n_tokens": 36
+  },
+  "Ls": 37,
+  "trunk": {
+    "backbone": "Qwen3-1.7B-Base",
+    "tap_layer": "20 of 28",
+    "lora": "LoRA r16 on the top 8 kept layers (13-20)",
+    "h100_state_ms": 20.1,
+    "h100_source": "site/data/latency.json .native_sweep.256.4.native[0] (m=1, one-off state encode)"
+  },
+  "questions": [
+    {
+      "type": "choice",
+      "question": "Which team should own this ticket?",
+      "labels": [
+        "billing",
+        "shipping",
+        "support",
+        "retention"
+      ],
+      "render": "letters_nonull",
+      "is_bern": false,
+      "suffix_text": "Which team should own this ticket?\nA. billing\nB. shipping\nC. support\nD. retention\n",
+      "suffix_tokens": 23,
+      "T": 24,
+      "spans": [
+        [
+          38,
+          45
+        ],
+        [
+          49,
+          57
+        ],
+        [
+          61,
+          68
+        ],
+        [
+          72,
+          81
+        ]
+      ],
+      "K": 4,
+      "probs": {
+        "billing": 0.0466,
+        "shipping": 0.3454,
+        "support": 0.5845,
+        "retention": 0.0234
+      },
+      "p_null": 0.0841,
+      "argmax": "support"
+    },
+    {
+      "type": "score",
+      "question": "How urgent is this ticket, 0=low..3=critical?",
+      "labels": [
+        "0",
+        "1",
+        "2",
+        "3"
+      ],
+      "render": "letters_nonull",
+      "is_bern": false,
+      "suffix_text": "How urgent is this ticket, 0=low..3=critical?\nA. 0\nB. 1\nC. 2\nD. 3\n",
+      "suffix_tokens": 35,
+      "T": 36,
+      "spans": [
+        [
+          49,
+          50
+        ],
+        [
+          54,
+          55
+        ],
+        [
+          59,
+          60
+        ],
+        [
+          64,
+          65
+        ]
+      ],
+      "K": 4,
+      "probs": {
+        "0": 0.0179,
+        "1": 0.1099,
+        "2": 0.2257,
+        "3": 0.6466
+      },
+      "p_null": 0.0014,
+      "argmax": "3",
+      "expected": 2.501
+    },
+    {
+      "type": "noul",
+      "question": "Should this be escalated to a manager? Answer yes if the customer was charged twice or asks for same-day resolution; otherwise answer no.",
+      "labels": [
+        "no",
+        "yes"
+      ],
+      "render": "query_only",
+      "is_bern": true,
+      "suffix_text": "Should this be escalated to a manager? Answer yes if the customer was charged twice or asks for same-day resolution; otherwise answer no.\n",
+      "suffix_tokens": 27,
+      "T": 28,
+      "spans": [],
+      "K": 2,
+      "probs": {
+        "no": 0.0016,
+        "yes": 0.9984
+      },
+      "p_null": 0.005,
+      "argmax": "yes"
+    },
+    {
+      "type": "choice",
+      "question": "What is the customer asking for?",
+      "labels": [
+        "a refund of the duplicate charge",
+        "a replacement item",
+        "an apology",
+        "a working tracking number"
+      ],
+      "render": "letters_nonull",
+      "is_bern": false,
+      "suffix_text": "What is the customer asking for?\nA. a refund of the duplicate charge\nB. a replacement item\nC. an apology\nD. a working tracking number\n",
+      "suffix_tokens": 34,
+      "T": 35,
+      "spans": [
+        [
+          36,
+          68
+        ],
+        [
+          72,
+          90
+        ],
+        [
+          94,
+          104
+        ],
+        [
+          108,
+          133
+        ]
+      ],
+      "K": 4,
+      "probs": {
+        "a refund of the duplicate charge": 0.034,
+        "a replacement item": 0.0003,
+        "an apology": 0.0008,
+        "a working tracking number": 0.9649
+      },
+      "p_null": 0.0025,
+      "argmax": "a working tracking number"
+    }
+  ],
+  "noul_swap": {
+    "order_a": [
+      "no",
+      "yes"
+    ],
+    "order_b": [
+      "yes",
+      "no"
+    ],
+    "suffix_text_a": "Should this be escalated to a manager? Answer yes if the customer was charged twice or asks for same-day resolution; otherwise answer no.\n",
+    "suffix_text_b": "Should this be escalated to a manager? Answer yes if the customer was charged twice or asks for same-day resolution; otherwise answer no.\n",
+    "suffix_identical": true,
+    "p_yes": 0.9984,
+    "note": "query_only renders the question alone (no candidate text), so both label orders produce the identical suffix and therefore the identical P(yes) -- see inference/typical/native.py::_render_query_only and ::_yes_idx"
+  },
+  "head": {
+    "choice_formula": "s_k = u\u00b7v_k ; r = \u03c3(gate(top2, margin, mean, lse, h, mean_c, var_c)) ; P(k) = (1-r)p_k, P(\u2205) = r  (inference/typical/native.py::factored_null_logits)",
+    "noul_formula": "P(yes) = \u03c3(w_n \u00b7 h_D)  (inference/typical/native.py::NativeHead._bern_probs)"
+  },
+  "replay": {
+    "hash": "1wzx452",
+    "ms": 211.8,
+    "device": "mps",
+    "model": "typical-small"
+  },
+  "source": "site/data/presets.json#playground + site/data/replays.json['1wzx452'] + inference/typical/native.py (RENDERS, factored_null_logits, _bern_probs) + Qwen/Qwen3-1.7B-Base tokenizer + site/data/latency.json.native_sweep.256.4"
+}

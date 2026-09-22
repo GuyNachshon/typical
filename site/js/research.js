@@ -3,6 +3,7 @@
 // mounts scripts/build_research.py wraps in white .media panels. Charts are js/charts.js as-is
 // (hand-rolled SVG, no animation). No sticky TOC on this page (the Agility lane has none).
 import { donut, barChart, hbarFloor, timeline } from './charts.js';
+import { mountExplorables } from './explorables.js';
 
 async function loadJSON(path) {
   try {
@@ -95,5 +96,6 @@ if (typeof window !== 'undefined') {
     mountHeldout();
     mountJevFamily();
     mountTimeline();
+    mountExplorables();
   });
 }

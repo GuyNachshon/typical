@@ -72,6 +72,11 @@ decision state, with nothing generated.</p></div>
          └───────────────────┘      └──────────────────────┘      └──────────────────┘
 </pre></div>
 <div class="prose"><p><em>Fig. 1. Typical forward pass, state to probabilities.</em></p>
+<p>Looking at: the real forward pass on one support ticket, from tokens to probabilities, replayed
+from a recorded run of typical-small.</p></div>
+<div class="media" style="padding:30px"><div class="chart" id="chart-trace" data-chart="trace"></div></div>
+<div class="prose"><p>Takeaway: the state is encoded once, each question is a short suffix, and abstain is a gate in the
+head rather than a candidate in the list.</p>
 <h3 class="t-feature" id="a-why-mid-depth-not-the-last-layer">a) Why mid-depth, not the last layer</h3>
 <p>Tapping the trunk at layer 20 of 28 beats reading its last layer on every evidence task. The
 project's first version (a candidate-blind decision vector on a frozen 0.6B backbone) read the last
@@ -99,7 +104,13 @@ fails a basic control. The experiments behind this tried to compile a listwise t
 None of the above-chance accuracy was question-dependent; all of it was candidate-set priors and
 calibration, learned uniformly across every head shape (REPORT §3j). The same student at full
 depth (28 layers) gave Δ_q −0.008, within noise of zero, while evidence tasks regressed as the depth
-result predicts (REPORT §3s).</p></div>
+result predicts (REPORT §3s).</p>
+<h3 class="t-feature" id="d-what-reading-the-state-once-costs">d) What reading the state once costs</h3>
+<p>Looking at: measured milliseconds on one H100 for one decision and for each extra question on the
+same cached state, native head versus prompting the same backbone.</p></div>
+<div class="media" style="padding:30px"><div class="chart" id="chart-latency" data-chart="latency"></div></div>
+<div class="prose"><p>Takeaway: one decision costs about 45 ms whatever K is, and each extra question costs a few
+milliseconds because the state is read once.</p></div>
 </div></div>
 </section>
 
@@ -201,7 +212,12 @@ conditioned on non-∅; hard tier at chance for both models.</p></div>
 (<a href="https://huggingface.co/OzLabs/typical-small">§3ae</a>): DecisionMix v2 and the typed heads raise
 held-out noul/score/flip and clear the PagerDuty floor for both models (.817 / .838 vs .792), at the
 cost of about 1 SE of JevBench standard. jevlogs (research-licensed, caveated) is marginal for small
-(.710 vs floor .697) and below floor for medium (.673).</p></div>
+(.710 vs floor .697) and below floor for medium (.673).</p>
+<h3 class="t-feature" id="every-run-every-set">Every run, every set</h3>
+<p>Looking at: every evaluation set for every run of this project, ordered by date, with the
+constant-prediction floor where one exists.</p></div>
+<div class="media" style="padding:30px"><div class="chart" id="chart-runs" data-chart="runs"></div></div>
+<div class="prose"><p>Takeaway: a handful of fixes moved the numbers and most runs were controls that did not.</p></div>
 </div></div>
 </section>
 
@@ -258,7 +274,13 @@ constant-prediction floor).</p></div>
 <div class="prose"><h3 class="t-feature" id="jevbench-per-family-typical-small">JevBench, per family (typical-small)</h3></div>
 <div class="media" style="padding:30px"><div class="chart" id="chart-jevfamily" data-chart="jevfamily"></div></div>
 <div class="ucard" style="padding-top:30px;min-height:0;max-width:72ch"><blockquote class="note"> <p><strong>D1 — JevBench disclosure (<a href="https://huggingface.co/OzLabs/typical-small">REPORT §3q</a>).</strong> JevBench numbers are a public-subset run against <code>fstandhartinger/jevbench</code> v1.2.1 (72 standard / 48 easy / 111 hard public ids), not a submitted or ranked leaderboard entry (the leaderboard requires ≥95% coverage including 146 non-public judge items). Probabilities are the head's softmax conditioned on non-∅ (mean p_null ≈ .03). Latency is in-process on one H100, one decision at a time, model load excluded. Option order is the harness's label order; a reversed-order control on a related checkpoint moved standard accuracy ±4 points, larger than the differences between our own checkpoints. Chance/majority baselines are .311 standard / .284 easy / .336 hard (n = 72 standard, SE ≈ .058) — the hard tier of both released models is within 1 SE of chance.</p> </blockquote></div>
-<div class="prose"><h3 class="t-feature" id="knowledge-retained-from-the-backbone">Knowledge retained from the backbone</h3>
+<div class="prose"><h3 class="t-feature" id="calibration-bin-by-bin">Calibration, bin by bin</h3>
+<p>Looking at: the accuracy of each confidence bin on the JevBench public subset, with the weighted
+gap that makes up the ECE.</p></div>
+<div class="media" style="padding:30px"><div class="chart" id="chart-calibration" data-chart="calibration"></div></div>
+<div class="prose"><p>Takeaway: calibration holds on the standard tier and breaks on the hard tier, where both models are
+also at chance.</p>
+<h3 class="t-feature" id="knowledge-retained-from-the-backbone">Knowledge retained from the backbone</h3>
 <p>MMLU-Pro among-K, Δ_q (shuffled-question control), and TruthfulQA-MC1 measure how much of the
 frozen backbone's knowledge survives the fine-tune; they are not a selling point. typical-small:
 among-K .343, Δ_q .127, TruthfulQA .257. typical-medium: among-K .458, Δ_q .193, TruthfulQA .408

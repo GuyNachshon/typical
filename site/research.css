@@ -45,3 +45,48 @@
 @media (max-width: 760px) {
   .code pre { font-size: clamp(6px, 1.55vw, 12px); line-height: 1.25; }
 }
+
+/* ---- explorables (P1-P4, js/explorables.js): segmented steppers, tiles, scrub rail, dot
+   charts — everything else (.bars/.bar, .media, .note, .btn.ghost) is src.css as-is. ---- */
+.explorable { display: grid; gap: 18px; }
+.explorable-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.explorable-controls { display: grid; gap: 10px; }
+.explorable-body { display: grid; gap: 14px; }
+.explorable-label { min-width: 96px; }
+.explorable-skeleton { font-family: var(--font-mono); }
+
+.seg { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.seg .btn[aria-pressed="true"] { background: var(--color-off); color: var(--color-warm); border-color: var(--color-off); }
+
+.explorable-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.explorable-tile { background: var(--color-lgray); border-radius: var(--radius-icon); padding: 12px 14px; display: grid; gap: 4px; }
+.explorable-note { font-size: 12px; }
+
+.calib-arith { position: relative; display: grid; gap: 10px; }
+.calib-list { margin: 0; padding: 0 0 0 18px; display: grid; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--color-off); }
+.calib-list li.dim { color: var(--color-mid); }
+.calib-sum { margin: 0; }
+.chart-hover-label { position: absolute; top: -8px; right: 0; font-family: var(--font-mono); font-size: 11px; background: var(--color-off); color: var(--color-warm); padding: 4px 8px; border-radius: var(--radius-icon); }
+.chart-hover-label[hidden] { display: none; }
+
+/* scrub rail: 6px steel track, 14px off-black thumb, on every browser's range input */
+.scrub-rail { display: grid; gap: 10px; }
+.scrub-ticks { display: flex; justify-content: space-between; gap: 8px; }
+.scrub-tick { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.36px; text-transform: uppercase; color: var(--color-mid); text-align: center; flex: 1; }
+.scrub-tick.is-on { color: var(--color-off); font-weight: 700; }
+.scrub { -webkit-appearance: none; appearance: none; width: 100%; height: 20px; background: transparent; }
+.scrub::-webkit-slider-runnable-track { height: 6px; background: var(--color-steel); border-radius: 3px; }
+.scrub::-moz-range-track { height: 6px; background: var(--color-steel); border-radius: 3px; }
+.scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -4px; border-radius: 50%; background: var(--color-off); cursor: pointer; }
+.scrub::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--color-off); cursor: pointer; }
+.scrub-nav { display: flex; gap: 8px; }
+.trace-panel { background: var(--color-lgray); border-radius: var(--radius-card); padding: 24px; }
+.trace-text { overflow-wrap: anywhere; }
+
+@media (max-width: 48rem) {
+  .explorable-row { flex-direction: column; align-items: stretch; }
+  .seg { width: 100%; }
+  .seg .btn { flex: 1; text-align: center; justify-content: center; }
+  .scrub-ticks { flex-direction: column; gap: 2px; }
+  .scrub-tick { text-align: left; }
+}

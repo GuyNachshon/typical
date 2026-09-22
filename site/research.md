@@ -52,6 +52,15 @@ decision state, with nothing generated.
 
 *Fig. 1. Typical forward pass, state to probabilities.*
 
+Looking at: the real forward pass on one support ticket, from tokens to probabilities, replayed
+from a recorded run of typical-small.
+
+```chart trace
+```
+
+Takeaway: the state is encoded once, each question is a short suffix, and abstain is a gate in the
+head rather than a candidate in the list.
+
 ### a) Why mid-depth, not the last layer
 
 Tapping the trunk at layer 20 of 28 beats reading its last layer on every evidence task. The
@@ -86,6 +95,17 @@ None of the above-chance accuracy was question-dependent; all of it was candidat
 calibration, learned uniformly across every head shape (REPORT §3j). The same student at full
 depth (28 layers) gave Δ_q −0.008, within noise of zero, while evidence tasks regressed as the depth
 result predicts (REPORT §3s).
+
+### d) What reading the state once costs
+
+Looking at: measured milliseconds on one H100 for one decision and for each extra question on the
+same cached state, native head versus prompting the same backbone.
+
+```chart latency
+```
+
+Takeaway: one decision costs about 45 ms whatever K is, and each extra question costs a few
+milliseconds because the state is read once.
 
 ## Data
 
@@ -193,6 +213,16 @@ held-out noul/score/flip and clear the PagerDuty floor for both models (.817 / .
 cost of about 1 SE of JevBench standard. jevlogs (research-licensed, caveated) is marginal for small
 (.710 vs floor .697) and below floor for medium (.673).
 
+### Every run, every set
+
+Looking at: every evaluation set for every run of this project, ordered by date, with the
+constant-prediction floor where one exists.
+
+```chart runs
+```
+
+Takeaway: a handful of fixes moved the numbers and most runs were controls that did not.
+
 ## Findings
 
 Eight results, each with a matched control and, where it mattered, a seed pair or a full-row
@@ -278,6 +308,17 @@ constant-prediction floor).
 > a related checkpoint moved standard accuracy ±4 points, larger than the differences between our
 > own checkpoints. Chance/majority baselines are .311 standard / .284 easy / .336 hard (n = 72
 > standard, SE ≈ .058) — the hard tier of both released models is within 1 SE of chance.
+
+### Calibration, bin by bin
+
+Looking at: the accuracy of each confidence bin on the JevBench public subset, with the weighted
+gap that makes up the ECE.
+
+```chart calibration
+```
+
+Takeaway: calibration holds on the standard tier and breaks on the hard tier, where both models are
+also at chance.
 
 ### Knowledge retained from the backbone
 
