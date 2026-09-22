@@ -1,4 +1,5 @@
 // Neutral architectural street study. Geometry and distance carry the scene.
+import { drawScanlines, drawGlass } from './crt.js';
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js';
 import { Drive, greedyPolicy, QUESTION, ROAD_LENGTH, DEST_POS } from './drive.js';
 import { mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, replayFrame, loadJSON } from './loop.js';
@@ -9,15 +10,12 @@ const TICK_MS = 400;
 const LANES = 3;
 const LANE_W = 3.2;
 
-// Chase camera: low and close, pulled back just far enough to clear the sedan's own body, tuned
-// (by projecting the ego's world position through this exact camera, not by eye) so the car
-// lands ~60% down the frame with the street receding into the upper third. See the composition
-// note in mount()'s resize() for the viewSize math.
-const CAM_HEIGHT = 6.5; // metres above the road
-const CAM_BACK = 15.5; // metres behind the ego
-const CAM_AHEAD = 34; // metres ahead the camera aims at
-const CAM_OFFSET_X = 2.6; // metres the camera rides left of the ego
-const CAM_LOOK_Y = -3; // aim low: a camera tilted down puts the car higher in frame, clear of the readout
+// A centred, level chase view; the instruments have their own column.
+const CAM_HEIGHT = 7.5;
+const CAM_BACK = 16;
+const CAM_AHEAD = 19;
+const CAM_OFFSET_X = 0;
+const CAM_LOOK_Y = 0;
 const SKY = '#f0eeeb';
 const ASPHALT = '#292827';
 const KERB = '#938f89';
@@ -32,7 +30,6 @@ const PED_CLOTHES = '#292827';
 const PED_SKIN = '#c2bfba';
 const WHEEL_DARK = '#000000';
 const CABIN_DARK = '#292827';
-const GLASS_TINT = '#938f89';
 const EGO_BODY = '#f0eeeb';
 const TAIL_OFF = '#938f89';
 const TAIL_ON = '#f0eeeb';
@@ -73,7 +70,8 @@ function buildShadowTexture() {
   c.width = c.height = size;
   const ctx = c.getContext('2d');
   const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  g.addColorStop(0, 'rgba(0,0,0,0.4)');
+  g.addColorStop(0, 'rgba(0,0,0,0.9)');
+  g.addColorStop(0.55, 'rgba(0,0,0,0.65)');
   g.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
@@ -101,55 +99,70 @@ function buildRing() {
   return ring;
 }
 
-// Bevelled coachwork, a tapered glasshouse and a pale roof read at card scale.
+// Cross sections follow a sedan's sill, shoulder and roof, rather than stacked boxes.
 function buildCar(bodyColor, cabinColor) {
   const group = new THREE.Group();
-  const lower = new THREE.Mesh((() => {
-    const profile = new THREE.Shape();
-    profile.moveTo(-0.8, -1.95); profile.lineTo(0.8, -1.95);
-    profile.lineTo(0.88, 1.65); profile.lineTo(0.65, 1.95);
-    profile.lineTo(-0.65, 1.95); profile.lineTo(-0.88, 1.65); profile.closePath();
-    const geometry = new THREE.ExtrudeGeometry(profile, { depth: 0.42, bevelEnabled: true, bevelSegments: 1, steps: 1, bevelSize: 0.12, bevelThickness: 0.12 });
-    geometry.rotateX(-Math.PI / 2);
-    return geometry;
-  })(), new THREE.MeshLambertMaterial({ color: bodyColor, flatShading: true }));
-  lower.position.y = 0.275;
-  group.add(lower);
-
-  const cabin = new THREE.Mesh(new THREE.CylinderGeometry(0.86, 1.08, 0.6, 4, 1), new THREE.MeshLambertMaterial({ color: cabinColor, flatShading: true }));
-  cabin.rotation.y = Math.PI / 4;
-  cabin.scale.set(1, 1, 1.7);
-  cabin.position.set(0, 1.0, -0.2);
-  group.add(cabin);
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 1.9), lower.material);
-  roof.position.set(0, 1.32, -0.2);
-  group.add(roof);
-  const bumper = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.12, 0.12), new THREE.MeshBasicMaterial({ color: POST_DARK }));
-  bumper.position.set(0, 0.35, -2.08);
-  group.add(bumper);
-
-  const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.4), new THREE.MeshBasicMaterial({ color: GLASS_TINT }));
-  glass.position.set(0, 0.86, 1.02);
-  glass.rotation.x = -Math.PI / 2.6;
-  group.add(glass);
-
+  const bodyMat = new THREE.MeshLambertMaterial({ color: bodyColor });
+  function shell(sections, material) {
+    const vertices = [];
+    const faces = [];
+    for (const [y, halfW, rear, front] of sections) {
+      vertices.push(-halfW, y, rear, halfW, y, rear, halfW, y, front, -halfW, y, front);
+    }
+    for (let row = 0; row < sections.length - 1; row++) {
+      for (let side = 0; side < 4; side++) {
+        const a = row * 4 + side, b = row * 4 + (side + 1) % 4;
+        faces.push(a, a + 4, b, b, a + 4, b + 4);
+      }
+    }
+    const top = (sections.length - 1) * 4;
+    faces.push(top, top + 3, top + 1, top + 1, top + 3, top + 2);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setIndex(faces);
+    geometry.computeVertexNormals();
+    const mesh = new THREE.Mesh(geometry, material);
+    group.add(mesh);
+    return mesh;
+  }
+  shell([[0.24, 0.76, -2.12, 2.15], [0.5, 0.9, -2.2, 2.2],
+    [0.76, 0.85, -2.04, 2.04], [0.83, 0.73, -1.8, 1.85]], bodyMat);
+  shell([[0.8, 0.75, -1.45, 1.12], [1.32, 0.59, -0.86, 0.5]],
+    new THREE.MeshLambertMaterial({ color: cabinColor }));
+  shell([[1.32, 0.59, -0.86, 0.5], [1.36, 0.56, -0.82, 0.46]], bodyMat);
+  // Fine pillars divide the side windows; sills and bumpers carry a continuous ink line.
+  for (const x of [-0.79, 0.79]) {
+    const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.47, 0.075), bodyMat);
+    pillar.position.set(x * 0.85, 1.07, -0.35);
+    group.add(pillar);
+    const sill = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.06, 3.9), new THREE.MeshBasicMaterial({ color: POST_DARK }));
+    sill.position.set(x, 0.32, 0);
+    group.add(sill);
+  }
   const wheelMat = new THREE.MeshLambertMaterial({ color: WHEEL_DARK });
-  const wheelGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.26, 10);
-  for (const x of [-0.88, 0.88]) {
-    for (const z of [-1.55, 1.55]) {
-      const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-      wheel.rotation.z = Math.PI / 2;
-      wheel.position.set(x, 0.32, z);
-      group.add(wheel);
+  const wheelGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.22, 20);
+  const hubGeo = new THREE.CylinderGeometry(0.19, 0.19, 0.235, 16);
+  const hubMat = new THREE.MeshLambertMaterial({ color: SIDEWALK });
+  for (const x of [-0.86, 0.86]) {
+    for (const z of [-1.38, 1.38]) {
+      for (const [geometry, material] of [[wheelGeo, wheelMat], [hubGeo, hubMat]]) {
+        const wheel = new THREE.Mesh(geometry, material);
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(x, 0.35, z);
+        group.add(wheel);
+      }
     }
   }
-
   const tailMat = new THREE.MeshBasicMaterial({ color: TAIL_OFF });
-  const tailGeo = new THREE.BoxGeometry(0.34, 0.16, 0.06);
-  for (const x of [-0.62, 0.62]) {
-    const lamp = new THREE.Mesh(tailGeo, tailMat);
-    lamp.position.set(x, 0.5, -2.12);
-    group.add(lamp);
+  for (const z of [-2.17, 2.17]) {
+    const bumper = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.075, 0.08), wheelMat);
+    bumper.position.set(0, 0.43, z);
+    group.add(bumper);
+    for (const x of [-0.59, 0.59]) {
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.09, 0.06), z < 0 ? tailMat : bodyMat);
+      lamp.position.set(x, 0.61, z);
+      group.add(lamp);
+    }
   }
   return { group, tailMat };
 }
@@ -220,7 +233,7 @@ function buildBuilding(w, d, h, baseColor, glassColor) {
   const bands = Math.max(2, Math.round(h / 4));
   const glassMat = new THREE.MeshLambertMaterial({ color: glassColor });
   for (let i = 0; i < bands; i++) {
-    const band = new THREE.Mesh(new THREE.BoxGeometry(w * 0.94, h / (bands * 3.5), d * 1.01), glassMat);
+    const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.04, h / (bands * 3.5), d + 0.04), glassMat);
     band.position.y = ((i + 0.5) / bands) * h;
     group.add(band);
   }
@@ -230,6 +243,17 @@ function buildBuilding(w, d, h, baseColor, glassColor) {
     mullion.position.set(x, h / 2, 0);
     group.add(mullion);
   }
+  // Street-facing elevations need vertical rhythm too, not only the end walls.
+  for (let z = -d / 2 + 1; z < d / 2; z += 1.8) {
+    const pier = new THREE.Mesh(new THREE.BoxGeometry(w + 0.09, h, 0.12), mullionMat);
+    pier.position.set(0, h / 2, z);
+    group.add(pier);
+  }
+  const cornice = new THREE.Mesh(new THREE.BoxGeometry(w + 0.35, 0.2, d + 0.35), mullionMat);
+  cornice.position.y = h;
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(w * 0.55, 0.8, d * 0.6), glassMat);
+  roof.position.y = h + 0.4;
+  group.add(cornice, roof);
   return group;
 }
 
@@ -463,30 +487,51 @@ function buildRibbon(action) {
   return { mesh, tip: labelPos };
 }
 
-// Injected once (scoped to .gc-drive, this module's own root class - never leaks into the
-// snake/doom cards which share loop.js's .gc-root). Two things no existing exhibits.css class
-// covers: a crosshair cursor over the clickable road, and a home for the hazard-chip row - it
-// docks above loop.js's Model/Restart row (same right edge, same small-button language) rather
-// than joining .gc-controls's own no-wrap flex line, labelled and wrapping/shrinking on narrow
-// panels so it never pushes past the panel edge or collides with Model/Restart.
-function injectStyle() {
-  if (document.getElementById('gc-drive-style')) return;
-  const style = document.createElement('style');
-  style.id = 'gc-drive-style';
-  style.textContent = `
-    .gc-drive canvas { cursor: crosshair; touch-action: manipulation; }
-    .gc-drive .gc-hazards-wrap {
-      position: absolute; right: 18px; bottom: 54px; z-index: 4;
-      display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
-      max-width: min(240px, calc(100% - 36px));
+// Reuse crt.js glass/scanlines and filmfx.js's quarter-size bloom + tiled grain.
+// No barrel distortion: road clicks must still match the camera's ray projection.
+function buildSurface(stage, source, still) {
+  const layer = document.createElement('canvas');
+  layer.className = 'drive-surface';
+  layer.setAttribute('aria-hidden', 'true');
+  stage.appendChild(layer);
+  const ctx = layer.getContext('2d');
+  const bloom = document.createElement('canvas');
+  const bc = bloom.getContext('2d');
+  const grain = document.createElement('canvas');
+  grain.width = grain.height = 96;
+  const gc = grain.getContext('2d');
+  const pixels = gc.createImageData(96, 96);
+  for (let i = 0; i < pixels.data.length; i += 4) {
+    const v = 120 + Math.floor(Math.random() * 70);
+    pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = v;
+    pixels.data[i + 3] = 255;
+  }
+  gc.putImageData(pixels, 0, 0);
+  const pattern = ctx.createPattern(grain, 'repeat');
+  return () => {
+    const w = source.width, h = source.height;
+    if (layer.width !== w || layer.height !== h) {
+      layer.width = w; layer.height = h;
+      bloom.width = Math.max(1, Math.round(w / 4));
+      bloom.height = Math.max(1, Math.round(h / 4));
     }
-    .gc-drive .gc-hazards-label {
-      font-family: var(--font-mono, monospace); font-size: 10px; letter-spacing: 0.36px;
-      text-transform: uppercase; color: rgba(240,238,235,0.85); text-shadow: 0 1px 3px rgba(0,0,0,0.7);
-    }
-    .gc-drive .gc-hazards { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
-  `;
-  document.head.appendChild(style);
+    ctx.clearRect(0, 0, w, h);
+    bc.filter = 'brightness(1.45) contrast(2.2) blur(2px)';
+    bc.drawImage(source, 0, 0, bloom.width, bloom.height);
+    ctx.save();
+    ctx.globalAlpha = 0.1;
+    ctx.drawImage(bloom, 0, 0, w, h);
+    ctx.restore();
+    drawScanlines(ctx, 0, 0, w, h, { step: 3 * Math.min(2, devicePixelRatio || 1), alpha: 0.08 });
+    drawGlass(ctx, 0, 0, w, h, { radius: 0, roll: false });
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    const shift = still ? 0 : Math.floor(performance.now() / 90) % 96;
+    ctx.translate(-shift, -shift);
+    ctx.fillStyle = pattern;
+    ctx.fillRect(0, 0, w + 96, h + 96);
+    ctx.restore();
+  };
 }
 
 const HAZARDS = [
@@ -496,9 +541,13 @@ const HAZARDS = [
 ];
 
 export async function mount(el, { decide, mode } = {}) {
-  injectStyle();
   const refs = mountChrome(el, { label: 'Drive · city street' });
   el.classList.add('gc-drive');
+  const instruments = document.createElement('div');
+  instruments.className = 'drive-instruments';
+  const footTop = refs.policyBtn.closest('.gc-foot-top');
+  instruments.append(refs.hud, refs.sentence.parentElement, footTop);
+  el.appendChild(instruments);
   const canvas = refs.canvas;
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
@@ -507,6 +556,7 @@ export async function mount(el, { decide, mode } = {}) {
   const replay = ((await loadJSON('data/replays/drive.json').catch(() => null)) ?? {}).frames ?? [];
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  const paintSurface = buildSurface(refs.stage, canvas, reducedMotion);
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
 
   const { scene, road } = buildScene();
@@ -519,13 +569,13 @@ export async function mount(el, { decide, mode } = {}) {
   scene.add(egoMesh);
 
   const shadowTex = buildShadowTexture();
-  const egoShadow = buildShadow(shadowTex, 2.1, 4.6);
+  const egoShadow = buildShadow(shadowTex, 2.8, 5.4);
   scene.add(egoShadow);
 
   const ribbonGroup = new THREE.Group();
   scene.add(ribbonGroup);
   const label = buildLabelSprite();
-  ribbonGroup.add(label.sprite);
+  // The probability is already printed in the instrument column.
   let ribbonMesh = null;
   let ribbonKey = null;
 
@@ -641,12 +691,6 @@ export async function mount(el, { decide, mode } = {}) {
     const h = Math.max(1, rect.height);
     renderer.setSize(w, h, false);
     const aspect = w / h;
-    // viewSize picked (by projecting the ego through CAM_HEIGHT/CAM_BACK/CAM_AHEAD above, not by
-    // eye) so the sedan lands ~55-65% down the frame at a readable size on both the desktop card
-    // (~620x560, aspect ~1.1) and the mobile one (~350x360, aspect ~0.97), while the ~1.3 lanes
-    // either side of the ego needed for a legible lane change still fit at the tighter mobile
-    // aspect. A larger viewSize (more zoomed out) shrinks the car below "readable"; a smaller one
-    // clips the neighbour lane on mobile.
     camera.aspect = aspect;
     // Narrow cards (the mobile panel is nearly square) crop horizontally, so widen the vertical
     // field there to keep both neighbour lanes in shot.
@@ -667,19 +711,11 @@ export async function mount(el, { decide, mode } = {}) {
     const egoX = lerp(laneToX(pe.lane), laneToX(ce.lane), t);
     const egoZ = lerp(pe.position, ce.position, t);
     egoMesh.position.set(egoX, 0, egoZ);
-    egoShadow.position.set(egoX, 0.006, egoZ);
+    egoShadow.position.set(egoX, 0.025, egoZ);
     tailMat.color.set(ce.speed < pe.speed ? TAIL_ON : TAIL_OFF);
 
     const targetSettle = reducedMotion ? 0 : (pe.speed - ce.speed) * 0.015; // >0 while decelerating
     settle = lerp(settle, targetSettle, 0.12);
-    // The camera sits behind and above the ego and looks down the road. The car lands high enough
-    // in the frame to clear the decision readout (.gc-foot, bottom-left) without panning the whole
-    // scene sideways — panning was what skewed the shot.
-    // A modest lateral offset (the camera rides to the left of the car) puts the ego in the right
-    // half of the frame, clear of the decision bars that dock bottom-left. With a perspective
-    // camera this reads as an offset chase view; the earlier ortho pan just sheared the scene.
-    // +X renders to the LEFT here: the camera looks down +Z, which mirrors the X axis, so the
-    // camera has to ride to the car's right in world space to put the car in the right half.
     const camX = egoX * 0.6 + CAM_OFFSET_X;
     camera.position.set(camX, CAM_HEIGHT + settle * 0.4, egoZ - CAM_BACK - settle * 1.2);
     if (typeof window !== 'undefined' && window.__driveProbe) {
@@ -712,14 +748,14 @@ export async function mount(el, { decide, mode } = {}) {
       const color = placed ? HAZARD_WARN : TRAFFIC_COLORS[trafficPool.length % TRAFFIC_COLORS.length];
       return buildCar(color, CABIN_DARK).group; // traffic tail lights stay off (only the ego's brake to the model's decision)
     }, currState.traffic.length);
-    const trafficShadows = ensurePool(trafficShadowPool, () => buildShadow(shadowTex, 2, 4.2), currState.traffic.length);
+    const trafficShadows = ensurePool(trafficShadowPool, () => buildShadow(shadowTex, 2.8, 5.4), currState.traffic.length);
     const trafficRings = ensurePool(trafficRingPool, buildRing, currState.traffic.length);
     currState.traffic.forEach((car, i) => {
       const prev = prevState.traffic[i] ?? car;
       const x = lerp(laneToX(prev.lane), laneToX(car.lane), t);
       const z = lerp(prev.position, car.position, t);
       traffic[i].position.set(x, 0, z);
-      trafficShadows[i].position.set(x, 0.006, z);
+      trafficShadows[i].position.set(x, 0.025, z);
       trafficRings[i].position.set(x, 0.012, z);
       trafficRings[i].visible = Boolean(car.placed);
     });
@@ -751,6 +787,7 @@ export async function mount(el, { decide, mode } = {}) {
     });
 
     renderer.render(scene, camera);
+    paintSurface();
   }
 
   function frame() {
@@ -817,7 +854,7 @@ export async function mount(el, { decide, mode } = {}) {
   });
   hazardBtns[0].classList.add('gc-on');
   hazardWrap.append(hazardLabel, hazardRow);
-  el.appendChild(hazardWrap);
+  instruments.insertBefore(hazardWrap, footTop);
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();

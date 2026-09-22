@@ -613,6 +613,9 @@ async function boot() {
   // set before the film mounts; filmfx clears it the moment the cold start is over (or at once,
   // if it is skipped for a repeat visit or for reduced motion)
   mountFilm(ctx, { fx: true });
+  // The same game again in chapter 04, plain: no bloom layer, so the card shows the frame exactly
+  // as the engine draws it. Only one of the two runs at a time — each pauses when off screen.
+  mountFilm(ctx, { film: 'film-card', rows: 'card-rows', sentence: 'card-sentence', rec: 'card-rec' });
   import('./motion.js').then((m) => {
     const go = () => {
       if (!document.documentElement.classList.contains('booting')) {
