@@ -156,8 +156,71 @@ def test_typical_from_pretrained_loads_qwen35_checkpoint(tmp_path, monkeypatch):
     assert 0.0 <= runtime["p_null"] <= 1.0
 
 
+@pytest.mark.skipif(not os.environ.get("RUN_SLOW"), reason="downloads the real typical-small "
+                     "checkpoint; set RUN_SLOW=1 to run")
+def test_state_cache_is_exact_and_faster():
+    """Serving-latency work (PLAN item 2): Typical's per-instance state LRU (core.py's
+    _state_kv_for) must make a second choice() call on the SAME state (a) bit-identical to
+    the first call's probabilities and (b) meaningfully faster, since it skips
+    native.encode_state's state_prefix_forward entirely on the cache hit."""
+    import time
+
+    from typical import Typical
+
+    m = Typical.from_pretrained(CKPT_REPO, filename=CKPT_FILE, device="cpu")
+    query, labels = ITEMS[0]
+
+    m._state_kv.clear()
+    t0 = time.perf_counter()
+    first = m.choice(STATE, query, labels)
+    cold_s = time.perf_counter() - t0
+    assert len(m._state_kv) == 1, "one state text -> one cache entry"
+
+    t0 = time.perf_counter()
+    second = m.choice(STATE, query, labels)
+    warm_s = time.perf_counter() - t0
+    assert len(m._state_kv) == 1, "same state text -> cache hit, no growth"
+
+    assert first == second, "cache hit must reproduce the cold call's probabilities exactly"
+    assert warm_s < cold_s, f"warm ({warm_s:.4f}s) should be faster than cold ({cold_s:.4f}s)"
+
+    # LRU eviction: max_states caps how many distinct states are held
+    m2 = Typical.from_pretrained(CKPT_REPO, filename=CKPT_FILE, device="cpu", max_states=2)
+    for i in range(5):
+        m2.choice(f"{STATE} [{i}]", query, labels)
+    assert len(m2._state_kv) == 2, "LRU must evict down to max_states"
+
+
+@pytest.mark.skipif(not os.environ.get("RUN_SLOW"), reason="downloads the real typical-small "
+                     "checkpoint; set RUN_SLOW=1 to run")
+def test_max_option_tokens_is_noop_when_nothing_truncated():
+    """Serving-latency work (PLAN item 5, "suffix diet"): capping each rendered option at
+    max_option_tokens must not move probabilities at all when no option actually exceeds the
+    cap -- the default (24) is generous enough that ITEMS' short labels never trigger it."""
+    from typical import Typical
+    from typical.native import native_kv_decide
+
+    m = Typical.from_pretrained(CKPT_REPO, filename=CKPT_FILE, device="cpu")
+    query, labels = ITEMS[0]
+    cache = m._state_kv_for(STATE)
+
+    p_default = native_kv_decide(m.head, m.model, STATE, [(query, labels)], max_state=m.max_state,
+                                 state_cache=cache)[0]  # default max_option_tokens=24
+    p_uncapped = native_kv_decide(m.head, m.model, STATE, [(query, labels)], max_state=m.max_state,
+                                  state_cache=cache, max_option_tokens=None)[0]
+    diff = (p_default - p_uncapped).abs().max().item()
+    assert diff == 0.0, f"max abs diff {diff}"
+
+    # a genuinely long option DOES get truncated and still returns a valid distribution
+    long_labels = [labels[0], labels[1] + " extra words " * 20] + labels[2:]
+    p_long = m.choice(STATE, query, long_labels)
+    assert abs(sum(v for k, v in p_long.items() if k != "p_null") - 1.0) < 1e-4
+
+
 if __name__ == "__main__":
     if not os.environ.get("RUN_SLOW"):
         os.environ["RUN_SLOW"] = "1"
     test_typical_matches_pcdm_decider()
     test_typical_noul_via_choice_path_on_preview()
+    test_state_cache_is_exact_and_faster()
+    test_max_option_tokens_is_noop_when_nothing_truncated()

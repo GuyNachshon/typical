@@ -13,6 +13,7 @@ import copy
 import string
 
 import torch
+from torch.profiler import record_function
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -292,15 +293,57 @@ def _causal_pad_mask(attn2d, q_len, dtype):
     return mask.masked_fill(~allowed.unsqueeze(1), torch.finfo(dtype).min)
 
 
+DEFAULT_MAX_OPTION_TOKENS = 24
+
+
+def _truncate_options(tok, cand_texts: list[str], max_tokens: int | None) -> list[str]:
+    """Cap each rendered option at max_tokens tokens (append a visible "..." if cut) --
+    "suffix diet": the K rendered options dominate suffix length, so a long option balloons
+    every subsequent forward. None/<=0 disables (no-op, returns cand_texts unchanged)."""
+    if not max_tokens or max_tokens <= 0:
+        return cand_texts
+    out = []
+    for c in cand_texts:
+        ids = tok(c, add_special_tokens=False)["input_ids"]
+        out.append(tok.decode(ids[:max_tokens]) + "..." if len(ids) > max_tokens else c)
+    return out
+
+
+@torch.inference_mode()
+def encode_state(head, model, state: str, max_state: int = 256):
+    """[eos] + state -> (past_key_values, Ls), the once-per-state prefix encode that used to
+    run inside native_kv_decide on every call. Split out so a caller (Typical's state LRU)
+    can compute it once and reuse the KV cache across many decisions on the same state --
+    see native_kv_decide's `state_cache` param. Pure function of (backbone weights, state
+    text): deterministic in eval/inference_mode, so a cached entry is bit-identical to a
+    fresh encode, not just numerically close. @inference_mode here (not just relying on the
+    caller) because the resulting KV tensors get copy.deepcopy'd later (native_kv_decide's
+    per-chunk batch_repeat_interleave) -- a non-leaf, grad-tracked tensor can't be
+    deepcopy'd, so this must never run under regular autograd tracking, regardless of what
+    context the caller happens to be in."""
+    tok, dev, lm = head.backbone.tokenizer, head.device, head.backbone.model
+    with record_function("typical/tokenize_state"):
+        prefix = torch.tensor([[tok.eos_token_id] + _ids(tok, [state], max_state)[0]], device=dev)
+    with record_function("typical/state_prefix_forward"):
+        cache = lm(input_ids=prefix, use_cache=True).past_key_values
+    return cache, prefix.shape[1]
+
+
 @torch.inference_mode()
 def native_kv_decide(head, model, state, queries, chunk: int = 32, max_state: int = 256,
-                     max_suffix: int = MAX_SUFFIX, vec_cache=None):
+                     max_suffix: int = MAX_SUFFIX, vec_cache=None, state_cache=None,
+                     max_option_tokens: int | None = DEFAULT_MAX_OPTION_TOKENS):
     """Serving path: [eos] + state encoded ONCE into a KV cache on head.backbone.model; every
     query's suffix runs against that cached prefix, `chunk` queries per forward. queries =
     [(query, candidates)] -> list of [K_i + 1] probability vectors (null last). Verbatim port
     of native.native_kv_decide (head/model contract unchanged -- head needs only .backbone
-    (tokenizer + model) and .device; model is a NativeHead). No hierarchical fallback: a
-    suffix longer than max_suffix raises (raise max_suffix instead)."""
+    (tokenizer + model) and .device; model is a NativeHead), plus two additions: `state_cache`,
+    an optional (past_key_values, Ls) pair from encode_state -- pass it to skip re-encoding
+    the state prefix (Typical.choice/score/noul/decide do this automatically via an LRU; see
+    core.py) -- and `max_option_tokens` ("suffix diet": caps each rendered option's length,
+    see _truncate_options; None/0 disables, matching the training repo's untruncated
+    behaviour exactly). No hierarchical fallback: a suffix longer than max_suffix raises
+    (raise max_suffix instead)."""
     if model.use2:
         raise NotImplementedError(
             "nc_head n2/n2n3 (Qwen3-Embedding candidate vectors) isn't ported to the "
@@ -309,39 +352,47 @@ def native_kv_decide(head, model, state, queries, chunk: int = 32, max_state: in
             "checkpoint requires it."
         )
     tok, dev, lm = head.backbone.tokenizer, head.device, head.backbone.model
-    prefix = torch.tensor([[tok.eos_token_id] + _ids(tok, [state], max_state)[0]], device=dev)
-    state_cache = lm(input_ids=prefix, use_cache=True).past_key_values
-    Ls = prefix.shape[1]
+    state_cache, Ls = state_cache if state_cache is not None else encode_state(head, model, state, max_state)
     out = []
     for start in range(0, len(queries), chunk):
         qs = queries[start:start + chunk]
         m = len(qs)
-        is_bern = [model.noul_head == "bern" and _is_bern_row(c) for _, c in qs]
-        rendered = [RENDERS["query_only" if b else getattr(model, "render", "letters")](q, c)
-                    for b, (q, c) in zip(is_bern, qs)]
-        enc = tok([r[0] for r in rendered], add_special_tokens=False, return_offsets_mapping=True)
-        x_ids, offs = enc["input_ids"], enc["offset_mapping"]
-        assert max(len(x) for x in x_ids) <= max_suffix, f"suffix > max_suffix={max_suffix}; raise it"
-        input_ids, am, lengths = _pack(tok, [[]] * m, x_ids, tail=[tok.eos_token_id], sink=False)
-        T = input_ids.shape[1]
-        Kmax = max(len(c) for _, c in qs)
-        pool = torch.stack([_pool_matrix(r[1], o, 0, Kmax, T, K=len(c)) for r, o, (_, c) in zip(rendered, offs, qs)])
-        cmask = torch.zeros(m, Kmax, dtype=torch.bool)
-        for i, (_, c) in enumerate(qs):
-            cmask[i, :len(c)] = True
+        with record_function("typical/tokenize_suffix"):
+            # is_bern/yes-idx/cmask all key off candidate COUNT and the literal "yes"/"no"
+            # text (never truncated -- 1 token), so they read the original `c`; only the
+            # rendered text is diet'd.
+            is_bern = [model.noul_head == "bern" and _is_bern_row(c) for _, c in qs]
+            rendered = [RENDERS["query_only" if b else getattr(model, "render", "letters")]
+                        (q, _truncate_options(tok, c, max_option_tokens))
+                        for b, (q, c) in zip(is_bern, qs)]
+            enc = tok([r[0] for r in rendered], add_special_tokens=False, return_offsets_mapping=True)
+            x_ids, offs = enc["input_ids"], enc["offset_mapping"]
+            assert max(len(x) for x in x_ids) <= max_suffix, f"suffix > max_suffix={max_suffix}; raise it"
+            input_ids, am, lengths = _pack(tok, [[]] * m, x_ids, tail=[tok.eos_token_id], sink=False)
+        with record_function("typical/mask_build"):
+            T = input_ids.shape[1]
+            Kmax = max(len(c) for _, c in qs)
+            pool = torch.stack([_pool_matrix(r[1], o, 0, Kmax, T, K=len(c)) for r, o, (_, c) in zip(rendered, offs, qs)])
+            cmask = torch.zeros(m, Kmax, dtype=torch.bool)
+            for i, (_, c) in enumerate(qs):
+                cmask[i, :len(c)] = True
 
-        cache = copy.deepcopy(state_cache)
-        _cache_batch_repeat_interleave(cache, m)
-        attn = torch.cat([torch.ones(m, Ls, dtype=torch.long), am], dim=1).to(dev)
-        position_ids = (torch.arange(T) + Ls).expand(m, -1).to(dev)
-        H = lm(input_ids=input_ids.to(dev), attention_mask=_causal_pad_mask(attn, T, lm.dtype),
-               position_ids=position_ids, past_key_values=cache, use_cache=False).last_hidden_state.float()
-        h = H[torch.arange(m, device=dev), (lengths - 1).to(dev)]
-        C3 = torch.bmm(pool.to(dev), H)
-        C2 = None  # n2 unsupported -- guarded above
-        yi = _yes_idx([c for _, c in qs], dev) if model.noul_head == "bern" else None
-        bm = torch.tensor(is_bern, dtype=torch.bool, device=dev) if model.noul_head == "bern" else None
-        probs = torch.softmax(model(h, cmask.to(dev), C3, C2, yes_idx=yi, bern_mask=bm), dim=-1)
-        for i, (_, c) in enumerate(qs):
-            out.append(torch.cat([probs[i, :len(c)], probs[i, -1:]]))
+        with record_function("typical/state_cache_deepcopy"):
+            cache = copy.deepcopy(state_cache)
+            _cache_batch_repeat_interleave(cache, m)
+        with record_function("typical/suffix_forward"):
+            attn = torch.cat([torch.ones(m, Ls, dtype=torch.long), am], dim=1).to(dev)
+            position_ids = (torch.arange(T) + Ls).expand(m, -1).to(dev)
+            H = lm(input_ids=input_ids.to(dev), attention_mask=_causal_pad_mask(attn, T, lm.dtype),
+                   position_ids=position_ids, past_key_values=cache, use_cache=False).last_hidden_state.float()
+        with record_function("typical/head_forward"):
+            h = H[torch.arange(m, device=dev), (lengths - 1).to(dev)]
+            C3 = torch.bmm(pool.to(dev), H)
+            C2 = None  # n2 unsupported -- guarded above
+            yi = _yes_idx([c for _, c in qs], dev) if model.noul_head == "bern" else None
+            bm = torch.tensor(is_bern, dtype=torch.bool, device=dev) if model.noul_head == "bern" else None
+            probs = torch.softmax(model(h, cmask.to(dev), C3, C2, yes_idx=yi, bern_mask=bm), dim=-1)
+        with record_function("typical/cpu_sync"):
+            for i, (_, c) in enumerate(qs):
+                out.append(torch.cat([probs[i, :len(c)], probs[i, -1:]]))
     return out

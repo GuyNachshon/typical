@@ -8,12 +8,13 @@ its buffers (mu_h/sd_h/mu_c/sd_c) are just part of ckpt["tower"]'s state_dict.
 """
 import json
 import time
+from collections import OrderedDict
 
 import torch
 from huggingface_hub import hf_hub_download
 
 from .backbone import Backbone, pick_device
-from .native import NativeHead, native_kv_decide
+from .native import DEFAULT_MAX_OPTION_TOKENS, NativeHead, encode_state, native_kv_decide
 
 MAX_QUERY = 64   # trained query length (see pcdm_jev.decider) -- informational only below
 MAX_STATE = 256  # trained state length -- native_kv_decide's own max_state default is separate
@@ -59,14 +60,24 @@ def to_labels(p: torch.Tensor, labels: list[str]) -> tuple[dict, float]:
 class Typical:
     """from_pretrained("OzLabs/typical-small") -> a ready-to-decide native-readout model."""
 
-    def __init__(self, head: _Head, model: NativeHead, device: str, max_state: int = 4096):
+    def __init__(self, head: _Head, model: NativeHead, device: str, max_state: int = 4096,
+                max_states: int = 16, max_option_tokens: int | None = DEFAULT_MAX_OPTION_TOKENS):
         self.head, self.model, self.device, self.max_state = head, model, device, max_state
+        self.max_option_tokens = max_option_tokens
         self.tok = head.backbone.tokenizer
+        # Persistent state -> prefix-KV cache (LRU, keyed on the exact state text): choice/
+        # score/noul/decide all route through _raw -> _state_kv_for, so a warm call (same
+        # state, new question) never re-runs the state_prefix_forward -- see native.py's
+        # encode_state/native_kv_decide docstrings. max_states caps how many distinct states
+        # are held at once (each entry is one KV cache, ~O(state_tokens) memory).
+        self.max_states = max_states
+        self._state_kv: OrderedDict[str, tuple] = OrderedDict()
 
     @classmethod
     def from_pretrained(cls, repo_id: str, device: str = "auto", filename: str = "best.pt",
                         revision: str | None = None, cache_dir: str | None = None,
-                        max_state: int = 4096) -> "Typical":
+                        max_state: int = 4096, max_states: int = 16,
+                        max_option_tokens: int | None = DEFAULT_MAX_OPTION_TOKENS) -> "Typical":
         path = hf_hub_download(repo_id, filename, revision=revision, cache_dir=cache_dir)
         ckpt = torch.load(path, map_location="cpu", weights_only=True)
         args = ckpt.get("args", {})
@@ -81,13 +92,31 @@ class Typical:
                            noul_head=args.get("noul_head", "choice")).to(dev)
         model.load_state_dict(ckpt["tower"])
         model.eval()
-        return cls(_Head(backbone), model, dev, max_state=max_state)
+        return cls(_Head(backbone), model, dev, max_state=max_state, max_states=max_states,
+                   max_option_tokens=max_option_tokens)
+
+    def _state_kv_for(self, state: str):
+        """LRU lookup/insert of (past_key_values, Ls) for this exact state text. A hit skips
+        encode_state entirely -- bit-identical result to a fresh encode (deterministic
+        eval-mode forward), just without paying for it again."""
+        entry = self._state_kv.get(state)
+        if entry is not None:
+            self._state_kv.move_to_end(state)
+            return entry
+        entry = encode_state(self.head, self.model, state, self.max_state)
+        self._state_kv[state] = entry
+        if len(self._state_kv) > self.max_states:
+            self._state_kv.popitem(last=False)
+        return entry
 
     def _raw(self, state, query: str, labels: list[str]) -> torch.Tensor:
         if not isinstance(state, str):
             state = json.dumps(state, ensure_ascii=False)
         with torch.inference_mode():
-            return native_kv_decide(self.head, self.model, state, [(query, labels)], max_state=self.max_state)[0]
+            cache = self._state_kv_for(state)
+            return native_kv_decide(self.head, self.model, state, [(query, labels)],
+                                    max_state=self.max_state, state_cache=cache,
+                                    max_option_tokens=self.max_option_tokens)[0]
 
     def choice(self, state, question: str, labels: list[str]) -> dict:
         """-> {label: p, ...} + "p_null"."""
