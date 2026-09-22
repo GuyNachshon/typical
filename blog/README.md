@@ -68,6 +68,10 @@ This is the part that goes stale first, so read it before editing.
   1.7B arms on the same 605 held-out long states under both renders, with no truncation at eval.
   Matched-condition diagonal: facts-first .942 vs facts-last .830, **+11.2 points, 95% CI
   [+.077, +.147], z = 6.2, p = 5e-10** (policy_permit +.091, action_select +.138). Three separable
+  It replicates at 14B: **+7.8 points, [+.055, +.100], p = 7e-12** (REPORT §3ak-c), smaller only
+  because the facts-first 14B is at .997. The 14B pair is not single-variable -- those arms differ
+  in the rest of the release bundle -- so it corroborates direction and magnitude rather than
+  isolating the variable twice. Three separable
   effects: (1) the truncation fix works; (2) render mismatch is separately real and large, and is
   what put the facts-last arm on its majority floor in the single-render comparison; (3) JevBench's
   long_policy subfamily (n = 19) could resolve neither, returning Fisher exact p = 0.232 with the
@@ -95,6 +99,21 @@ This is the part that goes stale first, so read it before editing.
   almost entirely (.450 [.360, .541] vs .477 [.387, .568]). The correct claim is that the
   direction is consistent and the effect is undetectable at this sample size. Never re-credit KD
   for the calibration gains either.
+- **JevBench cannot rank our checkpoints, and both posts now say so (RESULTS.md §5a).** With
+  cluster-bootstrapped intervals, *every adjacent pair* in the ladder is indistinguishable:
+  `ts1b` .694 [.569, .819], `tm1b` .806 [.694, .903], `tm2` .861 [.778, .944], `tl2` .833
+  [.722, .931], `ladder_14b` .875 [.792, .944], `tl1b` .931 [.861, .986], `tl1b_nokd` .917
+  [.833, .986]; hard is ±9 at n = 111. `tl2` and `tm2` both score exactly 55/111 on hard while
+  disagreeing on 26 items, which is resolution exhaustion, not a tie. **Only paired per-item tests
+  are quotable**: frozen-14B − `tl1b` hard +.108 [+.027, +.189] p = .015; frozen − `tl1b_nokd`
+  +.081 p = .082; KD off-vs-on +.027 p = .45; `ts1b_semif` − `ts1b` standard +.097 p = .23;
+  `tl2` − `tm2` hard .000 p = 1.00. Never present two marginal JevBench scores as a comparison.
+- **The released checkpoints have a deployment caveat and it leads the architecture section
+  (RESULTS.md §5b).** Both predate the facts-first fix. On 605 held-out long states, rendering the
+  case block *before* the policy body instead of after costs `typical-small` 20.0 points
+  (.798 → .598) and `typical-medium` 25.5 (.866 → .612), with Small landing on the majority-class
+  floor for yes/no. The caller writes the state, so the advice is concrete: evidence last. This is
+  now in the launch post, both model cards and the paper's limitations; keep it in all four.
 - **Sample size.** JevBench public subset: 72 standard items over only 36 independent states (two
   paraphrases per state, so it must be clustered) and 111 hard items, roughly ±9 points on hard.
   Point estimates are fine; comparative claims built on a few points are not. The deep dive

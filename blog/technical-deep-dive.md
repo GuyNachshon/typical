@@ -11,7 +11,21 @@ That interface sounds like a simplification of a language model. In practice, re
 
 This is the archaeology: the architecture that didn't work, the bugs that looked like results, and the results that looked like bugs. Section references (§3j, §3t and so on) point at our internal experiment report, which publishes with the training code.
 
-One measurement caveat applies throughout. Our JevBench runs are against the public subset, unranked: 72 standard items that come from only 36 independent states (each state appears as two paraphrases), and 111 hard items. Cluster-bootstrapped, that puts roughly ±9 points on any hard-tier number. Where a claim below rests on a small JevBench gap we say so.
+One measurement caveat applies throughout, and it is load-bearing enough to state before anything else. Our JevBench runs are against the public subset, unranked: 72 standard items from only 36 independent states (each appears as two paraphrases), and 111 hard items. Cluster-bootstrapped, that is ±9 points on any hard-tier number and ±6 to 13 on standard. Here is what that does to the whole checkpoint ladder:
+
+| run | standard | 95% CI | hard | 95% CI |
+|---|---|---|---|---|
+| `ts1b` (typical-small, 1.7B) | .694 | [.569, .819] | .432 | [.342, .523] |
+| `tm1b` (typical-medium, 4B) | .806 | [.694, .903] | .423 | [.333, .514] |
+| `tm2` (Qwen3.5-4B) | .861 | [.778, .944] | .495 | [.405, .595] |
+| `tl2` (Qwen3.5-9B) | .833 | [.722, .931] | .495 | [.405, .586] |
+| `ladder_14b` | .875 | [.792, .944] | .468 | [.378, .559] |
+| `tl1b` (14B) | .931 | [.861, .986] | .450 | [.360, .541] |
+| `tl1b_nokd` (14B, no KD) | .917 | [.833, .986] | .477 | [.387, .568] |
+
+**Every adjacent pair in that table is statistically indistinguishable.** A 1.7B model and a 14B model, four backbone generations, our best checkpoint and our worst — the benchmark cannot separate them at this sample size. `tl2` and `tm2` both score exactly 55 of 111 on hard while agreeing on none of their probability vectors and disagreeing on 26 items outright; that is not a tie, it is a measurement that has run out of resolution.
+
+So the only JevBench comparisons worth quoting are paired per-item tests, and we quote those where we have them. Everything else in this post that carries weight comes from evaluation sets we built to answer one question at a sample size that could answer it.
 
 ## 1. The obvious architecture failed
 
@@ -118,7 +132,11 @@ That looked like the answer, and we drafted it as the answer: the mechanism is t
 
 Compare each model in its own matched condition — the diagonal, which removes the render confound entirely — and facts-first training is ahead by **11.2 points**: .942 against .830, 95% CI [+.077, +.147], p = 5e-10. The facts-first model is also the more robust of the two, losing 14.5 points when the render is switched against it against the facts-last model's 19.0.
 
-So three effects were stacked on top of each other, and only the full design separates them. The truncation fix works, unambiguously at 605 items. Render mismatch is separately real and large, and it is what dragged the facts-last arm to its floor in the half-finished comparison. And JevBench's long-policy subfamily, at 19 items, could not see either one: it returned p = 0.232 on a mechanism that a better-powered measurement puts at p = 5e-10.
+It replicates at 14B, an order of magnitude up: **+7.8 points, [+.055, +.100], p = 7e-12**, the gap smaller only because the facts-first 14B is at .997 and has nowhere left to go. (That pair is not a single-variable ablation — the 14B arms differ in the rest of the release bundle too — so it corroborates the size and direction rather than isolating the variable twice.)
+
+So three effects were stacked on top of each other, and only the full design separates them. The truncation fix works, unambiguously at 605 items and at two scales. Render mismatch is separately real and large, and it is what dragged the facts-last arm to its floor in the half-finished comparison. And JevBench's long-policy subfamily, at 19 items, could not see either one: it returned p = 0.232 on a mechanism that a better-powered measurement puts below 1e-9 twice.
+
+**One number is worth the whole section.** On JevBench's `long_policy` subfamily, `ladder_14b` scores **.053** — two items out of nineteen, indistinguishable from broken. On long states in its own matched render, the same checkpoint scores **.919**. Nothing about the model changed between those two numbers. What changed is whether the evaluation put the evidence where that model had been trained to look for it. If you take one thing from this post, take that a benchmark score is a joint measurement of a model and an interface, and that you cannot tell which one you are reading without varying both.
 
 We are publishing the sequence and not just the endpoint, because the intermediate state is the part that generalises. We had a pre-registered primary metric, it came back null, and the null was an artefact of nineteen items and a single-render design — not of the mechanism. If you have run a matched ablation where each arm is evaluated in the condition its own training assumed, you have not run a matched ablation.
 
@@ -200,7 +218,11 @@ We had been explaining the hard tier as missing data coverage: our generators ne
 
 Missing coverage still explains why training didn't *add* the behaviour. It doesn't explain why training appears to have removed it. That distinction matters for what we build next, and we had it wrong until we looked at the columns side by side.
 
-Two related findings sharpen it. First, the backbone generation appears to matter more than our training does here: a frozen Qwen3.5-9B scores .541 hard with three examples and .595 under a different rendering, above the .495 of the best checkpoint we've trained at any size, again with intervals that overlap. Second, that rendering effect is visible on its own. The same frozen Qwen3.5-9B goes from .806 to .931 on the standard tier purely by changing how the state and options are laid out, with zero training, and all three Qwen3.5 sizes we tested moved the same way under the same change. We'd read that as a sign that a meaningful share of the public leaderboard's standard-tier spread is a protocol effect, and as a reason to be careful reading ours.
+Two related findings sharpen it. First, the backbone generation appears to matter more than our training does here: a frozen Qwen3.5-9B scores .541 hard with three examples and .595 under a different rendering, above the .495 that `tm2` and `tl2`, the best checkpoints we've trained at any size, both reach. Marginal intervals, so read it as a direction.
+
+Second, that rendering effect is visible on its own, and this one does separate. The same frozen Qwen3.5-9B goes from .806 to .931 on the standard tier purely by changing how the state and options are laid out, with zero training: paired, that's +.125 [+.056, +.208], p < .001, and all three Qwen3.5 sizes we tested moved the same way. A protocol change on frozen weights is worth more than a year of our training on that tier. We'd read that as a sign that a meaningful share of the public leaderboard's standard-tier spread is a protocol effect, and as a reason to be careful reading ours.
+
+The obvious follow-up is to run that rendering on our own models, and we did. `ts1b_semif` scores .792 standard against `ts1b`'s .694 — which looks like a large gain until you pair it: +.097 [−.056, +.250], p = .23. Same benchmark, same n_eff of 36, and the effect that was unmissable on a frozen 9B is unresolvable on our 1.7B. That is not evidence the rendering doesn't help us. It is evidence that this benchmark stops being able to tell at our size, which is the theme of §11.
 
 The lesson we'd generalise: a frozen model with a few examples in context is a ceiling to verify you've cleared, per tier, and we publish the tiers where we haven't. One control we have *not* run and should have: the same frozen backbone with a scratchpad, on the same 111 items. Until that exists, nothing here distinguishes "this task needs intermediate computation" from "our fine-tuning damaged a backbone that already had some of it." We think it's the second. It's first on the list.
 
@@ -243,6 +265,22 @@ Long-document policy looked like it belonged in between, and it turned out to be
 The open question is narrower than we'd been framing it, and §8 is why. We had been asking when a decision needs intermediate computation and when a single direct read is enough. The data doesn't support that question yet, because the thing beating us on the serial families is another single direct read — a frozen backbone, one forward pass, letter logits, no scratchpad. Whatever those families need, the untrained backbone has more of it than our trained model does, and no amount of arguing about depth explains a result where the same architecture does better without our training.
 
 So the question we can actually pose is: what does our fine-tuning remove? Two controls decide it, and neither is expensive. Frozen 14B with a scratchpad on the same 111 items tells us whether intermediate computation is the missing ingredient at all. A frozen backbone trained only on the families it already handles tells us whether the damage is coverage or interference. Both are queued.
+
+## 11. What we'd tell you about our own evidence
+
+The honest summary of this project's measurement, stated plainly because we'd want it stated in someone else's post: **our benchmark comparisons mostly did not survive contact with confidence intervals.** Look back at the table at the top. Seven checkpoints spanning 1.7B to 14B and four backbone generations, and not one adjacent pair separates. The size ladder, the recipe changes, the backbone port — everything we spent the year comparing on that benchmark is, at n = 111 and n_eff = 36, a set of overlapping intervals we were reading as a ranking.
+
+What did survive is a short list, and it has a shape:
+
+- The candidate-blind negative, on a 1,200-item probe with a shuffled-question control.
+- The rendered-∅ pathology, on a K-sweep that measures abstention rate directly.
+- The tap-depth result, on full evidence suites with a premise-blanked control.
+- The render 2×2, on 605 purpose-built items, at two scales, p < 1e-9.
+- The three paired per-item JevBench tests that do separate, chiefly frozen-versus-trained on the hard tier.
+
+Every one of those is either a purpose-built evaluation set sized to the question, or a paired test that exploits both models seeing the same items. Not one is a marginal comparison between two benchmark scores. The benchmark was useful for finding out that something was wrong and useless for finding out what; the diagnosis always came from a control we had to build.
+
+We'd read that as a claim about this whole category rather than about us. Decision models are being ranked on a few hundred items, and a few hundred items cannot rank them. If you are choosing between models in this space — ours included — the number you want is a paired test on your decisions, not a leaderboard row.
 
 ---
 

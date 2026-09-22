@@ -102,6 +102,26 @@ Capability per millisecond (JevBench standard / single-decision ms): 1.7B .694/4
 frozen-with-shots .559 hard (not part of the release ladder) — the 4B is the knee, +11 JevBench
 standard and +11 MMLU among-K over the 1.7B for 1.25x the latency.
 
+## Deployment caveat: put case facts at the END of a long state
+
+**Read this before using the checkpoint on anything longer than a paragraph.** This checkpoint was
+trained before the facts-first corpus fix (REPORT §3ag), so it carries that corpus's positional
+bias: `data_wf_long` rendered `Case: <facts>` *after* the policy body, training right-truncates at
+`--max_state 1024`, and 98.8% of those rows therefore lost their facts before the model saw them.
+The model learned to answer long policies from where its training data put the evidence.
+
+Scored on 605 held-out long states (`scripts/make_long_eval.py`), identical items, differing only in
+where the `Case:` block sits, no truncation at eval:
+
+| | facts **before** the policy body | facts **after** it | cost |
+|---|---:|---:|---:|
+| `typical-medium` | .612 | .866 | **-25.5 pts** |
+
+Callers write their own state text, so this is under your control: **render the policy or document
+first and the case facts last.** Retrained checkpoints on the fixed corpus do not show the bias
+(REPORT §3ak-a/§3ak-c; the facts-first 14B reaches .997 on the same set), and retraining this
+checkpoint on it is the next planned release work.
+
 ## Known limitations
 
 - Hard tier is .423 with Brier .77 — still within range of the .336 chance baseline; long_policy

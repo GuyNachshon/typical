@@ -87,18 +87,35 @@ For technical readers: the released models use a truncated Qwen3 base model with
 
 We train on four kinds of decision: evidence (NLI-style), knowledge (multiple choice), workflows, and uncertainty (soft targets). The workflow portion includes counterfactual rubric groups, described below.
 
-**A known defect in these two checkpoints.** Both were trained with a 1,024-token state window on a long-policy corpus that rendered its supporting facts at the *end* of each row. Training truncates from the right, so 98.8% of those rows lost their facts before the model saw them, and the model was optimised to answer long policies from states that no longer contained the evidence. We found this after the training runs that produced Small and Medium. It is the main reason both are weak on long-document policy (.21 for Medium), and it is why the released models are for states up to roughly 1k tokens rather than the 4k the inference package will accept. A matched 2×2 puts the cost of that defect at 11.2 points on a held-out long-state set (p = 5e-10); the corpus is regenerated facts-first and the next checkpoints train on the fixed version. The [deep dive](./technical-deep-dive.md) has the measurement.
+**Put your case facts at the end of a long state.** This is the one thing to know before you deploy either of these checkpoints, and it is a defect, not a feature.
+
+Both were trained with a 1,024-token state window on a long-policy corpus that rendered its supporting facts at the *end* of each row. Training truncates from the right, so 98.8% of those rows lost their facts before the model ever saw them, and the model was optimised to answer long policies from states that no longer contained the evidence for the answer. We found this after the runs that produced Small and Medium.
+
+The consequence is positional, and you control it, because you write the state text. On 605 held-out long states, identical items differing only in where the case block sits:
+
+| released model | facts *before* the policy body | facts *after* it | cost |
+|---|---|---|---|
+| `typical-small` | .598 | .798 | **−20.0** |
+| `typical-medium` | .612 | .866 | **−25.5** |
+
+Twenty to twenty-five points, on the same documents, for moving one block of text. Rendered facts-first, `typical-small` sits on the majority-class floor for yes/no — it has stopped reading the evidence. So: policy or document first, case facts last.
+
+The fix is upstream, not a rendering convention we want to keep. The corpus is regenerated facts-first, and a matched 2×2 puts the cost of the original defect at 11.2 points at 1.7B (p = 5e-10) and 7.8 at 14B (p = 7e-12), with the facts-first 14B reaching .997 on that same set. Retraining both released checkpoints on the fixed corpus is the next thing we're doing, and it is worth more than anything else currently on our table. The [deep dive](./technical-deep-dive.md) has the measurement.
 
 ## The released models
 
 | model | size | JevBench standard\* | JevBench hard\* | CLINC-150 | warm p50 |
 |---|---|---|---|---|---|
-| `typical-small` | 1.7B | .694 | .432 | .801 | 15.5–17 ms |
-| `typical-medium` | 4B | .806 | .423 | .847 | 19–21 ms |
+| `typical-small` | 1.7B | .694 [.569, .819] | .432 [.342, .523] | .801 | 15.5–17 ms |
+| `typical-medium` | 4B | .806 [.694, .903] | .423 [.333, .514] | .847 | 19–21 ms |
 
-\* Public-subset run against JevBench v1.2.1 (72 standard / 111 hard public ids), not a ranked leaderboard entry. Majority baselines on this split are .311 standard and .336 hard, and at n_eff ≈ 36 on standard, small gaps are noise. Latency is warm p50 for a single K = 2 decision over a 256-token state, one stream, in process on one H100 through the public inference package, model load excluded — not a hosted-endpoint number and not comparable to one measured over a network.
+\* Public-subset run against JevBench v1.2.1 (72 standard / 111 hard public ids), not a ranked leaderboard entry. Brackets are 95% cluster bootstraps over the paraphrase group; the standard tier's 72 items come from only 36 independent states. Majority baselines are .311 standard and .336 hard. Latency is warm p50 for a single K = 2 decision over a 256-token state, one stream, in process on one H100 through the public inference package, model load excluded — not a hosted-endpoint number and not comparable to one measured over a network.
 
-Medium is the better model for a small latency increase, on most of what we measure: it leads Small by 5 points on CLINC-150, 11 on MMLU-Pro among-K, 10 on held-out yes/no decisions and 5 on the composition curriculum. The JevBench standard gap (.694 to .806) points the same way, though at 36 independent states that tier alone would not settle it. It is not a clean sweep — Medium is 9 points worse on TREC-fine (50 fine-grained topics), and the two are within noise of each other on the hard tier. Neither released model solves the hard compositional tier: long-policy, multi-step, temporal, unit and trade-off decisions sit far below the standard tier for both.
+Those intervals are the point of printing them. **JevBench cannot separate these two models**, and at this sample size it cannot separate any adjacent pair of checkpoints we have trained, ours or anyone's. Do not read the .694-to-.806 gap as a result.
+
+What does separate them is everything measured at a usable sample size: Medium leads Small by 5 points on CLINC-150, 11 on MMLU-Pro among-K, 10 on held-out yes/no decisions, 5 on the composition curriculum. It is not a clean sweep — Medium is 9 points worse on TREC-fine (50 fine-grained topics). Take Medium for accuracy, Small for cost, and don't use the benchmark column to decide.
+
+Neither released model solves the hard compositional tier: long-policy, multi-step, temporal, unit and trade-off decisions sit far below the standard tier for both.
 
 <p align="center"><img src="../figures/fig_latency_quality.png" alt="Warm per-decision latency against JevBench standard accuracy for typical-small and typical-medium, against the latency bands of a generative LLM call" width="640"></p>
 <p align="center"><em>Warm per-decision latency against the bands a normal LLM call falls into depending on how it has to answer. Both released models sit left of the fastest of those, which is a model emitting a single letter.</em></p>
@@ -165,7 +182,7 @@ It needs `torch`, `transformers`, `safetensors`, `huggingface_hub` and `numpy`, 
 
 Pick one bounded decision your software currently makes by calling an LLM and parsing the answer. Write down the label set as it actually varies at runtime. Swap the generation step for `choice`, `noul` or `score`, and test it on your own labels. If the model abstains a lot, that's telling you something about your label set.
 
-And run the control we keep running on ourselves: a frozen larger model with a few examples in its prompt. If it beats these, believe that number before you believe ours. We already know of cases where it does — a frozen Qwen3.5-9B reading letter logits scores .931 standard and .595 hard under a rendering we replicated from another published system, above anything we have trained at any size. That's in the deep dive too. What these buy you over it is the interface, the latency and the runtime label space. Not capability.
+And run the control we keep running on ourselves: a frozen larger model with a few examples in its prompt. If it beats these, believe that number before you believe ours. We already know one that does — a frozen Qwen3.5-9B reading letter logits, under a rendering we replicated from another published system, scores .931 on the standard tier, which ties the best checkpoint we have trained at any size, and .595 on the hard tier, which beats all of them. With no decision training at all. That's in the deep dive too. What these two models buy you over it is the interface, the latency and the runtime label space. Not capability.
 
 ## Category context
 
@@ -175,4 +192,4 @@ What's ours is the rest of the stack being inspectable, and a set of published n
 
 Where we actually stand: we are not a ranked leaderboard entry, we have run the public subset only, and several entries on that board are ahead of us on the hard tier. Our training code is not public yet, which is a weaker position on inspectability than at least one competitor already holds. Those are the two things to fix next, and neither is a research problem.
 
-Next: a calibration objective aimed at the hard tier, generator work on the composition families, a Qwen3.5 port already in progress, training-code release, and `typical-large` if the 14B clears its own bar.
+Next, in the order we think it matters: retrain Small and Medium on the facts-first corpus, which the 2×2 says is worth 8–11 points on long states and is larger than any other effect currently on our table; release the training code; then a calibration objective aimed at the hard tier and generator work on the composition families. A Qwen3.5 port is already running. There is no `typical-large` — the 14B missed its bar, and the bar needs restating on a lower confidence bound before it gates anything again.
