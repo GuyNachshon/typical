@@ -56,7 +56,7 @@ for r in runs:
     safe = re.sub(r"[^A-Za-z0-9_.-]", "_", r.name)
     (OUT / f"{safe}.json").write_text(json.dumps(doc, separators=(",", ":")))
     index.append({"run": r.name, "file": f"{safe}.json", "state": r.state, "created": str(r.created_at),
-                  "backbone": cfg.get("backbone"), "steps": cfg.get("steps"), "keys": sorted(series.keys()),
+                  "backbone": cfg.get("backbone"), "steps": cfg.get("steps"), "keys": sorted(k for k in series if k == "train/loss" or k.startswith("val") or k.startswith("eval/"))[:12],
                   "final_loss": series.get("train/loss", [[None, None]])[-1][1]})
     print(f"{r.name:32s} {len(series)} keys  loss points {len(series.get('train/loss', []))}")
 

@@ -176,6 +176,17 @@ and controls run rather than scale (decision log below). typical-medium (4B) use
 `--grad_accum 4` (releases/typical-medium.md). Final val NLL 0.376, temperature T = 1.124,
 null_offset 0.0 (typical-small; fit post-hoc on the val split, applied at eval).
 
+### Training curves
+
+Looking at: training loss and validation NLL against step for the runs logged to W&B, selectable
+by size and recipe.
+
+```chart curves
+```
+
+Takeaway: the released models are twelve thousand steps at batch 64, and the failed runs are
+visible as curves rather than as footnotes.
+
 ### Cost, where REPORT states it
 
 typical-small (`ts1b`): ~$12 of H100 time, plus ~$10 lost to a routing bug caught and fixed mid-run

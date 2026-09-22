@@ -178,6 +178,12 @@ six days (2026-09-16 → 09-21), most under $20 of H100 time. The line moves bec
 and controls run rather than scale (decision log below). typical-medium (4B) uses the same recipe on <code>Qwen3-4B-Base</code>, tap 26/36, effective batch 64 via
 <code>--grad_accum 4</code> (releases/typical-medium.md). Final val NLL 0.376, temperature T = 1.124,
 null_offset 0.0 (typical-small; fit post-hoc on the val split, applied at eval).</p>
+<h3 class="t-feature" id="training-curves">Training curves</h3>
+<p>Looking at: training loss and validation NLL against step for the runs logged to W&amp;B, selectable
+by size and recipe.</p></div>
+<div class="media" style="padding:30px"><div class="chart" id="chart-curves" data-chart="curves"></div></div>
+<div class="prose"><p>Takeaway: the released models are twelve thousand steps at batch 64, and the failed runs are
+visible as curves rather than as footnotes.</p>
 <h3 class="t-feature" id="cost-where-report-states-it">Cost, where REPORT states it</h3>
 <p>typical-small (<code>ts1b</code>): ~$12 of H100 time, plus ~$10 lost to a routing bug caught and fixed mid-run
 (<a href="https://huggingface.co/OzLabs/typical-small">REPORT §3ae</a>). typical-medium (<code>tm1b</code>): ~$15, plus ~$8

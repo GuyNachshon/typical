@@ -83,6 +83,12 @@
 .trace-panel { background: var(--color-lgray); border-radius: var(--radius-card); padding: 24px; }
 .trace-text { overflow-wrap: anywhere; }
 
+/* P5 training-curve explorer: pinned-run chips (click = unpin) + unpinned browse list
+   (click = pin) — same .btn.ghost, distinguished only by aria-pressed like every other seg. */
+.curve-legend, .curve-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.curve-chip[aria-pressed="true"] { background: var(--color-off); color: var(--color-warm); border-color: var(--color-off); }
+.curve-list .btn { font-weight: 400; }
+
 @media (max-width: 48rem) {
   .explorable-row { flex-direction: column; align-items: stretch; }
   .seg { width: 100%; }

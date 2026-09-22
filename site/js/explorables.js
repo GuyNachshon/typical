@@ -20,14 +20,12 @@ function svgEl(tag, attrs = {}) {
   return n;
 }
 
-async function loadJSON(path) {
-  try {
-    const res = await fetch(path);
-    if (res.ok) return await res.json();
-  } catch {
-    // static file:// serving without a data/ dir - explorable renders its error state below
+const _jsonCache = new Map(); // path -> Promise<data|null> - P4 and P5 both need runs-index.json etc; fetch once
+function loadJSON(path) {
+  if (!_jsonCache.has(path)) {
+    _jsonCache.set(path, fetch(path).then((res) => (res.ok ? res.json() : null)).catch(() => null));
   }
-  return null;
+  return _jsonCache.get(path);
 }
 
 function skeleton(el, path) {
@@ -623,13 +621,225 @@ async function mountRunExplorer() {
   render();
 }
 
+// ============================================================================
+// P5 — training-curve explorer (size x recipe filters, pin/unpin legend, lazy per-run fetch)
+// ============================================================================
+const SIZES = ['1.7B', '4B', '8B', '14B'];
+function sizeOf(backbone) {
+  for (const s of SIZES) if (backbone && backbone.includes(s)) return s;
+  return 'other';
+}
+function recipeOf(name) {
+  if (/^(joint_|e3)/.test(name)) return 'energy';
+  if (/^nc_/.test(name)) return 'native';
+  if (/^ladder_/.test(name)) return 'ladder';
+  if (/^(ts1b|tm1b|r1_)/.test(name)) return 'release';
+  return 'other';
+}
+const RECIPES = ['energy', 'native', 'ladder', 'release', 'other'];
+const CURVE_RELEASED = new Set(['ts1b', 'tm1b']); // the two frozen checkpoints — off-black; everything else pinned is mid-gray
+
+async function mountCurves() {
+  const el = document.getElementById('chart-curves');
+  if (!el) return;
+  skeleton(el, 'data/curves/index.json');
+  const [idx, runsIdx] = await Promise.all([loadJSON('data/curves/index.json'), loadJSON('data/runs-index.json')]);
+  if (!idx) return missing(el, 'data/curves/index.json');
+
+  const runs = idx.runs.map((r) => ({ ...r, size: sizeOf(r.backbone), recipe: recipeOf(r.run) }));
+  const byName = new Map(runs.map((r) => [r.run, r]));
+  const noCurve = runsIdx ? runsIdx.runs.filter((r) => !byName.has(r.name)).map((r) => r.name) : [];
+
+  const state = {
+    size: 'all', recipe: 'all',
+    pinned: ['ts1b', 'tm1b', 'ladder_4b', 'ladder_8b', 'ladder_14b'].filter((n) => byName.has(n)),
+    cache: new Map(), // run name -> fetched curve JSON
+  };
+
+  el.innerHTML = '';
+  const root = document.createElement('div');
+  root.className = 'explorable explorable-curves';
+  el.appendChild(root);
+
+  const filterRow = document.createElement('div');
+  filterRow.className = 'explorable-row';
+  filterRow.append(
+    seg([{ value: 'all', label: 'all sizes' }, ...SIZES.map((v) => ({ value: v, label: v }))], state.size, (v) => { state.size = v; renderBrowse(); }, 'backbone size'),
+    seg([{ value: 'all', label: 'all recipes' }, ...RECIPES.map((v) => ({ value: v, label: v }))], state.recipe, (v) => { state.recipe = v; renderBrowse(); }, 'recipe tag'),
+  );
+  root.appendChild(filterRow);
+
+  const chartHost = document.createElement('div');
+  const legendHost = document.createElement('div');
+  legendHost.className = 'curve-legend';
+  const browseHost = document.createElement('div');
+  browseHost.className = 'curve-list';
+  const sourceHost = document.createElement('div');
+  const lineKey = document.createElement('p');
+  lineKey.className = 't-mono muted explorable-note';
+  lineKey.textContent = 'faint thin line = train/loss · bold line = the run\'s first val/* series · ink = released (ts1b/tm1b) · mid-gray = everything else';
+  root.append(chartHost, lineKey, legendHost, browseHost, sourceHost);
+
+  const noCurveNote = document.createElement('p');
+  noCurveNote.className = 'note';
+  noCurveNote.textContent = noCurve.length
+    ? `${noCurve.length} runs have results.json only, no exported curve: ${noCurve.slice(0, 12).join(', ')}${noCurve.length > 12 ? ', …' : ''}`
+    : '';
+  root.appendChild(noCurveNote);
+
+  async function ensureLoaded(name) {
+    if (state.cache.has(name)) return state.cache.get(name);
+    const d = await loadJSON(`data/curves/${byName.get(name).file}`);
+    state.cache.set(name, d);
+    return d;
+  }
+
+  function firstValKey(series) {
+    return Object.keys(series).find((k) => k.startsWith('val')) || null;
+  }
+
+  async function togglePin(name) {
+    if (state.pinned.includes(name)) {
+      state.pinned = state.pinned.filter((n) => n !== name);
+    } else {
+      state.pinned.push(name);
+      await ensureLoaded(name);
+    }
+    render();
+  }
+
+  function renderBrowse() {
+    browseHost.innerHTML = '';
+    const candidates = runs.filter((r) => (state.size === 'all' || r.size === state.size) && (state.recipe === 'all' || r.recipe === state.recipe) && !state.pinned.includes(r.run));
+    candidates.forEach((r) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn ghost';
+      b.textContent = `+ ${r.run}`;
+      b.title = `${r.backbone} · ${r.steps} steps · ${r.state}`;
+      b.addEventListener('click', async () => { await togglePin(r.run); });
+      browseHost.appendChild(b);
+    });
+    if (!candidates.length) browseHost.appendChild(p('no unpinned runs match this filter', 'note'));
+  }
+
+  function render() {
+    chartHost.innerHTML = '';
+    legendHost.innerHTML = '';
+    const loaded = state.pinned.map((n) => state.cache.get(n)).filter(Boolean);
+    if (!loaded.length) { chartHost.appendChild(p('pin a run to plot it', 'note')); renderBrowse(); return; }
+
+    const lines = []; // {run, series, label, dash, color, points:[[step,v]]}
+    loaded.forEach((d) => {
+      const ink = CURVE_RELEASED.has(d.run) ? INK : MID;
+      const trainLoss = d.series['train/loss'];
+      if (trainLoss) lines.push({ run: d.run, key: 'train/loss', points: trainLoss, color: ink, dash: 'none', width: 1, opacity: 0.45 });
+      const valKey = firstValKey(d.series);
+      if (valKey) lines.push({ run: d.run, key: valKey, points: d.series[valKey], color: ink, dash: 'none', width: 2.5, opacity: 1 });
+    });
+
+    const w = 1040, h = 400, mm = { t: 20, r: 24, b: 44, l: 50 };
+    const iw = w - mm.l - mm.r, ih = h - mm.t - mm.b;
+    const allSteps = lines.flatMap((l) => l.points.map((pt) => pt[0]));
+    const allVals = lines.flatMap((l) => l.points.map((pt) => pt[1]));
+    const xMax = Math.max(...allSteps, 1);
+    const yMax = Math.max(...allVals, 1) * 1.05;
+    const x = scale([0, xMax], [0, iw]);
+    const y = scale([0, yMax], [ih, 0]);
+    const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, width: '100%', role: 'img' });
+    const container = document.createElement('div');
+    container.style.background = '#fff';
+    container.style.maxWidth = `${w}px`;
+    container.appendChild(svg);
+    const g = svgEl('g', { transform: `translate(${mm.l},${mm.t})` });
+    svg.appendChild(g);
+
+    niceTicks(0, yMax, 5).forEach((t) => {
+      g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(t), y2: y(t), stroke: STEEL, 'stroke-dasharray': '2,3' }));
+      g.appendChild(svgEl('text', { x: -8, y: y(t) + 3, fill: MID, 'font-size': 12, 'font-family': 'var(--font-mono)', 'text-anchor': 'end' })).textContent = fmtNum(t);
+    });
+    niceTicks(0, xMax, 6).forEach((t) => {
+      g.appendChild(svgEl('text', { x: x(t), y: ih + 18, fill: MID, 'font-size': 12, 'font-family': 'var(--font-mono)', 'text-anchor': 'middle' })).textContent = fmtNum(t);
+    });
+    g.appendChild(svgEl('line', { x1: 0, x2: 0, y1: 0, y2: ih, stroke: STEEL }));
+    g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: ih, y2: ih, stroke: STEEL }));
+
+    lines.forEach((l) => {
+      const pts = l.points.map((pt) => `${x(pt[0])},${y(pt[1])}`).join(' ');
+      const attrs = { points: pts, fill: 'none', stroke: l.color, 'stroke-width': l.width ?? 2, 'stroke-opacity': l.opacity ?? 1 };
+      if (l.dash !== 'none') attrs['stroke-dasharray'] = l.dash;
+      g.appendChild(svgEl('polyline', attrs));
+    });
+
+    // hover crosshair: nearest point per line to the pointer's step
+    const hoverLabel = document.createElement('div');
+    hoverLabel.className = 'chart-hover-label';
+    hoverLabel.hidden = true;
+    container.style.position = 'relative';
+    container.appendChild(hoverLabel);
+    const overlay = svgEl('rect', { x: 0, y: 0, width: iw, height: ih, fill: 'transparent' });
+    const crosshair = svgEl('line', { x1: 0, x2: 0, y1: 0, y2: ih, stroke: STEEL, 'stroke-dasharray': '2,2' });
+    crosshair.style.display = 'none';
+    g.append(crosshair, overlay);
+    overlay.addEventListener('mousemove', (ev) => {
+      const rect = overlay.getBoundingClientRect();
+      const px = ev.clientX - rect.left;
+      const step = (px / rect.width) * xMax;
+      crosshair.style.display = '';
+      crosshair.setAttribute('x1', x(step));
+      crosshair.setAttribute('x2', x(step));
+      const rows = lines.map((l) => {
+        let nearest = l.points[0];
+        let best = Infinity;
+        for (const pt of l.points) { const d = Math.abs(pt[0] - step); if (d < best) { best = d; nearest = pt; } }
+        return `${l.run} ${l.key.replace('train/', '').replace('val/', '')}: ${nearest[1].toFixed(3)} @ step ${nearest[0]}`;
+      });
+      hoverLabel.hidden = false;
+      hoverLabel.style.right = 'auto';
+      hoverLabel.style.left = `${mm.l + x(step) + 8}px`;
+      hoverLabel.style.top = `${mm.t}px`;
+      hoverLabel.innerHTML = rows.join('<br>');
+    });
+    overlay.addEventListener('mouseleave', () => { hoverLabel.hidden = true; crosshair.style.display = 'none'; });
+
+    chartHost.appendChild(container);
+
+    state.pinned.forEach((name) => {
+      const d = state.cache.get(name);
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'btn ghost curve-chip';
+      chip.setAttribute('aria-pressed', 'true');
+      const meta = d ? `${d.config.steps} steps, bs ${d.config.bs}` : 'loading…';
+      chip.textContent = `${name} (${meta})`;
+      chip.title = 'click to unpin';
+      chip.addEventListener('click', async () => { await togglePin(name); });
+      legendHost.appendChild(chip);
+    });
+
+    sourceHost.innerHTML = '';
+    const srcLines = [...new Set(loaded.map((d) => d.source))];
+    sourceLine(sourceHost, `site/data/curves/index.json + ${srcLines.join(', ')}`);
+    renderBrowse();
+  }
+
+  function p(str, cls = '') {
+    const n = document.createElement('p');
+    if (cls) n.className = cls;
+    n.textContent = str;
+    return n;
+  }
+
+  await Promise.all(state.pinned.map(ensureLoaded));
+  render();
+}
+
 export function mountExplorables() {
   mountLatency();
   mountCalibration();
   mountTrace();
   mountRunExplorer();
+  mountCurves();
 }
-
-if (typeof window !== 'undefined') {
-  window.addEventListener('DOMContentLoaded', mountExplorables);
-}
+// research.js is the page's one bootstrap entry (its own DOMContentLoaded handler already
+// calls mountExplorables()) — no second listener here, or every fetch above runs twice.
