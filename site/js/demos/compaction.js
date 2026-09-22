@@ -13,6 +13,8 @@
 //     VERB_Q (exact) = "Does the result contain source code, a diff, or test output? Answer
 //       yes if it does; otherwise answer no."
 
+import { dotRow } from './rowdots.js';
+
 const KEEP_Q = "Is this tool call's result relevant to the task? Answer yes if the result is about the file, function, or test named in the task; otherwise answer no.";
 const VERB_Q = 'Does the result contain source code, a diff, or test output? Answer yes if it does; otherwise answer no.';
 
@@ -104,15 +106,10 @@ export async function mount(host, ctx) {
   scored.forEach(({ call, pKeep }, rank) => {
     const r = el('div', 'ex-row');
     r.appendChild(el('span', 'compaction-index', String(rank + 1).padStart(2, '0')));
-    const text = el('span', 'compaction-call', `${call.tool} ${call.args}`);
-    text.title = `${call.tool} ${call.args}`;
-    r.appendChild(text);
-    const bar = el('span', 'ex-bar');
-    const fill = el('span', 'ex-bar-fill' + (call.keep ? ' is-winner' : ''));
-    fill.style.width = `${(pKeep * 100).toFixed(1)}%`;
-    bar.appendChild(fill);
-    r.appendChild(bar);
-    r.appendChild(el('span', 'ex-num', pKeep.toFixed(2)));
+    const dr = dotRow(`${call.tool} ${call.args}`, { dots: 16, title: `${call.tool} ${call.args}` });
+    dr.el.style.flex = '1 1 auto';
+    dr.update(pKeep, { isWinner: call.keep });
+    r.appendChild(dr.el);
     r.appendChild(el('span', 'compaction-mark ' + (call.keep ? 'keep' : 'drop'), call.keep ? 'KEEP' : 'DROP'));
     register.appendChild(r);
   });

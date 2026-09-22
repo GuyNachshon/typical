@@ -4,6 +4,7 @@
 // ponytail: skipped hover-highlight-the-relevant-sentence (spec allows skipping it "if
 // cheap, else skip" - precise sentence attribution per question isn't cheap here); add a
 // per-question sentence-index field to data/demos/doc20.json if that lands later.
+import { dotRow } from './rowdots.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -50,14 +51,9 @@ export async function mount(host, ctx) {
   host.appendChild(wrap);
 
   const rows = data.questions.map((question) => {
-    const row = el('div', 'ex-row');
-    const q = el('span', 'doc20-q ex-row-text', question.display);
-    const a = el('span', 'doc20-a', '');
-    const mark = el('span', 'doc20-mark', '·');
-    const p = el('span', 'ex-num', '');
-    row.append(q, a, mark, p);
-    register.appendChild(row);
-    return { row, mark, a, p };
+    const r = dotRow(question.display, { dots: 14, title: question.display });
+    register.appendChild(r.el);
+    return r;
   });
 
   const allQueries = data.questions.map((question) => ({ type: question.type, question: question.query, labels: question.labels }));
@@ -73,13 +69,15 @@ export async function mount(host, ctx) {
   let correct = 0;
   full.results.forEach((result, i) => {
     const question = data.questions[i];
-    const t = rows[i];
     const hit = isHit(question, result);
     if (hit) correct += 1;
     const p = result.probs[result.argmax] ?? 0;
-    t.mark.className = 'doc20-mark ' + (hit ? 'hit' : 'miss');
-    t.a.textContent = result.argmax;
-    t.p.textContent = p.toFixed(2);
+    // champagne (isWinner) marks a hit, not just p >= .5 - the mark this exhibit cares about
+    // is "matched the gold answer", carried over from the old hit/miss dot.
+    rows[i].update(p, { isWinner: hit });
+    const label = rows[i].el.querySelector('.dotbars-label');
+    label.textContent = `${question.display} — ${result.argmax}`;
+    label.title = label.textContent;
   });
 
   function statPair(target, seconds, label) {

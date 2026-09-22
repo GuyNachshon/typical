@@ -1,12 +1,13 @@
 // 04 SQL - `SELECT * FROM tickets WHERE typical(body, '<condition>')`. 129 rows, one Noul
-// query each. Atoms register: query line, ghost-link conditions, hairline rows with a 2px
-// cream bar (champagne once it's a match) + tabular numeral. The scan animates only by the
-// rows filling in as they're decided - no glow (see exhibits.css / js/ink.js).
+// query each. Atoms register: query line, ghost-link conditions, each row a dot-strip
+// readout (js/demos/rowdots.js) - champagne dots once it's a match. The scan animates only
+// by the rows filling in as they're decided - no glow.
 //
 // TEMPLATE (mirrored verbatim in scripts/record_data_demos.py's sql_question()):
 //   state = row text, verbatim
 //   query = {type:'noul', question:`Does this row satisfy the condition: ${condition}? Answer
 //            yes if ${criterion}; otherwise answer no.`, labels:['no','yes']}
+import { dotRow } from './rowdots.js';
 
 function sqlQuestion(condition, criterion) {
   return `Does this row satisfy the condition: ${condition}? Answer yes if ${criterion}; otherwise answer no.`;
@@ -69,31 +70,14 @@ export async function mount(el, ctx) {
     "129 rows, one forward pass each, no embeddings. Four conditions score precision 1.00 and recall .69–1.00 against hand labels. It keys on the words in the rule: 'charged once' lit up 'duplicate charge'.";
   el.appendChild(caption);
 
-  const rowEls = pool.rows.map((row) => {
-    const div = document.createElement('div');
-    div.className = 'ex-row';
-    const text = document.createElement('span');
-    text.className = 'ex-row-text';
-    text.textContent = row.text;
-    text.title = row.text;
-    const bar = document.createElement('span');
-    bar.className = 'ex-bar';
-    const fill = document.createElement('span');
-    fill.className = 'ex-bar-fill';
-    bar.appendChild(fill);
-    const p = document.createElement('span');
-    p.className = 'ex-num';
-    p.textContent = '—';
-    div.append(text, bar, p);
-    return { div, fill, p };
-  });
+  const rowEls = pool.rows.map((row) => dotRow(row.text, { dots: 16, title: row.text }));
 
   // 12 rows shown by default (no scroll box); "Show all N →" renders the rest inline.
   let order = pool.rows.map((_, i) => i);
   let expanded = false;
   function renderVisible() {
     register.innerHTML = '';
-    (expanded ? order : order.slice(0, VISIBLE_ROWS)).forEach((i) => register.appendChild(rowEls[i].div));
+    (expanded ? order : order.slice(0, VISIBLE_ROWS)).forEach((i) => register.appendChild(rowEls[i].el));
     showMore.hidden = expanded || pool.rows.length <= VISIBLE_ROWS;
   }
   showMore.addEventListener('click', () => {
@@ -120,15 +104,12 @@ export async function mount(el, ctx) {
 
     for (let i = 0; i < pool.rows.length; i++) {
       const row = pool.rows[i];
-      const { fill, p: pEl } = rowEls[i];
       const out = await ctx.decide(row.text, [{ type: 'noul', question, labels: ['no', 'yes'] }]);
       const p = out?.results?.[0]?.probs?.yes ?? 0;
       row._p = p;
       const predicted = p > 0.5;
       const gold = row.gold === cond.id;
-      fill.classList.toggle('is-winner', predicted);
-      fill.style.width = `${(p * 100).toFixed(1)}%`;
-      pEl.textContent = p.toFixed(2);
+      rowEls[i].update(p, { isWinner: predicted });
       if (predicted && gold) tp++;
       else if (predicted && !gold) fp++;
       else if (!predicted && gold) fn++;

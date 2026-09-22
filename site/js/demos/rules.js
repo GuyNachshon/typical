@@ -157,12 +157,12 @@ export async function mount(host, ctx) {
         const word = el('span', 'ex-cell-word', r.argmax);
         word.title = r.argmax;
         const barRow = el('span', 'ex-cell-barrow');
-        const bar = el('span', 'ex-bar ex-bar--sm');
-        const fill = el('span', 'ex-bar-fill');
-        fill.style.width = `${(r.probs[r.argmax] * 100).toFixed(1)}%`;
-        bar.appendChild(fill);
+        const strip = el('span', 'dotbars-strip');
+        const dots = 10;
+        const lit = Math.round(r.probs[r.argmax] * dots);
+        for (let d = 0; d < dots; d++) strip.appendChild(el('i', d < lit ? 'on' : null));
         const num = el('span', 'ex-num', r.probs[r.argmax].toFixed(2));
-        barRow.append(bar, num);
+        barRow.append(strip, num);
         cell.append(word, barRow);
         if (i === 1 && flipped) cell.appendChild(el('span', 'ex-tag ex-tag--flip', 'FLIP'));
         td.appendChild(cell);

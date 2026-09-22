@@ -4,7 +4,7 @@
 // FG_ACCENT / accentFor below), never used as a full-surface fill.
 const NS = 'http://www.w3.org/2000/svg';
 const DIM = '#66635f'; // ember ash
-const RULE = 'rgba(255,247,221,0.14)';
+const RULE = 'rgba(255,247,221,0.12)'; // --hair-soft
 const FG = '#fff7dd'; // candlelight cream
 const ACCENT = '#c8ad86'; // champagne gold — released models' primary series only
 
@@ -40,6 +40,25 @@ function markerEl(shape, cx, cy, r, fill) {
   return svgEl('circle', { cx, cy, r, fill });
 }
 
+// A "bar" is a column of stacked 7px dots (3px gaps) growing up from the baseline - the
+// value is how many dots are lit, not a continuous fill height (no opacity-as-magnitude
+// gradients; the dot system quantizes). `fill` picks cream (default) vs champagne for an
+// emphasised series.
+function dotColumn(g, cx, baseline, top, { dot = 7, gap = 3, fill = FG, opacity = 0.85 } = {}) {
+  const step = dot + gap;
+  for (let y = baseline - dot; y >= top - 0.5; y -= step) {
+    g.appendChild(svgEl('rect', { x: cx - dot / 2, y, width: dot, height: dot, rx: 1.5, fill, 'fill-opacity': opacity }));
+  }
+}
+
+// Horizontal counterpart (hbarFloor's rows) - dots grow rightward from the axis.
+function dotRowMeter(g, y0, left, right, { dot = 7, gap = 3, fill = FG, opacity = 0.85 } = {}) {
+  const step = dot + gap;
+  for (let x = left; x <= right - dot + 0.5; x += step) {
+    g.appendChild(svgEl('rect', { x, y: y0, width: dot, height: dot, rx: 1.5, fill, 'fill-opacity': opacity }));
+  }
+}
+
 function svgEl(tag, attrs = {}) {
   const n = document.createElementNS(NS, tag);
   for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
@@ -67,19 +86,21 @@ function baseSvg(container, w, h, titleStr) {
 // Default tick formatter: at most 2 decimals, no float noise.
 export const fmtNum = (v) => (Number.isInteger(v) ? String(v) : Number(v.toFixed(2)).toString());
 
-// Legend swatch is a dash-pattern preview (currentColor - themed by .chart-legend CSS),
-// not a colour key - matches how the series are actually told apart on the chart.
+// Legend key is an 8px dot in the series' own marker shape (still told apart by shape, not
+// colour, for series that share cream) - the same dot vocabulary as the chart itself.
 function legend(container, series) {
   if (series.length < 2) return;
   const leg = document.createElement('div');
   leg.className = 'chart-legend';
-  leg.innerHTML = series
-    .map((s, i) => {
-      const { dash } = seriesStyle(i);
-      const dashAttr = dash === 'none' ? '' : ` stroke-dasharray="${dash}"`;
-      return `<span class="legend-key"><svg class="legend-swatch" width="18" height="10" viewBox="0 0 18 10"><line x1="0" y1="5" x2="18" y2="5" stroke="currentColor" stroke-width="2"${dashAttr} /></svg>${s.label}</span>`;
-    })
-    .join('');
+  series.forEach((s, i) => {
+    const { shape } = seriesStyle(i);
+    const key = document.createElement('span');
+    key.className = 'legend-key';
+    const swatch = svgEl('svg', { class: 'legend-swatch', width: 8, height: 8, viewBox: '0 0 8 8' });
+    swatch.appendChild(markerEl(shape, 4, 4, 3, accentFor(s.label)));
+    key.append(swatch, document.createTextNode(s.label));
+    leg.appendChild(key);
+  });
   container.appendChild(leg);
 }
 
@@ -122,7 +143,7 @@ function axisPair(g, iw, ih) {
 
 function gridRow(g, iw, y, label, fmt) {
   g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y, y2: y, stroke: RULE, 'stroke-dasharray': '2,3' }));
-  g.appendChild(svgText(-8, y + 3, fmt(label), { fill: DIM, 'text-anchor': 'end' }));
+  g.appendChild(svgText(-8, y + 3, fmt(label), { fill: DIM, 'font-size': 10, 'text-anchor': 'end' }));
 }
 
 const M = { t: 20, r: 24, b: 50, l: 56 };
@@ -149,25 +170,22 @@ export function barChart(container, { series, yLabel = '', fmt = fmtNum, title =
   cats.forEach((cat, ci) => {
     series.forEach((s, si) => {
       const v = s.values[ci]?.y ?? 0;
+      const bw = barW * 0.85;
       const bx = ci * groupW + barW * (si + 0.5);
       const by = y(v);
-      const rect = svgEl('rect', {
-        x: bx,
-        y: by,
-        width: barW * 0.85,
-        height: Math.max(0, ih - by),
-        fill: FG,
-        'fill-opacity': (0.3 + 0.6 * (yMax ? v / yMax : 0)).toFixed(2),
-      });
+      dotColumn(g, bx + bw / 2, ih, by, { fill: accentFor(s.label) });
+      // transparent hit area under the dots keeps the hover title working over the bar's
+      // full footprint, not just the lit dots
+      const hit = svgEl('rect', { x: bx, y: by, width: bw, height: Math.max(0, ih - by), fill: 'transparent' });
       const ttl = svgEl('title');
       ttl.textContent = `${s.label} · ${cat}: ${fmt(v)}`;
-      rect.appendChild(ttl);
-      g.appendChild(rect);
+      hit.appendChild(ttl);
+      g.appendChild(hit);
     });
-    g.appendChild(svgText(ci * groupW + groupW / 2, ih + 18, String(cat), { fill: DIM, 'text-anchor': 'middle' }));
+    g.appendChild(svgText(ci * groupW + groupW / 2, ih + 18, String(cat), { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }));
   });
 
-  if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: DIM }));
+  if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: DIM, 'font-size': 10 }));
   legend(container, series);
   return svg;
 }
@@ -190,7 +208,7 @@ export function lineChart(container, { series, xLabel = '', yLabel = '', logX = 
   niceTicks(0, yMax, 5).forEach((t) => gridRow(g, iw, y(t), t, fmt));
   // log-x: label the actual data points (K = 2, 32, 256), not interpolated nonsense
   const xTicks = logX ? [...new Set(allX)].sort((a, b) => a - b) : niceTicks(xMin, xMax, 5);
-  xTicks.forEach((t) => g.appendChild(svgText(x(t), ih + 18, fmt(t), { fill: DIM, 'text-anchor': 'middle' })));
+  xTicks.forEach((t) => g.appendChild(svgText(x(t), ih + 18, fmt(t), { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' })));
   axisPair(g, iw, ih);
 
   series.forEach((s, si) => {
@@ -201,7 +219,7 @@ export function lineChart(container, { series, xLabel = '', yLabel = '', logX = 
     if (dash !== 'none') lineAttrs['stroke-dasharray'] = dash;
     g.appendChild(svgEl('polyline', lineAttrs));
     s.values.forEach((v) => {
-      const dot = markerEl(shape, x(v.x), y(v.y), 3.5, color);
+      const dot = markerEl(shape, x(v.x), y(v.y), 4.5, color);
       const ttl = svgEl('title');
       ttl.textContent = `${s.label}: ${fmt(v.x)}, ${fmt(v.y)}`;
       dot.appendChild(ttl);
@@ -209,8 +227,8 @@ export function lineChart(container, { series, xLabel = '', yLabel = '', logX = 
     });
   });
 
-  if (xLabel) g.appendChild(svgText(iw / 2, ih + 38, xLabel, { fill: DIM, 'text-anchor': 'middle' }));
-  if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: DIM }));
+  if (xLabel) g.appendChild(svgText(iw / 2, ih + 38, xLabel, { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }));
+  if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: DIM, 'font-size': 10 }));
   legend(container, series);
   return svg;
 }
@@ -232,8 +250,8 @@ export function reliability(container, { bins, ece, title = 'Reliability' }) {
   [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
     g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(t), y2: y(t), stroke: RULE, 'stroke-dasharray': '2,3' }));
     g.appendChild(svgEl('line', { x1: x(t), x2: x(t), y1: 0, y2: ih, stroke: RULE, 'stroke-dasharray': '2,3' }));
-    g.appendChild(svgText(-8, y(t) + 3, t.toFixed(2), { fill: DIM, 'text-anchor': 'end' }));
-    g.appendChild(svgText(x(t), ih + 16, t.toFixed(2), { fill: DIM, 'text-anchor': 'middle' }));
+    g.appendChild(svgText(-8, y(t) + 3, t.toFixed(2), { fill: DIM, 'font-size': 10, 'text-anchor': 'end' }));
+    g.appendChild(svgText(x(t), ih + 16, t.toFixed(2), { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }));
   });
   g.appendChild(svgEl('line', { x1: x(0), y1: y(0), x2: x(1), y2: y(1), stroke: DIM, 'stroke-dasharray': '4,3' }));
 
@@ -243,18 +261,18 @@ export function reliability(container, { bins, ece, title = 'Reliability' }) {
     const bw = slot * 0.8 * (b.n / maxN || 0.05);
     const bx = i * slot + (slot - bw) / 2;
     const by = y(b.accuracy);
-    // ink density stands in for the old confidence colour ramp - denser fill = more confident
-    const rect = svgEl('rect', { x: bx, y: by, width: bw, height: Math.max(0, ih - by), fill: FG, 'fill-opacity': (0.25 + 0.65 * b.mean_confidence).toFixed(2) });
+    dotColumn(g, i * slot + slot / 2, ih, by);
+    const hit = svgEl('rect', { x: bx, y: by, width: bw, height: Math.max(0, ih - by), fill: 'transparent' });
     const ttl = svgEl('title');
     ttl.textContent = `[${b.lo.toFixed(2)}–${b.hi.toFixed(2)}] n=${b.n} acc=${b.accuracy.toFixed(3)} conf=${b.mean_confidence.toFixed(3)}`;
-    rect.appendChild(ttl);
-    g.appendChild(rect);
+    hit.appendChild(ttl);
+    g.appendChild(hit);
     if (b.n > 0) g.appendChild(svgText(i * slot + slot / 2, by - 4, `n=${b.n}`, { fill: DIM, 'text-anchor': 'middle', 'font-size': 10 }));
   });
 
   axisPair(g, iw, ih);
-  g.appendChild(svgText(iw / 2, ih + 36, 'confidence', { fill: DIM, 'text-anchor': 'middle' }));
-  g.appendChild(svgText(-mm.l + 4, -8, 'accuracy', { fill: DIM }));
+  g.appendChild(svgText(iw / 2, ih + 36, 'confidence', { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }));
+  g.appendChild(svgText(-mm.l + 4, -8, 'accuracy', { fill: DIM, 'font-size': 10 }));
   return svg;
 }
 
@@ -273,7 +291,7 @@ export function ladder(container, { points, xLabel = 'latency (ms)', yLabel = 'a
 
   niceTicks(Math.min(...ys, ...refYs) * 0.9, Math.max(...ys) * 1.1, 6).forEach((t) => gridRow(g, iw, y(t), t, fmt));
   niceTicks(Math.min(...xs) * 0.9, Math.max(...xs) * 1.1, 5).forEach((t) =>
-    g.appendChild(svgText(x(t), ih + 18, fmt(t), { fill: DIM, 'text-anchor': 'middle' }))
+    g.appendChild(svgText(x(t), ih + 18, fmt(t), { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }))
   );
   axisPair(g, iw, ih);
 
@@ -300,8 +318,8 @@ export function ladder(container, { points, xLabel = 'latency (ms)', yLabel = 'a
     if (rl.label) g.appendChild(svgText(iw - 4, y(rl.y) - 5, rl.label, { fill: DIM, 'text-anchor': 'end', 'font-size': 10 }));
   });
 
-  if (xLabel) g.appendChild(svgText(iw / 2, ih + 38, xLabel, { fill: DIM, 'text-anchor': 'middle' }));
-  if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: DIM }));
+  if (xLabel) g.appendChild(svgText(iw / 2, ih + 38, xLabel, { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }));
+  if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: DIM, 'font-size': 10 }));
   return svg;
 }
 
@@ -370,7 +388,7 @@ export function hbarFloor(container, { rows, xLabel = 'accuracy', title = '' }) 
 
   [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
     g.appendChild(svgEl('line', { x1: x(t), x2: x(t), y1: 0, y2: rows.length * rowH, stroke: RULE, 'stroke-dasharray': '2,3' }));
-    g.appendChild(svgText(x(t), rows.length * rowH + 16, t.toFixed(2), { fill: DIM, 'text-anchor': 'middle' }));
+    g.appendChild(svgText(x(t), rows.length * rowH + 16, t.toFixed(2), { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }));
   });
 
   rows.forEach((row, i) => {
@@ -383,11 +401,13 @@ export function hbarFloor(container, { rows, xLabel = 'accuracy', title = '' }) 
     ].forEach(({ key, dy, label, opacity }) => {
       const v = row[key];
       if (v == null) return;
-      const rect = svgEl('rect', { x: 0, y: y0 + dy, width: Math.max(0, x(v)), height: barH, fill: FG, 'fill-opacity': opacity });
+      const vw = Math.max(0, x(v));
+      dotRowMeter(g, y0 + dy + (barH - 7) / 2, 0, vw, { opacity });
+      const hit = svgEl('rect', { x: 0, y: y0 + dy, width: vw, height: barH, fill: 'transparent' });
       const ttl = svgEl('title');
       ttl.textContent = `${label} · ${row.label}: ${v.toFixed(3)}${row.floor != null ? ` (floor ${row.floor.toFixed(3)})` : ''}`;
-      rect.appendChild(ttl);
-      g.appendChild(rect);
+      hit.appendChild(ttl);
+      g.appendChild(hit);
     });
     if (row.floor != null) {
       const fx = x(row.floor);
@@ -399,7 +419,7 @@ export function hbarFloor(container, { rows, xLabel = 'accuracy', title = '' }) 
     }
   });
 
-  if (xLabel) g.appendChild(svgText(iw / 2, rows.length * rowH + 34, xLabel, { fill: DIM, 'text-anchor': 'middle' }));
+  if (xLabel) g.appendChild(svgText(iw / 2, rows.length * rowH + 34, xLabel, { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }));
   const leg = document.createElement('div');
   leg.className = 'chart-legend';
   leg.textContent = 'upper bar = typical-small   ·   lower bar = typical-medium   ·   | tick = floor (majority / constant-prediction baseline)';
@@ -437,11 +457,11 @@ export function timeline(container, { lineage, bugs = [], verdicts = [], title =
 
   [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
     g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(t), y2: y(t), stroke: RULE, 'stroke-dasharray': '2,3' }));
-    g.appendChild(svgText(-8, y(t) + 3, t.toFixed(2), { fill: DIM, 'text-anchor': 'end' }));
+    g.appendChild(svgText(-8, y(t) + 3, t.toFixed(2), { fill: DIM, 'font-size': 10, 'text-anchor': 'end' }));
   });
   // chance baseline
   g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(0.311), y2: y(0.311), stroke: DIM, 'stroke-dasharray': '4,3' }));
-  g.appendChild(svgText(iw - 4, y(0.311) - 5, 'chance (.311)', { fill: DIM, 'text-anchor': 'end' }));
+  g.appendChild(svgText(iw - 4, y(0.311) - 5, 'chance (.311)', { fill: DIM, 'font-size': 10, 'text-anchor': 'end' }));
 
   // lineage line + numbered dots. Same-date points sit at very different x
   // but sometimes close y; rather than fight label collisions inline, each
@@ -496,7 +516,7 @@ export function timeline(container, { lineage, bugs = [], verdicts = [], title =
   g.appendChild(svgText(0, verdictY + 14, 'section verdicts (triangle ticks)', { fill: DIM, 'font-size': 10 }));
 
   axisPair(g, iw, ih);
-  g.appendChild(svgText(-mm.l + 4, -10, 'JevBench standard', { fill: DIM }));
+  g.appendChild(svgText(-mm.l + 4, -10, 'JevBench standard', { fill: DIM, 'font-size': 10 }));
 
   const leg = document.createElement('ol');
   leg.className = 'timeline-legend';

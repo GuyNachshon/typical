@@ -1,9 +1,15 @@
-// research.html bootstrap: mounts the data-mix (donut + corpus bars), held-out/external
-// bars, JevBench-per-family bars, and timeline charts from data/research-*.json, plus a
-// scroll-spy on the left table of contents. No GSAP, no load animation (Atoms: "placed,
-// not kinetic") — charts are js/charts.js as-is: monochrome, series told apart by
-// dash/marker, never colour.
+// research.html bootstrap: the dot-matrix "Research" title, mounts the data-mix (donut +
+// corpus bars), held-out/external bars, JevBench-per-family bars, and timeline charts from
+// data/research-*.json, plus a scroll-spy on the left table of contents. No GSAP, no load
+// animation (Atoms: "placed, not kinetic") — charts are js/charts.js as-is: monochrome,
+// series told apart by dash/marker, never colour.
+import { dotText } from './dots.js';
 import { donut, barChart, hbarFloor, timeline } from './charts.js';
+
+function mountTitle() {
+  const el = document.getElementById('title-dots');
+  if (el) dotText(el, 'RESEARCH', { dot: 14, gap: 5 });
+}
 
 async function loadJSON(path) {
   try {
@@ -116,6 +122,7 @@ function wireToc() {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
+    mountTitle();
     wireToc();
     mountMix();
     mountHeldout();

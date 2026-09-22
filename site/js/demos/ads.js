@@ -18,6 +18,8 @@
 //       criterion is listed; pick the single best match.\n" + "{id}: {desc}" pairs joined by
 //       two spaces
 
+import { dotRow } from './rowdots.js';
+
 const AD_Q =
   "Is this text an advertisement or not? Each option's criterion is listed; pick the single best match.\n" +
   'advertisement: promotes a product, service, or brand so the reader will buy or use it  ' +
@@ -45,15 +47,9 @@ function el(tag, className, text) {
 }
 
 function row(label, p, isWinner) {
-  const r = el('div', 'ex-row');
-  r.appendChild(el('span', 'ex-row-text', label));
-  const bar = el('span', 'ex-bar');
-  const fill = el('span', 'ex-bar-fill' + (isWinner ? ' is-winner' : ''));
-  fill.style.width = `${(p * 100).toFixed(1)}%`;
-  bar.appendChild(fill);
-  r.appendChild(bar);
-  r.appendChild(el('span', 'ex-num', p.toFixed(2)));
-  return r;
+  const r = dotRow(label, { dots: 12 });
+  r.update(p, { isWinner });
+  return r.el;
 }
 
 export async function mount(el0, ctx) {

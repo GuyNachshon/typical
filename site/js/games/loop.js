@@ -3,10 +3,12 @@
 // reskinned here, out of scope), DOM chrome (HUD/buttons/decision strip), model-vs-scripted
 // policy helpers, viewport pausing and keyboard override. Keeps the three renderers from
 // re-deriving the same mount() contract three times. Chrome styles (.gc-*) live in
-// exhibits.css, which reuses the .ex-row/.ex-bar/.ex-ghost kit for the decision strip and
-// policy/restart controls - see the "game chrome" section there.
+// exhibits.css; the decision strip is a dotBars readout (js/dots.js), the take-over hint
+// and MODEL/SCRIPTED/RESTART are .ghost links (style.css) - see the "game chrome" section
+// in exhibits.css.
 // Atoms palette (keys kept so the renderers need no edits): canvas black, cream strokes,
 // champagne for the one emphasised element, ash for muted surfaces.
+import { dotBars } from '../dots.js';
 export const TOKENS = {
   putty: '#000000',   // field / ground
   ink: '#fff7dd',     // primary marks (snake body, ego car, wall edges)
@@ -37,10 +39,10 @@ export function mountChrome(el, { label } = {}) {
   const controls = document.createElement('div');
   controls.className = 'gc-controls';
   const policyBtn = document.createElement('button');
-  policyBtn.className = 'ex-ghost gc-btn';
+  policyBtn.className = 'ghost gc-btn';
   policyBtn.type = 'button';
   const restartBtn = document.createElement('button');
-  restartBtn.className = 'ex-ghost gc-btn';
+  restartBtn.className = 'ghost gc-btn';
   restartBtn.type = 'button';
   restartBtn.textContent = 'Restart';
   controls.append(policyBtn, restartBtn);
@@ -74,33 +76,15 @@ export function scoreboardLine(counts, unit = '') {
   return `YOU ${counts.you} · MODEL ${counts.model}${unit ? ' ' + unit : ''}`;
 }
 
-// Paints the candidate · cream bar · tabular numeral list + the ∅ row, and the read sentence
-// underneath, reusing the .ex-row/.ex-bar kit (exhibits.css) so the decision strip matches
-// every data exhibit. `probs` is a plain {label: p} map. The highest-p row (candidate or ∅)
-// gets the champagne fill - it's the winner.
+// Paints the decision strip as a dotBars readout (js/dots.js): candidate · 24-dot strip ·
+// tabular numeral, plus the ∅ row (hollow dots), and the read sentence underneath. `probs`
+// is a plain {label: p} map. The highest-p row (candidate or ∅) gets the champagne dots -
+// it's the winner. One dotBars instance per game mount, reused across ticks via .update().
 export function paintDecision(refs, { candidates = [], probs = {}, p_null = null, sentence = '' } = {}) {
-  refs.decision.innerHTML = '';
-  const rows = candidates.map((c) => [c, probs[c] ?? 0]);
-  if (p_null != null) rows.push(['∅ (null)', p_null]);
-  const maxP = rows.reduce((m, [, p]) => Math.max(m, p), -Infinity);
-  for (const [label, p] of rows) {
-    const row = document.createElement('div');
-    row.className = 'ex-row';
-    const name = document.createElement('span');
-    name.className = 'ex-row-text';
-    name.textContent = label;
-    const track = document.createElement('span');
-    track.className = 'ex-bar';
-    const bar = document.createElement('span');
-    bar.className = 'ex-bar-fill' + (p === maxP ? ' is-winner' : '');
-    bar.style.width = `${Math.max(0, Math.min(1, p)) * 100}%`;
-    track.appendChild(bar);
-    const num = document.createElement('span');
-    num.className = 'ex-num';
-    num.textContent = p.toFixed(2);
-    row.append(name, track, num);
-    refs.decision.appendChild(row);
-  }
+  const rows = candidates.map((c) => ({ label: c, p: probs[c] ?? 0 }));
+  if (p_null != null) rows.push({ label: '∅', p: p_null, isNull: true });
+  if (!refs.decisionBars) refs.decisionBars = dotBars(refs.decision, rows, { dots: 24 });
+  else refs.decisionBars.update(rows);
   refs.sentence.textContent = sentence;
 }
 

@@ -2,9 +2,10 @@
 // scripts/record_realdoom.mjs both import this - no DOM, safe in Node and the browser). Kept
 // separate from render-realdoom.js so the recorder can drive the exact same sentence grammar
 // and legal-move rules the live card uses, without dragging THREE.js/loop.js into Node.
-// Same demo-spec v3 design as js/games/doom.js: the model picks an intent (retreat / engage /
-// explore) from the situations that apply; resolveIntent() aims and picks the key.
-import { INTENTS, HURT_BELOW } from './doom.js';
+// Same demo-spec v4 design as js/games/doom.js: the state pre-computes the turn side ("The player
+// must turn left to face the imp."), the model picks retreat / shoot / turn left / turn right /
+// explore, and the engine only presses the key (a closed-loop turn by the lead monster's bearing).
+import { LABELS, HURT_BELOW } from './doom.js';
 
 const CELL_UNITS = 64; // map units per Doom grid cell (doom-wasm-notes.md)
 const CROSSHAIR_DEG = 8;
@@ -32,11 +33,7 @@ export function cellsOf(units) {
   return Math.max(0, Math.round(units / CELL_UNITS));
 }
 
-function bearingPhrase(m) {
-  const b = m.bearing ?? 0;
-  if (m.in_crosshair || Math.abs(b) <= CROSSHAIR_DEG) return 'ahead in the crosshair';
-  return b < 0 ? 'to the left' : 'to the right';
-}
+const inCrosshair = (m) => m.in_crosshair || Math.abs(m.bearing ?? 0) <= CROSSHAIR_DEG;
 
 // Monsters "in sight": line of sight (state.visible, P_CheckSight in the wasm patch), not behind,
 // within SIGHT_CELLS; crosshair first, then nearest first.
@@ -50,24 +47,27 @@ export function inSight(state) {
     });
 }
 
-// The model's candidates: the three intents, always.
+// The model's candidates: the five labels, minus `shoot` without ammo (the only real illegality).
 export function candidatesFor(state) {
-  return state.in_level === false ? [] : [...INTENTS];
+  if (state.in_level === false) return [];
+  return LABELS.filter((l) => l !== 'shoot' || (state.ammo ?? 0) > 0);
 }
 
 // state -> the sentence the model reads: health/ammo, then only the situations that apply,
-// worded exactly as the rule conditions (js/games/doom.js RULES), monster type included.
+// worded exactly as the rule conditions (js/games/doom.js RULES), monster type included, in a
+// fixed order. The lead monster (crosshair first, then nearest) is the one the sentence is about.
 export function describeDoom(state) {
   const sentences = [`The player has ${state.health} health and ${state.ammo} ammo.`];
   if (state.health < HURT_BELOW) sentences.push('The player is badly hurt.');
   const seen = inSight(state);
-  const where = (m) => {
-    const d = cellsOf(m.dist);
-    return `${/^[aeiou]/i.test(m.type) ? 'an' : 'a'} ${m.type} ${d} cell${d === 1 ? '' : 's'} ${bearingPhrase(m)}`;
-  };
-  if (seen.length === 1) sentences.push(`The player has an enemy in sight: ${where(seen[0])}.`);
-  else if (seen.length > 1) sentences.push(`The player has ${seen.length} enemies in sight; the nearest is ${where(seen[0])}.`);
-  else sentences.push('The player sees no enemy.');
+  const lead = seen[0];
+  const typed = (m) => `${/^[aeiou]/i.test(m.type) ? 'an' : 'a'} ${m.type}`;
+  if (seen.length > 1) sentences.push(`The player has ${seen.length} enemies in sight.`);
+  if (!lead) sentences.push('The player sees no enemy.');
+  else if (inCrosshair(lead)) {
+    const d = cellsOf(lead.dist);
+    sentences.push(`The player has ${typed(lead)} in the crosshair, ${d} cell${d === 1 ? '' : 's'} ahead.`);
+  } else sentences.push(`The player must turn ${lead.bearing < 0 ? 'left' : 'right'} to face ${seen.length > 1 ? 'the nearest enemy' : `the ${lead.type}`}.`);
   if (state.blocked_ahead) sentences.push('A wall is ahead.');
   return sentences.join(' ');
 }
@@ -148,25 +148,33 @@ function exploreAction(state, now = Date.now()) {
   return 'move forward';
 }
 
-// Intent -> key press (the engine aims; the page says so). Raw actions pass through for the
-// human override.
+// Label -> key action. The model aims (shoot / turn left / turn right are its own labels); the
+// engine walks for retreat/explore. Raw actions pass through for the human override.
 export function resolveIntent(state, move) {
-  if (!INTENTS.includes(move)) return move;
   if (move === 'retreat') return 'move back';
-  const target = inSight(state)[0];
-  if (move === 'engage' && target) {
-    const b = target.bearing ?? 0;
-    if (target.in_crosshair || Math.abs(b) <= CROSSHAIR_DEG) return (state.ammo ?? 0) > 0 ? 'shoot' : 'move forward';
-    return b < 0 ? 'turn left' : 'turn right';
-  }
   if (move === 'explore') return exploreAction(state);
-  return state.blocked_ahead ? 'turn right' : 'move forward';
+  return move;
 }
 
-// Scripted policy = RULES applied literally (never calls the model) -> an intent.
+// Key press for an action: [key, holdMs] or [key, { deg }] for a closed-loop turn (games/doom/
+// index.html Doom.turnBy). A model turn turns by the lead monster's bearing so the next state
+// has it in the crosshair; an explore turn follows the navigator's request.
+export function keyPress(state, move, action) {
+  if (action !== 'turn left' && action !== 'turn right') return KEY_FOR_MOVE[action];
+  const key = action === 'turn left' ? 'left' : 'right';
+  if (move === 'explore') return [key, { deg: navTurnDeg }];
+  const lead = inSight(state)[0];
+  return [key, { deg: lead ? Math.min(120, Math.max(8, Math.abs(lead.bearing ?? 0))) : DEFAULT_TURN_DEG }];
+}
+
+// Scripted policy = RULES applied literally (never calls the model) over the offered labels.
+// With a crosshair target and no ammo nothing fires; the residual goes to the first label.
 export function scriptedPolicy(state) {
   if (state.health < HURT_BELOW) return 'retreat';
-  return inSight(state).length ? 'engage' : 'explore';
+  const lead = inSight(state)[0];
+  if (!lead) return 'explore';
+  if (inCrosshair(lead)) return (state.ammo ?? 0) > 0 ? 'shoot' : 'retreat';
+  return lead.bearing < 0 ? 'turn left' : 'turn right';
 }
 
 function selfTest() {
