@@ -414,6 +414,9 @@
   .dest a { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; min-height: 220px; padding: 18px; border-radius: var(--radius-pill); background: var(--color-graphite); color: var(--color-warm); border: 1px solid var(--color-warm); transition: background var(--duration-tap) var(--ease-out); }
   .dest a:hover { background: var(--color-charcoal); }
   .dest .t-card { max-width: 14ch; }
+  .dest a .t-eyebrow { transition: transform var(--duration-tap) var(--ease-out); }
+  .dest a:hover .t-eyebrow { transform: translateX(3px); }
+  @media (prefers-reduced-motion: reduce) { .dest a:hover .t-eyebrow { transform: none; } }
 
   .exlist { border-bottom: 1px solid var(--color-steel); }
 

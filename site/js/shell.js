@@ -627,19 +627,23 @@ async function boot() {
   mountFilm(ctx, { film: 'film-card', rows: 'card-rows', sentence: 'card-sentence', rec: 'card-rec' });
   import('./motion.js').then((m) => {
     const go = () => {
-      if (document.documentElement.classList.contains('booting')) {
-        // wait for the cold start rather than playing the hero entrance behind it
-        const obs = new MutationObserver(() => {
-          if (!document.documentElement.classList.contains('booting')) {
-            obs.disconnect();
-            m.mountMotion();
-          }
-        });
-        obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-        setTimeout(() => { obs.disconnect(); m.mountMotion(); }, 12000); // never strand the page
+      if (!document.documentElement.classList.contains('booting')) {
+        m.mountMotion();
         return;
       }
-      m.mountMotion();
+      // wait for the cold start rather than playing the hero entrance behind it, but never strand
+      // the page if it never finishes. Whichever path gets there first cancels the other: an
+      // uncancelled fallback fires twelve seconds later and runs the choreography a second time
+      // over a page that already played it, which re-hides every chapter head.
+      let fallback = 0;
+      const obs = new MutationObserver(() => {
+        if (document.documentElement.classList.contains('booting')) return;
+        obs.disconnect();
+        clearTimeout(fallback);
+        m.mountMotion();
+      });
+      fallback = setTimeout(() => { obs.disconnect(); m.mountMotion(); }, 12000);
+      obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     };
     if (window.gsap) go(); else window.addEventListener('load', go);
   });
