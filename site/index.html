@@ -4,49 +4,50 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Typical — small open models that decide</title>
-<meta name="description" content="Typical: open 1.7B and 4B decision models. One pass over the text, a probability for every option, and an explicit abstain. Results, controls, and live demos.">
-<link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500&display=swap" rel="stylesheet">
+<meta name="description" content="Typical: open 1.7B and 4B decision models. One pass over the text, a probability for every option, and an explicit abstain. Results with controls, and live demos.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="exhibits.css">
 </head>
 <body>
-<nav class="nav" aria-label="Site">
-  <a class="brand" href="#top">Typical</a>
-  <div class="links">
-    <a href="#results">Results</a><a href="#demos">Demos</a><a href="research.html">Research</a>
-    <a href="https://huggingface.co/OzLabs/typical-small/tree/main/inference">Code →</a>
-    <a href="https://huggingface.co/OzLabs/typical-small">Hugging Face →</a>
-  </div>
-</nav>
+<nav class="nav"><div class="wrap">
+  <a class="brand" href="#top"><i></i>Typical</a>
+  <div class="links"><a href="#results">Results</a><a href="#demos">Demos</a><a href="research.html">Research</a><a href="https://huggingface.co/OzLabs/typical-small/tree/main/inference">Code</a></div>
+  <div class="btns"><a class="btn" href="https://huggingface.co/OzLabs/typical-small">Hugging Face →</a><a class="btn primary" href="#tryit">Try it live</a></div>
+</div></nav>
 
-<header class="hero" id="top">
-  <div class="wrap">
-    <div class="wall" id="wall" aria-label="Typical, drawn as a dot matrix of recorded probabilities"></div>
-    <div class="caption caps wall-caption"><span>each dot is one probability the model produced</span><span id="wall-count"></span><span id="wall-mode">updates as decisions arrive</span></div>
-    <h1>Small open models that decide. One pass over the text, a probability for every option, and an explicit ∅.</h1>
-    <a class="ghost" href="#results">Results →</a>
+<header class="wrap hero" id="top">
+  <div>
+    <h1>Small open models that decide.<span class="light">One pass, a probability for every option, and an explicit ∅.</span></h1>
+    <p class="sub">Typical reads your text once and answers typed questions as calibrated probabilities. 1.7B and 4B, open weights, 45 ms per decision. No generation, no parsing.</p>
+    <div class="btns"><a class="btn primary" href="#results">See the results</a><a class="btn" href="research.html">Read the research</a></div>
+  </div>
+  <div class="decision" id="hero-decision">
+    <div class="eyebrow mono"><span data-kind>Choice · recorded</span><span data-ms>—</span></div>
+    <div class="state" data-state></div>
+    <div class="q" data-q></div>
+    <div data-bars></div>
+    <div class="meta mono"><span data-model>typical-small</span><span>one forward pass</span><span data-count></span></div>
   </div>
 </header>
 
-<section class="section" id="results">
-  <div class="wrap">
-    <h2>Two sizes, one recipe, a control beside every number.</h2>
-    <div class="figures">
-      <div class="fig"><span class="pill">latency</span><div class="num" data-dotnum="45"></div><p><b>45 ms</b> per decision on one H100, K = 2, in-process. 2.7 ms per extra question on a cached state.</p></div>
-      <div class="fig"><span class="pill">JevBench</span><div class="num" data-dotnum=".694"></div><p><b>.694 / .806</b> standard, small / medium. Frozen backbones, 3-shot: .528 / .778. Chance .311. Public subset, unranked.</p></div>
-      <div class="fig"><span class="pill">CLINC-150</span><div class="num" data-dotnum=".804"></div><p><b>.804 / .847</b> intent accuracy over 150 runtime labels; out-of-scope abstain recall .827 (typical-small).</p></div>
-    </div>
-
-    <div id="results-table"></div>
-
-    <div class="charts">
-      <figure><figcaption class="caps">Scaling ladder</figcaption><div class="chart" id="chart-g1"></div></figure>
-      <figure><figcaption class="caps">Single-decision latency vs K</figcaption><div class="chart" id="chart-g2"></div></figure>
-    </div>
-    <figure class="reliability"><figcaption class="caps">Reliability, JevBench standard and hard</figcaption><div class="chart-grid" id="chart-g4"></div><div id="g4-caption"></div></figure>
-
-    <div class="status" id="in-training"></div>
-    <blockquote class="disclosure-box">
+<section class="section" id="results"><div class="wrap">
+  <div class="stats">
+    <div class="stat sky"><span class="mono">↓ Latency</span><div><div class="num">45 ms</div><div class="cap">per decision on one H100, K = 2, in-process. 2.7 ms per extra question on a cached state.</div></div></div>
+    <div class="stat blush"><span class="mono">↑ JevBench standard</span><div><div class="num">.694 / .806</div><div class="cap">small / medium. Frozen backbones, 3-shot: .528 / .778. Chance .311. Public subset, unranked.</div></div></div>
+    <div class="stat peach"><span class="mono">↑ CLINC-150</span><div><div class="num">.804 / .847</div><div class="cap">intent accuracy over 150 runtime labels; out-of-scope abstain recall .827 (typical-small).</div></div></div>
+  </div>
+  <h2>Two sizes, one recipe, <span class="light">a control beside every number.</span></h2>
+  <p class="lede">Trained and frozen backbones on the same 231 public JevBench items. Training helps the standard tier at 1.7B (+.17) far more than at 4B (+.03); on the hard tier the frozen 4B is ahead.</p>
+  <div id="results-table"></div>
+  <div class="charts">
+    <figure><figcaption class="label">Scaling ladder</figcaption><div class="chart" id="chart-g1"></div></figure>
+    <figure><figcaption class="label">Single-decision latency vs K</figcaption><div class="chart" id="chart-g2"></div></figure>
+  </div>
+  <figure><figcaption class="label">Reliability, JevBench standard and hard</figcaption><div class="chart-grid" id="chart-g4"></div><div id="g4-caption"></div></figure>
+  <div class="status" id="in-training"></div>
+  <blockquote class="disclosure-box">
         <strong>JevBench disclosure.</strong> JevBench numbers are a public-subset run against
         <code>fstandhartinger/jevbench</code> v1.2.1 (72 standard / 48 easy / 111 hard public ids), not a
         submitted or ranked leaderboard entry (the leaderboard requires &ge;95% coverage including 146
@@ -57,118 +58,100 @@
         baselines are .311 standard / .284 easy / .336 hard (n = 72 standard, SE &asymp; .058) &mdash; the hard
         tier of both released models is within 1 SE of chance.
       </blockquote>
-  </div>
-</section>
+</div></section>
 
-<section class="section" id="how">
-  <div class="wrap">
-    <h2>Three question types, one head.</h2>
-    <div class="prims">
-      <div class="prim"><div class="glyph" data-glyph="choice"></div><span class="pill">Choice</span><p>Pick one candidate from a set you define at runtime. Returns a probability for every option and for ∅.</p></div>
-      <div class="prim"><div class="glyph" data-glyph="noul"></div><span class="pill">Noul</span><p>A yes/no read on the same state. The only query type whose answer is exactly order-invariant.</p></div>
-      <div class="prim"><div class="glyph" data-glyph="score"></div><span class="pill">Score</span><p>An ordered level, 0 through N, plus the expected level under the candidates.</p></div>
-    </div>
-    <div class="code"><pre>from typical import Typical
+<section class="section wash" id="how"><div class="wrap">
+  <h2>Three question types, <span class="light">one head.</span></h2>
+  <p class="lede">Give it a text state and a typed question and it returns a probability for every candidate plus an explicit ∅ in one forward pass: no generation, no parsing.</p>
+  <div class="prims">
+    <div class="prim sky"><span class="label">Choice</span><h3>Pick one of K</h3><p>Candidates you define at runtime. Returns a probability for every option and for ∅.</p></div>
+    <div class="prim mint"><span class="label">Noul</span><h3>Yes or no</h3><p>A yes/no read on the same state. The only query type whose answer is exactly order-invariant.</p></div>
+    <div class="prim peach"><span class="label">Score</span><h3>An ordered level</h3><p>0 through N, plus the expected level under the candidates.</p></div>
+  </div>
+  <div class="code"><pre>from typical import Typical
 
 m = Typical.from_pretrained("OzLabs/typical-small")
 m.choice(state, "What does the customer want?", ["refund", "replacement", "repair"])
 m.noul(state, "Is the order still under warranty?")
 m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
-    <p class="lede">Typical is an open family of small decision models. Give it a text state and a typed question (Choice over candidates you define at runtime, Noul for yes/no, Score for ordered levels) and it returns a probability for every candidate plus an explicit ∅ in one forward pass: no generation, no parsing.</p>
-    <p class="lede">It is not an LLM replacement or a knowledge model. It decides from the text you give it (≤1k tokens); it does not plan, compute, or reason over long documents, and on hard multi-step workflow judgments it is still at chance. Weights (1.7B, 4B) and inference code are open on Hugging Face.</p>
-    <a class="ghost" href="research.html">Architecture and data →</a>
-  </div>
-</section>
+  <p class="lede" style="margin-bottom:12px">It is not an LLM replacement or a knowledge model. It decides from the text you give it (≤1k tokens); it does not plan, compute, or reason over long documents, and on hard multi-step workflow judgments it is still at chance. Weights (1.7B, 4B) and inference code are open on Hugging Face.</p>
+  <a class="btn" href="research.html">Architecture and data →</a>
+</div></section>
 
-<section class="section" id="demos">
-  <div class="wrap">
-    <h2>Real games, real transcripts, one forward pass per decision.</h2>
-    <p class="lede">Every demo runs the public <code>inference/typical</code> package, the same code behind the numbers above. Live mode calls a local model server and shows its own measured latency and device; static mode replays recorded outputs. <span data-mode-pill class="pill"></span></p>
+<section class="section" id="demos"><div class="wrap">
+  <h2>Real games, real transcripts, <span class="light">one forward pass per decision.</span></h2>
+  <p class="lede">Every demo runs the public <code>inference/typical</code> package, the same code behind the numbers above. Live mode calls a local model server and shows its own measured latency and device; static mode replays recorded outputs. <span data-mode-pill class="tag live"></span></p>
+  <div class="games">
+      <div class="gamecard wide">
+        <div class="game-mount" data-game="realdoom" data-game-fallback="doom"></div>
+        <div class="gamecopy"><div class="row"><h3>Doom</h3><span class="tag ">Works</span></div><p>Chocolate Doom, the 1993 shareware, running in WebAssembly. Each tick the model reads the situations that apply, pre-computed as agent-subject sentences (“the player is badly hurt”, “the player has a zombieman in the crosshair, 6 cells ahead”, “the player must turn left to face the imp”) and picks retreat, shoot, turn left, turn right or explore from five one-condition rules; the engine only presses the key (a closed-loop turn by the enemy’s bearing) and walks a scripted route from the E1M1 spawn to the first zombiemen. It matched the rule list 48/48 in the probe (chance .20; .73 with no rules) and 200/200 in the recorded E1M1 run: 3 turns, 64 shots, 4 kills, health 86. The v3 form “the enemy is 5 cells to the left” never fired a turn (0/12); the rewrite to “the player must turn left to face the enemy” did. Raw health numbers had to go: “41 health” with an enemy in the crosshair read as danger (retreat .56 over shoot).</p></div>
+      </div>
+      <div class="gamecard">
+        <div class="game-mount" data-game="snake"></div>
+        <div class="gamecopy"><div class="row"><h3>Snake</h3><span class="tag ">Works</span></div><p>A 10×10 board on canvas. Each tick the board is rendered as the situations that apply, pre-computed as agent-subject sentences (“the snake must move right to close the larger gap to the food”, “the snake can also move up to close the smaller gap”, “moving down hits the wall”), and the model picks one of the safe moves; the candidate set is the only guardrail. Following the sentences literally is a greedy policy that eats about 28 food per 300 ticks; the model matched it on 61/62 scripted boards (chance .48) and on 216/217 ticks of the recorded run, eating 24 food before greedy trapped it at length 27. It does not plan, and spelling the same rules out in the question made it worse (.82–.95, p_null .9).</p></div>
+      </div>
+      <div class="gamecard">
+        <div class="game-mount" data-game="drive"></div>
+        <div class="gamecopy"><div class="row"><h3>Drive</h3><span class="tag ">Works</span></div><p>A Three.js toy road. Each tick the road is rendered as the situations that apply (“the traffic light 40 m ahead is red”, “the car is closing on a slower vehicle 17 m ahead”), seven one-condition rules are in the prompt in precedence order, and the model picks one manoeuvre from the legal set (a lane change is only offered into a clear lane). It matched the rule list on 70/70 scripted situations (chance .16; .16 for random-among-legal; .16 with no rules) and on every tick of the recorded run: 18/18 red lights, 3 lane changes, exit taken. It cannot take a rule with an “or” in it, and it reads sentence order.</p></div>
+      </div>
   </div>
-  <div class="plates">
-  <article class="plate" id="game-snake">
-    <div class="plate-copy">
-      <span class="pill">Works</span>
-      <h3>Snake</h3>
-      <p>A 10×10 board on canvas. Each tick the board is rendered as the situations that apply, pre-computed as agent-subject sentences (“the snake must move right to close the larger gap to the food”, “the snake can also move up to close the smaller gap”, “moving down hits the wall”), and the model picks one of the safe moves; the candidate set is the only guardrail. Following the sentences literally is a greedy policy that eats about 28 food per 300 ticks; the model matched it on 61/62 scripted boards (chance .48) and on 216/217 ticks of the recorded run, eating 24 food before greedy trapped it at length 27. It does not plan, and spelling the same rules out in the question made it worse (.82–.95, p_null .9).</p>
-    </div>
-    <div class="plate-stage game-mount" data-game="snake"></div>
-  </article>
-  <article class="plate" id="game-drive">
-    <div class="plate-copy">
-      <span class="pill">Works</span>
-      <h3>Drive</h3>
-      <p>A Three.js toy road. Each tick the road is rendered as the situations that apply (“the traffic light 40 m ahead is red”, “the car is closing on a slower vehicle 17 m ahead”), seven one-condition rules are in the prompt in precedence order, and the model picks one manoeuvre from the legal set (a lane change is only offered into a clear lane). It matched the rule list on 70/70 scripted situations (chance .16; .16 for random-among-legal; .16 with no rules) and on every tick of the recorded run: 18/18 red lights, 3 lane changes, exit taken. It cannot take a rule with an “or” in it, and it reads sentence order.</p>
-    </div>
-    <div class="plate-stage game-mount" data-game="drive"></div>
-  </article>
-  <article class="plate" id="game-realdoom">
-    <div class="plate-copy">
-      <span class="pill">Works</span>
-      <h3>Doom</h3>
-      <p>Chocolate Doom, the 1993 shareware, running in WebAssembly. Each tick the model reads the situations that apply, pre-computed as agent-subject sentences (“the player is badly hurt”, “the player has a zombieman in the crosshair, 6 cells ahead”, “the player must turn left to face the imp”) and picks retreat, shoot, turn left, turn right or explore from five one-condition rules; the engine only presses the key (a closed-loop turn by the enemy’s bearing) and walks a scripted route from the E1M1 spawn to the first zombiemen. It matched the rule list 48/48 in the probe (chance .20; .73 with no rules) and 200/200 in the recorded E1M1 run: 3 turns, 64 shots, 4 kills, health 86. The v3 form “the enemy is 5 cells to the left” never fired a turn (0/12); the rewrite to “the player must turn left to face the enemy” did. Raw health numbers had to go: “41 health” with an enemy in the crosshair read as danger (retreat .56 over shoot).</p>
-    </div>
-    <div class="plate-stage game-mount" data-game="realdoom" data-game-fallback="doom"></div>
-  </article>
+  <div class="exindex" id="tryit">
+      <div class="exrow" data-exhibit-card>
+        <div class="exrow-head">
+          <span class="tag live">Live</span>
+          <h3>Try it</h3>
+          <p>Your own state, question and options, decided in one forward pass. Needs the local model server; static mode replays the prefilled example only.</p>
+          <button class="btn small" type="button" data-exhibit-toggle>Run →</button>
+        </div>
+        <div class="exrow-body" data-exhibit-body hidden><div data-demo="tryit"></div></div>
+      </div>
+      <div class="exrow" data-exhibit-card>
+        <div class="exrow-head">
+          <span class="tag ">Works</span>
+          <h3>SQL over judgment</h3>
+          <p><code>SELECT * FROM tickets WHERE typical(body, 'customer is angry about billing')</code>. 129 rows, one forward pass each, no embeddings; four conditions against hand labels.</p>
+          <button class="btn small" type="button" data-exhibit-toggle>Run →</button>
+        </div>
+        <div class="exrow-body" data-exhibit-body hidden><div data-demo="sql"></div></div>
+      </div>
+      <div class="exrow" data-exhibit-card>
+        <div class="exrow-head">
+          <span class="tag ">Works</span>
+          <h3>One document, twenty questions</h3>
+          <p>A short handbook is read once into the KV cache, then twenty typed questions (12 yes/no, 5 choice, 3 score) are answered from that cached state in one call, timed against twenty one-at-a-time calls and marked against a hand label.</p>
+          <button class="btn small" type="button" data-exhibit-toggle>Run →</button>
+        </div>
+        <div class="exrow-body" data-exhibit-body hidden><div data-demo="doc-20"></div></div>
+      </div>
+      <div class="exrow" data-exhibit-card>
+        <div class="exrow-head">
+          <span class="tag ">Works</span>
+          <h3>Rules are the program</h3>
+          <p>Five fixed facts about a loan applicant and four rules with a stated precedence. Reorder the rules and the model re-decides live on the same facts; a second panel runs six applicants under both orders and flags each flip.</p>
+          <button class="btn small" type="button" data-exhibit-toggle>Run →</button>
+        </div>
+        <div class="exrow-body" data-exhibit-body hidden><div data-demo="rules"></div></div>
+      </div>
+      <div class="exrow" data-exhibit-card>
+        <div class="exrow-head">
+          <span class="tag ">Works</span>
+          <h3>Ads</h3>
+          <p>Forty short observations, each scored three ways in one call: is it an ad, which of 20 brands, which of 8 categories. The brand and category cues are written into the question, so the rules are the program; the tally compares every answer with a hand label.</p>
+          <button class="btn small" type="button" data-exhibit-toggle>Run →</button>
+        </div>
+        <div class="exrow-body" data-exhibit-body hidden><div data-demo="ads"></div></div>
+      </div>
+      <div class="exrow" data-exhibit-card>
+        <div class="exrow-head">
+          <span class="tag fails">Fails</span>
+          <h3>Compaction</h3>
+          <p>A 24-call coding-tool transcript, each call scored with a yes/no relevance question. P(keep) never crosses .5 on this pool, so there is no usable keep/drop threshold; the ranking by P(keep) is shown instead, with its AUROC against hand labels.</p>
+          <button class="btn small" type="button" data-exhibit-toggle>Run →</button>
+        </div>
+        <div class="exrow-body" data-exhibit-body hidden><div data-demo="compaction"></div></div>
+      </div>
   </div>
-  <div class="wrap">
-    <div class="exindex">
-  <div class="exrow" data-exhibit-card>
-    <div class="exrow-head">
-      <span class="pill">Live</span>
-      <h3>Try it</h3>
-      <p>Your own state, question and options, decided in one forward pass. Needs the local model server; static mode replays the prefilled example only.</p>
-      <button class="ghost" type="button" data-exhibit-toggle>Run →</button>
-    </div>
-    <div class="exrow-body" data-exhibit-body hidden><div data-demo="tryit"></div></div>
-  </div>
-  <div class="exrow" data-exhibit-card>
-    <div class="exrow-head">
-      <span class="pill">Works</span>
-      <h3>SQL over judgment</h3>
-      <p><code>SELECT * FROM tickets WHERE typical(body, 'customer is angry about billing')</code>. 129 rows, one forward pass each, no embeddings; four conditions against hand labels.</p>
-      <button class="ghost" type="button" data-exhibit-toggle>Run →</button>
-    </div>
-    <div class="exrow-body" data-exhibit-body hidden><div data-demo="sql"></div></div>
-  </div>
-  <div class="exrow" data-exhibit-card>
-    <div class="exrow-head">
-      <span class="pill">Works</span>
-      <h3>One document, twenty questions</h3>
-      <p>A short handbook is read once into the KV cache, then twenty typed questions (12 yes/no, 5 choice, 3 score) are answered from that cached state in one call, timed against twenty one-at-a-time calls and marked against a hand label.</p>
-      <button class="ghost" type="button" data-exhibit-toggle>Run →</button>
-    </div>
-    <div class="exrow-body" data-exhibit-body hidden><div data-demo="doc-20"></div></div>
-  </div>
-  <div class="exrow" data-exhibit-card>
-    <div class="exrow-head">
-      <span class="pill">Works</span>
-      <h3>Rules are the program</h3>
-      <p>Five fixed facts about a loan applicant and four rules with a stated precedence. Reorder the rules and the model re-decides live on the same facts; a second panel runs six applicants under both orders and flags each flip.</p>
-      <button class="ghost" type="button" data-exhibit-toggle>Run →</button>
-    </div>
-    <div class="exrow-body" data-exhibit-body hidden><div data-demo="rules"></div></div>
-  </div>
-  <div class="exrow" data-exhibit-card>
-    <div class="exrow-head">
-      <span class="pill">Works</span>
-      <h3>Ads</h3>
-      <p>Forty short observations, each scored three ways in one call: is it an ad, which of 20 brands, which of 8 categories. The brand and category cues are written into the question, so the rules are the program; the tally compares every answer with a hand label.</p>
-      <button class="ghost" type="button" data-exhibit-toggle>Run →</button>
-    </div>
-    <div class="exrow-body" data-exhibit-body hidden><div data-demo="ads"></div></div>
-  </div>
-  <div class="exrow" data-exhibit-card>
-    <div class="exrow-head">
-      <span class="pill">Fails</span>
-      <h3>Compaction</h3>
-      <p>A 24-call coding-tool transcript, each call scored with a yes/no relevance question. P(keep) never crosses .5 on this pool, so there is no usable keep/drop threshold; the ranking by P(keep) is shown instead, with its AUROC against hand labels.</p>
-      <button class="ghost" type="button" data-exhibit-toggle>Run →</button>
-    </div>
-    <div class="exrow-body" data-exhibit-body hidden><div data-demo="compaction"></div></div>
-  </div>
-    </div>
-    <div class="notwork">
+  <div class="notwork">
       <h3>What does not work</h3>
       <ul>
         <li>Object-location sentences. Doom’s “the enemy is 5 cells to the left” never fired a turn (0 of 12); the model aims only once the state says “the player must turn left to face the enemy”. Numbers it must compare itself (“41 health”) leak into the decision: with them, an enemy in the crosshair at mid health read as retreat. Snake and Doom both need the engine to pre-compute the comparison.</li>
@@ -178,39 +161,34 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
         <li>Long documents: states above ~1k tokens. The cause is a truncation bug in the training data; a fix is in training.</li>
       </ul>
     </div>
-  </div>
-</section>
+</div></section>
 
-<section class="section" id="limits">
-  <div class="wrap">
-    <h2>What this isn't.</h2>
-    <p class="lede">Typical works from short states and literal rules over bounded candidate sets: no long documents, no vision, no arithmetic. The JevBench hard tier sits at chance and is over-confident there. Choice is order-robust, not order-invariant; reordering candidates can shift a probability by a few points.</p>
-    <a class="ghost" href="research.html#limitations">Full limitations →</a>
-  </div>
-</section>
+<section class="band" id="findings"><div class="wrap">
+  <h2>What we found.</h2>
+  <p class="lede">Eight results, each with a matched control. The full account, with every number sourced, is on the research page.</p>
+  <div class="cards" id="findings-cards"></div>
+  <div class="btns" style="margin-top:32px"><a class="btn" href="research.html">Read the research →</a></div>
+</div></section>
 
-<section class="section" id="start">
-  <div class="wrap">
-    <h2>Get started.</h2>
-    <p class="lede">The public inference package ships inside the model repos on Hugging Face. Download the <a href="https://huggingface.co/OzLabs/typical-small/tree/main/inference"><code>inference/</code></a> folder, install its requirements, then six lines of Python. <code>state</code> is a string or a dict; candidates are whatever you pass.</p>
-    <div class="code"><pre >pip install huggingface_hub
+<section class="section wash" id="start"><div class="wrap">
+  <h2>Get started.</h2>
+  <p class="lede">The public inference package ships inside the model repos on Hugging Face. Download the <a href="https://huggingface.co/OzLabs/typical-small/tree/main/inference"><code>inference/</code></a> folder, install its requirements, then six lines of Python. <code>state</code> is a string or a dict; candidates are whatever you pass.</p>
+  <div class="code"><pre >pip install huggingface_hub
 hf download OzLabs/typical-small --include "inference/*" --local-dir typical
 pip install -r typical/inference/requirements.txt</pre></div>
-    <div class="code"><pre>from typical import Typical
+  <div class="code"><pre>from typical import Typical
 
 m = Typical.from_pretrained("OzLabs/typical-small")
 m.choice(state, "What does the customer want?", ["refund", "replacement", "repair"])
 m.noul(state, "Is the order still under warranty?")
 m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
-  </div>
-</section>
+  <p class="lede" style="margin:0">Typical works from short states and literal rules over bounded candidate sets: no long documents, no vision, no arithmetic. The JevBench hard tier sits at chance and is over-confident there. Choice is order-robust, not order-invariant. <a href="research.html#limitations">Full limitations →</a></p>
+</div></section>
 
-<footer class="footer">
-  <div class="wrap">
-    <span>Weights and inference code on Hugging Face. Training code to follow.</span>
-    <span class="links"><a href="https://huggingface.co/OzLabs/typical-small">typical-small</a><a href="https://huggingface.co/OzLabs/typical-medium">typical-medium</a><a href="https://huggingface.co/OzLabs/typical-small-preview">typical-small-preview</a></span>
-  </div>
-</footer>
+<footer class="footer"><div class="wrap">
+  <span>Weights and inference code on Hugging Face. Training code to follow.</span>
+  <span class="links"><a href="https://huggingface.co/OzLabs/typical-small">typical-small</a><a href="https://huggingface.co/OzLabs/typical-medium">typical-medium</a><a href="https://huggingface.co/OzLabs/typical-small-preview">typical-small-preview</a></span>
+</div></footer>
 
 <script type="module" src="js/shell.js"></script>
 </body>

@@ -15,7 +15,7 @@ function loadReplays() {
 }
 
 // Small deterministic string hash (djb2-ish) - only needs to be stable, not secure.
-function hashKey(state, queries) {
+export function hashKey(state, queries) {
   const s = state + JSON.stringify(queries);
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;

@@ -4,7 +4,8 @@
 // Every number that reaches the page comes from data/*.json (precompute output) or a live
 // decide() call — never an invented one.
 import { decide, mode, probeHealth } from './api.js';
-import { dotText, dotBars } from './dots.js';
+import { bars, inkBars, rowsFromResult } from './bars.js';
+import { hashKey } from './api.js';
 import { lineChart, reliability, ladder } from './charts.js';
 
 async function loadJSON(path) {
@@ -288,68 +289,70 @@ function mountGameScreens(ctx) {
 
 // ---- hero mark mosaic ------------------------------------------------------------------
 
-// ---- the dot system: wall (wordmark), numerals, primitive glyphs ----------------------
+// ---- hero decision card: cycles through real recorded decisions (presets are the replay keys) ----
 
-// inkBars-compatible adapter so the demo modules need no change: rows + nullP -> dotBars rows.
-function inkBars(el, { rows = [], nullP = null } = {}) {
-  const toRows = (rs, np) => [
-    ...rs.map((r) => ({ label: r.label, p: r.p })),
-    ...(np != null ? [{ label: '∅', p: np, isNull: true }] : []),
-  ];
-  const h = dotBars(el, toRows(rows, nullP));
-  return { update: (rs, np) => h.update(toRows(rs, np)) };
-}
-
-let wall = null;
-async function mountWall() {
-  const el = document.getElementById('wall');
-  if (!el) return;
-  const replays = (await loadJSON('data/replays.json')) || {};
-  // every probability the recorded demos produced, in file order: the wordmark is data
-  const values = [];
-  for (const e of Object.values(replays)) {
-    for (const r of e.results || []) {
-      for (const v of Object.values(r.probs || {})) values.push(v);
-      values.push(r.p_null ?? 0);
-    }
-  }
-  wall = dotText(el, 'TYPICAL', { dot: 22, gap: 8, values });
-  const count = document.getElementById('wall-count');
-  if (count) {
-    const b = document.createElement('b');
-    b.textContent = values.length.toLocaleString();
-    count.textContent = ' recorded probabilities';
-    count.prepend(b);
-  }
-  // static: walk the recorded stream; live: decide() results are pushed in by pushDecision()
-  if (mode() !== 'live' && values.length) {
-    let i = 0;
-    setInterval(() => { wall.push(values.slice(i, i + 6)); i = (i + 6) % values.length; }, 900);
-  }
-}
-// called by the live decide wrapper below
-function pushDecision(res) {
-  if (!wall || !res?.results) return;
-  const vec = [];
-  for (const r of res.results) { for (const v of Object.values(r.probs || {})) vec.push(v); vec.push(r.p_null ?? 0); }
-  wall.push(vec);
-}
-
-function mountNumerals() {
-  document.querySelectorAll('[data-dotnum]').forEach((el) => dotText(el, el.dataset.dotnum, { dot: 14, gap: 5 }));
-}
-
-// Choice / Noul / Score as dot glyphs: a 5-dot row with one lit, two dots, an ascending ladder.
-function mountGlyphs() {
-  const shapes = {
-    choice: { cols: 5, rows: 1, values: [0.05, 0.05, 0.92, 0.05, 0.05] },
-    noul: { cols: 2, rows: 1, values: [0.08, 0.92] },
-    score: { cols: 5, rows: 1, values: [0.1, 0.25, 0.45, 0.7, 0.95] },
+function heroPool(presets, replays) {
+  const pool = [];
+  const add = (state, queries) => {
+    const e = replays[hashKey(state, queries)];
+    if (!e) return;
+    queries.forEach((q, k) => { if (e.results[k] && q.labels.length <= 6) pool.push({ state, q, r: e.results[k], ms: e.ms, device: e.device, model: e.model }); });
   };
-  document.querySelectorAll('[data-glyph]').forEach((el) => {
-    const sh = shapes[el.dataset.glyph];
-    if (!sh) return;
-    import('./dots.js').then((d) => d.dotField(el, sh.cols, sh.rows, { dot: 18, gap: 8, values: sh.values }));
+  if (presets.playground) { add(presets.playground.state, presets.playground.queries); presets.playground.queries.forEach((q) => add(presets.playground.state, [q])); }
+  if (presets.policy) add(presets.policy.state, presets.policy.queries);
+  if (presets.abstain) presets.abstain.variants.forEach((v) => add(presets.abstain.state, v.queries));
+  if (presets.flip) presets.flip.orders.forEach((order) => {
+    const crit = order.map((l) => `${l}: ${presets.flip.rules[l]}`).join('  ');
+    add(presets.flip.state, [{ type: 'choice', question: `${presets.flip.question_prefix}\n${crit}`, labels: order }]);
+  });
+  return pool;
+}
+
+let heroLive = null; // set by pushDecision in live mode
+async function mountHero(presets) {
+  const card = document.getElementById('hero-decision');
+  if (!card || !presets) return;
+  const replays = (await loadJSON('data/replays.json')) || {};
+  const pool = heroPool(presets, replays);
+  if (!pool.length) return;
+  const $ = (k) => card.querySelector(`[data-${k}]`);
+  const trunc = (t, n) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
+  let i = 0;
+  let barsEl = bars($('bars'), rowsFromResult(pool[0].r));
+  const show = (e, source) => {
+    $('kind').textContent = `${e.q.type} · ${source}`;
+    $('ms').textContent = `${Math.round(e.ms)} ms · ${e.device || 'mps'}`;
+    $('state').textContent = trunc(e.state, 260);
+    $('q').textContent = trunc(e.q.question, 170);
+    $('model').textContent = e.model || 'typical-small';
+    barsEl.update(rowsFromResult(e.r));
+  };
+  $('count').textContent = `${pool.length} recorded decisions`;
+  show(pool[0], 'recorded');
+  setInterval(() => {
+    if (heroLive) { show(heroLive, 'live'); heroLive = null; return; }
+    i = (i + 1) % pool.length;
+    show(pool[i], 'recorded');
+  }, 2600);
+}
+// live decide() results flow into the hero card
+function pushDecision(res, state, queries) {
+  if (!res?.results?.[0] || !queries?.[0] || queries[0].labels.length > 6 || !state) return;
+  heroLive = { state: String(state), q: queries[0], r: res.results[0], ms: res.ms, device: res.device, model: res.model };
+}
+
+async function mountFindings() {
+  const el = document.getElementById('findings-cards');
+  const doc = await loadJSON('data/findings.json');
+  if (!el || !doc) return;
+  doc.items.forEach((f) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const tag = document.createElement('span'); tag.className = 'mono'; tag.textContent = f.tag;
+    const h = document.createElement('h3'); h.textContent = f.title;
+    const p = document.createElement('p'); p.textContent = f.meta;
+    card.append(tag, h, p);
+    el.appendChild(card);
   });
 }
 
@@ -377,12 +380,11 @@ async function boot() {
     loadJSON('data/frozen.json'),
   ]);
 
-  const liveDecide = async (...args) => { const res = await decide(...args); pushDecision(res); return res; };
+  const liveDecide = async (state, queries, opts) => { const res = await decide(state, queries, opts); pushDecision(res, state, queries); return res; };
   const ctx = { decide: liveDecide, mode, readout, presets, inkBars };
 
-  mountWall();
-  mountNumerals();
-  mountGlyphs();
+  mountHero(presets);
+  mountFindings();
   mountResults(models, reliabilityDoc, chanceDoc, frozenDoc);
   mountTryit(ctx);
   wireExhibits(ctx);

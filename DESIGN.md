@@ -1,43 +1,42 @@
-# DESIGN.md — Typical, "the dot is the probability"
+# DESIGN.md — Typical, "research console on paper"
 
-## Concept
-One visual system carries the whole site: a dot matrix in which every dot's brightness is a real probability
-the model produced. The wordmark, the headline numbers, the charts, the decision readouts and the game HUDs
-are all the same dots. It is Nothing's dot-matrix brand system pointed at our data, on the Atoms canvas.
-Nothing on the page is decorative; if a dot is lit, a number made it so.
+Sources: designs/TOGETHER_AI_DESIGN.md (skeleton), designs/HUME_DESIGN.md (data bars, pastel tiles),
+designs/RUNWAY_DESIGN.md (image-card grid, restraint). Approved mock: site/mock-paper.html.
 
-## Color (Restrained, Vercel-black reference, warm-tinted)
-- canvas `oklch(0.10 0.006 80)` (≈ #0c0b09; not pure black)
-- cream `#fff7dd` text and hairlines (hairlines at 22% alpha)
-- champagne `#c8ad86` the only accent: lit dots, tags, the winning candidate, hover
-- ash `#66635f` muted text and unlit dots (at 35% alpha)
-- DOOM's own palette is allowed inside its canvas; everything else is the four above.
+## Color
+paper #ffffff canvas · bone #fff9f3 section wash and card surface on white · ink #0a0a0a text ·
+slate #4d4d4d secondary · smoke #7a7876 muted · hairline #d6d6d6 · midnight #010120 (ONE dark band per
+page; white text on it, never pure black) · periwinkle #bdbbff small punctuation only (dashes, active
+underline) · pastel tiles: sky #c1dff9, blush #fde3f6, peach #ffdccd, mint #c8f6f9 (category-coded, never
+decoration) · violet #c094e4 = every probability bar. No gradients on chrome, no shadows, 4px radius on
+cards/buttons/inputs, 12px on the hero decision card only.
 
 ## Type
-Switzer (Fontshare, free) 400/500. Scale: 10 caps (+0.18px), 12, 14 body (line-height 1.5 on dark),
-16 (−0.13px), 44 headline (−1.85px, 1.13). No other sizes. Numbers use `tabular-nums`. Dot-matrix numerals
-(5×7 dots) are the display size: 8–14px dots, so a "45" can be 120–200px tall without a new type size.
+Inter Tight (stand-in for The Future): 400/500. Display 56px −1.7px lh 1.1 (bold line + light slate
+continuation line); h2 40px −0.8px; body 16px −0.16px lh 1.4; 18px ledes; 14px captions.
+JetBrains Mono (stand-in for PP Neue Montreal Mono): 11px 500 uppercase labels/eyebrows/badges, 13px
+buttons, 12px question text inside decision cards. Numbers tabular.
 
-## Dot primitives (`js/dots.js`)
-- `dotText(el, text, {size, values})`: 5×7 dot font; each dot's alpha from `values[i]` (a probability) or,
-  when no data applies, a fixed 0.9. Champagne when lit ≥ .5, cream below, ash off.
-- `dotBars(el, rows)`: one row per candidate: a 24-dot strip filled to p, label 12px, numeral tabular 14px.
-  Winner row's dots champagne; ∅ row outlined dots.
-- `dotChart(el, series)`: bars/points drawn as dots on a dot grid; axes as ash dots; labels 10px caps.
-- `dotField(el, values)`: the hero wall, N×M dots.
-Static on load. Live updates (a decision arrives) change dot alpha with a 120 ms ease-out; nothing moves.
+## Components
+- Buttons: primary = ink fill, white mono 13px, 4px, 8px 16px; ghost = hairline border. One primary per view.
+- Stat tile: pastel fill, mono label with ↑/↓, 64px number, 14px slate caption. No border.
+- Decision card: bone surface, 12px radius, 28px padding: eyebrow mono (type · source · ms · device),
+  state text 16px, question mono 12px, rows label + violet bar with value (value inside when p ≥ .15,
+  outside in slate otherwise), ∅ row dashed outline. This IS the readout everywhere (demos, Try-it, games).
+- Register: hairline table, mono 11px headers, ink rule under the header row, tabular numerals; stacks to
+  label/value rows ≤ 600px.
+- Demo card (Runway): white card, hairline border, 4px; canvas/iframe on top (16:10 or 480px), mono label
+  row (title · tag · measured ms), decision rows below. Two-up grid for games; exhibits open inline as a
+  full-width bone panel under an index row.
+- Research band: midnight, cards #0b0b33 with a 3px periwinkle dash, mono category, 22px title, mono meta.
+- Nav: white, brand (violet dot + wordmark 18px 600), links 16px, ghost + primary CTA. Sticky, hairline
+  bottom only.
 
 ## Layout
-1200px column, but the hero wall and the game plates bleed to the viewport. One dominant element per
-screen; sections separated by a single hairline and 80–120px. Left-aligned text, asymmetric plates
-(a game 60% / its readout 40%), no card grids. Tables are hairline registers with tabular numerals.
-Tags are 100px pills. No scroll containers anywhere; content folds inline.
+1200px max, 32px gutters, sections 72–96px apart, tiles/cards 16px gaps, 4px base grid. Hero two-column
+(copy 52% / decision card 48%). Results: three tiles → register → charts (violet marks, hairline grid,
+mono axis labels) → disclosure in a bone box. Demos: two-up game cards, then an exhibit index. Research
+band → Get started (bone wash) → footer. Nothing scrolls inside the page except game canvases.
 
 ## Motion
-None on load. Live-data alpha changes only. Hover: cream → champagne, 120 ms.
-
-## Screens
-0 nav · 1 hero wall (dot-matrix TYPICAL, live) + 44px headline + Results → · 2 results: three dot-matrix
-numerals, register, dot charts, disclosure · 3 how it works: Choice/Noul/Score as dot glyphs + code ·
-4 demos as plates: DOOM, Drive, Snake, then the exhibits as an index that opens inline · 5 limits (short) ·
-6 install · footer.
+None on load. Live data changes ease (bars 400 ms ease-out-quint). Hover: ghost → ink text.
