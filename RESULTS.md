@@ -75,6 +75,57 @@ a shorter pass — see each card's footnotes); treat these as the full-row figur
 
 `ladder_8b` predates DecisionMix v2 (6A recipe) and was never trained or evaluated on `data_wh`/`data_u`.
 
+## 5a. JevBench with confidence intervals — what this benchmark can and cannot resolve (2026-09-22)
+
+Cluster-bootstrapped over the paraphrase `group` (`scripts/jev_ci.py`): the standard tier is 72 items but only
+**36 independent states**, each appearing as two paraphrases, so item-level resampling would understate the
+interval. Hard has one item per group. 20,000 resamples.
+
+| run | standard | 95% CI | hard | 95% CI |
+|---|---:|---|---:|---|
+| `ts1b` (typical-small) | .694 | [.569, .819] | .432 | [.342, .523] |
+| `tm1b` (typical-medium) | .806 | [.694, .903] | .423 | [.333, .514] |
+| `tm2` (Qwen3.5-4B) | .861 | [.778, .944] | .495 | [.405, .595] |
+| `tl2` (Qwen3.5-9B) | .833 | [.722, .931] | .495 | [.405, .586] |
+| `ladder_14b` | .875 | [.792, .944] | .468 | [.378, .559] |
+| `tl1b` (14B, KD) | .931 | [.861, .986] | .450 | [.360, .541] |
+| `tl1b_nokd` (14B, no KD) | .917 | [.833, .986] | .477 | [.387, .568] |
+| `ts1b_semif` (1.7B, SemIf render) | .792 | [.667, .903] | .441 | [.351, .532] |
+| `trunc_first` (ablation arm A) | .750 | [.625, .861] | .378 | [.288, .468] |
+| `trunc_last` (ablation arm B) | .736 | [.597, .861] | .396 | [.306, .486] |
+
+**Read this table before reading any other JevBench comparison in this repo.** Hard is ±9 points at n = 111 and
+standard is ±6–13 points at n_eff = 36, so *every* adjacent pair above is statistically indistinguishable.
+Paired per-item tests are more powerful than differencing these intervals and are the only JevBench comparisons
+worth quoting:
+
+| paired comparison | diff | 95% CI | p |
+|---|---:|---|---|
+| frozen 14B (3-shot) − `tl1b`, hard | +.108 | [+.027, +.189] | **.015** |
+| frozen 14B (3-shot) − `tl1b_nokd`, hard | +.081 | [−.009, +.171] | .082 |
+| `tl1b_nokd` − `tl1b` (KD off vs on), hard | +.027 | [−.027, +.090] | .45 |
+| `ts1b_semif` − `ts1b`, standard | +.097 | [−.056, +.250] | .23 |
+| `tl2` (9B) − `tm2` (4B), hard | .000 | [−.090, +.090] | 1.00 |
+
+`tl2` vs `tm2` are both exactly 55/111 but are *not* the same model: zero of 111 probability vectors match and
+they disagree on 26 items (13 each way). The benchmark cannot resolve 4B vs 9B here; that is not a tie.
+
+## 5b. Render sensitivity of the released checkpoints — a deployment caveat
+
+Both public checkpoints were trained before the facts-first corpus fix (REPORT §3ag), so they inherit its
+positional bias. Scored on 605 held-out long states (`scripts/make_long_eval.py`), identical items, differing only
+in where the `Case:` block sits, no truncation at eval:
+
+| released model | facts-**first** state | facts-**last** state | cost of facts-first |
+|---|---:|---:|---:|
+| `typical-small` | .598 | .798 | **−20.0** |
+| `typical-medium` | .612 | .866 | **−25.5** |
+
+Callers write their own state text. On long documents these checkpoints want the case facts **after** the policy
+body; putting them first costs 20–25 points, and `typical-small` then sits at the majority-class floor on the
+yes/no family. Retrained checkpoints on the fixed corpus do not show this (REPORT §3ak-a/§3ak-c: the facts-first
+14B reaches .997 on the same set). This belongs on the model cards.
+
 ## 5. JevBench (public-subset, 72 standard / 48 easy / 111 hard; see "how to read this")
 
 | model | checkpoint | release status | std acc (Brier) | easy acc (Brier) | hard acc (Brier) |
