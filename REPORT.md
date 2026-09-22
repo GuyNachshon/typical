@@ -1451,6 +1451,39 @@ outcome is more valuable than a confirmation, because the mechanism is currently
 the paper.
 
 
+## 3aj. Tap-depth sweep at 1.7B — 54% / 61% / 64% (3 H100s, 2026-09-22, ~$20)
+
+The tap layer (how far up the backbone the state prefix is read) was fixed at 71% by §3f and never re-tested
+against the Release-1 recipe. Three matched runs at tap 15 / 17 / 18 of 28 (54% / 61% / 64%), updated defaults
+(`max_state` 2,048, `--drop_truncated`, `--grad_ckpt`, `--best_on data_u_val,data_wh_val`, 8k steps). JevBench
+values below re-read from `jev_native_ts1c_tap*/{original,hard}/summary.json` on the hub.
+
+| | `ts1b` (§3ae, old recipe) | tap15 (54%) | tap17 (61%) | tap18 (64%) |
+|---|---|---|---|---|
+| JevBench standard / hard | .694 / .432 | **.764** / .324 | .708 / **.441** | **.764** / **.441** |
+| JevBench Brier standard | .40 | **.375** | .441 | .414 |
+| CLINC / TREC / HWU64 / 20NG | .804/.508/.761/.540 | .828/.560/.782/.468 | .796/.434/.762/.482 | .824/.556/.761/.542 |
+| MMLU among-K / Δ_q_sh | .343 / .127 | .320 / .120 | .317 / .123 | .331 / .117 |
+| held-out noul / score / style | .715/.520/.859 | .628/.473/.868 | .626/.515/.855 | .608/.555/.838 |
+| W NLL score / typed | 1.01 / 1.25 | 1.79 / 1.50 | 1.15 / 1.27 | 1.02 / 1.24 |
+| wh family / level 7 / flip | .836 / .495 / .718 | .820/.481/.715 | .848/**.503**/.732 | .839/.490/.717 |
+| single decision K=2 / 256 (ms) | – | 66.6 / 111.2 | **50.8** / 113.6 | 53.1 / 114.2 |
+
+**No free win, and the sweep does not support a depth story.** Quality rises weakly and non-monotonically toward
+tap18, but every gain sits inside the spread §3v measured between two seeds of the same config, and the one large
+signal — tap15's W NLL (1.79 / 1.50 against ~1.0–1.2 for the other two) — is a single-arm outlier that has not been
+reproduced. Δ_q_sh is flat across all three taps (.117–.123), so there is no shallow-tap "compilation" cliff of the
+kind §3e was hunting. **Two caveats that limit what this table can be used for**: (1) the `ts1b` column is the *old*
+recipe (`max_state` 1,024, 12k steps, no `--drop_truncated`/`--best_on`), so it is a shape reference, not a matched
+baseline — the matched tap20 control under the updated defaults has not been run; (2) the latency column is almost
+certainly noise, not depth — it reports the *shallowest* tap as the *slowest* at low K (66.6 ms at tap15 vs 50.8 at
+tap17), which is backwards, since a shallower tap can only reduce the one-time state pass. K=256 latency is flat
+(111–114 ms) across all three, as expected, because tap depth barely touches decision-batching cost.
+
+**Verdict: tap stays at 71%.** Nothing here clears the bar for changing a frozen architecture parameter, and the
+sweep's own baseline is mismatched. Recorded as a closed negative; re-open only with a matched tap20 arm.
+
+
 ## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
 
 - `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
