@@ -1,0 +1,333 @@
+\section{Appendix}
+
+\subsection{Additional ablation tables and figures}
+\label{app:extra-figures}
+
+\Cref{tab:app-blind-closure,tab:app-null-fix} give the full numbers for the candidate-blind closure
+(\Cref{sec:results:candidate-blind}) and the rendered-null-line ablation (\Cref{sec:results:null})
+summarized in the main text. \Cref{fig:truncation,fig:serving} give the long-state truncation histogram
+and the serving-latency fix referenced from \Cref{sec:results:mixture,sec:results:latency}.
+
+\begin{table}[h]
+  \centering
+  \caption{Candidate-blind $Z$, closure at full depth vs.\ the original tap-20 student.}
+  \label{tab:app-blind-closure}
+  \small
+  \begin{tabular}{lrrr}
+    \toprule
+    & Tap 20 & Full depth (28) & Teacher \\
+    \midrule
+    MMLU-Pro among-$K$ / choices-only / shuffled-q & .157 / .166 / .182 & .147 / .177 / .156 & .310 / .222 / .208 \\
+    $\dq$ (choices-only) / $\dqsh$ (primary) & $-.009$ / $-.026$ & $-.030$ / $-.008$ & .088 / .102 \\
+    SNLI / MNLI / ANLI / BoolQ & .905/.873/.541/.826 & .881/.807/.462/.712 & -- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+  \centering
+  \caption{Rendered $\nullsym$ line vs.\ the factored null, matched checkpoints (tap 20).}
+  \label{tab:app-null-fix}
+  \small
+  \begin{tabular}{lrr}
+    \toprule
+    & Rendered $\nullsym$ line & Factored null (no rendered line) \\
+    \midrule
+    MMLU-Pro false-abstain rate & .692 & .003 \\
+    MMLU-Pro accuracy & .133 & .353 \\
+    Banking77 (unseen labels) accuracy / false-abstain & .063 / .924 & .579 / .135 \\
+    CLINC-OOS accuracy / null AUROC & .639 / .840 & .798 / .973 \\
+    $\dqsh$ (unchanged) & .118 & .122 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig_truncation.pdf}
+  \caption{Left: histogram of \texttt{data\_wf\_long} state token lengths with truncation fractions at
+  256/1024/2048/3072 tokens. Right: long\_policy (hard-tier) accuracy across the long-state bug/fix
+  sequence.}
+  \label{fig:truncation}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig_serving.pdf}
+  \caption{Per-decision p50 latency before/after the zero-copy prefix fix, cold vs.\ warm, for
+  \texttt{typical-small} (1.7B), \texttt{typical-medium} (4B), and \texttt{tm2} (Qwen3.5-4B), at $K{=}2$,
+  256-token state.}
+  \label{fig:serving}
+\end{figure}
+
+\subsection{Full hyperparameters}
+\label{app:hyperparams}
+
+\Cref{tab:app-hparams} gives the released and candidate recipes' exact configuration. All runs use AdamW,
+bf16, and LoRA rank 16 on the top eight kept layers of the truncated backbone; the family-balanced sampler
+and null augmentation are described in \Cref{sec:method:mixture}.
+
+\begin{table}[h]
+  \centering
+  \caption{Training configuration by checkpoint. Tap is given as layer / total layers of the base model.
+  $E{:}K{:}W{:}U$ is the family-sampler weight per batch. Max state is the training-time token budget for
+  the cached prefix.}
+  \label{tab:app-hparams}
+  \small
+  \begin{tabular}{lrrrrrr}
+    \toprule
+    Checkpoint & Backbone & Tap & Steps & Batch & $E{:}K{:}W{:}U$ & Max state \\
+    \midrule
+    \texttt{typical-small-preview} & Qwen3-1.7B-Base & 20/28 & 12{,}000 & 64 & .35{:}.25{:}.40{:}0 & 256 \\
+    \texttt{ts1b} (\texttt{typical-small}) & Qwen3-1.7B-Base & 20/28 & 12{,}000 & 64 & .40{:}.15{:}.35{:}.10 & 1{,}024 \\
+    \texttt{tm1b} (\texttt{typical-medium}) & Qwen3-4B-Base & 26/36 & 12{,}000 & 64 & .40{:}.15{:}.35{:}.10 & 1{,}024 \\
+    \texttt{ladder\_8b} & Qwen3-8B-Base & 26/36 & 12{,}000 & 64 & .35{:}.25{:}.40{:}0 & 256 \\
+    \texttt{ladder\_14b} & Qwen3-14B-Base & 28/40 & 12{,}000 & 64 & .35{:}.25{:}.40{:}0 & 256 \\
+    \texttt{tl1b} (candidate) & Qwen3-14B-Base & 28/40 & 8{,}000 & 64 & DecisionMix v2 + $U$, facts-first & 3{,}072 \\
+    \texttt{tm2} & Qwen3.5-4B-Base & $\approx$71\% & 12{,}000 & 64 & .40{:}.15{:}.35{:}.10 & 2{,}048 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\texttt{ts1b}/\texttt{tm1b} additionally set \texttt{null\_aug W:0.20}, \texttt{ordinal\_smooth 0.7} (Score),
+\texttt{noul\_head bern} (routed per row, \Cref{sec:method:typed}), \texttt{null factored}, and
+\texttt{nc\_render letters\_nonull}. \texttt{tl1b} adds \texttt{--drop\_truncated}, frozen-teacher KD
+($\alpha \cdot \mathrm{CE} + \beta \cdot \mathrm{KL}$, $T{=}2$, against the same backbone's own frozen
+3-shot letter distribution on 63k labelled rows), and checkpoint selection on held-out
+uncertainty-plus-curriculum validation NLL (\texttt{--best\_on}) rather than in-distribution loss. Final
+fitted temperature and null offset for \texttt{ts1b}: $T{=}1.124$, offset $0$ (post-hoc, applied at eval).
+
+\subsection{Corpus tables}
+\label{app:corpora}
+
+\begin{table}[h]
+  \centering
+  \caption{\texttt{data\_wf}: 15 families, 72{,}006 train rows, 3 held out (marked *). ``In rubric groups''
+  counts rows that are part of a same-state-same-candidates, different-rubric-different-gold group.}
+  \label{tab:app-wf}
+  \small
+  \begin{tabular}{llrr}
+    \toprule
+    Family & Type & Rows & In rubric groups \\
+    \midrule
+    policy\_permit & Noul & 9{,}000 & 5{,}205 \\
+    adequacy & Noul & 5{,}000 & 0 \\
+    support & Noul & 6{,}000 & 0 \\
+    fact & Noul & 5{,}000 & 0 \\
+    eligibility* & Noul & 1{,}500 & 851 \\
+    routing & Choice & 9{,}003 & 5{,}208 \\
+    action\_select & Choice & 7{,}000 & 4{,}054 \\
+    enum\_extract & Choice & 7{,}000 & 3{,}618 \\
+    categorical & Choice & 7{,}004 & 3{,}882 \\
+    tool\_select* & Choice & 1{,}500 & 905 \\
+    quality & Score & 6{,}000 & 0 \\
+    severity & Score & 6{,}000 & 3{,}497 \\
+    relevance & Score & 3{,}998 & 0 \\
+    completeness & Score & 4{,}001 & 2{,}196 \\
+    urgency* & Score & 1{,}502 & 900 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+  \centering
+  \caption{\texttt{data\_wh} (DecisionMix v2): 60{,}605 train rows across 12 domains $\times$ 6 boolean
+  conditions, levels 1--6; level 7 (temporal/numeric/probability/trade-off composition) is eval-only.}
+  \label{tab:app-wh}
+  \small
+  \begin{tabular}{lrr}
+    \toprule
+    Level & Train rows & Held-out grammar rows \\
+    \midrule
+    1 & 10{,}601 & 142 \\
+    2 & 10{,}600 & 141 \\
+    3 & 10{,}600 & 141 \\
+    4 & 10{,}601 & 140 \\
+    5 & 10{,}602 & 142 \\
+    6 & 10{,}601 & 141 \\
+    \bottomrule
+  \end{tabular}
+  \quad
+  \begin{tabular}{lr}
+    \toprule
+    Eval file & Rows \\
+    \midrule
+    \texttt{wh\_heldout\_family} & 422 \\
+    \texttt{wh\_heldout\_style} & 403 \\
+    \texttt{wh\_heldout\_grammar} & 816 \\
+    \texttt{wh\_level7} & 880 \\
+    \texttt{wh\_rubric\_flip} & 2{,}206 \\
+    \texttt{wh\_rubric\_shuffled} & 2{,}437 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+  \centering
+  \caption{\texttt{data\_u}: 31{,}029 train rows, 100\% soft-target.}
+  \label{tab:app-u}
+  \small
+  \begin{tabular}{lr}
+    \toprule
+    Source & Train rows \\
+    \midrule
+    Synthetic (4 closed-form generators) & 28{,}560 \\
+    UNLI (validation split only) & 2{,}068 \\
+    AmbiEnt (ambiguous rows) & 401 \\
+    \midrule
+    By decision type: Noul / Score / Choice & 23{,}403 / 7{,}225 / 401 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Per-family JevBench-hard tables}
+\label{app:hard-families}
+
+\Cref{tab:app-hard} reports the hard-tier sub-families discussed in \Cref{sec:analysis:hard}. As flagged in
+\Cref{fig:hard_families}'s caption, per-family values in the figure are re-derived directly from each run's
+JSON evaluation artifact, which for \texttt{ladder\_14b}'s temporal\_numeric and probability sub-families
+differs from the corresponding prose in this project's internal report (.333/.50 in the JSON vs.\ .20/.40
+in the report's own prose); we use the report's own prose numbers below for \texttt{tl1b} and the frozen
+control, since those cells do not exhibit the same discrepancy, and refer readers to the JSON-derived
+figure for \texttt{ladder\_14b}'s two affected cells.
+
+\begin{table}[h]
+  \centering
+  \caption{JevBench hard-tier sub-family accuracy, 14B.}
+  \label{tab:app-hard}
+  \small
+  \begin{tabular}{lrrr}
+    \toprule
+    Sub-family & \texttt{ladder\_14b} & \texttt{tl1b} & Frozen 14B, 3-shot \\
+    \midrule
+    long\_policy & .05 & .158 & -- \\
+    multi\_hop & .44 & .611 & -- \\
+    trap & 1.00 & 1.00 & -- \\
+    adversarial & .67 & .667 & -- \\
+    temporal & .20\textsuperscript{$\dagger$} & .20 & -- \\
+    probability & .40\textsuperscript{$\dagger$} & .30 & -- \\
+    tradeoff & .67 & .17 & -- \\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{2pt}
+  \raggedright\footnotesize $\dagger$ See discrepancy note above; the JSON-derived values for these two
+  \texttt{ladder\_14b} cells are .333 (temporal) and .50 (probability).
+\end{table}
+
+\subsection{Operations and reproducibility notes}
+\label{app:ops}
+
+Training and evaluation ran on rented RunPod H100 instances (SXM and NVL variants); a handful of
+infrastructure issues affected timing and are recorded here for reproducibility rather than folded into
+the results. A pod created with an SSH-only startup flag never reached a ready state on the account used
+and billed regardless (encountered repeatedly before being diagnosed); using a fixed exposed port at boot
+avoided it. Stopping a pod without an attached persistent volume wipes it, so checkpoints and manifests were
+always written to a network volume or pushed to the Hugging Face Hub before a pod was stopped.
+\texttt{tmux kill-session} does not terminate a \texttt{timeout}-wrapped child process, which once produced
+a stray duplicate training run sharing a GPU with the intended one; process matching over SSH must target
+the exact command, since a loose \texttt{pkill} pattern can match and kill the SSH shell itself before the
+target process. Two pods sharing one Python environment on the same network volume corrupted it under
+concurrent dependency resolution; per-pod environments with dependency syncing disabled avoided this.
+Every run's manifest records the harness commit, checkpoint hash, and dependency lock file used, and the
+JevBench per-item comparisons in this paper are all computed against the same fixed set of 231 public ids
+from one harness commit.
+
+\subsection{Full result tables}
+\label{app:full-results}
+
+\Cref{tab:app-evidence,tab:app-knowledge,tab:app-wf-eval,tab:app-jevbench,tab:app-latency} reproduce this
+project's complete cross-checkpoint result tables at the time of writing, restricted to checkpoints that
+completed evaluation (in-flight checkpoints are omitted per \Cref{sec:limitations}).
+
+\begin{table}[h]
+  \centering
+  \caption{Evidence and knowledge-classification accuracy by checkpoint.}
+  \label{tab:app-evidence}
+  \small
+  \begin{tabular}{llrrrrrrrr}
+    \toprule
+    Model & Checkpoint & CLINC-150 & TREC-fine & HWU64 & 20NG & SNLI & MNLI & BoolQ & ANLI \\
+    \midrule
+    Qwen3-1.7B & \texttt{ts1b} & .801 & .508 & .761 & .540 & .894 & .859 & .824 & .497 \\
+    Qwen3-4B & \texttt{tm1b} & .847 & .414 & .769 & .588 & .909 & .861 & .843 & .544 \\
+    Qwen3-8B & \texttt{ladder\_8b} & .769 & .486 & .740 & .452 & .853 & .831 & .822 & .468 \\
+    Qwen3-14B & \texttt{tl1b} & .827 & .508 & .760 & .690 & .911 & .868 & .882 & .583 \\
+    Qwen3.5-4B & \texttt{tm2} & .795 & .480 & .717 & .579 & .900 & .855 & .840 & .554 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+  \centering
+  \caption{Knowledge probe (MMLU-Pro among-$K$, $\dqsh$) and TruthfulQA MC1.}
+  \label{tab:app-knowledge}
+  \small
+  \begin{tabular}{llrrr}
+    \toprule
+    Model & Checkpoint & MMLU-Pro among-$K$ & $\dqsh$ & TruthfulQA MC1 \\
+    \midrule
+    Qwen3-1.7B & \texttt{ts1b} & .343 & .127 & .257 \\
+    Qwen3-4B & \texttt{tm1b} & .458 & .193 & .408 \\
+    Qwen3-8B & \texttt{ladder\_8b} & .302 & .093 & .277 \\
+    Qwen3-14B & \texttt{tl1b} & .498 & .235 & .481 \\
+    Qwen3.5-4B & \texttt{tm2} & .429 & .194 & .414 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+  \centering
+  \caption{Held-out workflow and external floors, full-row \texttt{eval\_wf} pass.}
+  \label{tab:app-wf-eval}
+  \small
+  \begin{tabular}{lrrrrrr}
+    \toprule
+    Model & Held-out noul & Held-out score (NLL) & Held-out style & PagerDuty (.792) & jevlogs (.697) & Mind2Web (.427) \\
+    \midrule
+    \texttt{ts1b} & .710 & .522 (1.01) & .861 & .560 & .500 & .351 \\
+    \texttt{tm1b} & .811 & .528 (1.03) & .861 & .553 & .480 & .547 \\
+    \texttt{ladder\_8b} & .681 & .543 (1.67) & .882 & .321 & .501 & .404 \\
+    \texttt{tl1b} & .831 & .621 (0.95) & .882 & .805 & .514 & .564 \\
+    \texttt{tm2} & .858 & .586 (0.97) & .842 & .757 & .518 & .497 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+  \centering
+  \caption{JevBench (public subset, 72 standard / 48 easy / 111 hard) accuracy (Brier).}
+  \label{tab:app-jevbench}
+  \small
+  \begin{tabular}{lrrr}
+    \toprule
+    Model (checkpoint) & Standard (Brier) & Easy (Brier) & Hard (Brier) \\
+    \midrule
+    Qwen3-1.7B (\texttt{ts1b}) & .694 (.40) & 1.00 (.005) & .432 (.79) \\
+    Qwen3-4B (\texttt{tm1b}) & .806 (.30) & 1.00 (.012) & .423 (.77) \\
+    Qwen3-8B (\texttt{ladder\_8b}) & .667 (.55) & 1.00 (.015) & .396 (.83) \\
+    Qwen3-14B (\texttt{tl1b}) & \textbf{.931} (.18) & 1.00 (.005) & .450 (.66) \\
+    Qwen3.5-4B (\texttt{tm2}) & .861 (.22) & 1.00 & \textbf{.495} (.72) \\
+    Qwen3.5-4B, frozen 3-shot & .764 (.36) & 1.00 & .495 (.60) \\
+    Qwen3.5-9B, frozen semif-render & .931 (.11) & 1.00 & .595 (.51) \\
+    Qwen3-14B, frozen 3-shot & .819 (.28) & 1.00 & .559 (.56) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+  \centering
+  \caption{Single-decision latency (same-pod, same-torch-build; ms), $L_s{=}256$.}
+  \label{tab:app-latency}
+  \small
+  \begin{tabular}{lrrrr}
+    \toprule
+    Model (checkpoint) & $K{=}2$ & $K{=}32$ & $K{=}256$ & Peak memory $K{=}2{\to}256$ (GB) \\
+    \midrule
+    Qwen3-1.7B (\texttt{ts1b}-shape) & 45 & 46 & 106 & 6.4 $\to$ 9.3 \\
+    Qwen3-4B (\texttt{tm1b}) & 57 & 58 & 96 & 14.6 $\to$ 18.6 \\
+    Qwen3-8B (\texttt{ladder\_8b}) & 70 & 71 & 126 & 29.3 $\to$ 34.1 \\
+    Qwen3-14B (\texttt{tl1b}) & 59 & 62 & 156 & 51.6 $\to$ 57.5 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

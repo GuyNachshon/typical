@@ -1,0 +1,163 @@
+\section{Method}
+\label{sec:method}
+
+\textbf{Typical} turns a pretrained causal language model into a decision engine: it consumes a runtime
+state, a query, and a runtime-defined candidate set, and returns a calibrated probability distribution
+over the candidates without generating any tokens. This section describes the decision pass
+(\Cref{sec:method:pass}), typed output primitives (\Cref{sec:method:typed}), why a more appealing
+candidate-blind alternative does not work (\Cref{sec:method:blind-closure}), the training mixture
+(\Cref{sec:method:mixture}), and checkpoint selection (\Cref{sec:method:selection}).
+
+\subsection{The decision pass}
+\label{sec:method:pass}
+
+A decision is a tuple $(\state, \query, \cands)$: a state $\state$, a query $\query$, and a candidate set
+$\cands = \{\cand{1}, \dots, \cand{\numcands}\}$ of label strings supplied at request time, not fixed at
+training time. The model returns $P(\cand{j} \mid \state, \query, \cands)$ for every $j$ plus a null
+probability $\pnull$, without emitting an answer token.
+
+\textbf{Cached state, causal suffix.} $\state$ is encoded once as an ordinary causal prefix and its
+key-value cache is retained; every query against it is a short causal suffix -- query text followed by
+candidate labels -- run through the backbone attending to the cached prefix, never recomputing it. This
+is exactly a forward pass on $\mathrm{concat}(\state, \query, \cands)$ with the $\state$ half read from
+cache; a bit-exact equivalence test (state-KV-cache decode vs.\ full concatenation, tolerance $10^{-3}$
+over chunk sizes 1, 2, 3, 5, 64) confirms no query recomputes the state and no two queries attend to each
+other, so $M$ decisions against one state cost $O(\state) + M \cdot O(\query)$, not $M \cdot O(\state + \query)$.
+
+\textbf{Suffix-rendered options and the N3 readout.} We compare this design against two alternatives: a
+``candidate-blind'' state computed before candidates are known (\Cref{sec:method:blind-closure}), and a
+letter-logit readout (next-token probability over rendered option letters, as in ordinary multiple-choice
+prompting). The readout we adopt, \textbf{N3}, renders each candidate as lettered text inside the suffix
+(e.g.\ ``A. \textit{cancel\_subscription} B. \textit{escalate\_to\_human}'') and takes two things from one
+forward pass: the terminal hidden state $\hD$, and each option's own contextual hidden state $\hctx{j}$,
+span-pooled over its rendered tokens. Because the options are tokens inside the same causal computation
+as the query, $\hctx{j}$ already carries the option's slot identity -- something a candidate embedded in
+isolation (a dual-encoder or energy-scoring front end) cannot represent. The score for option $j$ is a
+bilinear function of $\hD$ and $\hctx{j}$; \Cref{sec:results:readout} compares this (N3) against the
+letter readout (N1) and a candidate-blind bilinear score (N2).
+
+\textbf{The null is factored out of the candidate softmax.} A rendered ``none of the above'' option
+competing for softmax mass dilutes as $\numcands$ grows, independent of whether the true label is absent
+(\Cref{sec:results:null}). We instead compute $\pnull$ from a gate over permutation-invariant statistics
+of the candidate scores $s_1,\dots,s_\numcands$ (max, top-2 margin, mean, log-sum-exp, each over valid
+candidates only) concatenated with $\hD$ and the candidate-set mean/variance: $r = \sigma(g(z))$, giving
+\begin{equation}
+  \label{eq:factored-null}
+  P(\cand{j} \mid \state, \query, \cands) = (1-r)\cdot\frac{\exp(s_j/T)}{\sum_{k=1}^{\numcands}\exp(s_k/T)},
+  \qquad
+  \pnull = r,
+\end{equation}
+implemented as logits $\ell_j = \log p_j + \log(1-r)$, $\ell_\nullsym = \log r$. Because $r$ never enters
+the candidate softmax, $p_j/p_k$ for any two candidates is exactly independent of the rest of the set
+(exact independence of irrelevant alternatives, IIA), and $T$ scales only the candidate softmax ($r$, computed from untempered statistics, is
+$T$-invariant). We call this the \textbf{factored null}, distinct from a candidate-aware null that
+competes inside the same softmax (an earlier, energy-scoring version of the architecture) and from a
+literal rendered ``none of the above'' option.
+
+\subsection{Typed primitives}
+\label{sec:method:typed}
+
+Choice, Score, and Noul share one backbone, tap, and N3 readout, differing only in target distribution and
+terminal head, routed per row rather than by a global flag.
+
+\textbf{Choice} is the $\numcands$-way readout above, unchanged. \textbf{Score} is ordinal (severity,
+quality, urgency): plain Choice penalizes a one-level miss as much as an opposite-end miss, so we use an
+\textbf{ordinal-smoothed target},
+\begin{equation}
+  \label{eq:ordinal-smooth}
+  \tilde{t}_j \propto \exp\!\left(-\frac{|j - y|}{\tauord}\right), \qquad \tauord = 0.7,
+\end{equation}
+normalized over valid levels, $\tauord{=}0$ recovering one-hot Choice -- a pure target change, no
+architecture change. \textbf{Noul} is a yes/no proposition; rendered as 2-way Choice it is not guaranteed
+order-invariant, since ``yes''/``no'' still occupy two different suffix positions with two different
+contextual states. We give Noul a dedicated \textbf{Bernoulli head} reading the query alone, no candidate
+text,
+\begin{equation}
+  \label{eq:bernoulli-noul}
+  P(\text{yes}) = \sigma(w_n \cdot \hD),
+\end{equation}
+exactly order-invariant by construction, verified empirically as an exact-zero reversed-label control
+(\Cref{sec:results:typed}); the remaining mass $1{-}P(\text{yes})$ spreads over the other candidate(s),
+and the factored-null gate above still applies.
+
+\textbf{Per-row routing, not a global flag.} A row is Noul-eligible iff its candidate set is exactly
+$\{\text{yes},\text{no}\}$; every other row scores as ordinary Choice, bit-identical to a run with Noul
+disabled. This boundary matters operationally: an early release candidate applying the Bernoulli head at
+the \emph{model} level rather than per row collapsed to chance, because Choice- and Score-typed rows in
+the same batch were then scored with no candidate text at all. Fixing the routing per row (verified by 140
+unit tests) restored it -- a typed-decision interface is a contract on the input, not a labeling
+convenience, and violating it does not degrade gracefully.
+
+\subsection{Candidate-blind factorization: what does not work, and why}
+\label{sec:method:blind-closure}
+
+Before adopting the option-in-suffix design, we tested computing a decision state $Z(\state,\query)$
+\emph{before} the candidate set is known and scoring candidates against $Z$ afterward -- a dual-encoder,
+energy-scoring-style design. We report the negative result because it is itself a methodological point: a
+candidate-blind state cannot be shown to fail on accuracy alone, since it can still absorb candidate-set
+priors and calibration and look like it retains knowledge.
+
+We distilled a listwise teacher (a fine-tuned decoder reading options in context) into $Z$ under several
+student architectures (a single vector; a multi-probe vector with token-level max-similarity; a
+set-conditioned variant with $O(\numcands)$ cross-attention over candidate tokens) and objectives
+(ordinary single-set distillation; an explicit same-$Z$ multi-set objective supervising the
+\emph{difference} in log-odds a candidate-set edit induces in the teacher). Every student closes 20--55\%
+of the chance-to-teacher accuracy gap -- but a control comparing each model's score on the real question
+against its score with the question replaced by a placeholder or a shuffled, unrelated one (candidate set
+fixed) shows this gain is candidate-set priors baked into the corpus: every candidate-blind student's
+score is unchanged under question-shuffling, while the teacher's drops substantially. More probes, explicit
+set-conditioning, and direct log-odds supervision all leave this unchanged, and it survives tapping the
+full backbone depth rather than an intermediate layer (\Cref{sec:results:candidate-blind}). We read this
+as evidence that, under the factorizations and objectives tried, question-conditioned parametric
+reasoning depends on the candidates being present \emph{inside} the computation that processes the
+question -- motivating the option-in-suffix design we adopt throughout.
+
+\subsection{Training mixture}
+\label{sec:method:mixture}
+
+The recipe applies LoRA \citep{hu2022lora} (rank 16) to the top eight layers of a Qwen3
+\citep{yang2025qwen3} backbone truncated at roughly 71\% of its
+depth (tap layer 20/28 at 1.7B, 26/36 at 4B/8B, 28/40 at 14B); layers below the tap are frozen. This
+truncation matters: reading the terminal state of the \emph{last} layer collapses to a readout that never
+uses the state at all (\Cref{sec:results:readout}), since the final layer's job in a causal LM is
+next-token prediction, not accumulating the state's evidence.
+
+Batches are drawn from a \textbf{family-balanced sampler} over four families rather than a pool sampled by
+raw row count, so no single large corpus silently dominates: $E$ (evidence/classification), $K$
+(closed-book knowledge), $W$ (rubric-conditioned workflow decisions), $U$ (soft-target uncertainty). The
+released recipe samples $E{:}0.40, K{:}0.15, W{:}0.35, U{:}0.10$ (\Cref{sec:experiments:data} gives
+provenance); a sweep (\Cref{sec:results:mixture}) shows $E \geq 0.45$ is needed once $W$/$U$ are added,
+with a wide flat region otherwise.
+
+\textbf{Null augmentation.} 10--20\% of $W$ rows are duplicated with their gold candidate removed, target
+$\nullsym$, because the natural null rate differs by two orders of magnitude between corpora (under 1\% of
+$W$ rows carry one vs.\ over 20\% of $E$) and a single global calibration offset cannot serve both regimes
+at once (\Cref{sec:results:calibration}): the offset that fixes false abstention on an evidence label
+space pushes a workflow-trained model to abstain on almost everything, and vice versa. Null augmentation
+fixes this at the data level.
+
+\textbf{Long-state handling.} Long-policy workflow rows train at a longer window (up to 1{,}024 tokens for
+the release recipe, 3{,}072 for the 14B long-state candidate). We diagnosed a data defect: an earlier
+version of the generator rendered supporting facts \emph{after} the request text, and because training
+right-truncates at the window, a 1{,}024-token window silently dropped the facts on 98.8\% of long-policy
+rows (100\% at 256 tokens) -- every model trained on that version was optimized to answer long policies
+from states that no longer contained the evidence for the answer. The fix re-renders \textbf{facts-first}
+(evidence before the request text) and adds \texttt{--drop\_truncated} to discard, rather than silently
+cut, any still-over-length row. Both are general lessons about decision-model training data: a
+fixed-length window interacts with \emph{where} the load-bearing content sits, not only how long the
+render is, and a truncation-length ablation alone would not surface this, since the fix is orthogonal to
+length. We report this fix as a diagnosed mechanism, not a demonstrated cause: it shipped in the same
+training run as frozen-teacher distillation, a Brier-score term, calibration-based checkpoint selection,
+and the longer window itself (\Cref{sec:results:kd}), and no matched facts-first-vs-facts-last pair at an
+identical window and seed isolates its individual contribution.
+
+\subsection{Checkpoint selection}
+\label{sec:method:selection}
+
+Selecting checkpoints on in-distribution training loss favors the majority hard-label data at the expense
+of probability quality on the minority of soft/ordinal rows. We instead select on held-out
+uncertainty-and-curriculum negative log-likelihood (NLL), optionally with a Brier-score term in the
+training objective itself rather than only post-hoc temperature fitting. This change to the selection
+criterion alone -- not model capacity or training data -- produces the largest single swing in probability
+quality in this project, taking held-out score NLL from among the worst in the size ladder to among the
+best at the same backbone size (\Cref{sec:results:calibration}).

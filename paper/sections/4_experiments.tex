@@ -1,0 +1,160 @@
+\section{Experimental setup}
+\label{sec:experiments}
+
+\subsection{Corpora}
+\label{sec:experiments:data}
+
+Training draws from seven corpora, summarized in \Cref{tab:corpora} (full per-family breakdowns in
+\Cref{app:corpora}). \textbf{\texttt{data\_v5}} covers evidence tasks (SNLI \citep{bowman2015snli}, MNLI
+\citep{williams2018mnli}, ANLI \citep{nie2020anli}, BoolQ \citep{clark2019boolq}, SQuAD-v2-style reading
+comprehension) and classification (including CLINC-150 and Banking77/HWU64
+\citep{larson2019clinc,casanueva2020banking77}) with a deliberately wide span of label vocabularies at low
+rows-per-source, so the model cannot memorize a fixed small set of label sets and must read the rendered
+options. \textbf{\texttt{data\_kb}} is a closed-book multiple-choice knowledge corpus distilled from nine
+standard sources (ARC, OpenBookQA, CommonsenseQA, SciQ, QASC, LogiQA, AQuA-RAT, MedMCQA,
+MMLU-auxiliary-train), with TruthfulQA-MC1 \citep{lin2022truthfulqa} held out entirely and two items
+excluded from all MMLU-Pro \citep{wang2024mmlupro,hendrycks2021mmlu} numbers after a leakage audit against
+that evaluation set. \textbf{\texttt{data\_wf}} is our own
+rubric-conditioned workflow generator, 15 families of Noul/Choice/Score decisions (policy checks,
+adequacy, support, fact verification, routing, action selection, extraction, categorical judgment, tool
+selection, and four ordinal scales plus urgency); one whole family per type is held out entirely, and 37\%
+of rows belong to \emph{rubric groups} -- the same state and candidate set rendered under two or three
+different rubrics with different gold answers, built to measure rubric dependence rather than
+state/candidate pattern-matching. \textbf{\texttt{data\_wf\_hf}} adds three externally sourced sets in the
+same typed shape (\texttt{cua-s1-forms}, MIT; \texttt{systemone-lite-general}, MIT;
+\texttt{jev-4b-distill-data}, Apache-2.0), each with its own held-out test/demo/adversarial split never
+trained on. \textbf{\texttt{data\_wf\_long}} is a longer-state variant of the workflow generator for
+multi-paragraph policy documents, rendered facts-first (\Cref{sec:method:mixture}).
+\textbf{\texttt{data\_wh}} is a second, independent rubric-conditioned generator (DecisionMix v2): a
+programmatic rule engine over 12 domains and six boolean conditions at seven levels of compositional
+depth, where levels 1--6 are trained and level 7 -- compositions requiring temporal, unit-conversion,
+expected-value, or trade-off reasoning the generator does not otherwise produce -- is evaluation-only;
+every trained row belongs to a counterfactual rubric group, and one domain/level pair, three whole
+domains, and two rubric styles are held out. \textbf{\texttt{data\_u}} is a soft-target uncertainty
+corpus: the validation split of UNLI \citep{chen2020unli}, the ambiguous rows of AmbiEnt, and four synthetic generators with
+exact closed-form posteriors (partial-evidence combination, a noisy-sensor Bayesian update, ordinal
+confusion, and conflicting-source log-odds pooling), each with a held-out parameter range;
+ChaosNLI-ambiguity \citep{nie2020chaosnli} is evaluation-only. None of the seven corpora contains any of the 231 public JevBench
+ids.
+
+\begin{table}[t]
+  \centering
+  \caption{Training corpora. ``Held out'' counts whole families, domains, styles, or parameter ranges
+  excluded from training entirely (not a random validation split).}
+  \label{tab:corpora}
+  \small
+  \begin{tabular}{lrrl}
+    \toprule
+    Corpus & Train rows & Held out & Role \\
+    \midrule
+    \texttt{data\_v5} & 633{,}213 & label wordings & Evidence (NLI/BoolQ) + wide-vocabulary classification \\
+    \texttt{data\_kb} & 147{,}447 & TruthfulQA-MC1, GPQA & Closed-book multiple-choice knowledge \\
+    \texttt{data\_wf} & 72{,}006 & 3 of 15 families & Rubric-conditioned workflow (Noul/Choice/Score) \\
+    \texttt{data\_wf\_hf} & 86{,}600 & 3 external test/demo splits & External workflow sets (forms, rules, distillation) \\
+    \texttt{data\_wf\_long} & 23{,}318 & -- & Long-state (multi-paragraph) workflow rows \\
+    \texttt{data\_wh} & 60{,}605 & 1 domain/level, 3 domains, 2 styles, level 7 & DecisionMix v2 hard curriculum \\
+    \texttt{data\_u} & 31{,}029 & 4 synthetic parameter ranges & Soft-target uncertainty corpus \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{External, evaluation-only sets}
+\label{sec:experiments:external}
+
+Six sets are never trained on and are used only to measure generalization beyond our own generators:
+\textbf{PagerDuty} (alert-triage yes/no, 6{,}000 rows, majority floor .792), \textbf{jevlogs} (log-triage
+yes/no, 5{,}080 rows, majority floor .697), \textbf{Mind2Web} (web-agent action choice, 1{,}600 rows,
+majority floor .427), \textbf{tree-choice} (a taxonomy-routed high-cardinality choice set, up to $K=320$,
+720 rows), \textbf{typed-decisions} (400 cases / 2{,}000 decisions spanning all three primitive types
+with full instructions, criteria, and probabilistic gold), and \textbf{TruthfulQA-MC1}. We report accuracy
+against each set's own majority-class floor because several of these sets are class-imbalanced enough
+that a constant prediction clears a nontrivial accuracy (e.g.\ jevlogs is 70\% ``no''); a model below its
+floor is worse than guessing the majority class.
+
+\subsection{Held-out design}
+\label{sec:experiments:heldout}
+
+Generalization is measured along four largely independent axes, each with its own held-out split rather
+than a single random validation set: (i) \emph{whole families} -- an entire workflow family (e.g.\
+eligibility, tool selection, urgency) is excluded from \texttt{data\_wf}/\texttt{data\_wh} training and
+evaluated only at test time; (ii) \emph{rubric styles} -- the same decision content rendered in a writing
+style (e.g.\ terse vs.\ audit-log phrasing) never seen in training; (iii) \emph{rule grammars} -- for
+DecisionMix v2, one domain/level combination's surface grammar is withheld while the underlying boolean
+logic is trained on other domains; and (iv) \emph{compositional depth (level 7)} -- decisions requiring a
+type of reasoning (temporal arithmetic, unit conversion, expected value, multi-attribute trade-off) that
+the generator never produces at any trained level. We additionally report \textbf{rubric-flip accuracy}:
+for a state and candidate set rendered under two different rubrics with different gold answers, the
+fraction of pairs where the model gets \emph{both} rubrics' answers correct, which is only possible if
+the rubric conditions the answer rather than the model pattern-matching the state or candidates alone.
+A companion diagnostic, $\dr = \mathrm{Acc}(\state, r, \cands) - \mathrm{Acc}(\state, r_{\mathrm{shuf}}, \cands)$,
+compares accuracy under the correct rubric against accuracy when the rubric text is swapped for an
+unrelated one from a same-type item, holding the state and candidates fixed.
+
+\subsection{JevBench protocol and disclosures}
+\label{sec:experiments:jevbench}
+
+JevBench (\texttt{fstandhartinger/jevbench} v1.2.1) is a third-party benchmark for typed decision models,
+with items typed \texttt{noul} (yes/no), \texttt{choice} ($K=2$--6), and \texttt{score} (ordinal), each
+supplying a state, an instruction/rubric, and an exact label set, split into standard, easy, and hard
+tiers. We report results with the following disclosures made explicit, because each materially affects
+how the numbers should be read.
+
+\textbf{Public subset, not a ranked entry.} The harness's public release exposes 231 of its items (72
+standard, 48 easy, 111 hard); a further 146 judge-scored items are not public. The harness's own
+leaderboard ranks only submissions covering at least 95\% of items including the private judge set. Every
+number we report is computed on the 231 public ids only and is \emph{not} a ranked leaderboard entry;
+comparisons to leaderboard entries in \Cref{sec:results} are drawn from the same public per-item file and
+are only valid for that reason.
+
+\textbf{Effective sample size.} With 72 standard items, the majority-class floor is .311 and the standard
+error of a proportion at that floor is $\approx .058$ ($n{=}72$); design effects from paraphrase pairs in
+the standard split further reduce the effective sample to $n_{\mathrm{eff}} = 36$. We treat any
+standard-tier difference between our own checkpoints under roughly 2 points, and any hard-tier difference
+under roughly 6 points, as noise rather than a ranking, and we say so explicitly wherever such a
+comparison appears.
+
+\textbf{Probabilities are conditioned on non-$\nullsym$.} The harness's scoring expects a distribution
+over the labeled candidates only; we report $P(\cand{j} \mid \state, \query, \cands, \neg\nullsym)$, i.e.\
+$\pnull$ is computed and then dropped and the remaining mass renormalized, rather than folding $\pnull$
+into the reported distribution.
+
+\textbf{Other disclosures}, held constant across every model we report: option order follows the
+harness's own label order (a reversed-order control on one checkpoint swung standard accuracy by $\pm 4$
+points, larger than the differences between our own model variants); latency is measured in-process on
+one H100, one decision at a time, with model loading excluded and cold candidate-label embedding included
+where applicable; and no hosted-API cost applies to any of our numbers (we are not a hosted service on
+this benchmark). Every run's harness commit, checkpoint hash, and dependency lock file are recorded in
+the run manifest.
+
+\subsection{Metrics}
+\label{sec:experiments:metrics}
+
+We report \textbf{accuracy} (argmax against gold), \textbf{Brier score} (mean squared distance between
+the predicted distribution and the one-hot or soft gold), \textbf{expected calibration error (ECE)}
+(binned gap between confidence and accuracy), and \textbf{negative log-likelihood (NLL)} under the
+predicted distribution, all against either hard or soft gold as the evaluation set provides. Where a
+label space is only partially covered by the candidate set at test time (e.g.\ a held-out intent whose
+correct label was never seen in training), we separately report \emph{among-K} accuracy (accuracy of the
+argmax restricted to the true candidate set, ignoring $\pnull$) so that null-calibration failures and
+discrimination failures are not conflated. $\dq$ is the gap between a model's score on a question and its
+score with the question replaced by a placeholder or a shuffled, unrelated question (candidate set held
+fixed); it measures question-conditioned signal separately from candidate-set priors, and we report both
+a choices-only and a stricter shuffled-question variant, the latter adopted as primary after the former
+was shown to still admit some candidate-prior leakage (\Cref{sec:method:blind-closure}). $\dr$ and
+rubric-flip accuracy are defined in \Cref{sec:experiments:heldout}. Rubric-conditioned score and typed
+external sets carry soft, non-one-hot gold, so NLL and Brier score are the primary metrics there and
+accuracy is reported alongside as a secondary, coarser signal.
+
+\subsection{Hardware and latency measurement}
+\label{sec:experiments:hardware}
+
+Training runs on rented NVIDIA H100 GPUs (SXM and NVL variants, noted where the distinction matters for
+latency comparisons), bf16, AdamW, effective batch size 64 (via gradient accumulation where a single
+forward pass does not fit), 8{,}000--12{,}000 steps depending on the run. Latency is measured in-process,
+single stream, one decision at a time unless a batch size is stated, with the state's key-value cache
+warm (encoded once, reused across queries) and model loading excluded; we report single-decision latency
+(one query against a freshly cached state) and marginal per-query latency at a stated number of queries
+$M$ against one cached state, both as a function of candidate-set size $K$. Where we compare candidate
+readouts at different backbone sizes, all numbers in a given table are measured on one pod with one
+PyTorch/CUDA build (``apples-to-apples''); numbers drawn from different pods or builds are marked as such
+and not compared directly.

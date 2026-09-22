@@ -1,0 +1,33 @@
+% math_commands.tex -- shared notation for the Typical / PCDM paper
+
+% === Generic shortcuts ===
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator{\softmax}{softmax}
+\DeclareMathOperator{\sigmoidop}{\sigma}
+
+% === Paper-specific notation ===
+% State, query, candidates
+\newcommand{\state}{x}
+\newcommand{\query}{q}
+\newcommand{\cands}{A}
+\newcommand{\cand}[1]{a_{#1}}
+\newcommand{\numcands}{K}
+\newcommand{\hD}{h_D}                      % terminal decision state
+\newcommand{\hctx}[1]{c^{\mathrm{ctx}}_{#1}}  % contextual hidden state of option i
+\newcommand{\nullsym}{\varnothing}
+\newcommand{\pnull}{P(\nullsym)}
+
+% Metrics
+\newcommand{\dq}{\Delta_q}
+\newcommand{\dqsh}{\Delta_q^{\mathrm{sh}}}
+\newcommand{\dr}{\Delta_r}
+\newcommand{\ece}{\mathrm{ECE}}
+\newcommand{\nll}{\mathrm{NLL}}
+\newcommand{\brier}{\mathrm{Brier}}
+\newcommand{\auroc}{\mathrm{AUROC}}
+
+% Ordinal smoothing temperature
+\newcommand{\tauord}{\tau}
