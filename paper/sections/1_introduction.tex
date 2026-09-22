@@ -2,86 +2,91 @@
 \label{sec:intro}
 
 Software increasingly asks a language model to make a decision, not to write a paragraph: route this
-ticket to one of forty queues, decide whether this transaction is fraudulent, score the severity of this
-alert, choose the next tool call. In every one of these cases the caller does not want text -- it wants a
-calibrated probability over a label set it defines at request time, delivered in milliseconds, so that
-ordinary code can threshold it. The dominant way of getting this out of a language model today is to
-prompt it to \emph{generate} an answer -- a letter, a JSON field, a word -- and then parse that generation
-back into a decision. This detour through generation is expensive (one forward pass per candidate, or a
-multi-token completion, for every decision), sensitive to the surface form of the answer (option-order and
-option-symbol biases are well documented), and poorly calibrated out of the box, because next-token
-probabilities were never trained to be probabilities over a request-defined label set.
+ticket to one of forty queues, decide whether this transaction is fraudulent, score the severity of
+this alert, choose the next tool call. In these settings the caller ultimately needs a structured
+decision -- often a probability distribution over a label set defined at request time -- rather than
+free-form text. Existing approaches typically recover that decision through generated answer symbols
+or strings, constrained decoding, or candidate log-probabilities, which introduces decoding cost and
+a sensitivity to the answer representation that is well documented: option-order and option-symbol
+biases, and first-token probabilities that disagree with the text the model would actually generate.
 
-The gap, concretely: can a pretrained language model be read directly as a decision engine -- one that
-consumes a state, a query, and a runtime-defined candidate set, and returns a calibrated distribution over
-that set at the cost of a few dozen extra tokens against a cached state -- without generating an answer at
-all? And if so, does the resulting model retain the parametric knowledge and evidence-grounded reasoning
-the same backbone has when prompted generatively, or does removing the generative interface cost something
-structural?
+This paper asks one question:
 
-We built and evaluated such a system, which we call \textbf{Typical}, and the central empirical result is
-a negative one that shapes everything else in the paper. The most appealing design computes a decision
-state \emph{before} the candidates are known -- fully candidate-blind, closer to a dual-encoder -- and
-scores candidates against it afterward, which would let a runtime enumerate candidates for free. Under six
-tested factorizations and distillation objectives, and at every backbone depth we tried, this design
-transfers a listwise teacher's candidate-set priors and calibration but never its question-conditioned
-parametric knowledge, a distinction only visible under a control that swaps the real question for a
-shuffled, unrelated one and checks that the model's score does not care. We report this as a load-bearing
-negative result, not a discarded pilot: it rules out the design that looks obviously right, and it is why
-Typical instead renders the candidate set \emph{inside} the same causal suffix as the query. A state is
-encoded once and its key-value cache retained; every query against it is a short causal suffix -- query
-text and candidates together -- attending to the cached prefix and never recomputing it, so each
-candidate's own contextual hidden state carries its position and identity the way it would in an ordinary
-multiple-choice prompt. Recent mechanistic work shows a decoder already knows which multiple-choice option
-is correct before it emits the answer symbol \citep{wong2026models}; our readout builds on that finding
-rather than restating it, turning the latent decision into the output primitive itself and asking what a
-direct readout needs to preserve it. The answer turns out to be specific: scoring the terminal decision
-state against a candidate-blind semantic embedding of the option text loses 13 points of knowledge-probe
-accuracy relative to the letter interface, while scoring it against the option's own \emph{contextual}
-hidden state -- carrying the slot identity a semantic embedding cannot -- matches the letter interface
-while cutting most of its order sensitivity. \Cref{fig:architecture} sketches the resulting decision pass
-and the three typed output primitives (Choice, Score, Noul) built on top of it.
+\begin{quote}
+\emph{Can a pretrained causal language model be read directly as a decision engine, without
+generating an answer at all -- and what has to remain inside its computation for that to work?}
+\end{quote}
 
-The resulting recipe scales close to monotonically with backbone size on standard, bounded decisions:
-\textbf{JevBench} standard-tier accuracy, on the benchmark's public item subset, rises from .694 at 1.7B to
-\textbf{.931} at 14B, and .861 at a same-recipe Qwen3.5-4B checkpoint, at 15--60\,ms per decision regardless
-of size, because a single decision's cost is dominated by the cached state and a short suffix rather than
-backbone depth. Calibration-shaped checkpoint selection takes the model's held-out soft-target negative
-log-likelihood from 2.87 -- the worst point on our own size ladder -- to 0.95 at the same backbone size,
-with no change to model capacity; a same-backbone frozen-teacher distillation term tested against its own
-matched control adds nothing measurable and is mildly negative on the hard tier. Against this, we report
-the honest
-limit as clearly as the headline numbers: JevBench's hard tier of compositional, multi-step decisions
-remains at or near chance for every checkpoint we trained, including our best 14B model, which a
-same-size \emph{frozen} backbone with three in-context exemplars and no training at all beats on hard-tier
-accuracy -- a comparison we present alongside its own confound, since how the state and options are
-rendered moves a frozen backbone's score by a similar margin (\Cref{sec:analysis:tension}).
+We break it into three research questions, which organize the rest of the paper.
 
-\textbf{Contributions.}
+\begin{description}
+  \item[RQ1] Can a decision representation be computed \emph{before} the candidate set is known and
+  still preserve question-conditioned language-model capability? (\Cref{sec:repr:blind})
+  \item[RQ2] If not, can candidate-aware contextual states expose the decision directly, without
+  answer generation? (\Cref{sec:repr:readout,sec:repr:depth,sec:repr:null})
+  \item[RQ3] How does such an interface behave under scaling, calibration training, and harder
+  compositional decisions? (\Cref{sec:train,sec:boundary})
+\end{description}
+
+RQ1 matters because a candidate-blind decision state is the formulation a systems designer wants: one
+state, computed once, reusable against any candidate set a runtime enumerates later, with scoring cost
+independent of the language model. We tested it and it does not work, in a specific and measurable
+way. Under six tested factorizations and distillation objectives, and at both backbone depths we
+tapped, a candidate-blind state absorbs a listwise teacher's candidate-set priors and calibration but
+not its question-conditioned closed-book capability. That failure is invisible to accuracy: the
+students score well above chance. It appears only under a control that replaces the real question with
+a shuffled, unrelated one and checks whether the score moves. We make that control a first-class
+metric, $\dq$ (\Cref{sec:experiments:deltaq}), and report the negative as load-bearing rather than as
+a discarded pilot -- it is the reason the architecture we adopt gives up candidate-independent scoring.
+
+The answer to RQ2 is that the candidates must participate in the language model's own computation, and
+that \emph{how} they are represented in the readout matters at the interface level. Typical encodes a
+state once and retains its key-value cache; every query against that state is a short causal suffix --
+query text and candidate labels together -- attending to the cached prefix and never recomputing it.
+A direct readout then scores the terminal decision state against each candidate's own
+\emph{contextual} hidden state. Scoring instead against a candidate-blind semantic embedding of the
+same option text loses 13 points of knowledge-probe accuracy; scoring against the contextual state
+matches a letter-generating interface's question-conditioned signal with roughly a quarter of its
+order sensitivity. Recent mechanistic work shows a decoder already knows which multiple-choice option
+is correct before it emits the answer symbol \citep{wong2026models}; we build on that finding rather
+than restate it, by making the candidate-aware latent representation the deployed output interface and
+measuring what is lost when the candidates are removed from the computation.
+\Cref{fig:architecture} sketches the resulting decision pass and the typed output contracts on it.
+
+RQ3 gives the boundary. On standard, bounded decisions the recipe generally improves with backbone
+size across the tested Qwen3 checkpoints, and soft-target probability quality improves substantially
+at fixed capacity once checkpoints are selected on a held-out calibration metric rather than
+in-distribution loss. On a harder tier of compositional, multi-step decisions nothing we trained
+clears a same-size \emph{frozen} backbone read with three in-context exemplars. We report that
+comparison with its own confound: state and option \emph{rendering} alone moves a frozen backbone's
+score by a margin comparable to the effect being discussed (\Cref{sec:boundary:rendering}).
+
+\textbf{Contributions.} Three primary, one diagnostic.
 \begin{enumerate}
-  \item A closed negative result: under six tested factorizations and distillation objectives, and at
-  every backbone depth, a candidate-blind decision state absorbs a teacher's candidate priors and
-  calibration but never its question-conditioned parametric knowledge, established with a
-  question-shuffling control (\Cref{sec:method:blind-closure}, \Cref{sec:results:candidate-blind}). We
-  state this as a scoped finding -- under these factorizations, objectives, and budget -- not an
-  impossibility result.
-  \item A direct decision interface reading calibrated, typed probabilities from a cached language-model
-  state with no answer generation, building on evidence that a decoder already encodes the correct
-  multiple-choice option before emitting its symbol \citep{wong2026models}: the interface-level pair
-  showing a candidate-blind semantic scorer loses 13 points of knowledge-probe accuracy while a readout
-  over candidates' own contextual hidden states matches the letter interface with a quarter of its order
-  sensitivity (\Cref{sec:method:pass}, \Cref{sec:results:readout}), plus a factored null gate with an exact
-  independence-of-irrelevant-alternatives property (\Cref{eq:factored-null}).
-  \item An empirical scaling ladder (1.7B--14B, one additional backbone family) with matched frozen
-  controls and a calibration-objective isolation (checkpoint selection and target distribution, not
-  capacity, is the binding constraint on soft-target probability quality), alongside a hard-tier tension
-  that training does not resolve at any size tested, reported together with its own rendering confound
-  (\Cref{sec:results:headline}, \Cref{sec:analysis:tension}).
-  \item Diagnosis of three failure modes invisible to aggregate accuracy alone -- a last-layer tap, a
-  rendered abstain option, and a facts-last truncation bug in long-context training data -- the first two
-  isolated with a matched control and the third with an exact measurement plus a matched
-  facts-first-vs-facts-last ablation (\Cref{sec:results:readout}, \Cref{sec:results:null},
-  \Cref{sec:results:mixture}).
+  \item \textbf{A candidate-blind negative result.} Under six tested factorizations and distillation
+  objectives, and at both tapped depths, candidate-blind decision states transfer candidate priors and
+  calibration but not question-conditioned closed-book capability
+  (\Cref{sec:method:blind}, \Cref{sec:repr:blind}). The shuffled-question control that exposes it,
+  formalized as $\dq$, separates genuine question dependence from candidate-set priors and is itself a
+  reusable diagnostic. We state this as a scoped empirical finding -- under these factorizations,
+  objectives, depths, and budget -- not an impossibility theorem.
+  \item \textbf{A candidate-aware direct readout.} A cached-prefix decision pass scores a terminal
+  decision representation against each candidate's contextual hidden state, recovering the
+  question-conditioned signal of a letter-generating interface while reducing order sensitivity and
+  removing answer-token generation entirely (\Cref{sec:method:pass}, \Cref{sec:repr:readout}). Typed
+  output contracts (categorical, ordinal, Bernoulli) and an abstention gate factored out of the
+  candidate softmax are components of that interface (\Cref{sec:method:typed},
+  \Cref{sec:repr:null,sec:train:typed}).
+  \item \textbf{A capability and scaling boundary.} Across matched scales and frozen controls,
+  standard bounded decisions generally improve with scale and soft-target likelihood improves without
+  additional capacity; hard compositional decisions remain unresolved and are not better after
+  fine-tuning than under frozen few-shot inference (\Cref{sec:train:ladder},
+  \Cref{sec:boundary:hard,sec:boundary:frozen}).
+  \item \textbf{Diagnosed failure modes} that aggregate accuracy hides: a last-layer tap that discards
+  the state, a rendered abstain option that dilutes under softmax competition as the candidate set
+  grows, and an evidence-removing truncation defect in long-context training data
+  (\Cref{sec:repr:depth}, \Cref{sec:repr:null}, \Cref{sec:boundary:truncation}). We treat these as
+  secondary contributions supporting the three claims above.
 \end{enumerate}
 
 \begin{figure}[t]

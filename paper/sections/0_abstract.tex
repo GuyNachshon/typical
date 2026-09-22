@@ -1,25 +1,23 @@
-Software that calls a language model to make a decision -- route this ticket, flag this transaction,
-score this alert -- typically gets an answer by prompting the model to generate text and parsing the
-result: slow, sensitive to answer surface form, and poorly calibrated. We first report a negative result
-that motivates our design: a decision state computed \emph{before} the candidate set is known transfers a
-teacher's candidate priors and calibration but never its question-conditioned knowledge, under six tested
-factorizations and objectives and at every backbone depth, shown with a control that swaps the real
-question for a shuffled one. This rules out the most appealing candidate-blind architecture and motivates
-Typical, which instead renders the query and its runtime-defined candidates inside one causal suffix
-against a state cached once, reading calibrated, typed decisions with no generated tokens. A direct
-readout scores the terminal decision state against each candidate's own contextual hidden state --
-carrying slot identity a candidate-blind embedding cannot -- recovering a letter-generating interface's
-question-conditioned knowledge with a quarter of its order sensitivity; a null probability comes from a
-gate over permutation-invariant candidate-score statistics rather than competing for softmax mass as a
-rendered abstain option. The same readout supports three typed primitives -- Choice, an ordinal-smoothed
-Score, and an order-invariant Bernoulli Noul -- by changing only the target distribution and terminal
-head. Scaled across Qwen3 (1.7B/4B/8B/14B) and once on Qwen3.5-4B with matched frozen controls, the recipe
-reaches .931 standard-tier accuracy on the public subset of JevBench, a third-party typed-decision
-benchmark, at 14B (.861 at Qwen3.5-4B) at 15--60\,ms per decision on our single-stream harness, and
-calibration-shaped checkpoint selection takes held-out soft-target negative log-likelihood from 2.87 to
-0.95 at the same size; a same-backbone frozen-teacher distillation term tested with its own matched
-control adds nothing measurable and is mildly negative on the hard tier. Against these gains, we report the honest
-limit: a harder tier of compositional, multi-step decisions stays at or near chance for every checkpoint
-we trained, including a same-size frozen backbone read with a few exemplars and no training, which still
-beats our best trained model there -- a comparison we report with its own confound, since state/option
-rendering alone moves a frozen backbone's score by a similar margin.
+Software that calls a language model to make a bounded decision -- route this ticket, flag this
+transaction, score this alert -- usually recovers the decision from generated answer symbols,
+constrained decoding, or candidate log-probabilities, even though what the caller needs is a
+distribution over a label set defined at request time. We ask whether a pretrained causal language
+model can expose that decision \emph{directly}, without generating an answer, and what must remain
+inside its computation for the decision to stay question-conditioned. Our central result is negative
+and scoped. A decision state computed \emph{before} the candidate set is known -- the formulation
+that would make one state reusable across arbitrary candidate sets -- transfers a listwise teacher's
+candidate priors and calibration but not its question-conditioned closed-book capability. This holds
+across six tested factorizations and distillation objectives and at both backbone depths we tapped,
+and it is invisible to raw accuracy: it appears only under $\dq$, the drop in accuracy when the real
+question is replaced by a shuffled one with the candidate set held fixed. \textbf{Typical} instead
+renders the query and its runtime-defined candidates inside one causal suffix against a state whose
+key-value cache is computed once, and scores the terminal decision state against each candidate's own
+\emph{contextual} hidden state. That readout recovers the question-conditioned signal of a
+letter-generating interface ($\dqsh$ .106 vs.\ .109; teacher .102) with about a quarter of its order
+sensitivity, and carries typed output contracts -- categorical Choice, ordinal Score, Bernoulli Noul
+-- plus an abstention gate factored out of the candidate softmax. Standard bounded decisions
+generally improve with backbone scale (1.7B--14B, with an anomalous 8B point) and soft-target
+probability quality improves substantially at fixed capacity through objective and
+checkpoint-selection changes. The boundary is sharp and we report it as prominently: hard
+compositional decisions remain unresolved at every size we trained, and a same-size \emph{frozen}
+backbone read with three in-context exemplars is not beaten there by any model we fine-tuned.

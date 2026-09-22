@@ -1,0 +1,210 @@
+\section{Where direct decision fine-tuning fails}
+\label{sec:boundary}
+
+The same recipe that improves standard bounded decisions does not solve hard compositional ones, and on
+that tier a frozen backbone with a few exemplars is not beaten by anything we trained. This section
+reports that boundary, the confounds attached to it, and one diagnosed data defect whose causal
+contribution we could not establish.
+
+\subsection{The hard compositional tier}
+\label{sec:boundary:hard}
+
+Breaking JevBench's hard tier down by sub-family (\Cref{fig:hard_families}, \Cref{app:hard-families})
+localizes where training helps and where it does not. Held-out rubric styles, families, and grammars
+\emph{inside} our own generators' distributions move sharply under workflow training
+(\Cref{sec:train:mixture}, \Cref{app:decisionmix}), but none of it transfers to \emph{level-7}
+composition -- decisions requiring temporal arithmetic, unit conversion, expected-value reasoning, or
+multi-attribute trade-offs -- which sits at chance for every checkpoint trained on this project's data,
+including the 14B model that leads the standard tier. It matches the JevBench hard tier's own
+temporal/probability/trade-off families.
+
+This is not obviously a capacity story: the frozen 14B backbone with three in-context exemplars does no
+better on these specific families either. The reading we favor is data coverage -- our generators
+produce boolean rule composition up to six levels deep and never produce the compositional operations
+level 7 and JevBench's long\_policy/temporal/probability/tradeoff sub-families require, and no model
+here acquires composition from data that does not contain it. We cannot exclude the alternative that a
+single constant-depth pass is the binding constraint; \Cref{sec:discussion} treats that as an open
+question rather than a conclusion.
+
+\subsection{A frozen backbone with exemplars is not beaten on the hard tier}
+\label{sec:boundary:frozen}
+
+\Cref{tab:tl1b} compares the previous-recipe 14B checkpoint, the bundle that fixed the long-state
+rendering, dropped over-length rows, added DecisionMix v2, the typed heads, and calibration-shaped
+checkpoint selection, the same bundle with frozen-teacher distillation removed, and the frozen backbone
+with three exemplars and no training at all.
+
+\begin{table}[t]
+  \centering
+  \caption{14B comparisons. \textbf{JevBench: public 231-id subset, unranked}; 95\% cluster-bootstrap
+  intervals over the paraphrase \texttt{group} field ($n_{\mathrm{eff}}{=}36$ standard states,
+  $n{=}111$ hard items). \texttt{tl1b\_nokd} is identical to \texttt{tl1b} in every flag except
+  \texttt{--distill\_beta 0}. Paired per-item bootstraps for the three comparisons that matter are in
+  the text; marginal intervals overlap heavily and should not be differenced by eye.}
+  \label{tab:tl1b}
+  \small
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular}{lcccc}
+    \toprule
+    & \texttt{ladder\_14b} & \texttt{tl1b} & \texttt{tl1b\_nokd} & Frozen, 3-shot \\
+    \midrule
+    JevBench std & .875 [.792, .944] & .931 [.861, .986] & .917 [.833, .986] & .819 [.708, .917] \\
+    JevBench hard & .468 [.378, .559] & .450 [.360, .541] & .477 [.387, .568] & \textbf{.559} [.468, .649] \\
+    JevBench Brier std (hard) & .173 (.85) & .175 (.66) & .127 (--) & .30 (.60) \\
+    \texttt{long\_policy} (hard subfamily) & .053 & .158 & .211 & -- \\
+    Training val NLL & -- & .438 & .410 & -- \\
+    Held-out score NLL & 2.87 & \textbf{0.95} & -- & -- \\
+    Level-7 composition & -- & .620 & -- & -- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{The frozen backbone leads the hard tier, and this survives a paired test.} A paired cluster
+bootstrap on the per-item difference over the same 111 hard items gives frozen-minus-trained
+$+.108$ $[+.027, +.189]$, $p{=}.015$ against \texttt{tl1b}. Against \texttt{tl1b\_nokd} the same test
+gives $+.081$ $[-.009, +.171]$, $p{=}.082$ -- consistent in direction but not separable at this sample
+size. So the result is real for the checkpoint we released and directionally consistent for its
+matched sibling, and it should be stated at that resolution rather than as a uniform ``fine-tuning
+hurts''. On the standard tier the ordering reverses (frozen-minus-trained $-.111$ $[-.250, +.014]$,
+$p{=}.10$).
+
+What this supports is that \emph{our current fine-tuning recipe does not preserve or improve the
+backbone's hard-tier behavior}. It does not by itself show that direct readout cannot solve hard tasks,
+that one forward pass is insufficient, or that autoregressive reasoning is required; the rendering
+confound of \Cref{sec:boundary:rendering} weakens any such causal reading further, since we did not
+sweep rendering for the frozen hard-tier control.
+
+\textbf{Frozen-teacher distillation: no detectable effect either way.} A KL term against the
+\emph{same} backbone's own frozen three-shot letter distribution is the one component of the 14B bundle
+with its own matched control. On that pair, \texttt{tl1b\_nokd} is nominally ahead on hard accuracy
+(.477 vs.\ .450), \texttt{long\_policy} (.211 vs.\ .158), training validation NLL (.410 vs.\ .438) and
+standard-tier Brier (.127 vs.\ .175), while \texttt{tl1b} is nominally ahead on standard accuracy (.931
+vs.\ .917). But the paired bootstraps are $-.027$ $[-.090, +.027]$ ($p{=}.45$) on hard and $+.014$
+$[-.042, +.069]$ ($p{=}.81$) on standard. \textbf{No effect of same-backbone frozen-teacher
+distillation is detectable at this sample size, in either direction.} The direction is consistent
+across several metrics and it is inside the noise; we report it as an uninformative control, not as a
+negative finding, and it is not evidence about distillation in general.
+
+\textbf{The \texttt{ladder\_14b} $\to$ \texttt{tl1b} standard-tier gain is likewise not clean}
+(.875 $\to$ .931; paired $+.056$ $[+.000, +.125]$, $p{=}.13$). The probability-quality change in the
+same bundle is much larger relative to its own noise (held-out score NLL 2.87 $\to$ 0.95, hard-tier
+Brier .85 $\to$ .66) and is the part of that result we stand behind. One consequence worth recording
+for practitioners: our own pre-registered release gate for the large model was a point threshold
+(``hard $\ge .559$'') on a quantity with a $\pm9$-point interval. A gate of that form is not decidable
+at this sample size and should be restated on a lower confidence bound, or on a metric with more items.
+
+\subsection{Rendering is a first-class experimental factor}
+\label{sec:boundary:rendering}
+
+How the state and the candidate set are rendered into the prompt is not a presentation detail. We have
+two independent demonstrations of its size, from opposite directions.
+
+\textbf{(i) Rendering alone, frozen model, no training.} Scoring the identical public JevBench items
+with the identical frozen Qwen3.5 checkpoints, changing only the rendering to a replication of another
+published system's format, moves standard-tier accuracy by up to 12.5 points
+(\Cref{tab:rendering}). No weights, no exemplar count, and no item set differ between the two columns,
+and the effect survives a paired per-item bootstrap at two of the three sizes.
+
+\begin{table}[t]
+  \centering
+  \caption{Rendering alone, on frozen weights. Identical Qwen3.5 base checkpoints, identical public
+  JevBench items (\textbf{public 231-id subset, unranked}), letter-logit readout in both columns; only
+  the state/option rendering differs. $\Delta$ is a paired cluster bootstrap over the per-item
+  difference on the same items, 20{,}000 resamples.}
+  \label{tab:rendering}
+  \small
+  \begin{tabular}{llccc}
+    \toprule
+    Tier & Backbone & our rendering & replicated rendering & paired $\Delta$ [95\% CI], $p$ \\
+    \midrule
+    \multirow{3}{*}{standard} & Qwen3.5-2B & .583 & .597 & $+.014$ $[-.194, +.208]$, $p{=}.95$ \\
+     & Qwen3.5-4B & .764 & .847 & $+.083$ $[+.014, +.167]$, $p{=}.048$ \\
+     & Qwen3.5-9B & .806 & \textbf{.931} & $\mathbf{+.125}$ $[+.056, +.208]$, $p{<}.001$ \\
+    \midrule
+    \multirow{3}{*}{hard} & Qwen3.5-2B & .387 & .441 & $+.054$ $[-.045, +.153]$, $p{=}.33$ \\
+     & Qwen3.5-4B & .495 & .468 & $-.027$ $[-.117, +.063]$, $p{=}.64$ \\
+     & Qwen3.5-9B & .541 & .595 & $+.054$ $[-.027, +.135]$, $p{=}.22$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The largest of these swings, 12.5 points on a frozen 9B checkpoint, is of the same order as the entire
+published standard-tier spread between leaderboard entries, and larger than any difference between our
+own model variants in \Cref{tab:headline}. It is concentrated on the standard tier; the hard tier does
+not move separably at any size.
+
+\textbf{(ii) Train/test render mismatch, same items, no truncation.} On a purpose-built held-out
+long-state evaluation set ($n{=}605$, no exact-state overlap with either training corpus, scored with a
+4{,}096-token window so that nothing is truncated at evaluation time; state lengths $p50 = 1{,}965$
+tokens, max 2{,}843), a model trained on facts-last renders scores \textbf{.830} overall when the
+evaluation set is rendered facts-last and \textbf{.640} when the same 605 items are rendered
+facts-first. On the $\numcands{=}2$ \texttt{policy\_permit} subset ($n{=}330$, majority-class floor
+.612) the two renderings give .842 and .615 -- that is, moving the evidence block from after the request
+to before it, with the evidence fully visible in both cases, costs 23 points and lands the model exactly
+on its majority-class floor.
+
+The implication is methodological and it applies to us first: \textbf{a benchmark score is a joint
+measurement of model capability and interface/rendering compatibility}, so rendering must be controlled
+when comparing architectures. We do not use this to dismiss any other system's results -- we cannot,
+because we have not run their rendering on their weights under a controlled protocol. What we can say is
+that a comparison between two decision architectures that does not hold rendering fixed is measuring
+something other than the architectures, and that our own frozen-vs-trained comparison
+(\Cref{sec:boundary:frozen}) inherits exactly this weakness. It is also why the leaderboard context for
+JevBench lives in \Cref{app:leaderboard} rather than in the body.
+
+\subsection{A verified data defect, and an ablation underpowered to confirm its effect}
+\label{sec:boundary:truncation}
+
+The long-state generator originally rendered supporting facts \emph{after} the request text. Two facts
+about this are exactly measured and not in doubt. First, the tokenizer's \texttt{truncation\_side} is
+\texttt{'right'}, verified empirically: the window keeps the start of the render and drops the end.
+Second, at the released 1{,}024-token training window this removed the supporting facts from
+\textbf{98.8\%} of long-policy rows (100\% at the 256-token window used earlier in the project). Every
+model trained on that version was optimized to answer long policies from states that no longer contained
+the evidence for the answer. The state-length histogram is \Cref{fig:truncation}.
+
+The natural next claim -- that this defect \emph{caused} the long-context collapse, and that fixing it
+caused the recovery -- is the one we cannot make. The 14B run that fixed it changed five things at once.
+We therefore ran the matched single-variable ablation: two 1.7B arms identical in every flag except
+whether \texttt{data\_wf\_long} renders its facts at 0\% or 97.6\% of the state text (same rows, same
+labels, matched state length, $p50 = 8{,}702$ characters in both arms), at \texttt{--max\_state 1024}
+with \texttt{--drop\_truncated} off in both arms so that truncation bites exactly as it did at release.
+\Cref{tab:trunc} reports it, and it is a null result.
+
+\begin{table}[t]
+  \centering
+  \caption{Matched facts-first vs.\ facts-last training ablation, 1.7B, single variable.
+  \textbf{JevBench: public 231-id subset, unranked}, 95\% cluster-bootstrap intervals. The
+  \texttt{long\_policy} difference is in the predicted direction but does not separate from zero; the
+  hard aggregate moves the other way.}
+  \label{tab:trunc}
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{lccp{6.1cm}}
+    \toprule
+    & Arm A (facts-first) & Arm B (facts-last) & Test \\
+    \midrule
+    \texttt{long\_policy} & .316 (6/19) & .105 (2/19) & Fisher exact $p{=}.232$; bootstrap $\Delta$ $[-.053, +.474]$ \\
+    JevBench hard & .378 [.288, .468] & .396 [.306, .486] & contradicts the predicted direction \\
+    JevBench std & .750 [.625, .861] & .736 [.597, .861] & indistinguishable \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+We report this as it is: the ablation is \emph{consistent with} the truncation mechanism on the
+subfamily it should affect, \emph{underpowered to confirm it} at 19 items, and \emph{contradicted} by
+the hard-tier aggregate. The mechanism is not demonstrated.
+
+The better-powered result on the same question is the render-mismatch finding of
+\Cref{sec:boundary:rendering}(ii), on 605 held-out items with no truncation at evaluation at all. It
+says that a substantial part of what we had attributed to truncation is a train/test \emph{render
+mismatch}: a model trained on facts-last renders is 23 points worse on facts-first renders of the same
+items, with the facts fully visible either way. The two mechanisms are not exclusive -- facts-last
+training is what makes the model render-dependent in the first place, and truncation is what made
+facts-last training uninformative -- but only the render effect is established at usable power here.
+The transferable lesson is the one we can support twice over: a fixed-length window interacts with
+\emph{where} the load-bearing content sits and not only with how long the render is, so a
+truncation-length ablation alone would not surface this; and silent truncation can produce confidently
+wrong behavior by systematically removing the evidence while preserving the labels
+\citep{sambasivan2021datacascades}. Full distributions and the remaining cells are in
+\Cref{app:truncation}.

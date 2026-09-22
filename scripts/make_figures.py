@@ -424,6 +424,101 @@ def fig_hard_families():
 
 
 # ---------------------------------------------------------------------------
+# fig_deltaq — the candidate-blind negative: raw accuracy vs question-dependence
+# ---------------------------------------------------------------------------
+def fig_deltaq():
+    """Raw MMLU-Pro among-K accuracy (x) vs Delta_q^sh (y) for every readout we probed.
+
+    Delta_q^sh = acc(real question) - acc(shuffled question), candidate set fixed.
+    A point high on x but at y ~ 0 is exploiting candidate-set priors, not answering
+    the question. Every candidate-blind variant sits in that band.
+    """
+    blind = [
+        ("single vector (z1)", "probe_e3a_z1", 0.0335),
+        ("8 probes (zr)", "probe_e3b_zr", -0.0325),
+        ("set-conditioned (zr_set)", "probe_e3c_zr_set", -0.0045),
+        ("single-set control", "probe_e3ms_ctrl", -0.0465),
+        (r"multi-set + $\Delta$log-odds", "probe_e3ms_zr_set", 0.0195),
+        ("8 probes, full depth", "probe_e3b_zr_tap28", -0.0185),
+    ]
+    aware = [
+        ("letter logits (N1)", "probe_nc_n1", ORANGE, "s"),
+        ("letter logits (N1, seed 1)", "probe_nc_n1_s1", ORANGE, "s"),
+        ("cand.-blind semantic (N2)", "probe_nc_n2", YELLOW, "D"),
+        ("contextual cand. (N3)", "probe_nc_n3", GREEN, "o"),
+        ("contextual cand. (N3, seed 1)", "probe_nc_n3_s1", GREEN, "o"),
+    ]
+
+    def probe(name):
+        p = REPO / "runs" / name / "results.json"
+        if not p.exists():
+            note_omitted(f"fig_deltaq: runs/{name}/results.json unavailable")
+            return None
+        e = json.loads(p.read_text())["eval"]
+        try:
+            a = e["mmlu_pro"]["raw"]["acc_k"]
+            s = e["mmlu_shuffledq"]["raw"]["acc_k"]
+        except KeyError:
+            note_omitted(f"fig_deltaq: runs/{name} missing mmlu probe fields")
+            return None
+        return a, a - s
+
+    fig, ax = plt.subplots(figsize=(7.0, 4.2))
+    ax.axhspan(-0.02, 0.02, color=GRAY, alpha=0.13, zorder=0)
+    ax.axhline(0.0, color=GRAY, linewidth=1.0, zorder=1)
+    ax.text(0.398, 0.021, r"$\Delta_q^{\mathrm{sh}} \approx 0$: candidate-set priors only",
+            fontsize=8, color="#444444", va="bottom", ha="right")
+
+    xs, ys = [], []
+    for label, name, ty in blind:
+        v = probe(name)
+        if v is None:
+            continue
+        xs.append(v[0]); ys.append(v[1])
+        ax.annotate(label, xy=v, xytext=(0.203, ty), fontsize=7.2, ha="left",
+                    va="center", color="#444444",
+                    arrowprops=dict(arrowstyle="-", color="#BBBBBB", linewidth=0.7,
+                                    shrinkA=1, shrinkB=4))
+    if xs:
+        ax.scatter(xs, ys, s=58, marker="^", color=BLUE, zorder=3,
+                   label="candidate-blind readouts (6 variants)")
+
+    for label, name, color, marker in aware:
+        v = probe(name)
+        if v is None:
+            continue
+        ax.scatter([v[0]], [v[1]], s=58, marker=marker, color=color, zorder=3,
+                   label=label if "seed 1" not in label else None)
+
+    t = probe("probe_teacher_kb")
+    if t is not None:
+        ax.scatter([t[0]], [t[1]], s=90, marker="*", color="#333333", zorder=4,
+                   label="listwise teacher (options in context)")
+
+    ax.set_xlabel("MMLU-Pro among-$K$ accuracy (raw)")
+    ax.set_ylabel(r"$\Delta_q^{\mathrm{sh}}$ (question-dependent signal)")
+    ax.set_xlim(0.105, 0.40)
+    ax.set_ylim(-0.055, 0.145)
+    ax.legend(frameon=False, loc="upper left", fontsize=8)
+
+    save(
+        fig, "fig_deltaq",
+        sources=[f"runs/{n}/results.json eval.mmlu_pro.raw.acc_k, eval.mmlu_shuffledq.raw.acc_k"
+                 for _, n, _ in blind] +
+                [f"runs/{n}/results.json eval.mmlu_pro.raw.acc_k, eval.mmlu_shuffledq.raw.acc_k"
+                 for _, n, _, _ in aware] +
+                ["runs/probe_teacher_kb/results.json eval.mmlu_pro.raw.acc_k, "
+                 "eval.mmlu_shuffledq.raw.acc_k"],
+        desc="The candidate-blind negative result. Raw MMLU-Pro among-K accuracy (x) against "
+             "Delta_q_sh, the drop in accuracy when the real question is replaced by a shuffled "
+             "one with the candidate set held fixed (y). All six candidate-blind variants sit in "
+             "the +/-.02 band around zero at 1,200 items: their above-chance accuracy is "
+             "candidate-set priors. The letter readout, the contextual-candidate readout, and the "
+             "listwise teacher all carry a question-dependent signal of .09-.12.",
+    )
+
+
+# ---------------------------------------------------------------------------
 # fig_truncation — data_wf_long state-token-length histogram + long_policy accuracy
 # ---------------------------------------------------------------------------
 def fig_truncation():
@@ -546,7 +641,7 @@ def fig_serving():
 
 # ---------------------------------------------------------------------------
 def write_latex_includes():
-    order = ["fig_architecture", "fig_ladder", "fig_latency_quality", "fig_calibration",
+    order = ["fig_architecture", "fig_deltaq", "fig_ladder", "fig_latency_quality", "fig_calibration",
              "fig_hard_families", "fig_truncation", "fig_serving"]
     blocks = []
     for name in order:
@@ -573,6 +668,7 @@ def write_manifest():
 
 def main():
     fig_architecture()
+    fig_deltaq()
     fig_ladder()
     fig_latency_quality()
     fig_calibration()

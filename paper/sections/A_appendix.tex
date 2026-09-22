@@ -4,19 +4,19 @@
 \label{app:extra-figures}
 
 \Cref{tab:app-blind-closure,tab:app-null-fix} give the full numbers for the candidate-blind closure
-(\Cref{sec:results:candidate-blind}) and the rendered-null-line ablation (\Cref{sec:results:null})
+(\Cref{sec:repr:blind}) and the rendered-null-line ablation (\Cref{sec:repr:null})
 summarized in the main text. \Cref{fig:truncation} gives the long-state truncation histogram referenced
-from \Cref{sec:results:mixture}; the serving-path engineering section and \Cref{fig:serving} referenced
-from \Cref{sec:results:latency} follow in \Cref{app:serving}.
+from \Cref{sec:train:mixture}; the serving-path engineering section and \Cref{fig:serving} referenced
+from \Cref{sec:train:latency} follow in \Cref{app:serving}.
 
 \begin{figure}[h]
   \centering
   \includegraphics[width=\linewidth]{figures/fig_hard_families.pdf}
-  \caption{Per-family JevBench-hard accuracy for \texttt{ladder\_14b}, \texttt{tl1b}, and the frozen-14B
+  \caption{\textbf{Public subset, unranked.} Per-family JevBench-hard accuracy for \texttt{ladder\_14b}, \texttt{tl1b}, and the frozen-14B
   3-shot control, sorted by \texttt{tl1b}'s value, chance line at .336. Per-family values are re-derived
   directly from each run's JSON artefact rather than transcribed from prose, and differ slightly from
-  \Cref{sec:results:kd}'s aggregate table in a small number of cells as a result; the JSON is the source
-  of truth. Referenced from \Cref{sec:analysis:hard}.}
+  \Cref{sec:boundary:frozen}'s aggregate table in a small number of cells as a result; the JSON is the source
+  of truth. Referenced from \Cref{sec:boundary:hard}.}
   \label{fig:hard_families}
 \end{figure}
 
@@ -24,7 +24,9 @@ from \Cref{sec:results:latency} follow in \Cref{app:serving}.
   \centering
   \caption{Candidate-blind $Z$, closure at full depth vs.\ the original tap-20 student.}
   \label{tab:app-blind-closure}
-  \small
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \resizebox{\linewidth}{!}{%
   \begin{tabular}{lrrr}
     \toprule
     & Tap 20 & Full depth (28) & Teacher \\
@@ -33,7 +35,7 @@ from \Cref{sec:results:latency} follow in \Cref{app:serving}.
     $\dq$ (choices-only) / $\dqsh$ (primary) & $-.009$ / $-.026$ & $-.030$ / $-.008$ & .088 / .102 \\
     SNLI / MNLI / ANLI / BoolQ & .905/.873/.541/.826 & .881/.807/.462/.712 & -- \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}}
 \end{table}
 
 \begin{table}[h]
@@ -69,9 +71,9 @@ from \Cref{sec:results:latency} follow in \Cref{app:serving}.
 \begin{figure}[h]
   \centering
   \includegraphics[width=\linewidth]{figures/fig_latency_quality.pdf}
-  \caption{JevBench standard accuracy vs.\ measured single-decision latency (ms, log scale) for our
+  \caption{\textbf{Public subset, unranked.} JevBench standard accuracy vs.\ measured single-decision latency (ms, log scale) for our
   trained models, with generative-LLM decode-latency comparison bands. Referenced from
-  \Cref{sec:results:latency}.}
+  \Cref{sec:train:latency}.}
   \label{fig:latency_quality}
 \end{figure}
 
@@ -110,11 +112,12 @@ path toward $\sim$10\,ms decisions but was not pursued further within budget.
 
 \begin{table}[h]
   \centering
-  \caption{Mixture sweep at 1.7B, matched steps, referenced from \Cref{sec:results:mixture}. ``6A'' is the
+  \caption{Mixture sweep at 1.7B, matched steps, referenced from \Cref{sec:train:mixture}. ``6A'' is the
   $E{:}0.35/K{:}0.25/W{:}0.40$ point; ``e45+null'' adds \texttt{null\_aug W:0.20} to
   $E{:}0.45/K{:}0.20/W{:}0.35$.}
   \label{tab:app-mixture}
   \small
+  \setlength{\tabcolsep}{4pt}
   \begin{tabular}{lrrrrr}
     \toprule
     & Base ($E$ only) & 6A & e45 & \textbf{e45+null} & long$_{e45}$ (1024 tok) \\
@@ -127,7 +130,7 @@ path toward $\sim$10\,ms decisions but was not pursued further within budget.
   \end{tabular}
 \end{table}
 
-Before the facts-first fix (\Cref{sec:results:mixture}), the long-state row (long$_{e45}$, 1{,}024 tokens,
+Before the facts-first fix (\Cref{sec:train:mixture}), the long-state row (long$_{e45}$, 1{,}024 tokens,
 25\% long-policy rows) alone raised \texttt{long\_policy} from .16 to .37 and \texttt{multi\_hop} from .17
 to .28 relative to 6A, and gave the best soft-target NLLs of the sweep.
 
@@ -165,7 +168,7 @@ convenience, and violating it does not degrade gracefully.
 \begin{table}[h]
   \centering
   \caption{Typed primitives vs.\ their $K$-way Choice control, matched fine-tunes, referenced from
-  \Cref{sec:results:typed}.}
+  \Cref{sec:train:typed}.}
   \label{tab:app-typed}
   \small
   \begin{tabular}{lrr}
@@ -189,8 +192,8 @@ convenience, and violating it does not degrade gracefully.
 
 Held-out family/grammar/style accuracy moves .48/.51/.49 (matched control, never trained on
 \texttt{data\_wh}) to .83/.88/.89 (DecisionMix v2), and rubric-flip accuracy moves .48 to .71, within the
-generator's own rule engine (\Cref{sec:results:kd}). Level-7 composition and typed-decisions NLL
-(2.06 $\to$ 1.71 with the uncertainty corpus) are reported in \Cref{sec:results:kd}.
+generator's own rule engine (\Cref{sec:boundary:frozen}). Level-7 composition and typed-decisions NLL
+(2.06 $\to$ 1.71 with the uncertainty corpus) are reported in \Cref{sec:boundary:frozen}.
 
 \subsection{Full hyperparameters}
 \label{app:hyperparams}
@@ -205,7 +208,9 @@ and null augmentation are described in \Cref{sec:method:mixture}.
   $E{:}K{:}W{:}U$ is the family-sampler weight per batch. Max state is the training-time token budget for
   the cached prefix.}
   \label{tab:app-hparams}
-  \small
+  \footnotesize
+  \setlength{\tabcolsep}{3pt}
+  \resizebox{\linewidth}{!}{%
   \begin{tabular}{lrrrrrr}
     \toprule
     Checkpoint & Backbone & Tap & Steps & Batch & $E{:}K{:}W{:}U$ & Max state \\
@@ -218,7 +223,7 @@ and null augmentation are described in \Cref{sec:method:mixture}.
     \texttt{tl1b} (candidate) & Qwen3-14B-Base & 28/40 & 8{,}000 & 64 & DecisionMix v2 + $U$, facts-first & 3{,}072 \\
     \texttt{tm2} & Qwen3.5-4B-Base & $\approx$71\% & 12{,}000 & 64 & .40{:}.15{:}.35{:}.10 & 2{,}048 \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}}
 \end{table}
 
 \texttt{ts1b}/\texttt{tm1b} additionally set \texttt{null\_aug W:0.20}, \texttt{ordinal\_smooth 0.7} (Score),
@@ -348,7 +353,7 @@ evaluation-only.
 \subsection{Per-family JevBench-hard tables}
 \label{app:hard-families}
 
-\Cref{tab:app-hard} reports the hard-tier sub-families discussed in \Cref{sec:analysis:hard}. As flagged in
+\Cref{tab:app-hard} reports the hard-tier sub-families discussed in \Cref{sec:boundary:hard}. As flagged in
 \Cref{fig:hard_families}'s caption, per-family values in the figure are re-derived directly from each run's
 JSON evaluation artifact, which for \texttt{ladder\_14b}'s temporal\_numeric and probability sub-families
 differs from the corresponding prose in this project's internal report (.333/.50 in the JSON vs.\ .20/.40
@@ -358,7 +363,8 @@ figure for \texttt{ladder\_14b}'s two affected cells.
 
 \begin{table}[h]
   \centering
-  \caption{JevBench hard-tier sub-family accuracy, 14B.}
+  \caption{JevBench hard-tier sub-family accuracy, 14B. \textbf{Public subset, unranked};
+  per-family cells are 3--19 items each and carry no useful interval.}
   \label{tab:app-hard}
   \small
   \begin{tabular}{lrrr}
@@ -378,6 +384,103 @@ figure for \texttt{ladder\_14b}'s two affected cells.
   \vspace{2pt}
   \raggedright\footnotesize $\dagger$ See discrepancy note above; the JSON-derived values for these two
   \texttt{ladder\_14b} cells are .333 (temporal) and .50 (probability).
+\end{table}
+
+\subsection{Development chronology}
+\label{app:chronology}
+
+\Cref{sec:repr,sec:train,sec:boundary} are organized by claim. The experiments were run in a different
+order, and the order matters for reading the negative results, because several of them closed branches
+rather than improving a metric. The sequence was: (1) a candidate-blind decision-state branch
+(dual-encoder-style $Z(\state,\query)$ with an energy scorer over cached candidate embeddings), which
+produced the ladder of \Cref{tab:blind} and was closed by the shuffled-question control; (2) a redirect
+to a candidate-in-suffix decision pass, comparing letter-logit, candidate-blind semantic, and
+contextual-candidate readouts, which produced \Cref{tab:n1n3}; (3) the two rendering/tap diagnoses --
+the last-layer tap and the rendered abstain line -- which collapsed a planned two-regime (energy +
+native) architecture into a single model; (4) workflow and uncertainty corpora, the mixture sweep, and
+null augmentation; (5) the size ladder across Qwen3 1.7B/4B/8B/14B with frozen controls; (6) the 14B
+bundle (facts-first long-state rendering, \texttt{--drop\_truncated}, DecisionMix v2, typed heads,
+calibration-shaped checkpoint selection, frozen-teacher KD) and its matched no-KD control; (7) the
+Qwen3.5 port; and (8) the post-hoc statistical work -- cluster bootstraps, the matched truncation
+ablation, and the held-out long-state render-mismatch set -- which is what weakened several claims in
+the earlier drafts of this paper to the form they now take in
+\Cref{sec:boundary:frozen,sec:boundary:truncation}.
+
+A closure worth recording: the candidate-blind branch was not abandoned because a metric was
+disappointing. Each student closed 20--55\% of the chance-to-teacher accuracy gap, which looked like
+progress. It was closed because the shuffled-question control showed that none of the closed gap was
+question-dependent. Had we selected on accuracy, we would have shipped that branch.
+
+\subsection{JevBench leaderboard context}
+\label{app:leaderboard}
+
+This is context, not evidence, for the reasons set out in \Cref{sec:experiments:jevbench} and
+\Cref{sec:boundary:rendering}: protocols and renderings differ between entries, several entries have no
+method paper, the 146 private judge items are unavailable to us, the public standard tier has
+$n_{\mathrm{eff}}{=}36$ independent states, and our own frozen-model rendering control moves scores by
+12.5 points, which is larger than most of the spread in this table. We reproduce it so that readers can
+place our numbers, and we draw no capability ranking from it.
+
+\begin{table}[h]
+  \centering
+  \caption{Other entries scored on the same public 231 ids, from the harness's own per-item files.
+  \textbf{Public subset, unranked}, for all rows including ours. Majority/chance baselines: .311
+  standard, .284 easy, .336 hard. 95\% cluster-bootstrap intervals for our own rows are in
+  \Cref{tab:headline,tab:tl1b}; differences smaller than $\pm6$--13 points (standard) or $\pm9$ points
+  (hard) are not rankings.}
+  \label{tab:app-leaderboard}
+  \small
+  \begin{tabular}{lrrr}
+    \toprule
+    Entry (backbone) & standard (72) & easy (48) & hard (111) \\
+    \midrule
+    open-jev-deberta-v3-large (classifier) & .431 & 1.00 & .378 \\
+    GLiNER2 & .639 & 1.00 & .369 \\
+    jeff (GLiFormer 400M) & .750 & 1.00 & .387 \\
+    Laya (ModernBERT) & .694 & 1.00 & .351 \\
+    open-alternative-jev (Qwen3.5-4B) & .833 & 1.00 & .568 \\
+    system-one-open (Gemma E2B LoRA) & .931 & 1.00 & .486 \\
+    SemIf (Qwen3.5-4B) & .986 & 1.00 & .613 \\
+    OpenJev (26B-A4B) & .972 & 1.00 & .640 \\
+    Jev 1.13.0 (closed) & .986 & 1.00 & .730 \\
+    \midrule
+    Typical, Qwen3-14B (\texttt{tl1b}) & .931 & 1.00 & .450 \\
+    Typical, Qwen3.5-4B (\texttt{tm2}) & .861 & 1.00 & .495 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Long-state truncation: distributions and the render-mismatch set}
+\label{app:truncation}
+
+\Cref{fig:truncation} gives the \texttt{data\_wf\_long} state-length histogram with truncation fractions
+at 256/1024/2048/3072 tokens, which is the exact measurement behind the 98.8\% figure of
+\Cref{sec:boundary:truncation}, together with \texttt{long\_policy} accuracy across the bug/fix
+sequence. The tokenizer's \texttt{truncation\_side} is \texttt{'right'}, verified empirically on the
+released tokenizer rather than assumed from configuration.
+
+The held-out long-state evaluation set (\texttt{scripts/make\_long\_eval.py}, $n{=}605$) was built for
+the render-mismatch measurement: it has zero exact-state overlap with either training corpus, with
+\texttt{Case}-stem overlaps dropped, and is scored at a 4{,}096-token window against states with
+$p50 = 1{,}965$ and $\max = 2{,}843$ tokens, so no item is truncated at evaluation in either rendering.
+The two renderings differ only in whether the evidence block precedes or follows the request text.
+\Cref{tab:app-rendermismatch} gives the per-subset breakdown summarized in
+\Cref{sec:boundary:rendering}.
+
+\begin{table}[h]
+  \centering
+  \caption{Train/test render mismatch on the held-out long-state set ($n{=}605$, no truncation at
+  evaluation). The model is trained on facts-last renders; only the evaluation rendering changes.}
+  \label{tab:app-rendermismatch}
+  \small
+  \begin{tabular}{lrrr}
+    \toprule
+    Evaluation rendering & overall & \texttt{policy\_permit} ($n{=}330$, $\numcands{=}2$, floor .612) & \texttt{action\_select} \\
+    \midrule
+    facts-last (matches training) & .830 & .842 & .815 \\
+    facts-first (mismatched) & .640 & .615 & .669 \\
+    \bottomrule
+  \end{tabular}
 \end{table}
 
 \subsection{Operations and reproducibility notes}
@@ -410,6 +513,7 @@ completed evaluation (in-flight checkpoints are omitted per \Cref{sec:limitation
   \caption{Evidence and knowledge-classification accuracy by checkpoint.}
   \label{tab:app-evidence}
   \small
+  \setlength{\tabcolsep}{3.5pt}
   \begin{tabular}{llrrrrrrrr}
     \toprule
     Model & Checkpoint & CLINC-150 & TREC-fine & HWU64 & 20NG & SNLI & MNLI & BoolQ & ANLI \\
@@ -446,9 +550,10 @@ completed evaluation (in-flight checkpoints are omitted per \Cref{sec:limitation
   \caption{Held-out workflow and external floors, full-row \texttt{eval\_wf} pass.}
   \label{tab:app-wf-eval}
   \small
+  \setlength{\tabcolsep}{2.5pt}
   \begin{tabular}{lrrrrrr}
     \toprule
-    Model & Held-out noul & Held-out score (NLL) & Held-out style & PagerDuty (.792) & jevlogs (.697) & Mind2Web (.427) \\
+    Model & \shortstack{Held-out\\noul} & \shortstack{Held-out\\score (NLL)} & \shortstack{Held-out\\style} & \shortstack{PagerDuty\\(.792)} & \shortstack{jevlogs\\(.697)} & \shortstack{Mind2Web\\(.427)} \\
     \midrule
     \texttt{ts1b} & .710 & .522 (1.01) & .861 & .560 & .500 & .351 \\
     \texttt{tm1b} & .811 & .528 (1.03) & .861 & .553 & .480 & .547 \\
@@ -461,7 +566,8 @@ completed evaluation (in-flight checkpoints are omitted per \Cref{sec:limitation
 
 \begin{table}[h]
   \centering
-  \caption{JevBench (public subset, 72 standard / 48 easy / 111 hard) accuracy (Brier).}
+  \caption{JevBench accuracy (Brier). \textbf{Public subset, unranked} (72 standard over 36
+  paraphrase-clustered states / 48 easy / 111 hard); see \Cref{tab:headline,tab:tl1b} for intervals.}
   \label{tab:app-jevbench}
   \small
   \begin{tabular}{lrrr}
