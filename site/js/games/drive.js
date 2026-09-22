@@ -9,9 +9,9 @@
 export const RULES = {
   stop: "applies when a pedestrian is crossing the car's lane",
   brake: 'applies when the traffic light ahead is red',
-  'change lane right': 'applies when the car must take the exit on the right',
+  'change lane right': 'applies when the car must move to the right lane',
   accelerate: 'applies when the road ahead is clear for 50 m', // speeds up to the limit; no-op at it
-  'change lane left': 'applies when the car must change lane to pass an obstruction ahead',
+  'change lane left': 'applies when the car must move to the left lane',
   follow: 'applies when the car cannot pass an obstruction ahead and must slow down',
   'hold speed': 'applies when none of the above rules fire',
 };
@@ -160,7 +160,11 @@ export class Drive {
       exitIn,
       red: Boolean(light && light.state === 'red'),
       blocked,
-      canPass: blocked && leftClear && !exitNear,
+      // Passing used to be left-only, so an obstruction with just the right lane free left the
+      // model nothing legal to pick and the car sat behind it. The engine picks the side (left
+      // first, the fast lane) and the sentence names it, so the rule stays one condition.
+      passSide: blocked && !exitNear ? (leftClear ? 'left' : rightClear ? 'right' : null) : null,
+      canPass: blocked && !exitNear && (leftClear || rightClear),
       exitNear,
       mustExit: exitNear && e.lane < LANES,
       roadClear: !lead,
@@ -306,12 +310,12 @@ export class Drive {
     // was why the model sat behind slower traffic instead of overtaking).
     if (sit.lead) {
       const obstacle = sit.lead.isCone ? 'cone' : 'vehicle';
-      if (sit.canPass) sentences.push(`The car must change lane to pass the ${obstacle} ahead.`);
+      if (sit.canPass) sentences.push(`The car must move to the ${sit.passSide} lane to pass the ${obstacle} ahead.`);
       else if (sit.blocked) sentences.push(`The car cannot pass the ${obstacle} ahead and must slow down.`);
       else if (sit.lead.isCone) sentences.push(`A cone is ${Math.round(sit.lead.position - e.position)} m ahead.`);
       else sentences.push(`The lead vehicle is ${Math.round(sit.lead.position - e.position)} m ahead at ${sit.lead.speed} km/h.`);
     }
-    if (sit.mustExit) sentences.push(`The car must take the exit on the right in ${Math.round(sit.exitIn)} m.`);
+    if (sit.mustExit) sentences.push(`The car must move to the right lane to take the exit in ${Math.round(sit.exitIn)} m.`);
     if (sit.roadClear) sentences.push(`The road ahead is clear for ${LEAD_RANGE} m.`);
     if (sit.leftClear) sentences.push('The lane to the left is clear.');
     if (sit.rightClear) sentences.push('The lane to the right is clear.');
@@ -398,9 +402,9 @@ export function greedyPolicy(engine) {
   const fires = {
     stop: Boolean(sit.ped),
     brake: sit.red,
-    'change lane right': sit.mustExit,
+    'change lane right': sit.mustExit || (sit.canPass && sit.passSide === 'right'),
     accelerate: sit.roadClear,
-    'change lane left': sit.canPass,
+    'change lane left': sit.canPass && sit.passSide === 'left',
     follow: sit.blocked,
     'hold speed': true,
   };
@@ -432,7 +436,7 @@ function selfTest() {
   d2.pedestrians = [];
   console.assert(
     d2.describe() ===
-      'The car is in lane 2 of 3 at 45 km/h, below the speed limit of 60 km/h. The traffic light 60 m ahead is red. The car must change lane to pass the vehicle ahead. The lane to the left is clear.',
+      'The car is in lane 2 of 3 at 45 km/h, below the speed limit of 60 km/h. The traffic light 60 m ahead is red. The car must move to the left lane to pass the vehicle ahead. The lane to the left is clear.',
     'describe() lists only the situations that apply, in the fixed order'
   );
   console.assert(!d2.candidates().includes('change lane right'), 'lane change blocked by a car within 15 m');
@@ -452,7 +456,7 @@ function selfTest() {
   d5.traffic = [];
   d5.lights = [];
   d5.pedestrians = [];
-  console.assert(d5.describe() === 'The car is in lane 2 of 3 at 40 km/h, below the speed limit of 60 km/h. The car must take the exit on the right in 200 m. The road ahead is clear for 50 m. The lane to the left is clear. The lane to the right is clear.', 'exit sentence precedes the clear-road sentence');
+  console.assert(d5.describe() === 'The car is in lane 2 of 3 at 40 km/h, below the speed limit of 60 km/h. The car must move to the right lane to take the exit in 200 m. The road ahead is clear for 50 m. The lane to the left is clear. The lane to the right is clear.', 'exit sentence precedes the clear-road sentence');
   console.assert(!d5.candidates().includes('change lane left'), 'no lane change away from the exit within 300 m');
   console.assert(greedyPolicy(d5) === 'change lane right', 'exit outranks accelerate');
   d5.pedestrians = [{ pos: 1312, lane: 2, ticksLeft: 3 }];
@@ -483,9 +487,12 @@ function selfTest() {
   console.assert(!d6.placeHazard('cone', 4, 520), 'hazard off-road is rejected');
   console.assert(d6.placeHazard('cone', 2, 515), 'on-road hazard ahead of the car is accepted');
   console.assert(d6.cones[0].placed === true, "placed hazards are flagged so the renderer can ring-mark only what the visitor placed");
-  console.assert(d6.describe().includes('The car must change lane to pass the cone ahead.'), 'a passable cone renders the unambiguous change-lane sentence');
-  console.assert(greedyPolicy(d6) === 'change lane left', 'cone with a clear lane -> change lane left (not driven through)');
-  d6.traffic.push({ lane: 1, position: 510, speed: 40, cruise: 40 }); // block the only clear lane
+  console.assert(d6.describe().includes('The car must move to the left lane to pass the cone ahead.'), 'a passable cone names the side to move to');
+  console.assert(greedyPolicy(d6) === 'change lane left', 'cone with a clear left lane -> change lane left (not driven through)');
+  d6.traffic.push({ lane: 1, position: 510, speed: 40, cruise: 40 }); // block the left lane
+  console.assert(d6.describe().includes('The car must move to the right lane to pass the cone ahead.'), 'with the left lane blocked the car passes on the right');
+  console.assert(greedyPolicy(d6) === 'change lane right', 'an obstruction with only the right lane free is passed on the right, not sat behind');
+  d6.traffic.push({ lane: 3, position: 512, speed: 40, cruise: 40 }); // block the right lane too
   console.assert(d6.describe().includes('The car cannot pass the cone ahead and must slow down.'), 'an unpassable cone renders the follow sentence');
   console.assert(greedyPolicy(d6) === 'follow', 'cone with no clear lane -> follow (slows toward a stop, never a pass-through)');
   console.assert(d6.placeHazard('pedestrian', 3, 510), 'pedestrian hazard accepted ahead in a different lane');
@@ -526,6 +533,7 @@ function selfTest() {
   d9.traffic = [
     { lane: 2, position: 10, speed: 0, cruise: 0 }, // stopped dead ahead, ego already matched its pace
     { lane: 1, position: 5, speed: 40, cruise: 40 }, // left lane currently blocked
+    { lane: 3, position: 6, speed: 40, cruise: 40 }, // and the right one too, so neither side is free
   ];
   d9.lights = [];
   d9.pedestrians = [];
@@ -533,7 +541,7 @@ function selfTest() {
   console.assert(d9.situations().blocked && !d9.situations().canPass, 'boxed in: blocked but cannot pass yet');
   console.assert(greedyPolicy(d9) === 'follow', 'follow (hold at the blocker\'s pace) while boxed in');
   d9.traffic[1].position = 200; // the blocking car in lane 1 moves well clear
-  console.assert(d9.situations().canPass, 'once the left lane clears the car re-evaluates and can pass, even at matched speed 0');
+  console.assert(d9.situations().canPass && d9.situations().passSide === 'left', 'once the left lane clears the car re-evaluates and can pass, even at matched speed 0');
   console.assert(greedyPolicy(d9) === 'change lane left', 'passing resumes instead of sitting behind the blocker forever');
 
   // determinism

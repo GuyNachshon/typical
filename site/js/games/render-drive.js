@@ -25,8 +25,8 @@ const LANE_W = 3.2;
 const CAM_HEIGHT = 4.6; // metres above the road
 const CAM_BACK = 15.5; // metres behind the ego
 const CAM_AHEAD = 34; // metres ahead the camera aims at
-const CAM_OFFSET_X = 3.4; // metres the camera rides left of the ego
-const CAM_LOOK_Y = 0.7; // aim low: a camera tilted down puts the car higher in frame, clear of the readout
+const CAM_OFFSET_X = 2.6; // metres the camera rides left of the ego
+const CAM_LOOK_Y = -6.5; // aim low: a camera tilted down puts the car higher in frame, clear of the readout
 const SKY = '#bcd6e6';
 const ASPHALT = '#6b6b6e';
 const KERB = '#b8b2a6';
@@ -623,9 +623,15 @@ export async function mount(el, { decide, mode } = {}) {
     // A modest lateral offset (the camera rides to the left of the car) puts the ego in the right
     // half of the frame, clear of the decision bars that dock bottom-left. With a perspective
     // camera this reads as an offset chase view; the earlier ortho pan just sheared the scene.
-    const camX = egoX * 0.6 - CAM_OFFSET_X;
+    // +X renders to the LEFT here: the camera looks down +Z, which mirrors the X axis, so the
+    // camera has to ride to the car's right in world space to put the car in the right half.
+    const camX = egoX * 0.6 + CAM_OFFSET_X;
     camera.position.set(camX, CAM_HEIGHT + settle * 0.4, egoZ - CAM_BACK - settle * 1.2);
-    camera.lookAt(camX + CAM_OFFSET_X * 0.45, CAM_LOOK_Y, egoZ + CAM_AHEAD);
+    if (typeof window !== 'undefined' && window.__driveProbe) {
+      const v = egoMesh.position.clone().project(camera);
+      window.__driveEgo = { x: (v.x * 0.5 + 0.5), y: (-v.y * 0.5 + 0.5) };
+    }
+    camera.lookAt(camX, CAM_LOOK_Y, egoZ + CAM_AHEAD); // straight ahead: aiming back at the ego cancelled the offset
 
     // intent ribbon: the model's own chosen action, drawn on the road ahead of the car, with its
     // winning probability at the tip - rebuilt only when the action changes, not every frame.
