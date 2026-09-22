@@ -376,6 +376,33 @@ export function mountFilmFx(host, getSource, opts = {}) {
         }
       }
     }
+    // The byline sits under the solid, small: the wordmark is the sculpture, this is the maker's
+    // mark. It arrives once the word has landed, so it does not compete with it.
+    if (b.word > 0.85) {
+      let lo = gRows;
+      let hi = 0;
+      let left = gCols;
+      let right = 0;
+      for (let y = 0; y < gRows; y++) {
+        for (let x = 0; x < gCols; x++) {
+          if (grid.lum[y * gCols + x] > 0.01) {
+            if (y < lo) lo = y;
+            if (y > hi) hi = y;
+            if (x < left) left = x;
+            if (x > right) right = x;
+          }
+        }
+      }
+      if (hi >= lo) {
+        const bySize = Math.max(10, Math.round(cell * 1.15));
+        c.font = `${bySize}px "Geist Mono", ui-monospace, monospace`;
+        c.textAlign = 'center';
+        c.textBaseline = 'top';
+        c.fillStyle = `rgba(190,255,215,${(0.5 * Math.min(1, (b.word - 0.85) / 0.15)).toFixed(2)})`;
+        c.fillText('by OZ LABS', ((left + right + 1) / 2) * cw, (hi + 2.2) * cell);
+      }
+    }
+
     // the lines under it, typed
     const size = Math.max(11, Math.round(H * 0.021));
     c.font = `${size}px "Geist Mono", ui-monospace, monospace`;
