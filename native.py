@@ -398,6 +398,25 @@ def _cache_batch_repeat_interleave(cache, repeats: int):
                 layer.recurrent_states[i] = layer.recurrent_states[i].repeat_interleave(repeats, dim=0)
 
 
+def _cache_select_rows(cache, lo: int, hi: int):
+    """New cache holding only batch rows [lo:hi) of `cache` (bench.py's B_fair sub-batch
+    chunking). Same hybrid-cache split as _cache_batch_repeat_interleave: DynamicLayer's
+    .keys/.values (full-attention) get plain slicing; LinearAttentionLayer has no per-row
+    selection of its own, so its conv_states/recurrent_states are sliced directly. Caller
+    deep-copies `cache` first (mirrors the pre-Qwen3.5 .keys/.values-only version)."""
+    for layer in cache.layers:
+        if hasattr(layer, "batch_repeat_interleave"):  # same discriminator: has .keys/.values
+            layer.keys = layer.keys[lo:hi]
+            layer.values = layer.values[lo:hi]
+            continue
+        for i in range(getattr(layer, "number_of_states", 1)):
+            if layer.is_conv_states_initialized[i]:
+                layer.conv_states[i] = layer.conv_states[i][lo:hi]
+            if layer.is_recurrent_states_initialized[i]:
+                layer.recurrent_states[i] = layer.recurrent_states[i][lo:hi]
+    return cache
+
+
 def _causal_pad_mask(attn2d, q_len, dtype):
     """Explicit additive (batch,1,q_len,kv_len) mask: causal by physical slot order
     within [past|current] (order-based, so identical across rows regardless of padding)

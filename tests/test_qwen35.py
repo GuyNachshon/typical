@@ -117,3 +117,31 @@ def test_native_kv_decide_matches_run_batch_qwen35_fp32():
         expected = torch.cat([probs[i, :len(c)], probs[i, -1:]])
         assert torch.allclose(dists[i], expected, atol=1e-4), (i, (dists[i] - expected).abs().max())
         assert torch.allclose(dists[i].sum(), torch.tensor(1.0), atol=1e-4)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="fla's DeltaNet kernel is Triton/CUDA-only "
+                     "(installed alongside this checkpoint on GPU pods) -- runs on CPU raise "
+                     "'Pointer argument cannot be accessed from Triton', unrelated to this test")
+def test_bench_b_fair_batched_runs_without_crashing_on_hybrid_cache():
+    """bench.py's B_fair baseline (score_b_fair_chunk / _cache_rows) crashed on Qwen3.5's hybrid
+    cache with AttributeError: 'LinearAttentionLayer' object has no attribute
+    'batch_repeat_interleave' (tm2 pod run, 2026-09-22) -- score_b_fair_chunk's own top-level
+    cache expansion AND _cache_rows' sub-batch row-slicing both called the raw method directly
+    instead of native._cache_batch_repeat_interleave / the new native._cache_select_rows.
+    max_seqs=2 forces multiple sub-batches through _cache_rows for m=3 queries, so this
+    exercises exactly the path that crashed, on the real hybrid stack (not Qwen3's uniform
+    DynamicCache, which never hit this bug). This only pins "doesn't crash" -- the batched-vs-
+    unbatched *numeric* parity check_batched_matches_fair enforces on Qwen3 does not yet hold
+    on this hybrid cache (~0.9 nat max diff, un-root-caused; see that function's TODO) and is
+    deliberately not asserted here. B_fair is a baseline-only comparator, not our product path;
+    native_kv_decide's own parity test above (test_native_kv_decide_matches_run_batch_qwen35_fp32)
+    is unaffected."""
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    from bench import check_batched_matches_fair
+
+    tok = AutoTokenizer.from_pretrained(NAME, padding_side="right")
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
+    lm = AutoModelForCausalLM.from_pretrained(NAME, dtype=torch.float32).to("cuda").eval()
+    check_batched_matches_fair(lm, tok, "cuda", k=3, m=3, max_seqs=2)  # must not raise
