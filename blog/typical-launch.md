@@ -111,7 +111,7 @@ The fix is upstream, not a rendering convention we want to keep. The corpus is r
 
 \* Public-subset run against JevBench v1.2.1 (72 standard / 111 hard public ids), not a ranked leaderboard entry. Brackets are 95% cluster bootstraps over the paraphrase group; the standard tier's 72 items come from only 36 independent states. Majority baselines are .311 standard and .336 hard. Latency is warm p50 for a single K = 2 decision over a 256-token state, one stream, in process on one H100 through the public inference package, model load excluded — not a hosted-endpoint number and not comparable to one measured over a network.
 
-Those intervals are the point of printing them. **JevBench cannot separate these two models**, and at this sample size it cannot separate any adjacent pair of checkpoints we have trained, ours or anyone's. Do not read the .694-to-.806 gap as a result.
+Those intervals are the point of printing them. **JevBench cannot separate these two models.** Nor can it separate any adjacent pair in our seven-checkpoint ladder, which spans 1.7B to 14B and four backbone generations. Do not read the .694-to-.806 gap as a result; we don't.
 
 What does separate them is everything measured at a usable sample size: Medium leads Small by 5 points on CLINC-150, 11 on MMLU-Pro among-K, 10 on held-out yes/no decisions, 5 on the composition curriculum. It is not a clean sweep — Medium is 9 points worse on TREC-fine (50 fine-grained topics). Take Medium for accuracy, Small for cost, and don't use the benchmark column to decide.
 
