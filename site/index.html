@@ -20,17 +20,18 @@
     <ul class="t-eyebrow hero brow">
       <li>Open decision models</li>
       <li>1.7B and 4B</li>
-      <li class="soon">14B soon</li>
+      <li>Open weights</li>
     </ul>
-    <h1 class="t-hero">Typical decides.</h1>
-    <p class="sub">Give it text, a question, and the answers you will accept. It scores each answer and flags when none of them fit.</p>
+    <h1 class="t-hero">Models that decide, not generate.</h1>
+    <p class="sub">Give Typical some state, a question, and the options your software can take. Get a probability for each one back, including none of the above.</p>
+    <p class="sub-note">No generation. No parsing.</p>
     <p class="watching">On screen: Typical playing DOOM, reading one sentence a tick and picking one of five moves.</p>
     <div class="btns"><a class="btn" href="#results">See the results</a><a class="btn outline" href="research.html">Read the research</a></div>
     <ul class="proof t-mono">
-      <li>45&nbsp;ms a decision</li>
-      <li>80.4% right on 150 intents</li>
-      <li>83.6% on rules it never saw</li>
-      <li>Open weights</li>
+      <li>Same facts, different rule, different decision</li>
+      <li>16&nbsp;ms a decision, warm</li>
+      <li>80.4% across 150 labels you define</li>
+      <li>Choice · Noul · Score</li>
     </ul>
   </div>
   <div class="stage-hud" id="hud">
@@ -46,8 +47,8 @@
     <p class="t-eyebrow">01 — What it is</p>
     <div>
       <h2 class="t-section">State in. A typed decision out.</h2>
-      <p class="lede">Typical is a decision model. Your code hands it text it already has, a question, and the answers it is willing to accept. Typical returns how likely each answer is, plus the odds that none of them apply. It never writes a sentence, so there is nothing to parse and no answer can come back that you did not list.</p>
-      <p class="lede muted mt-18">One call, 45 ms, the same shape every time. Cheap enough to run on every step of a workflow, not only the steps you can afford a chat model for.</p>
+      <p class="lede">Typical is a decision model. Your code gives it state, a question, and a set of possible answers defined at runtime. Typical returns a probability for each, plus the probability that none apply. It never generates an answer, so there is nothing to parse and it cannot invent an option your program does not support.</p>
+      <p class="lede muted mt-18">The output space belongs to your program, not the model. One call, about 16 ms warm, the same shape every time.</p>
     </div>
   </div>
   <div class="media dark">
@@ -63,8 +64,8 @@
   <div class="chapter-head">
     <p class="t-eyebrow">02 — Results</p>
     <div>
-      <h2 class="t-section">80.4% right on 150 intents. 45 ms a decision. Both with a control beside them.</h2>
-      <p class="lede">Every number below sits next to the same model before we trained it, so you can see what the training bought and what it cost. On the hard tier it bought nothing: both sizes sit at chance there, and say so too confidently.</p>
+      <h2 class="t-section">Small enough to sit inside the loop.</h2>
+      <p class="lede">Change the rule and the same facts get a different decision, because the rules arrive with the question rather than in the weights. Every number below sits next to the same model before training, so you can see what the training bought and what it cost. On the hard tier it bought nothing: both sizes are at chance there, and say so too confidently.</p>
       <p class="note mt-18">Those JevBench figures come from a public-subset run (72 standard / 48 easy / 111 hard ids), not a ranked leaderboard entry; chance is 31.1% standard, and both models&rsquo; hard tier sits within one standard error of it. The full disclosure is under the table.</p>
     </div>
   </div>
@@ -106,7 +107,7 @@
   </div>
   <div class="ucard-grid">
     <div class="ucard"><div><h3 class="t-card">Choice</h3><p>Pick one of K candidates you define at runtime. A probability for each, and for ∅.</p></div><div class="diagram"><i></i><i class="on"></i><i></i><i></i><i class="dot"></i></div></div>
-    <div class="ucard"><div><h3 class="t-card">Yes / no</h3><p>A Bernoulli head on the same cached state. The only query type whose answer is exactly order-invariant.</p></div><div class="diagram"><i style="flex:0 0 60px"></i><i class="on" style="flex:0 0 60px"></i></div></div>
+    <div class="ucard"><div><h3 class="t-card">Noul · yes/no</h3><p>P(yes) for a proposition, off the same cached state. The only question type whose answer is exactly order-invariant.</p></div><div class="diagram"><i style="flex:0 0 60px"></i><i class="on" style="flex:0 0 60px"></i></div></div>
     <div class="ucard"><div><h3 class="t-card">Score</h3><p>An ordered level, 0 through N, with the expected level under the candidates.</p></div><div class="diagram"><i style="height:10px"></i><i style="height:16px"></i><i class="on" style="height:22px"></i><i style="height:28px"></i></div></div>
   </div>
   <div class="code mt-18"><pre>from typical import Typical
@@ -115,7 +116,7 @@ m = Typical.from_pretrained("OzLabs/typical-small")
 m.choice(state, "What does the customer want?", ["refund", "replacement", "repair"])
 m.noul(state, "Is the order still under warranty?")
 m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
-  <p class="lede muted mt-30" style="max-width:56ch">It is not an LLM replacement or a knowledge model. It decides from the text you give it (≤ 1k tokens); it does not plan, compute, or reason over long documents, and on hard multi-step workflow judgments it is still at chance.</p>
+  <p class="lede muted mt-30" style="max-width:56ch">Typical is built for bounded decisions, not open-ended generation or multi-step planning. The released models work on states up to about 1k tokens; serial arithmetic, temporal composition and long-horizon reasoning are still weak.</p>
 </section>
 
 <section class="page chapter" id="demos">
@@ -135,7 +136,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
   </div>
   <div class="grid gap-18 lg:grid-cols-2" style="margin-bottom:55px">
     <div><div class="media dark"><p class="media-label t-eyebrow">Snake · canvas</p><div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="snake"></div></div></div><p class="note mt-18">One sentence per tick; the candidate set is the safe moves. 98.4% of moves on 62 boards (chance 48%); 24 food in the recorded run.</p></div>
-    <div><div class="media dark" style="min-height:520px"><p class="media-label t-eyebrow">DOOM · E1M1 · live</p><div class="media-scene"><iframe class="card-film" id="film-card" src="games/doom/index.html?film=1" title="DOOM played by typical-small" loading="lazy"></iframe></div><div class="card-hud t-mono"><p class="rec"><i></i><span id="card-rec">REC · typical-small · E1M1</span></p><p class="rec-sub" id="card-rec2">booting</p><div id="card-rows"></div><p class="sentence" id="card-sentence"></p></div></div><p class="note mt-18">Chocolate Doom, shareware 1.9, the frame exactly as the engine draws it. Two facts per tick (badly hurt? an enemy in sight?), the model picks retreat, engage or explore, and aims from &ldquo;the player must turn left to face the imp&rdquo;. Over a recorded 200-decision run on E1M1 it matched the rule list every time, fired 12 shots and finished on 11 health — most of its calls near the end were retreat (site/data/replays/realdoom.json). The kill counter that run reported does not reconcile with the shots fired, so it is not quoted here.</p></div>
+    <div><div class="media dark" style="min-height:520px"><p class="media-label t-eyebrow">DOOM · E1M1 · live</p><div class="media-scene"><iframe class="card-film" id="film-card" src="games/doom/index.html?film=1" title="DOOM played by typical-small" loading="lazy"></iframe></div><div class="card-hud t-mono"><p class="rec"><i></i><span id="card-rec">REC · typical-small · E1M1</span></p><p class="rec-sub" id="card-rec2">booting</p><div id="card-rows"></div><p class="sentence" id="card-sentence"></p></div></div><p class="note mt-18">Chocolate Doom, shareware 1.9, the frame exactly as the engine draws it. Two facts per tick (badly hurt? an enemy in sight?), the model picks retreat, engage or explore, and aims from &ldquo;the player must turn left to face the imp&rdquo;. The pipeline is engine &rarr; text state &rarr; Typical &rarr; action: it never receives a pixel. Over a recorded 200-decision run on E1M1 it matched the rule list every time, fired 12 shots and finished on 11 health — most of its calls near the end were retreat (site/data/replays/realdoom.json). The kill counter that run reported does not reconcile with the shots fired, so it is not quoted here.</p></div>
   </div>
   <div id="tryit">
     <div class="exrow" data-exhibit-card>
@@ -179,12 +180,17 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
 
 <section class="page chapter" id="fails">
   <div class="chapter-head">
-    <p class="t-eyebrow">05 — What does not work</p>
+    <p class="t-eyebrow">05 — Fit</p>
     <div>
-      <h2 class="t-section">Five things it gets wrong, and why.</h2>
+      <h2 class="t-section">Where it works, and where it does not.</h2>
+      <p class="lede">Bounded decisions over text you already have. Anything that needs several steps of reasoning, or a document longer than the state window, is outside what these two models do today.</p>
     </div>
   </div>
-  <div class="ucard" style="padding-top:30px;min-height:0;max-width:72ch"><ul style="margin:0;padding-left:18px;display:grid;gap:12px"><li>Object-location sentences. Doom’s “the enemy is 5 cells to the left” never fired a turn (0 of 12); the model aims only once the state says “the player must turn left to face the enemy”. Numbers it must compare itself (“41 health”) leak into the decision: with them, an enemy in the crosshair at mid health read as retreat. Snake and Doom both need the engine to pre-compute the comparison.</li><li>Rules with "or" in them, negated conditions, or more than four rules before the default. Drive holds its score only with the state sentences in a fixed order; shuffled, accuracy drops into the high eighties.</li><li>Compaction: P(keep) never crosses .5, so there is no usable keep/drop threshold, only a ranking.</li><li>Level-7 composition (temporal, units, expected value, trade-off): at chance on every checkpoint.</li><li>Long documents: states above ~1k tokens. The cause is a truncation bug in the training data; a fix is in training.</li></ul></div>
+  <div class="ucard-grid">
+    <div class="ucard"><div><h3 class="t-card">Good fit</h3><ul class="fit"><li>Routing and triage</li><li>Classification over labels you define</li><li>Policy and eligibility checks</li><li>Extraction with a closed answer set</li><li>Scoring on a scale you define</li><li>Tool choice and next action</li></ul></div></div>
+    <div class="ucard"><div><h3 class="t-card">Not yet</h3><ul class="fit"><li>Documents past the state window</li><li>Serial arithmetic</li><li>Temporal composition</li><li>Multi-step planning</li><li>Vision, or any raw perception</li></ul></div></div>
+    <div class="ucard"><div><h3 class="t-card">How we know</h3><p>Each of these has a measured failure behind it, including the ones that surprised us: object-location phrasing, rules with an &ldquo;or&rdquo; in them, a compaction threshold that never crosses .5, and a truncation bug that taught confident answers without evidence.</p></div><p class="figure-src"><a href="research.html#limitations">Every known failure, with its numbers &rarr;</a></p></div>
+  </div>
 </section>
 
 <section class="page chapter" id="start">
@@ -192,7 +198,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
     <p class="t-eyebrow">06 — Get started</p>
     <div>
       <h2 class="t-section">Three commands and you are running it locally.</h2>
-      <p class="lede">The public inference package ships inside the model repos on Hugging Face. Download the <code>inference/</code> folder, install its requirements, and call it. <code>state</code> is a string or a dict; candidates are whatever you pass, per call, with no retraining.</p>
+      <p class="lede">Open weights and inference code today. The full training recipe is documented; training code comes next. Download the <code>inference/</code> folder from the model repo, install its requirements, and call it. <code>state</code> is a string or a dict; the options are whatever you pass, per call, with no retraining.</p>
     </div>
   </div>
   <div class="code"><pre >pip install huggingface_hub
