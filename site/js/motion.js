@@ -23,6 +23,30 @@ function heroEnter() {
     .to(hud, { opacity: 1, duration: 0.5 }, 0.7);
 }
 
+// The hero insets as you leave it: the full-bleed film scales down a little and its corners
+// round, so the page reads as scrolling past a card rather than wiping a video off the top.
+// Scrubbed, not triggered — the shape tracks the scroll position exactly. Transform and
+// border-radius only; the stage keeps its layout box, so nothing below it moves.
+function heroInset() {
+  const g = gs();
+  const ST = window.ScrollTrigger;
+  const stage = document.querySelector('.stage');
+  if (!ST || !stage) return;
+  g.registerPlugin(ST);
+  g.set(stage, { transformOrigin: '50% 0%' });
+  g.to(stage, {
+    scale: 0.93,
+    borderRadius: 18,
+    ease: 'none',
+    scrollTrigger: {
+      trigger: stage,
+      start: 'top top',
+      end: 'bottom 55%', // done insetting well before the hero has left, so the shape settles
+      scrub: 0.4,
+    },
+  });
+}
+
 function scrollReveals() {
   const g = gs();
   const ST = window.ScrollTrigger;
@@ -43,5 +67,6 @@ function scrollReveals() {
 export function mountMotion() {
   if (!gs() || reduced()) return;
   heroEnter();
+  heroInset();
   scrollReveals();
 }
