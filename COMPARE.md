@@ -105,6 +105,71 @@ is raw GPU rent. Their null is a literal option; ours is learned. Model size dif
 | eval caps / leaks | ours capped at ~3k items per set; BoolQ / HWU64 ≤ 1–2 pts inflated (near-dup audit); B_8B subsampled 300–1000 |
 | their numbers | one third-party probe day; MMLU-Pro is a 1,200-item sample; latencies include queueing; workflow-eval labels are LLM-generated and vendor-run |
 
+## 4a. Update (2026-09-22): JevBench leaderboard, our own frozen-control ladder, and latency vs generative LLMs
+
+Sections 1–4 above are the 2026-09-18 comparison against TypeSafe/Jev from first-party docs and a third-party
+black-box analysis, run on the pre-native-head `joint_emb` family. Everything below is newer, sourced from
+REPORT.md §3q (JevBench harness run, 2026-09-20) and §3ab/§3ag/§3ah (scaling ladder, frozen controls, serving
+latency, 2026-09-21/22), and uses the current native-head, typed-primitive architecture — not `joint_emb`.
+
+**JevBench public-subset table (231 public ids; not a ranked leaderboard entry — see §3q's disclosures, reproduced
+in every `releases/*.md` card and in `RESULTS.md`).** Majority/chance baselines: .311 standard / .284 easy / .336
+hard.
+
+| entry | standard | easy | hard | notes |
+|---|---|---|---|---|
+| PCDM energy `joint_emb_lw_v5` (2026-09-18 architecture) | .403 | .875 | .360 | superseded by the native head below |
+| PCDM native `nc_v3` (pre-workflow-training) | .472 | .812 | .297 | the native-head starting point (§3q) |
+| **Typical `typical-small` (`ts1b`, Release 1, 1.7B)** | .694 | 1.00 | .432 | released |
+| **Typical `typical-medium` (`tm1b`, Release 1, 4B)** | .806 | 1.00 | .423 | released |
+| **Typical `tm2` (Qwen3.5-4B, Release-1 recipe)** | .861 | 1.00 | **.495** | trained, not released |
+| **Typical `tl1b` (Qwen3-14B, long-state fix + frozen-teacher KD)** | **.931** | 1.00 | .450 | candidate, not released — level with `system-one-open` on standard |
+| open-jev-deberta-v3-large (classifier, local CPU) | .431 | 1.00 | .378 | closest architectural transport to ours pre-Release-1 |
+| GLiNER2 / jeff (GLiFormer 400M) / Laya (ModernBERT) | .639 / .750 / .694 | 1.00 | .369 / .387 / .351 | small encoders trained on the task family |
+| open-alternative-jev (Qwen3.5-4B, frozen, their rendering) | .833 | 1.00 | .568 | frozen backbone, no task training |
+| system-one-open (Gemma E2B LoRA) / system-one (Qwen3-8B) | .931 / – | 1.00 | .486 / .486 | `tl1b` ties system-one-open on standard |
+| SemIf (Qwen3.5-4B) / OpenJev (26B-A4B) / djev | .986 / .972 / .986 | 1.00 | .613 / .640 / .676 | still ahead of everything we've measured on hard |
+| Jev 1.13.0 (closed) | .986 | 1.00 | .730 | closed reference ceiling |
+
+The gap to the leading open entries on standard is now small (`tl1b` .931 vs SemIf/OpenJev/djev .97–.99) and the
+gap on hard is where the project's own work still concentrates (`tm2` .495 is our best hard number at any size we
+control; the leaders are at .61–.73).
+
+**Our own frozen-control ladder (no training, letter logits over rendered options; §3ab/§3ag) — how much of any
+frozen model's leaderboard number is backbone scale vs training vs rendering:**
+
+| backbone | 0-shot std/hard | 3-shot std/hard | 3-shot, SemIf-style render std/hard |
+|---|---|---|---|
+| Qwen3-1.7B-Base | .583 / .369 | .528 / .369 | – |
+| Qwen3-4B-Base | .722 / .414 | .778 / .441 | – |
+| Qwen3-8B-Base | .375 / .360 (broken: all-"A" bug) | .556 / .369 | – |
+| Qwen3-14B-Base | .819 / .441 | .819 / **.559** | – |
+| Qwen3.5-2B-Base | – | .583 / .387 | .597 / .441 |
+| Qwen3.5-4B-Base | – | .764 / .495 | .847 / .468 |
+| Qwen3.5-9B-Base | – | .806 / .541 | **.931 / .595** |
+
+Reading: instruct-tuning Qwen3-4B changes nothing on this task (§3ag); the Qwen3.5 generation is measurably better
+on hard than Qwen3 at matched shot count (4B: .495 vs .441); and *rendering* — not just scale or generation —
+explains a large share of the published leaderboard's standard-tier numbers: the same frozen Qwen3.5-9B checkpoint
+goes from .806 to .931 standard purely by changing how the state/options are rendered, with zero training. This is
+the strongest evidence that SemIf/OpenJev/djev's .97–.99 standard is partly a rendering/protocol effect, not solely
+"bigger frozen model reads logits."
+
+**Latency vs generative LLMs.** Two separate comparisons, not directly poolable (different harnesses/hardware):
+
+- *Within the JevBench harness* (§3q): our native distributions run at p50 .13–.19 s raw (in-process, one H100,
+  cold label embedding included for the energy variant) vs .17–.24 s for the GPU-hosted generative entries on the
+  same leaderboard — competitive even before the serving-path optimization below.
+- *Our own prompted-LM baseline, same backbone size, same hardware* (`bench_fair`, pre-native-head but architecture-
+  independent for this comparison): 73× / 37× / 20× / 16× cheaper per query at K = 4 / 32 / 150 / 1000 (M = 256)
+  than a same-size prefix-sharing log-prob baseline that has to re-run a forward pass per candidate — this is the
+  generation-vs-direct-readout gap in isolation, not a vendor's number.
+- *Public serving path, after the zero-copy KV-cache fix* (§3ag, `runs/serve_bench2/`): warm p50 **15.5–17 ms**
+  (`typical-small`, 1.7B) and **19–21 ms** (`typical-medium`, 4B) per decision, down from 21–27 ms pre-fix. TypeSafe
+  quote "70ms–500ms" end-to-end for Jev and "3 to 329 seconds" for the frontier LLMs they compare against
+  [TS-blog] — our released models' warm decisions are below TypeSafe's own quoted floor for Jev, on different
+  hardware and without a network round-trip, so treat this as directional, not a head-to-head claim.
+
 ## 5. References
 
 TypeSafe (first party)

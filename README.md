@@ -1,70 +1,120 @@
-# PCDM v0 — Parallel Calibrated Decision Model (PoC)
+# Typical
 
-PoC of `idea.md`: encode a state once with a frozen LM, then answer many natural-language-defined
-questions with runtime-defined candidate sets in parallel, as calibrated probabilities with an
-architectural "null" (none of the above). Trained on real data, locally on an M4 Pro (MPS).
+Typical turns a pretrained language model into a direct probabilistic decision engine. Give it a state once —
+a support ticket, a policy document, an agent trace, any block of text — and it answers many independent,
+runtime-defined questions against that state in parallel, as calibrated probability distributions, with an
+explicit "none of the above." No generation, no JSON parsing to fix up, no re-encoding the state per question.
 
-See `PLAN.md` for the design, data mix, interfaces and pre-registered decision rules.
+Three typed primitives cover the decisions software actually needs to make:
 
-## Run
+- **Choice** — pick one of K runtime-defined options (or abstain).
+- **Noul** — yes/no, read from a dedicated Bernoulli head, exactly invariant to which label you call "yes."
+- **Score** — an ordinal level (urgency, severity, priority), trained with ordinal-smoothed targets so the
+  probability mass concentrates near the true level instead of spreading uniformly over "wrong."
+
+The state is encoded once into a KV cache; every question is a short causal suffix scored against that cache, so
+adding more questions to a state is cheap — a single decision costs 45–60 ms depending on model size, and that
+cost barely moves as the candidate set K grows from 2 to 256 (REPORT.md §3ab).
+
+## The models
+
+| model | backbone | JevBench standard / hard (public subset) | link |
+|---|---|---|---|
+| `typical-small-preview` | Qwen3-1.7B-Base | .750 / .387 | https://huggingface.co/OzLabs/typical-small-preview |
+| `typical-small` | Qwen3-1.7B-Base | .694 / .432 | https://huggingface.co/OzLabs/typical-small |
+| `typical-medium` | Qwen3-4B-Base | .806 / .423 | https://huggingface.co/OzLabs/typical-medium |
+
+`typical-small` and `typical-medium` are Release 1: DecisionMix v2's hard curriculum, ordinal-smoothed Score,
+a per-row Bernoulli Noul head, and 1,024-token decision states. `typical-small-preview` is the earlier Phase-6A
+checkpoint, kept public as the reference point Release 1 is measured against. All three JevBench numbers are a
+public-subset run (72 standard / 48 easy / 111 hard ids; not a ranked leaderboard entry — see each model's card).
+
+`typical-medium` is the capability-per-millisecond knee of the ladder we've measured: +11 points of JevBench
+standard and +11 points of MMLU-Pro among-K over `typical-small` for 1.25× the per-decision latency
+(56–58 ms vs 45–46 ms at K = 2–32, REPORT.md §3ab/§3af). A 14B candidate (`tl1b`) reaches JevBench standard
+**.931** — the best number this project has produced — but is not yet released; see `PROJECT.md` §1 and §7 for
+why and what's still open.
+
+## Quickstart
 
 ```bash
-uv sync
-uv run data.py          # HF datasets -> data/{train,val}.jsonl + data/eval/*.jsonl  (~1 min)
-uv run encode.py        # frozen Qwen3-0.6B-Base (20 layers) -> data/cache.pt        (~10 min, 3 GB)
-uv run train.py --name F                 # soft labels + null      (the model)
-uv run train.py --name D --no_null       # ablation: no null
-uv run train.py --name E --hard_only     # ablation: hard labels only
-uv run train.py --name G --cand_null     # variant: candidate-aware null
-uv run baselines.py Clate                # pooled late-interaction MLP (is the cross-attn tower needed?)
-uv run baselines.py C                    # frozen cross-encoder + per-task linear heads (accuracy ceiling)
-uv run baselines.py B                    # AR baseline: prompted candidate log-probs, full 28-layer LM
-uv run report.py                         # side-by-side table of runs/*/results.json
-uv run bench.py --model runs/F/model.pt  # H2: latency vs number of queries on one state
+pip install -r inference/requirements.txt
 ```
 
-## What was found while building it
+```python
+from typical import Typical
 
-- **Position-0 attention sink.** In Qwen3 (no BOS), the hidden state at position 0 is content-independent
-  (cosine 0.9998 between `neutral`, `yes`, `transfer`). Every single-token candidate collapsed to one vector.
-  Fix: prepend `<|endoftext|>` at encode time and drop it (`encode.py`).
-- **Fixed classifier in disguise.** With three fixed NLI label strings, the scorer memorised three vectors:
-  accuracy on paraphrased labels was 11% (below chance). Randomly paraphrasing label names during training
-  (`data.py: TRAIN_NAMES`) fixed the collapse, but transfer is shallow: over 5 never-seen wordings F gets 43%
-  (chance 33%), from 64% on wordings close to a training set down to chance on distant ones. B (prompted LM)
-  picks its literal `"none of the above"` on every paraphrased item (0%) — the §7 argument against a null string.
-- **State-only null vs unseen label spaces.** On 30 never-seen CLINC intents the model ranks the right
-  candidate 62% of the time (chance 10%) but answers null 93% of the time, because the null energy only sees
-  the state. Adding Banking77 (label diversity) helps somewhat; variant G makes the null candidate-aware.
+m = Typical.from_pretrained("OzLabs/typical-small", device="auto")  # or "typical-medium" / "typical-small-preview"
 
-## Results (single seed unless noted; scaled = after temperature scaling on val)
+# K-way choice over a fixed label set -> {label: p, ...} + p_null
+m.choice(state, "What does the customer want?", ["refund", "replacement", "repair"])
 
-Runs: **F** = the model (cross-attn slot + energy scorer, soft labels, state-only null). Ablations: **D** no null,
-**E** hard labels. Variant **G** = null energy sees the score-weighted best candidate. Baselines: **Clate** pooled
-late-interaction MLP (no cross-attention), **C** frozen cross-encoder + per-task linear head (frozen-feature ceiling;
-cannot do dynamic candidates), **B** full 28-layer LM, 3-shot prompt, length-normalised candidate log-probs.
+# Yes/no -> P(yes)
+m.noul(state, "Is the order still under warranty?")
 
-`uv run report.py` prints the table; `RESULTS.md` has the final snapshot.
+# Ordinal levels -> {level: p, ...} + p_null + expected (E[index])
+m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])
+```
 
-### Verdicts against the pre-registered rules in PLAN.md
+`state` is a string or a JSON-serialisable dict. Runnable end to end: `uv run --no-sync python inference/example.py`
+(`inference/example.py`). The `inference/` package (`inference/README.md`) is self-contained — no dependency on
+this training repo, just `torch`, `transformers`, `safetensors`, `huggingface_hub`, `numpy` — and is numerically
+verified against the internal decider (`inference/test_parity.py`, max abs probability diff `0.0` on CPU and MPS).
 
-| H | Rule | Outcome |
-|---|---|---|
-| H1 accuracy retention | F ≥ C − 2 pts on SNLI | **Holds (barely)**: 66.6 vs 68.4. F ties C on MNLI and beats it on CLINC (72 vs 45). Both sit at the frozen-layer-20 ceiling — the number is a backbone limit, not a decision-architecture limit. LoRA is the upgrade path. |
-| H3 probability quality | F beats E and C on ChaosNLI NLL and SNLI ECE | **Fails as stated.** F's ChaosNLI NLL (1.33) is worse than D (1.17) and C (1.27). Cause: a state-only null learns the null-synthesis base rate and leaks a constant ~13% onto ∅ on clean 3-way items (≈0.15 nats). Renormalising ∅ out, F ≈ D. **G removes the leak** (P(∅) ≈ 1%) and has the best NLL/ECE of all runs (1.13 / 0.046). Soft labels alone (E vs F) buy nothing measurable. |
-| H4 null detection | AUROC > 0.85 on CLINC-OOS and SNLI-null; ≥ 0.8 on held-out intents | **Partial.** CLINC in-scope vs OOS 0.90 ✓, SNLI-null 0.82 ✗ (narrow), held-out intents 0.20 ✗. Versus a no-null model's best signal (1 − max P): +8 to +17 AUROC. Null probability is K-dependent (P(∅ | gold absent) 0.98 at K=2 → 0.61 at K=50). |
-| H2 parallel latency | latency(M) ≪ M·latency(1) | **Holds**: 256 queries on one state = 11.8× the cost of 1 (1.58 s) vs ~70× at M=64 for the prompted LM (17.5 s); ~6 ms marginal per query. |
+## Demo
 
-### Other findings
-- **Tower vs pooled scorer.** Cross-attention is worth +8 pts on SNLI/MNLI and is what makes paraphrased labels work
-  (Clate: 29%). But Clate generalises better to *never-seen* intent names (76% vs 62% among-K): scoring in the frozen
-  space (`u ⊙ c`) is a zero-shot similarity, while the tower's learned 512-d space partly memorises the seen label set.
-- **Unsolved:** at K=150 with mixed seen/unseen candidates, utterances of unseen intents are confidently mapped to a
-  *seen* intent (12% among-K, null fires 27%) by every variant. This is the confident-wrong case H4 is about.
-- Noise floor: ±0.7 pt accuracy at n=5000, ±0.02–0.03 NLL on ChaosNLI, ±0.01–0.02 ECE. D/E/F/G are indistinguishable on
-  in-scope accuracy; F-vs-D NLL, G-vs-F NLL, and tower-vs-Clate gaps are real.
+```bash
+uv run --no-sync python demo/app.py
+```
 
-## Cut from v0 / next
-SQuAD, `Score` type, uncertainty-shaping losses (§12), RL (§14), latent compression, LoRA.
-Next by information-per-hour: (1) 2 more seeds of F and G (queued); (2) hybrid scorer — add the frozen-space
-similarity `u ⊙ c` to the tower's scorer input to get Clate's unseen-label transfer without losing the NLI edge.
+Opens a local Gradio app at `http://127.0.0.1:7860`: a playground (one state, one question, see the probability
+bar chart and latency), a batch view (one state, several questions, all scored against a single KV-encode of the
+state — this is what "cached state" buys you), and the release-page tables reproduced from `releases/*.md` and
+`REPORT.md` §3ab. See `demo/README.md`.
+
+## Where the docs live
+
+- `PROJECT.md` — start here: document map, code map, run registry, findings ledger, ops rules, open questions.
+- `REPORT.md` — the consolidated results log, in chronological sections (§3a, §3b, … §3ah); every claim has a
+  matched baseline and a section number.
+- `PLAN7.md` — the current roadmap (scaling ladder, mixture sweep, typed primitives, DecisionMix v2, calibration,
+  large-K path) and its execution notes.
+- `RESULTS.md` — one results table per model family/size, pulled straight from run artefacts.
+- `COMPARE.md` — the competitive picture against the closed Jev/System One family and the open JevBench leaderboard.
+- `NOVELTY.md` — the contribution story: what is and isn't novel, and why.
+- `releases/*.md` — one card per public release: exact backbone/adaptation/readout, training args, full results
+  tables, known limitations, license.
+
+## How to train
+
+Training code is not yet public (the release cards ship inference only). The Release-1 recipe at 1.7B
+(`typical-small`, checkpoint `ts1b`, from `releases/typical-small.md`):
+
+```bash
+uv run --no-sync python train.py --readout native --nc_head n3 --nc_render letters_nonull --null factored \
+    --tap_layer 20 --zscore --lora_r 16 --lora_layers 8 \
+    --data data_v5 --extra_data data_kb,data_wf,data_wf_hf,data_wf_long,data_wh,data_u \
+    --bucket_map data_wf_long=W,data_wh=W,data_u=U \
+    --family_weights E:0.40,K:0.15,W:0.35,U:0.10 --null_aug W:0.20 \
+    --ordinal_smooth 0.7 --noul_head bern --max_state 1024 \
+    --bs 64 --grad_accum 4 --eval_cap 1500 --steps 12000 \
+    --ckpt_upload --wandb --hf_repo guychuk/pcdm-runs
+```
+
+The 4B (`typical-medium`, `tm1b`) is the same recipe on `Qwen/Qwen3-4B-Base` at tap 26/36 — see
+`releases/typical-medium.md` for its exact args. `PROJECT.md` §6 has the current pod-ops rules (torch/kernel
+pinning, micro-batch sizing, watcher rules) for anyone reproducing a run on rented GPUs.
+
+## License and data notes
+
+- Backbones (`Qwen/Qwen3-1.7B-Base`, `Qwen/Qwen3-4B-Base`): Apache-2.0.
+- Training data is a mix of public NLU/NLI sets, a distilled knowledge-MCQ corpus, an in-repo rubric-conditioned
+  workflow generator, three HF-sourced workflow datasets (MIT / Apache-2.0), and DecisionMix v2 (`data_wh`, a
+  programmatic in-repo rule engine with no external license constraints; `data_u`, whose UNLI portion is MIT and
+  whose `metaeval/ambient` / `metaeval/chaos-mnli-ambiguity` portions do not declare a license on their HF cards —
+  flagged, not asserted). Full per-source breakdown and licenses: `releases/typical-small.md`'s Data/License
+  sections.
+- JevBench numbers throughout this repo are a **public-subset run** against `fstandhartinger/jevbench` v1.2.1 (72
+  standard / 48 easy / 111 hard public ids) — not a submitted or ranked leaderboard entry. The 72 MIT-licensed
+  original JevBench items are the only public JevBench material that is training-eligible, and none of it was
+  trained on for any released checkpoint.

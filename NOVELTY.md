@@ -349,3 +349,63 @@ Contribution story adopted for the write-up; each remaining PLAN5 step is judged
 5. **Typed primitives** — Phase 6; not started.
 Cautions kept: do not pitch N3 as "hidden option states contain the answer" (prior art); do not claim novelty for the K/null finding without a
 targeted search.
+
+---
+
+# Addendum (2026-09-22): what PLAN7's last two days add to the contribution story
+
+Everything below is downstream of the architecture story above (direct decision interface, candidate-blind
+factorization, typed primitives) and speaks to a different question: once the architecture is fixed, what does
+*training it well* look like, and where does it fail. Sourced from REPORT.md §3ag–§3ah.
+
+**1. The long-state/truncation finding is a methodological point, not just a bug fix.** `data_wf_long`'s rows
+rendered their supporting facts *after* the request text, so right-truncation at the training window silently
+dropped the facts on 98.8% of those rows at 1,024 tokens (100% at 256) — every model trained since was optimized
+to answer long policies *confidently* from states that no longer contained the evidence for the answer. The
+general point: a fixed-length training window interacts with *where in the render the facts live*, not just with
+how long the render is — a truncation-length ablation would have missed this, because the fix (facts-first
+ordering) is orthogonal to length. This is a claim about how silent failures compound in decision-model training
+data specifically, worth stating independently of the specific bug (REPORT §3ag).
+
+**2. Typed primitives generalize past "make Choice work" — Score and Noul want different objectives, not different
+architectures.** Ordinal-smoothed Score (τ = 0.7 exponential decay around the true level) changes *no decision* on
+JevBench's ordinal items relative to plain K-way Choice — it is exactly a calibration change, held-out score NLL
+2.07→1.23 with identical argmax — while the Bernoulli Noul head is exactly order-invariant by construction
+(reversed-label |ΔP(yes)| = 0/0 across all sets, vs up to .55 for the K-way Choice rendering of the same yes/no
+question) and is the first head to clear an untouched external floor by a margin (PagerDuty .602→.886). Read
+together: the same frozen backbone and readout support three distinct output *types* by changing only the target
+distribution and the terminal head, with the Choice machinery untouched and zero cost to the other types when
+routed correctly. That per-row routing had to be exact (a global instead of per-row Bernoulli route collapsed an
+entire release to chance) is itself evidence that "typed decisions" is a real interface boundary, not a labeling
+convenience — get the boundary wrong and the model doesn't degrade gracefully, it breaks (§3ac, §3ae).
+
+**3. Calibration-first checkpoint selection changes what "better" means during training, not just at eval time.**
+`--best_on` selects the checkpoint on held-out uncertainty+curriculum NLL instead of in-distribution val loss;
+combined with `--brier_lambda` in the training objective itself (not a post-hoc temperature fit), this is what took
+`tl1b`'s held-out score NLL from 2.87 (the worst of the whole ladder) to 0.95 and JevBench hard Brier from .85 to
+.66 — a bigger single-run swing than any architecture change measured in this project. The standing result before
+this (§3ab) was that soft-target calibration gets *worse* with scale under an accuracy-shaped selection criterion;
+this addendum's finding is that the criterion, not the capacity, was binding.
+
+**4. Frozen-teacher KD is a clean, cheap way to inject a stronger model's judgment without its cost.** `tl1b`'s KD
+term (α·CE + β·KL, T = 2, against the frozen 14B's own 3-shot letter distribution — the same backbone, not a
+larger one) contributes to a checkpoint that *matches* the leaderboard's best open standard-tier number (.931,
+level with `system-one-open`) at trained-model latency, not frozen-with-shots latency. Notably the teacher is not
+an external, larger, or more expensive model — it is the same backbone the student is initialized from, scored
+zero-shot with a fixed rendering. That a same-capacity frozen teacher's calibrated uncertainty is worth distilling
+into the trained model (rather than just training on hard labels) is a cheap, repeatable recipe independent of
+backbone family or size; `tl1b_nokd`'s eval (in flight) is the ablation that isolates how much of `tl1b`'s gain is
+the KD term specifically vs the other four fixes bundled into the same run.
+
+**5. "Training helps standard, hurts hard at scale" is the project's sharpest unresolved tension, and it survives
+every fix tried so far except at one architecture.** The original form of this (§3ab): the frozen Qwen3-14B with
+three exemplars scores .559 on JevBench hard, our *trained* 14B (`ladder_14b`) scores .468 — training on this
+project's data distribution made the hard tier *worse* than a base model with in-context examples, while lifting
+standard tier substantially (.819→.875). Fixing the diagnosed causes (long-state truncation, calibration objective,
+frozen-teacher KD) narrows but does not close this at 14B: `tl1b` reaches hard *accuracy* .450, still below the
+frozen 14B's .559, even though hard *Brier* improves past it (.66 vs .60 is close, and NLL/ECE metrics move far
+more than accuracy). The one point where this tension inverts is `tm2` (Qwen3.5-4B, same Release-1 recipe): hard
+.495, above every Qwen3 trained model at any size including `tl1b`, at a fraction of the parameters. Whether that
+is because Qwen3.5's own pretraining is a better prior for this task's hard tier, or because `tm2`'s smaller size
+happened to avoid whatever makes 14B "confidently wrong" rather than "uncertain," is the open question this
+addendum leaves for `tl2`'s (Qwen3.5-9B) evaluation to help answer.
