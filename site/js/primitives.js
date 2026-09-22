@@ -91,6 +91,11 @@ export function mountProgram(host, { state, questions, resultFor, decide } = {})
   host.append(head, code, foot);
 
   let open = 'team'; // the choice is expanded by default: it is the one you can change
+  // Where each rule was last drawn, so a redraw starts from the old value and the CSS width
+  // transition has something to run from. Without this every rule is a brand-new node whose width
+  // is already final, and the distribution snaps instead of moving — which is the one thing this
+  // panel exists to show.
+  const lastWidth = new Map();
 
   function readings() {
     const by = (k) => calls.find((c) => c.key === k)?.result;
@@ -152,8 +157,13 @@ export function mountProgram(host, { state, questions, resultFor, decide } = {})
       const row = el('div', `program-row${label === top && c.result ? ' is-win' : ''}`);
       const track = el('span', 'program-track');
       const rule = el('i');
-      rule.style.width = c.result ? `${Math.max(1, (p ?? 0) * 100).toFixed(1)}%` : '0%';
+      const target = c.result ? `${Math.max(1, (p ?? 0) * 100).toFixed(1)}%` : '0%';
+      rule.style.width = lastWidth.get(label) ?? '0%';
       track.appendChild(rule);
+      requestAnimationFrame(() => {
+        rule.style.width = target;
+        lastWidth.set(label, target);
+      });
       const drop = el('button', 'program-drop', '×');
       drop.type = 'button';
       drop.title = `take "${label}" out of the answer space`;
@@ -232,7 +242,20 @@ export function mountProgram(host, { state, questions, resultFor, decide } = {})
 
   render();
   runBtn.addEventListener('click', () => resolve(calls.filter((c) => c.key), 'three calls, one read of the ticket'));
-  return { stop() {} };
+
+  // The panel rendered blank until someone pressed the button, which reads as broken rather than
+  // as an invitation. It runs itself once when it comes into view; the button then says "Run again"
+  // and still does everything it did.
+  let armed = true;
+  const io = new IntersectionObserver((entries) => {
+    if (!armed || !entries.some((e) => e.isIntersecting)) return;
+    armed = false;
+    io.disconnect();
+    resolve(calls.filter((c) => c.key), 'three calls, one read of the ticket');
+  }, { threshold: 0.35 });
+  io.observe(host);
+
+  return { stop() { io.disconnect(); } };
 }
 
 export function selfTest() {

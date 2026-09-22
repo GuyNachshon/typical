@@ -340,6 +340,7 @@
   .program-add { justify-self: start; appearance: none; border: 0; background: none; padding: 2px 0 0; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.36px; color: var(--color-mid); cursor: pointer; }
   .program-add:hover { color: var(--color-off); text-decoration: underline; text-underline-offset: 3px; }
   .is-running .program-code { opacity: 0.35; }
+  @media (prefers-reduced-motion: reduce) { .program-track i { transition: none; } }
 
   /* ---- utility cards ---- */  /* ---- utility cards ---- */
   .ucard { background: var(--color-lgray); border-radius: var(--radius-card); padding: 88px 18px 18px; min-height: 300px; display: flex; flex-direction: column; justify-content: space-between; gap: 30px; }

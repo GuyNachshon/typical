@@ -196,3 +196,7 @@
 .gc-controls { display: flex; gap: 6px; flex: none; }
 .gc-controls .btn.outline { padding: 7px 10px; font-size: 10px; }
 .gc-controls .btn.outline.gc-on { background: var(--color-warm); color: var(--color-off); }
+
+/* A game strip ticks every 200-450ms; the 600ms page-wide fill transition would still be catching
+   up with the previous decision when the next one lands. */
+.gc-decision .bar .fill { transition-duration: 200ms; }
