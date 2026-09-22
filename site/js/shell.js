@@ -403,19 +403,43 @@ function pushDecision(res, state, queries) {
 // The hero film is shown as a character field, not a picture (js/ascii.js). Mounting is
 // best-effort: no iframe, no canvas or an unreadable buffer and the film just plays as itself.
 // Returns a handle whose pulse() the decision loop calls, or a no-op if the effect never mounts.
-function mountFilmFxOn(film) {
+function mountFilmFxOn(film, onReady) {
   const stage = film?.closest('.stage');
+  let startedAt = 0; // when we started the level ourselves, so the reveal can wait for it
   const handle = { pulse() {}, stop() {} };
-  if (!film || !stage) return handle;
+  if (!film || !stage) {
+    onReady?.();
+    return handle;
+  }
   import('./filmfx.js').then(({ mountFilmFx }) => {
     const fx = mountFilmFx(stage, () => {
       const c = film.contentDocument?.getElementById('canvas');
       return c && c.width ? c : null;
-    }, { after: film });
+    }, {
+      after: film,
+      onReady,
+      // in_level alone is not enough: DOOM's attract mode plays a recorded demo, and that reports
+      // in_level too, so the cold start handed over to the title screen. Start the level ourselves
+      // and only reveal once that game has been running for a moment.
+      ready: () => {
+        const D = film.contentWindow?.Doom;
+        if (!D?.ready) return false;
+        try {
+          if (!startedAt) {
+            D.newGame(3);
+            startedAt = performance.now();
+            return false;
+          }
+          return performance.now() - startedAt > 1200 && D.state().in_level;
+        } catch {
+          return false;
+        }
+      },
+    });
     handle.pulse = fx.pulse;
     handle.stop = fx.stop;
     handle.grade = fx.grade;
-  }).catch(() => {});
+  }).catch(() => onReady?.());
   return handle;
 }
 
@@ -423,7 +447,9 @@ function mountFilmFxOn(film) {
 function mountFilm(ctx, ids = {}) {
   const film = document.getElementById(ids.film || 'film');
   // The treatment is the hero's alone: the card in chapter 04 shows the frame untouched.
-  const fx = ids.fx === true ? mountFilmFxOn(film) : { pulse() {} };
+  // While the tube is running its cold start the page holds back: nav, copy and the probability
+  // panel stay hidden so the first thing a visitor reads is what the model is.
+  const fx = ids.fx === true ? mountFilmFxOn(film, () => document.documentElement.classList.remove('booting')) : { pulse() {} };
   if (ids.fx === true && typeof window !== 'undefined') { window.__fxPulse = () => fx.pulse(); window.__fxGrade = () => fx.grade?.(); } // probe hooks for the effect check
   const rowsEl = document.getElementById(ids.rows || 'hud-rows');
   const sentEl = document.getElementById(ids.sentence || 'hud-sentence');
@@ -565,11 +591,31 @@ async function boot() {
   const ctx = { decide: liveDecide, mode, readout, presets, inkBars };
 
   mountHero(presets);
+  // set before the film mounts; filmfx clears it the moment the cold start is over (or at once,
+  // if it is skipped for a repeat visit or for reduced motion)
+  document.documentElement.classList.add('booting');
   mountFilm(ctx, { fx: true });
   // The same game again in chapter 04, plain: no bloom layer, so the card shows the frame exactly
   // as the engine draws it. Only one of the two runs at a time — each pauses when off screen.
   mountFilm(ctx, { film: 'film-card', rows: 'card-rows', sentence: 'card-sentence', rec: 'card-rec' });
-  import('./motion.js').then((m) => { const go = () => m.mountMotion(); if (window.gsap) go(); else window.addEventListener('load', go); });
+  import('./motion.js').then((m) => {
+    const go = () => {
+      if (document.documentElement.classList.contains('booting')) {
+        // wait for the cold start rather than playing the hero entrance behind it
+        const obs = new MutationObserver(() => {
+          if (!document.documentElement.classList.contains('booting')) {
+            obs.disconnect();
+            m.mountMotion();
+          }
+        });
+        obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        setTimeout(() => { obs.disconnect(); m.mountMotion(); }, 12000); // never strand the page
+        return;
+      }
+      m.mountMotion();
+    };
+    if (window.gsap) go(); else window.addEventListener('load', go);
+  });
   mountFindings();
   mountResults(models, reliabilityDoc, chanceDoc, frozenDoc);
   mountTryit(ctx);

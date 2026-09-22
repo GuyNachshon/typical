@@ -42,6 +42,37 @@ export function bulgeAt(v) {
   return 1 - d * d;
 }
 
+// The cold start. Before the game appears, the tube says what it is you are about to watch —
+// the page has no other moment where it can state plainly that the thing playing DOOM is the
+// model. Typed out, phosphor on black, and it runs through the same warp and scanlines as the
+// footage that follows.
+const BOOT_WORD = 'TYPICAL';
+const BOOT_LINES = [
+  'open decision models · 1.7B and 4B',
+  '',
+  'state read once, cached · choice · yes/no · score · ∅',
+  'now playing: DOOM E1M1, one sentence per tick',
+];
+const BOOT_CPS = 60; // characters a second for the lines under the word
+const BOOT_WORD_MS = 1100; // the word rasterises in over this
+const BOOT_HOLD = 1000; // after the last character, before the game fades up
+const BOOT_FADE = 700;
+const FILL_CHAR = '·';
+const ON_CHAR = '█';
+const MID_CHAR = '▓';
+const EDGE_CHAR = '▒';
+const BOOT_KEY = 'typical_boot';
+
+// Where the cold start is at a given moment: how much of the word has rasterised, how much of
+// the text under it has been typed, and how far into the hand-over to the game we are.
+export function bootState(elapsed, chars) {
+  const word = Math.max(0, Math.min(1, elapsed / BOOT_WORD_MS));
+  const typed = Math.min(chars, Math.max(0, Math.floor(((elapsed - BOOT_WORD_MS) / 1000) * BOOT_CPS)));
+  const typedMs = BOOT_WORD_MS + (chars / BOOT_CPS) * 1000;
+  const fade = Math.max(0, Math.min(1, (elapsed - typedMs - BOOT_HOLD) / BOOT_FADE));
+  return { word, typed, fade, done: fade >= 1, typedMs };
+}
+
 function canvas2d(w = 1, h = 1, opts) {
   const el = document.createElement('canvas');
   el.width = w;
@@ -92,6 +123,11 @@ export function mountFilmFx(host, getSource, opts = {}) {
   let stopped = false;
   let pulseAt = -1e9;
   let lastFilter = 'none'; // what the pulse is currently grading with, for verification
+  const bootChars = BOOT_LINES.join('\n').length;
+  const skipBoot = still || opts.boot === false || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(BOOT_KEY));
+  let bootAt = skipBoot ? -1e9 : 0; // set on the first frame that has a source to draw
+  let booted = skipBoot;
+  if (skipBoot && opts.onReady) opts.onReady();
 
   function size(src) {
     const w = host.clientWidth;
@@ -144,7 +180,7 @@ export function mountFilmFx(host, getSource, opts = {}) {
   function drawWarped(src, W, H, pulse) {
     const c = warp.ctx;
     c.setTransform(1, 0, 0, 1, 0, 0);
-    c.clearRect(0, 0, W, H);
+    if (c.globalAlpha === 1) c.clearRect(0, 0, W, H); // during the boot fade the text stays under
     c.imageSmoothingEnabled = false;
     c.filter = pulse > 0.01
       ? `contrast(${(1 + 0.22 * pulse).toFixed(3)}) saturate(${(1 + 0.16 * pulse).toFixed(3)})`
@@ -166,12 +202,139 @@ export function mountFilmFx(host, getSource, opts = {}) {
     c.filter = 'none';
   }
 
+  // The word, rasterised into a character grid: the letterforms are drawn once into a small
+  // offscreen canvas, then read back so each cell knows whether it is inside a letter, on its
+  // edge, or in the field around it. Rebuilt only when the grid changes size.
+  let raster = null;
+  function buildRaster(cols, rows) {
+    if (raster && raster.cols === cols && raster.rows === rows) return raster;
+    const { el, ctx: c } = canvas2d(cols, rows);
+    c.fillStyle = '#000';
+    c.fillRect(0, 0, cols, rows);
+    let size = rows * 0.92;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillStyle = '#fff';
+    // shrink to fit the width, letter-spaced by hand since canvas has no tracking
+    const spacing = () => size * 0.14;
+    const widthAt = (px) => {
+      c.font = `700 ${px}px "Geist Mono", ui-monospace, monospace`;
+      return [...BOOT_WORD].reduce((w, ch) => w + c.measureText(ch).width, 0) + spacing() * (BOOT_WORD.length - 1);
+    };
+    while (size > 4 && widthAt(size) > cols * 0.86) size *= 0.94;
+    c.font = `700 ${size}px "Geist Mono", ui-monospace, monospace`;
+    const total = widthAt(size);
+    let x = (cols - total) / 2;
+    for (const ch of BOOT_WORD) {
+      const w = c.measureText(ch).width;
+      c.fillText(ch, x + w / 2, rows / 2);
+      x += w + spacing();
+    }
+    const px = c.getImageData(0, 0, cols, rows).data;
+    const on = new Uint8Array(cols * rows);
+    for (let i = 0, n = 0; n < on.length; i += 4, n++) on[n] = px[i] > 110 ? 1 : 0;
+    // edge cells: inside the letter but next to something that is not
+    const edge = new Uint8Array(cols * rows);
+    for (let y = 0; y < rows; y++) {
+      for (let cx = 0; cx < cols; cx++) {
+        const n = y * cols + cx;
+        if (!on[n]) continue;
+        const nb = (dx, dy) => {
+          const yy = y + dy;
+          const xx = cx + dx;
+          return yy < 0 || yy >= rows || xx < 0 || xx >= cols ? 0 : on[yy * cols + xx];
+        };
+        if (!nb(1, 0) || !nb(-1, 0) || !nb(0, 1) || !nb(0, -1)) edge[n] = 1;
+      }
+    }
+    raster = { cols, rows, on, edge, el };
+    return raster;
+  }
+
+  function drawBoot(W, H, b) {
+    const c = warp.ctx;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.fillStyle = '#06080a';
+    c.fillRect(0, 0, W, H);
+    const cell = Math.max(6, Math.round(H * 0.0135));
+    const cols = Math.floor(W / (cell * 0.62));
+    const rows = Math.round((H * 0.26) / cell);
+    const r = buildRaster(cols, rows);
+    c.font = `${cell}px "Geist Mono", ui-monospace, monospace`;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    const cw = W / cols;
+    const top = Math.round(H * 0.16);
+    // the field fills column by column, so the word arrives left to right
+    const front = b.word * (cols + 8);
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const n = y * cols + x;
+        const here = front - x;
+        if (here <= 0) continue;
+        const cx = (x + 0.5) * cw;
+        const cy = top + (y + 0.5) * cell;
+        if (r.on[n]) {
+          // the leading column burns brighter as it lands, then settles
+          const fresh = Math.max(0, 1 - here / 7);
+          c.fillStyle = `rgba(${175 + 60 * fresh | 0},255,${205 + 40 * fresh | 0},${(0.8 + 0.2 * fresh).toFixed(2)})`;
+          // a hint of texture across the letterform: solid in the middle, lighter at the edge
+          const ch = r.edge[n] ? EDGE_CHAR : ((x + y) % 5 === 0 ? MID_CHAR : ON_CHAR);
+          c.fillText(ch, cx, cy);
+        } else {
+          c.fillStyle = 'rgba(120,200,160,0.1)';
+          c.fillText(FILL_CHAR, cx, cy);
+        }
+      }
+    }
+    // the lines under it, typed
+    const size = Math.max(11, Math.round(H * 0.022));
+    c.font = `${size}px "Geist Mono", ui-monospace, monospace`;
+    c.textAlign = 'left';
+    c.textBaseline = 'top';
+    c.fillStyle = 'rgba(175,255,205,0.88)';
+    const x0 = Math.round(W * 0.5 - (cols * cw * 0.43) / 2);
+    let y = top + rows * cell + Math.round(H * 0.06);
+    let left = b.typed;
+    for (const line of BOOT_LINES) {
+      if (left <= 0) break;
+      const shown = line.slice(0, left);
+      left -= line.length + 1;
+      if (shown) c.fillText(shown, x0, y);
+      if (left <= 0) c.fillRect(x0 + c.measureText(shown).width + 4, y + 2, size * 0.5, size);
+      y += Math.round(size * 1.7);
+    }
+  }
+
   function draw(src, now) {
     const W = layer.width;
     const H = layer.height;
     const dpr = Math.min(2, devicePixelRatio || 1);
     const pulse = envelope(now - pulseAt);
-    drawWarped(src, warp.el.width, warp.el.height, pulse);
+    if (!booted) {
+      if (bootAt === 0) bootAt = now;
+      // The reveal waits for the game to actually be in the level: without this the cold start
+      // handed over to DOOM's title screen, which is not what the text just promised.
+      const { typedMs } = bootState(0, bootChars);
+      if (opts.ready && !opts.ready() && now - bootAt > typedMs + BOOT_HOLD * 0.6) {
+        bootAt = now - typedMs - BOOT_HOLD * 0.6;
+      }
+      const b = bootState(now - bootAt, bootChars);
+      if (b.done) {
+        booted = true;
+        try { sessionStorage.setItem(BOOT_KEY, '1'); } catch {}
+        opts.onReady?.();
+      } else {
+        drawBoot(warp.el.width, warp.el.height, b);
+        if (b.fade > 0) {
+          // the game fades up through the boot screen rather than cutting to it
+          warp.ctx.globalAlpha = b.fade;
+          drawWarped(src, warp.el.width, warp.el.height, pulse);
+          warp.ctx.globalAlpha = 1;
+        }
+      }
+    }
+    if (booted) drawWarped(src, warp.el.width, warp.el.height, pulse);
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, W, H);
@@ -272,6 +435,12 @@ export function mountFilmFx(host, getSource, opts = {}) {
 }
 
 export function selfTest() {
+  const chars = BOOT_LINES.join('\n').length;
+  console.assert(bootState(0, chars).typed === 0, 'nothing is typed at zero');
+  console.assert(bootState(BOOT_WORD_MS + 1000, chars).typed === BOOT_CPS, 'typing runs at the stated rate');
+  console.assert(bootState(0, chars).word === 0 && bootState(BOOT_WORD_MS, chars).word === 1, 'the word rasterises in over its own window');
+  console.assert(bootState(1e6, chars).done, 'the boot always finishes');
+  console.assert(!bootState((chars / BOOT_CPS) * 1000 + 100, chars).done, 'and holds before it fades');
   console.assert(envelope(-1) === 0 && envelope(PULSE_MS + 1) === 0, 'the pulse is silent outside its window');
   console.assert(Math.abs(envelope(PULSE_MS * 0.18) - 1) < 1e-6, 'the pulse peaks at the end of the attack');
   console.assert(envelope(PULSE_MS * 0.6) < envelope(PULSE_MS * 0.3), 'and settles after it');
