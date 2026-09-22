@@ -56,9 +56,9 @@ m.score(state,  "How urgent is this ticket?", ["0", "1", "2", "3"])
 
 Each one is a different head on the same backbone, and the difference is structural.
 
-Choice reads your label strings, so it can operate over label sets that were never hard-coded into an output head. On CLINC-150 (151 intents) `typical-small` scores .801 and `typical-medium` .847; on 20 Newsgroups, an entirely different label vocabulary, .540 and .588; on held-out workflow families neither model trained on, .818 and .865 (`RESULTS.md` §1, §4).
+Choice reads your label strings, so it can operate over label sets that were never hard-coded into an output head. On CLINC-150 (151 intents) `typical-small` scores .801 and `typical-medium` .847; on 20 Newsgroups, an entirely different label vocabulary, .540 and .588; on held-out workflow families neither model trained on, .818 and .865.
 
-Noul is not `Choice(["yes", "no"])`. It has a dedicated Bernoulli head with no candidate text rendered at all, so its answer cannot change because "yes" and "no" were listed in a different order. On the shipped `typical-small` checkpoint, reversing label order leaves P(yes) exactly unchanged on 10 of 11 held-out test sets and moves it by .009 on the eleventh. Held-out noul accuracy is .710 for Small and .811 for Medium (`RESULTS.md` §3).
+Noul is not `Choice(["yes", "no"])`. It has a dedicated Bernoulli head with no candidate text rendered at all, so its answer cannot change because "yes" and "no" were listed in a different order. On the shipped `typical-small` checkpoint, reversing label order leaves P(yes) exactly unchanged on 10 of 11 held-out test sets and moves it by .009 on the eleventh. Held-out noul accuracy is .710 for Small and .811 for Medium.
 
 Score knows adjacent levels are related. A severity of 2 is closer to 3 than to 0, so we train its probability distribution with ordinal-smoothed targets instead of treating levels as unrelated buckets. In the isolated ablation, ordinal training cut held-out score NLL from 2.07 to 1.23 without changing a single top-1 prediction on the JevBench ordinal items.
 
@@ -90,7 +90,7 @@ We train on four kinds of decision: evidence (NLI-style), knowledge (multiple ch
 
 \* Public-subset run against JevBench v1.2.1 (72 standard / 111 hard public ids), not a ranked leaderboard entry. Majority baselines on this split are .311 standard and .336 hard, and at n_eff ≈ 36 on standard, small gaps are noise. Latency is warm p50 per decision on one H100 through the public inference package.
 
-Medium buys a large jump in standard-tier decision quality for a small latency increase. Neither released model solves the hard compositional tier: long-policy, multi-step, temporal, unit and trade-off decisions sit far below the standard tier for both.
+Medium buys a large jump in standard-tier quality for a small latency increase. Neither released model solves the hard compositional tier: long-policy, multi-step, temporal, unit and trade-off decisions sit far below the standard tier for both.
 
 We also trained a 14B research candidate. Before training it we wrote down a release bar (hard-tier accuracy ≥ .559 or hard-tier Brier ≤ .65, and long-document policy accuracy ≥ .35). It reached .931 on the standard tier, the best number this project has produced, and still missed the bar on both counts, narrowly on Brier (.656) and by a wide margin on long-document policy (.158). So it isn't shipping.
 
@@ -98,7 +98,7 @@ We also trained a 14B research candidate. Before training it we wrote down a rel
 
 A decision model that memorises "this kind of ticket gets that label" is useless the moment your policy changes. So a large part of workflow training is counterfactual: the same state and the same options appear under different rubrics with different correct answers, which forces the model to read the rule instead of pattern-matching the state.
 
-It works inside the rule grammar we generate and stops at its edge. On held-out rubric-flip items, where the rule is inverted and the state is unchanged, `typical-small` scores .801 and `typical-medium` .833 (`RESULTS.md` §4). On level-7 composition, which mixes temporal, unit, expected-value and trade-off reasoning and which our generator never produces, both sit near .49 and .54. What we generate is learned. What we don't generate is not.
+It works inside the rule grammar we generate and stops at its edge. On held-out rubric-flip items, where the rule is inverted and the state is unchanged, `typical-small` scores .801 and `typical-medium` .833. On level-7 composition, which mixes temporal, unit, expected-value and trade-off reasoning and which our generator never produces, both sit near .49 and .54. What we generate is learned. What we don't generate is not.
 
 ## Where direct decisions still break
 
@@ -122,7 +122,7 @@ Each of those started as a bug or a failed run. [Read the technical deep dive �
 
 ## What's open today
 
-Open weights and inference code, today, on Hugging Face: [`OzLabs/typical-small`](https://huggingface.co/OzLabs/typical-small) and [`OzLabs/typical-medium`](https://huggingface.co/OzLabs/typical-medium), plus the earlier [`OzLabs/typical-small-preview`](https://huggingface.co/OzLabs/typical-small-preview) kept as the reference point Release 1 is measured against. Each repo carries the weights, the self-contained `inference/` package, and the full evaluation artefacts the tables above are read from.
+Open weights and inference code, today, on Hugging Face: [`OzLabs/typical-small`](https://huggingface.co/OzLabs/typical-small) and [`OzLabs/typical-medium`](https://huggingface.co/OzLabs/typical-medium), plus the earlier [`OzLabs/typical-small-preview`](https://huggingface.co/OzLabs/typical-small-preview) kept as the reference point Release 1 is measured against. Each repo carries the weights, the self-contained `inference/` package, and the evaluation artefacts every number in this post is read from (`eval_wf_full.json`, `jevbench_summary.json`), so you can check the tables above against the files rather than against us.
 
 Both released checkpoints are Apache-2.0 over Apache-2.0 Qwen3 base models. The training recipe is documented, down to the exact flags, in the model cards. Training code and the complete experimental report are not public yet; they're what we're preparing next. A packaged `pip` install doesn't exist yet either.
 
@@ -161,4 +161,4 @@ Typical is our version of it, built so that the weights, the inference stack, th
 <p align="center"><img src="../figures/fig_latency_quality.png" alt="Single-decision latency vs JevBench standard accuracy for the Typical family, against the latency bands of a generative LLM call" width="640"></p>
 <p align="center"><em>The Typical family's latency against the bands a normal LLM call falls into depending on how it has to answer.</em></p>
 
-Next: a calibration objective aimed at the hard tier specifically, generator work on the composition families where nothing we've tried has moved the needle, a Qwen3.5 port already in progress, and `typical-large` if and when the 14B clears its own bar.
+Next: a calibration objective aimed at the hard tier, generator work on the composition families, a Qwen3.5 port already in progress, and `typical-large` if the 14B clears its own bar.

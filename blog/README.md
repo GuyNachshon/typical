@@ -1,68 +1,102 @@
 # blog/
 
-The public launch post for Typical.
+Two public posts, meant to publish together.
 
-- `typical-launch.md` — the post. Plain Markdown with YAML front matter (`title`, `date`). Every
-  number in it traces to `REPORT.md`, `RESULTS.md`, `COMPARE.md`, or a `releases/*.md` card; see
-  those files for the underlying experiments if you want to check a claim.
+- `typical-launch.md` — **"Typical: Models That Decide, Not Generate."** The launch. Leads with the
+  decision primitive, shows the API, the two released models, where they break, and what is open.
+  ~1,900 words.
+- `technical-deep-dive.md` — **"We Removed Generation from an LLM. Here's What Broke."** The
+  archaeology: the candidate-blind architecture that failed, the wrong tap layer, the "none of the
+  above" pathology, the long-state data defect, the calibration results, the KV-cache deep copy.
+  ~3,200 words. The launch links to it twice.
+
+Every number in both traces to `REPORT.md`, `RESULTS.md`, `COMPARE.md`, or a `releases/*.md` card.
+Check the cited section before changing a number, not just the number.
+
+## What the posts may and may not claim
+
+This is the part that goes stale first, so read it before editing.
+
+- **The GitHub repo is private.** The only public artefacts are the Hugging Face model repos
+  (`OzLabs/typical-small`, `OzLabs/typical-medium`, `OzLabs/typical-small-preview`), which ship the
+  weights, the self-contained `inference/` package, and the eval artefacts. Neither post links
+  `REPORT.md`, `RESULTS.md` or `COMPARE.md` as if a reader could open them; the deep dive cites
+  report section numbers as provenance and says up front that the report publishes with the
+  training code. Do not reintroduce relative links out of `blog/`.
+- **There is no `pip install typical`.** PyPI `typical` is an unrelated package (Sean Stewart's
+  typing toolkit). The install flow in the launch post is the real one: download the model repo,
+  install `inference/requirements.txt`, put `inference/` on `sys.path`. The posts state plainly
+  that a packaged install does not exist yet. See the open naming question below.
+- **Licensing.** Both released checkpoints are Apache-2.0 over Apache-2.0 Qwen3 base models, and
+  the posts say so. The headline claim is "open weights and inference code today, recipe
+  documented, training code coming", because two portions of `data_u`
+  (`metaeval/ambient`, `metaeval/chaos-mnli-ambiguity`) declare no license on their HF cards. The
+  launch post flags that rather than asserting commercial-use safety. Don't upgrade that wording
+  without a licensing review.
+- **The truncation story is in progress.** Deep dive §5 states the data defect (98.8% of long rows
+  lost their facts at a 1,024-token window — verified, countable) and explicitly does *not* claim
+  it caused the long-policy metric movement, because the fix bundled five changes and the first
+  arm of the matched ablation shows a large train/test render-mismatch effect (.615 vs .842 on the
+  same 605 held-out items). That section is written to be updated when the second arm lands.
+- **The frozen teacher contributed nothing.** The matched `--distill_beta 0` control (`tl1b_nokd`)
+  beats the KD arm on hard (.477 vs .450), long-policy (.211 vs .158) and val NLL (0.410 vs
+  0.438). Never re-credit KD for the calibration gains.
+- **The 14B is not a product.** It stays out of the release table in the launch post and appears
+  only as a candidate that missed its own pre-registered bar.
 
 ## Where the assets live
 
-The post embeds seven figures by relative path (`../figures/fig_*.png`, since the post lives one
-directory below the repo root):
+Both posts embed figures by relative path (`../figures/fig_*.png`, since they live one directory
+below the repo root).
+
+Launch post:
 
 - `fig_architecture` — state encoded once into a KV cache, per-question suffixes read out.
-- `fig_ladder` — JevBench standard/hard accuracy across backbone size (Qwen3 vs Qwen3.5, frozen vs
-  trained), with reference lines for the rest of the leaderboard.
-- `fig_latency_quality` — the Typical family's latency vs. JevBench standard accuracy, plotted
-  against the latency bands a normal LLM call falls into (one-letter decode, JSON/label decode,
-  chain-of-thought).
-- `fig_calibration` — held-out score NLL and typed-decisions NLL across checkpoints, with the
-  ladder_14b-to-tl1b jump (long-state fix + frozen-teacher KD) annotated.
-- `fig_hard_families` — JevBench hard-tier accuracy by family for ladder_14b, tl1b, and the frozen
-  14B baseline.
-- `fig_truncation` — left, state token length vs. truncation cutoffs; right, long-policy accuracy
-  before/after the facts-first fix.
+- `fig_hard_families` — JevBench hard-tier accuracy by family, trained vs frozen 14B.
+- `fig_latency_quality` — the family's latency vs JevBench standard accuracy, against the latency
+  bands a normal LLM call falls into.
+
+Deep dive:
+
+- `fig_truncation` — state token length vs truncation cutoffs; long-policy accuracy by checkpoint.
+- `fig_calibration` — held-out score NLL and typed-decisions NLL across checkpoints.
 - `fig_serving` — cold/warm p50 latency before/after removing the per-decision KV-cache deep copy.
+- `fig_ladder` — JevBench standard/hard accuracy across backbone size, trained and frozen.
 
 These are generated by `scripts/make_figures.py` into `figures/<name>.png` (200dpi) and
-`figures/<name>.pdf` at the repo root, alongside `figures/figures_manifest.json` and
-`figures/latex_includes.tex` (for the paper, not needed here). If a figure is missing when you go
-to publish, regenerate it with that script rather than hand-drawing a substitute — the whole point
-of this post is that every number and every chart traces to a run in `runs/`.
+`figures/<name>.pdf` at the repo root. If a figure is missing when you go to publish, regenerate it
+with that script rather than hand-drawing a substitute — the whole point of these posts is that
+every number and every chart traces to a run in `runs/`.
 
 ## How to publish
 
-The post is written to render as-is on GitHub (relative image paths, standard Markdown tables) and
-to convert cleanly to a few common targets:
+Both files render as-is on GitHub (relative image paths, standard Markdown tables) and convert
+cleanly to the usual targets:
 
-1. **GitHub / repo README-style hosting.** Nothing to do — `typical-launch.md` and `figures/`
-   already sit in the right relative positions.
+1. **Hugging Face blog (`hf.co/blog`) or any static-site generator (Jekyll, Hugo, Ghost,
+   Substack).** Copy each post's body (everything after the closing `---`), re-export the front
+   matter (`title`, `date`) into the target's schema, upload the `figures/fig_*.png` files (not the
+   `.pdf` versions) to the target's media library, and swap the `../figures/` paths for the
+   resulting URLs. Keep the alt text and captions; they were written to stand alone if an image
+   fails to load.
+2. **Fix the cross-links.** The two posts link to each other by relative path
+   (`./technical-deep-dive.md`, `./typical-launch.md`). Point those at the published URLs.
+3. **Company site / marketing CMS.** Same as above. These assume a technical reader and link
+   straight to HF model cards. Don't trim those links to make it more "marketing"; the promise of
+   both posts is that every claim is checkable.
 
-2. **Hugging Face blog (`hf.co/blog`) or any static-site generator (Jekyll, Hugo, Ghost,
-   Substack).** These generally want the front matter in their own format and images uploaded to
-   their own asset store or CDN rather than referenced by a relative repo path:
-   - Copy `typical-launch.md`'s body (everything after the closing `---`) into the target's editor
-     or content file.
-   - Re-export the front matter (`title`, `date`) into whatever the target expects — most tools
-     have a distinct front-matter schema (slug, tags, cover image, author) that this file
-     deliberately doesn't guess at.
-   - Upload the seven `figures/fig_*.png` files (not the `.pdf` versions) to the target's media
-     library and swap the `../figures/fig_*.png` paths for the resulting URLs. Keep the alt text
-     and captions as-is; they were written to stand alone if an image fails to load.
-   - Double-check the two in-repo links near the end (`REPORT.md`, `COMPARE.md`) still resolve, or
-     point them at the GitHub-hosted versions if the post is leaving the repo.
+## Open question for a human
 
-3. **Company site / marketing CMS.** Same as above, plus: this post assumes a technical reader and
-   links straight to HF model cards and the raw experiment report. If the destination has a
-   separate "docs" or "changelog" audience, don't trim those links to make it more "marketing."
-   The promise of the post is that every claim is checkable, and that's the whole differentiator
-   from a typical launch post.
+Our inference package is imported as `from typical import Typical`, and PyPI `typical` v2.9.0 is
+an established, unrelated package. A future `pip` release needs either a different distribution
+name (with the import name possibly following) or a conversation with that project's maintainer.
+Both posts avoid the collision by shipping the package inside the model repos, so nothing is
+blocked, but it needs deciding before any packaged install ships.
 
-## Updating it later
+## Updating them later
 
-If a number changes (a new release, a fixed bug, a benchmark rerun), edit `typical-launch.md`
-directly and re-check the specific `REPORT.md`/`RESULTS.md`/`COMPARE.md` section cited next to the
-claim you're changing, rather than just bumping the number. If `typical-large` (`tl1b`) eventually
-clears its pass rule and ships, that's the biggest planned edit: the 14B paragraph under "The
-numbers" and the closing "What's next" line both need to move.
+If a number changes (a new release, a fixed bug, a benchmark rerun), edit the post directly and
+re-check the specific `REPORT.md`/`RESULTS.md`/`COMPARE.md` section cited next to the claim, rather
+than just bumping the number. Two edits are already queued: deep dive §5 when the render-order
+ablation's second arm lands, and the launch post's 14B paragraph plus the release table if
+`typical-large` ever clears its pass rule.
