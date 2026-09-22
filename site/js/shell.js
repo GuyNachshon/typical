@@ -458,6 +458,7 @@ async function boot() {
 
   mountHero(presets);
   mountFilm(ctx);
+  import('./motion.js').then((m) => { const go = () => m.mountMotion(); if (window.gsap) go(); else window.addEventListener('load', go); });
   mountFindings();
   mountResults(models, reliabilityDoc, chanceDoc, frozenDoc);
   mountTryit(ctx);
