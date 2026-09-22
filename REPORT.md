@@ -1480,6 +1480,12 @@ certainly noise, not depth — it reports the *shallowest* tap as the *slowest* 
 tap17), which is backwards, since a shallower tap can only reduce the one-time state pass. K=256 latency is flat
 (111–114 ms) across all three, as expected, because tap depth barely touches decision-batching cost.
 
+**Later correction (§3ak-d).** The `ts1b` comparison column is mismatched on the *corpus* as well as the recipe:
+these tap runs trained on the facts-first corpus and `ts1b` did not, and `ts1c` (the tap-20 control) turns out to
+be 34.9 points better than `ts1b` on long states while reading as indistinguishable on JevBench. The tap-depth
+conclusion below is unaffected — the three tap arms are matched to each other — but nothing in this table should
+be read as a `ts1b`-vs-`ts1c` comparison.
+
 **Verdict: tap stays at 71%.** Nothing here clears the bar for changing a frozen architecture parameter, and the
 sweep's own baseline is mismatched. Recorded as a closed negative; re-open only with a matched tap20 arm.
 
@@ -1598,8 +1604,16 @@ facts-first long states (+41.2 on the policy_permit family), while giving up not
 (.790 vs .798). It is strictly the better model for any caller who puts case facts before the policy body, and no
 worse for callers who do not.
 
+**The same holds at 4B.** `tm2` (Qwen3.5-4B, post-fix recipe) scores **.950** facts-first against the released
+`typical-medium`'s .612 (+33.8; policy_permit .967 vs .555), and *gains* slightly on facts-last (.879 vs .866).
+
+| supersedes | replacement | facts-first | facts-last |
+|---|---|---:|---:|
+| `typical-small` (.598 / .798) | `ts1c` | **.947** | .790 |
+| `typical-medium` (.612 / .866) | `tm2` | **.950** | .879 |
+
 **Consequences.**
-1. The `typical-small` v2 release is a card-and-upload job, not a training run — the checkpoint exists.
+1. Both v2 releases are card-and-upload jobs, not training runs — the checkpoints exist.
 2. This is the second time a checkpoint's real improvement was invisible on JevBench: `ts1c` scores .708/.432
    there against `ts1b`'s .694/.432, i.e. indistinguishable, while being 35 points better on the axis the fix
    targeted. §3aj filed `ts1c`'s tap sweep as a negative on exactly those JevBench-shaped grounds.
