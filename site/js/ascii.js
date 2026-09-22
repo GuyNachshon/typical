@@ -18,7 +18,7 @@
 // transcription of a frame) mixes letters, brackets and digits, which gives the field texture at
 // small sizes where a ramp of #%@ turns into a flat grey block.
 const BAYER = [0.25, 0.75, 1.0, 0.5]; // 2x2 ordered-dither thresholds
-const FLOOR = 0.34; // below this share of the frame's own range, a cell stays blank
+const FLOOR = 0.2; // below this share of the frame's own range, a cell stays blank
 const RAMP = [
   ' ', ' ', '.', ',', ':', ';', 'i', 'l', '!', '|', '/', '\\', '1', 'I', '{', '}', '[', ']',
   '?', 'r', 'c', 'v', 'z', 'x', 'Y', 'U', 'J', 'C', 'L', 'Q', '0', 'O', 'Z', 'm', 'w', 'q',
@@ -117,7 +117,10 @@ export function mountAscii(host, getSource, opts = {}) {
     lctx.clearRect(0, 0, W, H);
     // no opaque backing: the frame stays faintly visible through its own transcription, which is
     // both better looking and closer to the point (the picture is there; the model isn't reading it)
-    lctx.fillStyle = 'rgba(8,8,9,0.6)'; // the frame stays faintly readable under its transcription
+    // A heavy backing hid the scene: the glyphs alone cannot show you a zombieman four cells
+    // ahead. The transcription is a veil over the frame, not a replacement for it — the picture
+    // stays legible and the characters sit on top of it.
+    lctx.fillStyle = 'rgba(8,8,9,0.22)';
     lctx.fillRect(0, 0, W, H);
     const cw = W / cols;
     const ch = H / rows;
@@ -150,7 +153,7 @@ export function mountAscii(host, getSource, opts = {}) {
         // still carries at this resolution (a red wall, a green lamp, brown brick)
         const lift = raw > 0.01 ? Math.min(2.8, (0.45 + 0.8 * t) / raw) : 1;
         lctx.fillStyle = `rgb(${Math.min(255, r * lift) | 0},${Math.min(255, gch * lift) | 0},${Math.min(255, bch * lift) | 0})`;
-        lctx.globalAlpha = 0.55 + 0.45 * t;
+        lctx.globalAlpha = 0.3 + 0.5 * t;
         lctx.fillText(g, (x + 0.5) * cw, (y + 0.5) * ch);
       }
     }
