@@ -219,7 +219,7 @@
 
   .inst-flow { height: 100%; min-height: 200px; }
   .inst-flow canvas { display: block; width: 100%; height: 100%; }
-  @media (max-width: 64rem) { .inst-flow { height: 24px; min-height: 0; } }
+  @media (max-width: 64rem) { .inst-flow { height: 84px; min-height: 0; } }
 
   .inst-out { padding-top: 26px; } /* the first row sits on the state's first line, not above it */
   .inst-rows { display: grid; gap: 15px; }

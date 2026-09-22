@@ -36,10 +36,10 @@ export function ruleWidth(p) {
 // readout belongs to — a line floating in the gap said nothing.
 function flow(canvas, anchors = {}) {
   const ctx = canvas.getContext('2d');
-  const marks = Array.from({ length: 7 }, (_, i) => ({ t: i / 7, v: 0.06 + Math.random() * 0.05 }));
   let raf = 0;
   let last = 0;
-  let surge = 0; // rises when a decision lands, then decays
+  let pulses = []; // each is a soft head travelling the path once
+  let idle = 0; // a slow shimmer so the channel is never quite dead
   let y0 = 0.5;
   let y1 = 0.5;
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -59,35 +59,57 @@ function flow(canvas, anchors = {}) {
     }
     const W = canvas.width;
     const H = canvas.height;
-    // ease toward the anchors so a question change slides the connector rather than cutting it
-    const ty0 = anchors.from?.() ?? 0.5;
-    const ty1 = anchors.to?.() ?? 0.5;
-    y0 += (ty0 - y0) * Math.min(1, dt * 7);
-    y1 += (ty1 - y1) * Math.min(1, dt * 7);
-    const at = (t) => {
-      const e = t * t * (3 - 2 * t); // smoothstep: flat at both ends, curved in the middle
-      return (y0 + (y1 - y0) * e) * H;
+    // Stacked layouts put the readout below the questions, not beside them, so the connector has
+    // to run down the panel there. Aspect was the wrong signal: the channel is a wide, short band
+    // on a phone, so it kept drawing sideways and joining nothing.
+    const vertical = anchors.stacked?.() ?? H > W * 1.2;
+    const ta = anchors.from?.() ?? 0.5;
+    const tb = anchors.to?.() ?? 0.5;
+    y0 += (ta - y0) * Math.min(1, dt * 7);
+    y1 += (tb - y1) * Math.min(1, dt * 7);
+    // path(t) -> [x, y] in device pixels
+    const path = (t) => {
+      const e = t * t * (3 - 2 * t); // smoothstep: flat at both ends, the bend in the middle
+      // vertical: straight down the column, drifting a little toward the side the answer sits on
+      return vertical
+        ? [(0.5 + (y1 - 0.5) * 0.12) * W + (e - 0.5) * W * 0.04, t * H]
+        : [t * W, (y0 + (y1 - y0) * e) * H];
     };
+
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, W, H);
     ctx.strokeStyle = 'rgba(240,238,235,0.16)';
     ctx.lineWidth = Math.max(1, dpr * 0.5);
     ctx.beginPath();
-    for (let i = 0; i <= 24; i++) ctx[i ? 'lineTo' : 'moveTo']((i / 24) * W, at(i / 24));
-    ctx.stroke();
-    surge = Math.max(0, surge - dt * 1.6);
-    for (const m of marks) {
-      if (!still) m.t = (m.t + (m.v + surge * 0.6) * dt) % 1.2;
-      if (m.t > 1) continue;
-      const a = (0.2 + surge * 0.5) * (1 - Math.abs(m.t - 0.5) * 0.7);
-      ctx.fillStyle = `rgba(240,238,235,${Math.max(0, a).toFixed(3)})`;
-      ctx.fillRect(m.t * W, at(m.t) - dpr * 1.5, dpr * 9, dpr * 3);
+    for (let i = 0; i <= 24; i++) {
+      const [x, y] = path(i / 24);
+      ctx[i ? 'lineTo' : 'moveTo'](x, y);
     }
+    ctx.stroke();
+
+    idle = (idle + dt * 0.12) % 1;
+    if (!still) pulses.push({ t: idle, a: 0.1, idle: true });
+    pulses = pulses.filter((p) => p.t <= 1);
+    for (const p of pulses) {
+      if (!still) p.t += dt * (p.idle ? 0 : 1.5);
+      const [x, y] = path(p.t);
+      // a soft head, not a box: the eye reads it as something travelling, which is what it is
+      const r = dpr * (p.idle ? 10 : 15);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      const a = p.idle ? 0.09 : p.a * (1 - p.t * 0.3);
+      g.addColorStop(0, `rgba(240,238,235,${a.toFixed(3)})`);
+      g.addColorStop(1, 'rgba(240,238,235,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    pulses = pulses.filter((p) => !p.idle);
   }
   raf = requestAnimationFrame(frame);
   return {
     pulse() {
-      surge = 1;
+      if (!still) pulses.push({ t: 0, a: 0.5 });
     },
     stop() {
       cancelAnimationFrame(raf);
@@ -142,7 +164,9 @@ export function mountInstrument(host, { state, entries, decide, onLive } = {}) {
     const r = node.getBoundingClientRect();
     return Math.max(0, Math.min(1, (r.top + r.height / 2 - box.top) / box.height));
   };
+  const stacked = () => matchMedia('(max-width: 64rem)').matches;
   const stream = flow(canvas, {
+    stacked,
     from: () => anchorOf(buttons[active]),
     to: () => anchorOf(rows.querySelector('.is-win') || rows.firstElementChild),
   });
