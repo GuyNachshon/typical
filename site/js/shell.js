@@ -428,6 +428,7 @@ function mountFilm(ctx, ids = {}) {
   const rowsEl = document.getElementById(ids.rows || 'hud-rows');
   const sentEl = document.getElementById(ids.sentence || 'hud-sentence');
   const rec = document.getElementById(ids.rec || 'hud-rec');
+  const rec2 = document.getElementById(ids.rec2 || (ids.rec ? `${ids.rec}2` : 'hud-rec2'));
   if (!film || !rowsEl) return;
   // Each film owns its own navigator state; two instances sharing the module-level route counter
   // would walk each other's waypoints.
@@ -496,7 +497,9 @@ function mountFilm(ctx, ids = {}) {
         if (r) { probs = r.probs; move = cands.reduce((a, c) => ((r.probs[c] ?? 0) > (r.probs[a] ?? 0) ? c : a), cands[0]); source = `model · ${Math.round(res.ms)} ms on ${res.device || 'mps'}`; }
       } catch {}
     }
-    rec.textContent = glued(`${source.startsWith('model') ? 'LIVE' : 'REC'} · typical-small · E1M1 · ${source}`);
+    // Two lines by construction: one wrapped line used to start with a dangling separator.
+    rec.textContent = `${source.startsWith('model') ? 'LIVE' : 'REC'} · typical-small · E1M1`;
+    if (rec2) rec2.textContent = source;
     sentEl.textContent = sentence;
     rowsEl.innerHTML = '';
     fx.pulse(); // the probability panel is being rewritten: run a processing pulse through the film
