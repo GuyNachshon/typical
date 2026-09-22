@@ -43,14 +43,15 @@
 
 <section class="page chapter" id="what">
   <div class="chapter-head">
-    <p class="t-eyebrow">01 — What it is</p>
+    <p class="t-eyebrow">01 — The problem</p>
     <div>
-      <h2 class="t-section">One pass over the text. Your candidates. A probability for each, and ∅ when none of them apply.</h2>
-      <p class="lede">Typical is an open family of decision models built on Qwen3 (1.7B and 4B). It does not write. It reads a state once and answers typed questions from the cached state: a Choice over candidates you define at runtime, a yes or no, an ordered level. Ask it four questions about the same ticket and it reads the ticket once.</p>
+      <h2 class="t-section">A chat model answers in prose. Your code needed one of four answers.</h2>
+      <p class="lede">So you write a prompt, get a paragraph, parse it, and add a retry for the days the format slips. You pick a temperature by feel. You still cannot tell a confident answer from a guess.</p>
+      <p class="lede muted mt-18">None of that is the decision. It is the packaging you built around one.</p>
     </div>
   </div>
   <div class="media dark">
-    <p class="media-label t-eyebrow">A decision, as recorded</p>
+    <p class="media-label t-eyebrow">The same job, as a decision</p>
     <div class="media-split">
       <div class="media-scene"><div id="hero-decision-scene"></div></div>
       <div class="media-read" id="hero-decision"></div>
