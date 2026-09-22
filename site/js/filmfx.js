@@ -55,8 +55,12 @@ const BOOT_LINES = [
 ];
 const BOOT_CPS = 85; // characters a second for the lines under the word
 const BOOT_WORD_MS = 1100; // the word rasterises in over this
-const BOOT_HOLD = 750; // after the last character, before the game fades up
-const BOOT_FADE = 700;
+const BOOT_HOLD = 1500; // after the last character, so there is time to read it
+// The hand-over is the switch on an old set, not a cross-fade: the picture collapses to a
+// scan line, the line flares, and the next picture opens back out of it.
+const SW_COLLAPSE = 260;
+const SW_FLASH = 110;
+const SW_EXPAND = 340;
 const FILL_CHAR = '·';
 const FRONT_CHAR = '▓'; // the face of the word
 const SIDE_CHAR = '▒'; // the sides of the extrusion
@@ -67,8 +71,24 @@ export function bootState(elapsed, chars) {
   const word = Math.max(0, Math.min(1, elapsed / BOOT_WORD_MS));
   const typed = Math.min(chars, Math.max(0, Math.floor(((elapsed - BOOT_WORD_MS) / 1000) * BOOT_CPS)));
   const typedMs = BOOT_WORD_MS + (chars / BOOT_CPS) * 1000;
-  const fade = Math.max(0, Math.min(1, (elapsed - typedMs - BOOT_HOLD) / BOOT_FADE));
-  return { word, typed, fade, done: fade >= 1, typedMs };
+  const switchAt = typedMs + BOOT_HOLD;
+  const t = elapsed - switchAt;
+  let phase = 'text';
+  let k = 0; // 0..1 within the phase
+  if (t >= 0 && t < SW_COLLAPSE) {
+    phase = 'collapse';
+    k = t / SW_COLLAPSE;
+  } else if (t >= SW_COLLAPSE && t < SW_COLLAPSE + SW_FLASH) {
+    phase = 'flash';
+    k = (t - SW_COLLAPSE) / SW_FLASH;
+  } else if (t >= SW_COLLAPSE + SW_FLASH && t < SW_COLLAPSE + SW_FLASH + SW_EXPAND) {
+    phase = 'expand';
+    k = (t - SW_COLLAPSE - SW_FLASH) / SW_EXPAND;
+  } else if (t >= SW_COLLAPSE + SW_FLASH + SW_EXPAND) {
+    phase = 'done';
+    k = 1;
+  }
+  return { word, typed, phase, k, done: phase === 'done', switchAt };
 }
 
 function canvas2d(w = 1, h = 1, opts) {
@@ -121,6 +141,8 @@ export function mountFilmFx(host, getSource, opts = {}) {
   let stopped = false;
   let pulseAt = -1e9;
   let lastFilter = 'none'; // what the pulse is currently grading with, for verification
+  let switching = null; // set during the hand-over, read when the buffer is composited
+  let phase = 'boot'; // 'boot' | 'collapse' | 'flash' | 'expand' | 'live', exposed for verification
   const bootChars = BOOT_LINES.join('\n').length;
   // Every load, not once per session: a reload that skipped it read as the opening being broken.
   // It is short enough to sit through, and reduced motion still skips it outright.
@@ -382,25 +404,34 @@ export function mountFilmFx(host, getSource, opts = {}) {
       if (bootAt === 0) bootAt = now;
       // The reveal waits for the game to actually be in the level: without this the cold start
       // handed over to DOOM's title screen, which is not what the text just promised.
-      const { typedMs } = bootState(0, bootChars);
-      if (opts.ready && !opts.ready() && now - bootAt > typedMs + BOOT_HOLD * 0.6) {
-        bootAt = now - typedMs - BOOT_HOLD * 0.6;
-      }
+      // Hold the text on screen until the game is genuinely settled in a level. Without this the
+      // switch happened over whatever DOOM was doing at that instant — a glimpse of play, then
+      // its own title screen coming back.
+      const { switchAt } = bootState(0, bootChars);
+      if (opts.ready && !opts.ready() && now - bootAt > switchAt) bootAt = now - switchAt;
       const b = bootState(now - bootAt, bootChars);
+      phase = b.done ? 'live' : b.phase === 'text' ? 'boot' : b.phase;
       if (b.done) {
         booted = true;
+        switching = null;
         opts.onReady?.();
+      } else if (b.phase === 'expand') {
+        // the game is what opens back out of the line
+        drawWarped(src, warp.el.width, warp.el.height, pulse);
+        switching = b;
       } else {
         drawBoot(warp.el.width, warp.el.height, b);
-        if (b.fade > 0) {
-          // the game fades up through the boot screen rather than cutting to it
-          warp.ctx.globalAlpha = b.fade;
-          drawWarped(src, warp.el.width, warp.el.height, pulse);
-          warp.ctx.globalAlpha = 1;
-        }
+        switching = b.phase === 'text' ? null : b;
       }
     }
-    if (booted) drawWarped(src, warp.el.width, warp.el.height, pulse);
+    if (booted) {
+      // Hold the last good frame whenever the game is not in a level. DOOM's own demo sequencer
+      // can pull a running level back to the attract screen (typical_new_game only defers an
+      // init; it does not clear demoplayback/advancedemo), and the recovery takes a beat. Since
+      // the picture on screen is ours, we simply keep showing the last frame of play instead of
+      // letting the title screen appear on the hero.
+      if (!opts.live || opts.live()) drawWarped(src, warp.el.width, warp.el.height, pulse);
+    }
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, W, H);
@@ -408,7 +439,29 @@ export function mountFilmFx(host, getSource, opts = {}) {
     // No inset and no bezel: the tube fills the panel. The hero's own rounded corners come from
     // the stage (it clips, and the scroll inset rounds it), so the glass does not need its own.
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(warp.el, 0, 0, W, H);
+    if (switching) {
+      // collapse to the line, flare, then open back out of it
+      const ease = (v) => 1 - (1 - v) ** 2;
+      const h = switching.phase === 'collapse' ? 1 - ease(switching.k)
+        : switching.phase === 'flash' ? 0
+        : ease(switching.k);
+      const mid = H / 2;
+      if (h > 0.001) ctx.drawImage(warp.el, 0, 0, warp.el.width, warp.el.height, 0, mid - (H * h) / 2, W, H * h);
+      const lineA = switching.phase === 'flash' ? 1 : switching.phase === 'collapse' ? switching.k : Math.max(0, 1 - switching.k * 2.2);
+      if (lineA > 0.01) {
+        const lh = Math.max(2, H * 0.004 * (1 + (switching.phase === 'flash' ? 1.6 : 0)));
+        const g2 = ctx.createLinearGradient(0, mid - lh * 6, 0, mid + lh * 6);
+        g2.addColorStop(0, 'rgba(200,255,225,0)');
+        g2.addColorStop(0.5, `rgba(220,255,235,${(0.75 * lineA).toFixed(3)})`);
+        g2.addColorStop(1, 'rgba(200,255,225,0)');
+        ctx.fillStyle = g2;
+        ctx.fillRect(0, mid - lh * 6, W, lh * 12);
+        ctx.fillStyle = `rgba(240,255,245,${lineA.toFixed(3)})`;
+        ctx.fillRect(0, mid - lh / 2, W, lh);
+      }
+    } else {
+      ctx.drawImage(warp.el, 0, 0, W, H);
+    }
 
     // bloom, from the picture itself: pushed through a curve so only what was actually lit
     // survives, blurred at a quarter scale and added back. Blurring at full resolution cost three
@@ -496,6 +549,7 @@ export function mountFilmFx(host, getSource, opts = {}) {
       pulseAt = performance.now();
     },
     grade: () => lastFilter,
+    phase: () => (booted ? 'live' : phase),
     stop,
   };
 }
@@ -505,6 +559,12 @@ export function selfTest() {
   console.assert(bootState(0, chars).typed === 0, 'nothing is typed at zero');
   console.assert(bootState(BOOT_WORD_MS + 1000, chars).typed === BOOT_CPS, 'typing runs at the stated rate');
   console.assert(bootState(0, chars).word === 0 && bootState(BOOT_WORD_MS, chars).word === 1, 'the word rasterises in over its own window');
+  const at = bootState(0, chars).switchAt;
+  console.assert(bootState(at - 1, chars).phase === 'text', 'the text holds until the switch');
+  console.assert(bootState(at + 10, chars).phase === 'collapse', 'then the picture collapses');
+  console.assert(bootState(at + SW_COLLAPSE + 10, chars).phase === 'flash', 'the line flares');
+  console.assert(bootState(at + SW_COLLAPSE + SW_FLASH + 10, chars).phase === 'expand', 'and the game opens out of it');
+  console.assert(bootState(at + SW_COLLAPSE + SW_FLASH + SW_EXPAND + 1, chars).done, 'then it is over');
   console.assert(bootState(1e6, chars).done, 'the boot always finishes');
   console.assert(!bootState((chars / BOOT_CPS) * 1000 + 100, chars).done, 'and holds before it fades');
   console.assert(envelope(-1) === 0 && envelope(PULSE_MS + 1) === 0, 'the pulse is silent outside its window');

@@ -116,16 +116,34 @@
   .exrow-head .tag { justify-self: start; } /* grid stretch made it read as an empty input */
 
   /* ---- hero media stage ---- */
-  .stage { position: relative; height: 100vh; min-height: 640px; background: var(--color-black); overflow: hidden; color: var(--color-warm); }
+  /* Sticky, not pinned. ScrollTrigger's pin moves the element into a spacer, and re-parenting an
+     iframe reloads it — which was restarting DOOM every time the pin refreshed. Sticky gives the
+     same "hold while it insets" without touching the DOM. */
+  .stage-track { height: 155vh; }
+  .stage { position: sticky; top: 0; height: 100vh; min-height: 640px; background: var(--color-black); overflow: hidden; color: var(--color-warm); }
   .stage-film { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; } /* no filter: the film is shown exactly as the engine draws it */
   /* the film as characters (js/ascii.js) — the state the model actually gets is text, so text is
      what the hero shows; hovering the stage dissolves it to the frame underneath */
   /* The mask is owned by js/ascii.js (it carries the cursor lens); the base gradient there keeps
      the glyph field off the copy and HUD, since a headline over live character noise is
      unreadable and the bottom third of the stage is where every word lives. */
+  /* The panels are part of the same machine as the picture behind them: each carries a fine
+     scanline field and a faint phosphor edge, drawn behind the text so every glyph stays sharp.
+     Nothing here blurs or scales type. */
+  .stage-copy, .stage-hud, .card-hud { position: absolute; isolation: isolate; }
+  .stage-copy::before, .stage-hud::before, .card-hud::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+    background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.045) 0 1px, rgba(0,0,0,0.06) 1px 3px);
+    mix-blend-mode: soft-light;
+  }
+  .stage-copy, .stage-hud { box-shadow: inset 0 0 0 1px rgba(200,255,225,0.07), 0 0 42px rgba(150,255,200,0.05); }
+  .card-hud { box-shadow: inset 0 0 0 1px rgba(200,255,225,0.07); }
+  .stage-hud, .card-hud { text-shadow: 0 0 6px rgba(170,255,210,0.22); }
+
   /* held back while the tube runs its cold start (js/filmfx.js clears .booting when it ends) */
   .booting .nav, .booting .stage-copy, .booting .stage-hud, .booting .stage-shade { opacity: 0; }
-  .nav, .stage-copy, .stage-hud, .stage-shade { transition: opacity 600ms var(--ease-out); }
+  .nav, .stage-copy, .stage-hud, .stage-shade { transition: opacity 520ms var(--ease-out), transform 520ms var(--ease-out); }
+  .booting .stage-copy, .booting .stage-hud { transform: scaleY(0.985); }
 
   /* the treatment layer: over the film, under the shade, copy and HUD, which stay sharp */
   .film-fx { position: absolute; inset: 0; pointer-events: none; }

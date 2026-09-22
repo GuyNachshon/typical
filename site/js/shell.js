@@ -405,7 +405,7 @@ function pushDecision(res, state, queries) {
 // Returns a handle whose pulse() the decision loop calls, or a no-op if the effect never mounts.
 function mountFilmFxOn(film, onReady) {
   const stage = film?.closest('.stage');
-  let startedAt = 0; // when we started the level ourselves, so the reveal can wait for it
+  let heldSince = 0; // when the level last became live and stayed that way
   const handle = { pulse() {}, stop() {} };
   if (!film || !stage) {
     onReady?.();
@@ -421,16 +421,35 @@ function mountFilmFxOn(film, onReady) {
       // in_level alone is not enough: DOOM's attract mode plays a recorded demo, and that reports
       // in_level too, so the cold start handed over to the title screen. Start the level ourselves
       // and only reveal once that game has been running for a moment.
+      // The level has to be *settled*, not merely reported once. DOOM drops back to its title
+      // screen on its own, and its attract-mode demo reports in_level too, so a single true
+      // reading handed the switch over to whatever happened to be on screen. Require the level
+      // to hold continuously, and restart it if it slips back to the title.
+      // Is the game actually showing play right now? The treatment holds its last frame when not.
+      live: () => {
+        const D = film.contentWindow?.Doom;
+        if (!D?.ready) return false;
+        try {
+          const st = D.state();
+          return !!(st.in_level && (st.health ?? 0) > 0);
+        } catch {
+          return false;
+        }
+      },
+      // Observes only. Starting the level is the film loop's job and nobody else's: when this
+      // also called newGame, the two of them raced and the engine bounced between a fresh level
+      // and its own title screen, which is what the switch kept landing on.
       ready: () => {
         const D = film.contentWindow?.Doom;
         if (!D?.ready) return false;
         try {
-          if (!startedAt) {
-            D.newGame(3);
-            startedAt = performance.now();
+          const st = D.state();
+          if (!(st.in_level && (st.health ?? 0) > 0)) {
+            heldSince = 0;
             return false;
           }
-          return performance.now() - startedAt > 1200 && D.state().in_level;
+          if (!heldSince) heldSince = performance.now();
+          return performance.now() - heldSince > 1600;
         } catch {
           return false;
         }
@@ -439,6 +458,7 @@ function mountFilmFxOn(film, onReady) {
     handle.pulse = fx.pulse;
     handle.stop = fx.stop;
     handle.grade = fx.grade;
+    handle.phase = fx.phase;
   }).catch(() => onReady?.());
   return handle;
 }
@@ -449,8 +469,12 @@ function mountFilm(ctx, ids = {}) {
   // The treatment is the hero's alone: the card in chapter 04 shows the frame untouched.
   // While the tube is running its cold start the page holds back: nav, copy and the probability
   // panel stay hidden so the first thing a visitor reads is what the model is.
-  const fx = ids.fx === true ? mountFilmFxOn(film, () => document.documentElement.classList.remove('booting')) : { pulse() {} };
-  if (ids.fx === true && typeof window !== 'undefined') { window.__fxPulse = () => fx.pulse(); window.__fxGrade = () => fx.grade?.(); } // probe hooks for the effect check
+  // The cards arrive a beat after the picture does, not with it: the switch should land on the
+  // game alone, and only then does the page assemble itself around it.
+  const fx = ids.fx === true
+    ? mountFilmFxOn(film, () => setTimeout(() => document.documentElement.classList.remove('booting'), 700))
+    : { pulse() {} };
+  if (ids.fx === true && typeof window !== 'undefined') { window.__fxPulse = () => fx.pulse(); window.__fxGrade = () => fx.grade?.(); window.__fxPhase = () => fx.phase?.(); } // probe hooks for the effect check
   const rowsEl = document.getElementById(ids.rows || 'hud-rows');
   const sentEl = document.getElementById(ids.sentence || 'hud-sentence');
   const rec = document.getElementById(ids.rec || 'hud-rec');
@@ -475,7 +499,13 @@ function mountFilm(ctx, ids = {}) {
   let anchor = null;
   let stuckFor = 0;
   let lastHealth = 100;
+  let lastRestart = 0;
   function restart(D) {
+    // A cooldown matters: newGame while a previous start is still being processed leaves the
+    // engine flipping between the level and the title screen.
+    const now = performance.now();
+    if (now - lastRestart < 900) return;
+    lastRestart = now;
     stuckFor = 0;
     anchor = null;
     lastHealth = 100;
@@ -489,8 +519,8 @@ function mountFilm(ctx, ids = {}) {
     if (!D || !D.ready) return setTimeout(loop, 500);
     const st = D.state();
     if (!st.in_level || (st.health ?? 100) <= 0) {
-      restart(D);
-      return setTimeout(loop, 1500);
+      restart(D); // also how the very first level gets started: the harness no longer does it
+      return setTimeout(loop, 700);
     }
     if (!anchor || Math.hypot(st.x - anchor.x, st.y - anchor.y) > 90) {
       anchor = { x: st.x, y: st.y };

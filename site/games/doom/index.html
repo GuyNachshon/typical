@@ -74,7 +74,13 @@ window.Doom = {
     return norm(Doom.state().angle - a0);
   },
   // skill 1..5 as in the menu; loads E1M1 on the next game tic.
-  newGame(skill = 3) { Module._typical_new_game(skill - 1); },
+  newGame(skill = 3) {
+    Module._typical_new_game(skill - 1);
+    // Hold the attract sequence off for good: the engine was swapping our level for demo2 (E1M5)
+    // about ten seconds in, which looked like the hero restarting itself.
+    if (Module._typical_lock_demo) Module._typical_lock_demo(1);
+  },
+  lockDemo(on = true) { if (Module._typical_lock_demo) Module._typical_lock_demo(on ? 1 : 0); },
   releaseAll() { for (const c in held) if (held[c]) Doom.key(+c, false); },
 };
 
@@ -84,8 +90,10 @@ var Module = {
   preRun: [() => { Module.FS.createPreloadedFile('', 'doom1.wad', 'doom1.wad', true, true); }],
   onRuntimeInitialized() {
     Doom.ready = true;
-    // Give the title loop a second to come up, then start E1M1 (skill 3 = hurt me plenty).
-    setTimeout(() => Doom.newGame(3), 1500);
+    // The page starts the level (js/shell.js), and it is the only thing that may: when this
+    // harness also auto-started one, the two starts raced and the engine dropped back to its
+    // attract screen a second later, mid-hero.
+    Doom.autoStart = false;
     // film mode: enlarge the view to full screen (Doom's '=' key, KEY_EQUALS = 61) so the bezel goes away
     if (document.body.classList.contains('film')) [3200, 3700, 4200].forEach((t) => setTimeout(() => Doom.press(61, 120), t));
   },

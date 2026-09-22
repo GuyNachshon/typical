@@ -42,13 +42,12 @@ function heroInset() {
     borderRadius: 18,
     ease: 'none',
     scrollTrigger: {
-      trigger: stage,
+      // the track is 155vh and the stage is sticky inside it, so the hero holds on its own; this
+      // only drives the shape. No pin: pinning re-parents the element, and that reloads the film.
+      trigger: stage.parentElement || stage,
       start: 'top top',
-      end: '+=55%', // 55% of a viewport of scroll to complete the inset
+      end: '+=55%',
       scrub: 0.35,
-      pin: true,
-      pinSpacing: true,
-      anticipatePin: 1,
       invalidateOnRefresh: true,
     },
   });
