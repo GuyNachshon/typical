@@ -60,7 +60,7 @@ m.score(state,  "How urgent is this ticket?", ["0", "1", "2", "3"])
 
 Each is a different head on the same backbone, and the difference is structural.
 
-Choice reads your label strings, so it can operate over label sets that were never hard-coded into an output head. On CLINC-150 (151 intents) `typical-small` scores .804 and `typical-medium` .847 — though CLINC is in the training mix, so read that as a capacity number, not as evidence about unseen labels.
+Choice reads your label strings, so it can operate over label sets that were never hard-coded into an output head. On CLINC-150 (151 intents) `typical-small` scores .801 and `typical-medium` .847 — though CLINC is in the training mix, so read that as a capacity number, not as evidence about unseen labels.
 
 The evidence about unseen labels is the sets we held out. On CLINC intents that were removed from training entirely, and whose label strings the models have never scored, .932 and .937. On 20 Newsgroups, held out as a dataset and an entirely different label vocabulary, .540 and .588. On held-out workflow families neither model trained on, .836 and .874. The first of those is the claim: the label list is read at call time, so intents that didn't exist during training still work.
 
@@ -93,12 +93,12 @@ We train on four kinds of decision: evidence (NLI-style), knowledge (multiple ch
 
 | model | size | JevBench standard\* | JevBench hard\* | CLINC-150 | warm p50 |
 |---|---|---|---|---|---|
-| `typical-small` | 1.7B | .694 | .432 | .804 | 15.5–17 ms |
+| `typical-small` | 1.7B | .694 | .432 | .801 | 15.5–17 ms |
 | `typical-medium` | 4B | .806 | .423 | .847 | 19–21 ms |
 
 \* Public-subset run against JevBench v1.2.1 (72 standard / 111 hard public ids), not a ranked leaderboard entry. Majority baselines on this split are .311 standard and .336 hard, and at n_eff ≈ 36 on standard, small gaps are noise. Latency is warm p50 for a single K = 2 decision over a 256-token state, one stream, in process on one H100 through the public inference package, model load excluded — not a hosted-endpoint number and not comparable to one measured over a network.
 
-Medium is the better model for a small latency increase, on most of what we measure: it leads Small by 4 points on CLINC-150, 11 on MMLU-Pro among-K, 10 on held-out yes/no decisions and 5 on the composition curriculum. The JevBench standard gap (.694 to .806) points the same way, though at 36 independent states that tier alone would not settle it. It is not a clean sweep — Medium is 9 points worse on TREC-fine (50 fine-grained topics), and the two are within noise of each other on the hard tier. Neither released model solves the hard compositional tier: long-policy, multi-step, temporal, unit and trade-off decisions sit far below the standard tier for both.
+Medium is the better model for a small latency increase, on most of what we measure: it leads Small by 5 points on CLINC-150, 11 on MMLU-Pro among-K, 10 on held-out yes/no decisions and 5 on the composition curriculum. The JevBench standard gap (.694 to .806) points the same way, though at 36 independent states that tier alone would not settle it. It is not a clean sweep — Medium is 9 points worse on TREC-fine (50 fine-grained topics), and the two are within noise of each other on the hard tier. Neither released model solves the hard compositional tier: long-policy, multi-step, temporal, unit and trade-off decisions sit far below the standard tier for both.
 
 <p align="center"><img src="../figures/fig_latency_quality.png" alt="Warm per-decision latency against JevBench standard accuracy for typical-small and typical-medium, against the latency bands of a generative LLM call" width="640"></p>
 <p align="center"><em>Warm per-decision latency against the bands a normal LLM call falls into depending on how it has to answer. Both released models sit left of the fastest of those, which is a model emitting a single letter.</em></p>

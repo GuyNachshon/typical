@@ -21,7 +21,16 @@ passes and they are not interchangeable:
 - `runs/<run>/eval_wf_full.json` (or `eval_wf.json`) — the **full-row** pass, every row at
   `--max_state 4096`, `--limit 0`. This is the number to publish.
 
-The gap is not cosmetic. On `ts1b`, PagerDuty reads **.560 train-time and .817 full-row**, and
+Inside each of those files, every classification set also has **two** entries: `raw` and `scaled`
+(the post-hoc temperature `T = 1.124` and null offset, fit on `val` and applied at eval). Accuracy
+moves between them because temperature changes whether P(∅) wins the argmax. **The convention
+everywhere else in this project is `scaled`** — it is what the shipped checkpoint actually
+produces. `ts1b` CLINC-150 is .801 scaled and .804 raw; TREC-fine .508 / .516; HWU64 .761 / .768;
+20NG .540 / .545. The live model card's row is the only place that mixes the two (its CLINC cell
+is raw, the rest of the row scaled), which is what made the posts look like they had drifted from
+it. **The card's CLINC cell should read .801.**
+
+The train-time/full-row gap is not cosmetic. On `ts1b`, PagerDuty reads **.560 train-time and .817 full-row**, and
 jevlogs **.500 and .710** — the difference between "below its constant-prediction floor" and "the
 first 1.7B model in this project to clear it." Mixing the two has already produced two published
 errors: the paper's `tab:app-wf-eval` was built entirely from `results.json` under a caption that
