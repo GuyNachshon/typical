@@ -364,13 +364,14 @@ function stageFigure(label) {
 }
 
 function svgHost(w, h) {
-  const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, width: '100%', height: h, style: `max-width:${w}px` });
+  // width 100% + height auto: a row wider than the column scales down whole instead of clipping
+  const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, style: `display:block;width:100%;max-width:${w}px;height:auto` });
   return svg;
 }
 
 function stateStage(d) {
   const wrap = stageFigure('state tokens');
-  const w = Math.min(980, d.state.n_tokens * (BOX + GAP) + 40);
+  const w = d.state.n_tokens * (BOX + GAP) - GAP;
   const svg = svgHost(w, BOXH + 4);
   tokenRow(svg, d.state.n_tokens, 0, INK);
   wrap.appendChild(svg);
@@ -407,7 +408,7 @@ function trunkStage(d) {
 
 function cacheStage(d) {
   const wrap = stageFigure('KV cache');
-  const w = Math.min(980, d.state.n_tokens * (BOX + GAP) + 40);
+  const w = d.state.n_tokens * (BOX + GAP) - GAP;
   const svg = svgHost(w, BOXH + 4);
   tokenRow(svg, d.state.n_tokens, 0, MID);
   wrap.appendChild(svg);
@@ -418,7 +419,7 @@ function cacheStage(d) {
 function suffixStage(q, Ls) {
   const wrap = stageFigure('suffix (this question)');
   const cacheN = Math.min(Ls, 60);
-  const w = Math.min(980, (cacheN + q.suffix_tokens) * (BOX + GAP) + 40);
+  const w = (cacheN + q.suffix_tokens) * (BOX + GAP) - GAP;
   const svg = svgHost(w, BOXH + 4);
   const next = tokenRow(svg, cacheN, 0, MID);
   tokenRow(svg, q.suffix_tokens, next, INK);
