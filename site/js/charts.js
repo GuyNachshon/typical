@@ -337,7 +337,7 @@ export function reliability(container, opts) {
 
 // ladder(el, {points:[{label, x: ms, y: acc, size}]})
 export function ladder(container, opts) {
-  const { points, xLabel = 'latency (ms)', yLabel = 'accuracy', fmt = fmtNum, title = 'Ladder', refLines = [] } = opts;
+  const { points, xLabel = 'latency (ms)', yLabel = 'accuracy', fmt = fmtNum, xFmt = fmtNum, logX = false, title = 'Ladder', refLines = [] } = opts;
   const w = fitWidth(container, W_DESIGN);
   const iw = w - M.l - M.r;
   const ih = H - M.t - M.b;
@@ -345,14 +345,18 @@ export function ladder(container, opts) {
   const xs = points.map((p) => p.x);
   const ys = points.map((p) => p.y);
   const refYs = refLines.map((r) => r.y);
-  const x = scale([Math.min(...xs) * 0.9, Math.max(...xs) * 1.1], [0, iw]);
+  const xDomain = [Math.min(...xs) * 0.9, Math.max(...xs) * 1.1];
+  const x = logX ? logScale(xDomain, [0, iw]) : scale(xDomain, [0, iw]);
   const y = scale([Math.min(...ys, ...refYs) * 0.9, Math.max(...ys) * 1.1], [ih, 0]);
   const g = svgEl('g', { transform: `translate(${M.l},${M.t})` });
   svg.appendChild(g);
 
   niceTicks(Math.min(...ys, ...refYs) * 0.9, Math.max(...ys) * 1.1, 6).forEach((t) => gridRow(g, iw, y(t), t, fmt));
-  niceTicks(Math.min(...xs) * 0.9, Math.max(...xs) * 1.1, 5).forEach((t) =>
-    g.appendChild(svgText(x(t), ih + 18, fmt(t), { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }))
+  // on a log axis the only honest ticks are the points themselves: 1.7B and 4B sit on top of each
+  // other under a linear scale stretched to reach 14B
+  const xTicks = logX ? [...new Set(xs)].sort((a, b) => a - b) : niceTicks(xDomain[0], xDomain[1], 5);
+  xTicks.forEach((t) =>
+    g.appendChild(svgText(x(t), ih + 18, xFmt(t), { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }))
   );
   axisPair(g, iw, ih);
 
@@ -367,7 +371,7 @@ export function ladder(container, opts) {
     const dot = markerEl('circle', cx, cy, r, style.color, hollow);
     if (hollow) dot.setAttribute('stroke-dasharray', '3,2');
     const ttl = svgEl('title');
-    ttl.textContent = `${p.label}: ${fmt(p.x)}, ${fmt(p.y)}`;
+    ttl.textContent = `${p.label}: ${xFmt(p.x)}, ${fmt(p.y)}`;
     dot.appendChild(ttl);
     g.appendChild(dot);
     // labels flip to the left of the dot near the right edge so they never clip. Direct labels

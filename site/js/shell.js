@@ -123,7 +123,7 @@ function buildResultsTable(container, models, frozenDoc) {
     ])
   );
   row.appendChild(
-    buildTable('Evidence / intent', ['model', 'CLINC-150', 'SNLI', 'MNLI', 'BoolQ', 'PagerDuty (floor 79.2%)'], (m) => [
+    buildTable('Evidence / intent', ['model', 'CLINC-150', 'SNLI', 'MNLI', 'BoolQ', 'PagerDuty'], (m) => [
       td(m.id.replace(/-/g, '\u2011')), // a model id is one token; plain hyphens let it split across lines
       tdAcc(m.topic_intent.clinc),
       tdAcc(m.nlu.snli),
@@ -138,7 +138,7 @@ function buildResultsTable(container, models, frozenDoc) {
   footnote.className = 'note';
   footnote.style.marginTop = '18px';
   footnote.textContent =
-    'JevBench easy is 100% for every model and is omitted. typical-small-preview → typical-small is 75.0% → 69.4% on JevBench standard (about 1 SE at n = 72, SE ≈ 5.8 points), traded for typed heads and calibration (held-out score NLL 2.03 → 1.01).';
+    'PagerDuty is scored against a 79.2% majority floor. JevBench easy is 100% for every model and is omitted. typical-small-preview → typical-small is 75.0% → 69.4% on JevBench standard (about 1 SE at n = 72, SE ≈ 5.8 points), traded for typed heads and calibration (held-out score NLL 2.03 → 1.01).';
   container.appendChild(footnote);
 
   if (frozenByTrained.size) {
@@ -192,10 +192,12 @@ async function mountResults(models, reliabilityDoc, chanceDoc, frozenDoc) {
         size: m.latency.single_ms.k2,
         hollow: !m.released,
       })),
-      xLabel: 'params (B)',
+      xLabel: 'parameters',
       yLabel: 'JevBench standard accuracy',
       title: 'scaling ladder',
       fmt: fmtPct,
+      xFmt: (v) => `${v}B`,
+      logX: true,
       refLines: chanceDoc ? [{ y: chanceDoc.std.acc, label: `chance ${fmtPct(chanceDoc.std.acc)}` }] : [],
     });
     const chanceTxt = chanceDoc
