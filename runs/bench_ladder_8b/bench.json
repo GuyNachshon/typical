@@ -1,0 +1,426 @@
+{
+  "model": "runs/ladder_8b",
+  "energy_model": null,
+  "backbone": "Qwen/Qwen3-8B-Base",
+  "quick": false,
+  "b_chunk": 4,
+  "native": {
+    "256": {
+      "2": {
+        "state_tokens": 256,
+        "suffix_tokens": 22,
+        "nc_chunk": 8,
+        "native": [
+          {
+            "m": 1,
+            "t_state_ms": 21.732901223003864,
+            "t_queries_ms": 48.12810476869345,
+            "total_ms": 69.86100599169731,
+            "ratio": 1.0,
+            "marginal_ms": 48.12810476869345
+          },
+          {
+            "m": 32,
+            "t_state_ms": 21.86480723321438,
+            "t_queries_ms": 127.49795150011778,
+            "total_ms": 149.36275873333216,
+            "ratio": 2.137998968281151,
+            "marginal_ms": 3.9843109843786806
+          },
+          {
+            "m": 256,
+            "t_state_ms": 21.840876899659634,
+            "t_queries_ms": 861.4545781165361,
+            "total_ms": 883.2954550161958,
+            "ratio": 12.643612019002013,
+            "marginal_ms": 3.3650569457677193
+          }
+        ],
+        "native_peak_mem_mb": 29311.364608,
+        "b_batched": [
+          {
+            "m": 1,
+            "t_state_ms": 23.905116133391857,
+            "t_queries_ms": 81.47164899855852,
+            "total_ms": 105.37676513195038,
+            "ratio": 1.0,
+            "marginal_ms": 81.47164899855852
+          },
+          {
+            "m": 32,
+            "t_state_ms": 23.94333854317665,
+            "t_queries_ms": 493.0108366534114,
+            "total_ms": 516.954175196588,
+            "ratio": 4.905770020072924,
+            "marginal_ms": 15.406588645419106
+          },
+          {
+            "m": 256,
+            "t_state_ms": 23.936238139867783,
+            "t_queries_ms": 3777.3231519386172,
+            "total_ms": 3801.259390078485,
+            "ratio": 36.0730317097762,
+            "marginal_ms": 14.755168562260224
+          }
+        ],
+        "b_batched_peak_mem_mb": 29788.546048
+      },
+      "4": {
+        "state_tokens": 256,
+        "suffix_tokens": 34,
+        "nc_chunk": 8,
+        "native": [
+          {
+            "m": 1,
+            "t_state_ms": 22.02043030411005,
+            "t_queries_ms": 48.33517409861088,
+            "total_ms": 70.35560440272093,
+            "ratio": 1.0,
+            "marginal_ms": 48.33517409861088
+          },
+          {
+            "m": 32,
+            "t_state_ms": 22.05338515341282,
+            "t_queries_ms": 133.02860502153635,
+            "total_ms": 155.08199017494917,
+            "ratio": 2.204259226987062,
+            "marginal_ms": 4.157143906923011
+          },
+          {
+            "m": 256,
+            "t_state_ms": 22.044301964342594,
+            "t_queries_ms": 886.6511797532439,
+            "total_ms": 908.6954817175865,
+            "ratio": 12.915751196111446,
+            "marginal_ms": 3.463481170911109
+          }
+        ],
+        "native_peak_mem_mb": 29324.363264,
+        "b_batched": [
+          {
+            "m": 1,
+            "t_state_ms": 24.040655232965946,
+            "t_queries_ms": 81.92374184727669,
+            "total_ms": 105.96439708024263,
+            "ratio": 1.0,
+            "marginal_ms": 81.92374184727669
+          },
+          {
+            "m": 32,
+            "t_state_ms": 24.077859707176685,
+            "t_queries_ms": 492.1082928776741,
+            "total_ms": 516.1861525848508,
+            "ratio": 4.871316846109769,
+            "marginal_ms": 15.378384152427316
+          },
+          {
+            "m": 256,
+            "t_state_ms": 24.154779501259327,
+            "t_queries_ms": 3772.818027995527,
+            "total_ms": 3796.972807496786,
+            "ratio": 35.83253349350433,
+            "marginal_ms": 14.737570421857527
+          }
+        ],
+        "b_batched_peak_mem_mb": 30155.411968
+      },
+      "10": {
+        "state_tokens": 256,
+        "suffix_tokens": 70,
+        "nc_chunk": 8,
+        "native": [
+          {
+            "m": 1,
+            "t_state_ms": 22.107303142547607,
+            "t_queries_ms": 48.41067735105753,
+            "total_ms": 70.51798049360514,
+            "ratio": 1.0,
+            "marginal_ms": 48.41067735105753
+          },
+          {
+            "m": 32,
+            "t_state_ms": 22.114905528724194,
+            "t_queries_ms": 138.09430692344904,
+            "total_ms": 160.20921245217323,
+            "ratio": 2.2718916697664318,
+            "marginal_ms": 4.3154470913577825
+          },
+          {
+            "m": 256,
+            "t_state_ms": 22.04755786806345,
+            "t_queries_ms": 947.0857745036483,
+            "total_ms": 969.1333323717117,
+            "ratio": 13.74306702472282,
+            "marginal_ms": 3.699553806654876
+          }
+        ],
+        "native_peak_mem_mb": 29385.805824,
+        "b_batched": [
+          {
+            "m": 1,
+            "t_state_ms": 23.993151262402534,
+            "t_queries_ms": 82.53112901002169,
+            "total_ms": 106.52428027242422,
+            "ratio": 1.0,
+            "marginal_ms": 82.53112901002169
+          },
+          {
+            "m": 32,
+            "t_state_ms": 24.126918986439705,
+            "t_queries_ms": 590.5585819855332,
+            "total_ms": 614.6855009719729,
+            "ratio": 5.770379291932148,
+            "marginal_ms": 18.454955687047914
+          },
+          {
+            "m": 256,
+            "t_state_ms": 24.204062297940254,
+            "t_queries_ms": 4558.41735843569,
+            "total_ms": 4582.621420733631,
+            "ratio": 43.019501366393435,
+            "marginal_ms": 17.806317806389416
+          }
+        ],
+        "b_batched_peak_mem_mb": 31290.611712
+      },
+      "32": {
+        "state_tokens": 256,
+        "suffix_tokens": 224,
+        "nc_chunk": 8,
+        "native": [
+          {
+            "m": 1,
+            "t_state_ms": 22.142023779451847,
+            "t_queries_ms": 48.588236793875694,
+            "total_ms": 70.73026057332754,
+            "ratio": 1.0,
+            "marginal_ms": 48.588236793875694
+          },
+          {
+            "m": 32,
+            "t_state_ms": 22.18032907694578,
+            "t_queries_ms": 259.1987159103155,
+            "total_ms": 281.3790449872613,
+            "ratio": 3.978198902512875,
+            "marginal_ms": 8.09995987219736
+          },
+          {
+            "m": 256,
+            "t_state_ms": 26.73538215458393,
+            "t_queries_ms": 1916.8208567425609,
+            "total_ms": 1943.5562388971448,
+            "ratio": 27.47842610988573,
+            "marginal_ms": 7.487581471650628
+          }
+        ],
+        "native_peak_mem_mb": 29704.538112,
+        "b_batched": [
+          {
+            "m": 1,
+            "t_state_ms": 24.057180620729923,
+            "t_queries_ms": 88.9347642660141,
+            "total_ms": 112.99194488674402,
+            "ratio": 1.0,
+            "marginal_ms": 88.9347642660141
+          },
+          {
+            "m": 32,
+            "t_state_ms": 24.080416187644005,
+            "t_queries_ms": 999.9957866966724,
+            "total_ms": 1024.0762028843164,
+            "ratio": 9.063267332116334,
+            "marginal_ms": 31.249868334271014
+          },
+          {
+            "m": 256,
+            "t_state_ms": 24.057130329310894,
+            "t_queries_ms": 7851.120564155281,
+            "total_ms": 7875.1776944845915,
+            "ratio": 69.696806284538,
+            "marginal_ms": 30.668439703731565
+          }
+        ],
+        "b_batched_peak_mem_mb": 35449.247232
+      },
+      "64": {
+        "state_tokens": 256,
+        "suffix_tokens": 460,
+        "nc_chunk": 8,
+        "native": [
+          {
+            "m": 1,
+            "t_state_ms": 22.13289402425289,
+            "t_queries_ms": 49.10794924944639,
+            "total_ms": 71.24084327369928,
+            "ratio": 1.0,
+            "marginal_ms": 49.10794924944639
+          },
+          {
+            "m": 32,
+            "t_state_ms": 22.121800109744072,
+            "t_queries_ms": 462.0076334103942,
+            "total_ms": 484.12943352013826,
+            "ratio": 6.7956724158944555,
+            "marginal_ms": 14.437738544074818
+          },
+          {
+            "m": 256,
+            "t_state_ms": 22.0532463863492,
+            "t_queries_ms": 3545.885605737567,
+            "total_ms": 3567.938852123916,
+            "ratio": 50.08277117686967,
+            "marginal_ms": 13.851115647412371
+          }
+        ],
+        "native_peak_mem_mb": 30221.83936,
+        "b_batched": [
+          {
+            "m": 1,
+            "t_state_ms": 24.207395501434803,
+            "t_queries_ms": 109.35018863528967,
+            "total_ms": 133.55758413672447,
+            "ratio": 1.0,
+            "marginal_ms": 109.35018863528967
+          },
+          {
+            "m": 32,
+            "t_state_ms": 24.533421732485294,
+            "t_queries_ms": 1620.7343954592943,
+            "total_ms": 1645.2678171917796,
+            "ratio": 12.31878988996611,
+            "marginal_ms": 50.64794985810295
+          },
+          {
+            "m": 256,
+            "t_state_ms": 24.597197771072388,
+            "t_queries_ms": 12802.63494886458,
+            "total_ms": 12827.232146635652,
+            "ratio": 96.04270869038977,
+            "marginal_ms": 50.01029276900226
+          }
+        ],
+        "b_batched_peak_mem_mb": 41453.154816
+      },
+      "128": {
+        "state_tokens": 256,
+        "suffix_tokens": 1029,
+        "nc_chunk": 8,
+        "native": [
+          {
+            "m": 1,
+            "t_state_ms": 22.422825917601585,
+            "t_queries_ms": 61.60737294703722,
+            "total_ms": 84.0301988646388,
+            "ratio": 1.0,
+            "marginal_ms": 61.60737294703722
+          },
+          {
+            "m": 32,
+            "t_state_ms": 22.164535708725452,
+            "t_queries_ms": 970.741868019104,
+            "total_ms": 992.9064037278295,
+            "ratio": 11.816066332620089,
+            "marginal_ms": 30.335683375597
+          },
+          {
+            "m": 256,
+            "t_state_ms": 22.15891983360052,
+            "t_queries_ms": 7615.931603126228,
+            "total_ms": 7638.090522959828,
+            "ratio": 90.89697068626187,
+            "marginal_ms": 29.749732824711828
+          }
+        ],
+        "native_peak_mem_mb": 31374.342144,
+        "b_batched": [
+          {
+            "m": 1,
+            "t_state_ms": 24.178446270525455,
+            "t_queries_ms": 154.87077925354242,
+            "total_ms": 179.04922552406788,
+            "ratio": 1.0,
+            "marginal_ms": 154.87077925354242
+          },
+          {
+            "m": 32,
+            "t_state_ms": 24.07993283122778,
+            "t_queries_ms": 3131.5158708021045,
+            "total_ms": 3155.5958036333323,
+            "ratio": 17.624180134804078,
+            "marginal_ms": 97.85987096256576
+          },
+          {
+            "m": 256,
+            "t_state_ms": 24.191660806536674,
+            "t_queries_ms": 24906.390498392284,
+            "total_ms": 24930.58215919882,
+            "ratio": 139.23870425146094,
+            "marginal_ms": 97.29058788434486
+          }
+        ],
+        "b_batched_peak_mem_mb": 48079.886848
+      },
+      "256": {
+        "state_tokens": 256,
+        "suffix_tokens": 2309,
+        "nc_chunk": 8,
+        "native": [
+          {
+            "m": 1,
+            "t_state_ms": 23.704481311142445,
+            "t_queries_ms": 102.1747188642621,
+            "total_ms": 125.87920017540455,
+            "ratio": 1.0,
+            "marginal_ms": 102.1747188642621
+          },
+          {
+            "m": 32,
+            "t_state_ms": 23.064631037414074,
+            "t_queries_ms": 2277.1963020786643,
+            "total_ms": 2300.2609331160784,
+            "ratio": 18.273558537953953,
+            "marginal_ms": 71.16238443995826
+          },
+          {
+            "m": 256,
+            "t_state_ms": 23.22910912334919,
+            "t_queries_ms": 17510.200657881796,
+            "total_ms": 17533.429767005146,
+            "ratio": 139.2877436667332,
+            "marginal_ms": 68.39922131985077
+          }
+        ],
+        "native_peak_mem_mb": 34070.915072,
+        "b_batched": [
+          {
+            "m": 1,
+            "t_state_ms": 26.37187298387289,
+            "t_queries_ms": 243.54967009276152,
+            "total_ms": 269.9215430766344,
+            "ratio": 1.0,
+            "marginal_ms": 243.54967009276152
+          },
+          {
+            "m": 32,
+            "t_state_ms": 24.346948601305485,
+            "t_queries_ms": 5969.6861719712615,
+            "total_ms": 5994.033120572567,
+            "ratio": 22.20657548208658,
+            "marginal_ms": 186.55269287410192
+          },
+          {
+            "m": 256,
+            "t_state_ms": 24.369820952415466,
+            "t_queries_ms": 47614.463083446026,
+            "total_ms": 47638.83290439844,
+            "ratio": 176.49140695254965,
+            "marginal_ms": 185.99399641971104
+          }
+        ],
+        "b_batched_peak_mem_mb": 42519.54176
+      }
+    }
+  },
+  "crossover": {},
+  "notes": "CAVEAT (2026-09-20/21): 4B and 8B benches ran on different pods/hosts -- 4B measured on the ladder_4b pod (uv-locked torch, driver-reported CUDA 13.0, no cu128 workaround needed), 8B on a host whose driver reported CUDA 12.8 (triggered the cu128 torch reinstall workaround, torch==2.11.0+cu128). Single-decision ms differ (8B ~70ms vs 4B ~90ms at matched K), which is the wrong direction for model size and is most plausibly host/torch-version variance, not a real capability-per-ms signal. Do not quote these two numbers against each other as a scaling curve; re-measure 1.7B/4B/8B/14B back-to-back on one pod (see the 14B-pod apples-to-apples sweep) before drawing conclusions."
+}

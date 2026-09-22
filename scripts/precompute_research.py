@@ -175,7 +175,7 @@ TIMELINE = {
 # index would silently change the comparison protocol mid-run, so they're left out here and
 # `group`/`released_as`/floors are the only cross-run context added).
 # ---------------------------------------------------------------------------
-_SKIP_INDEX_DIR = re.compile(r"^(smoke|bench_|jev_)")
+_SKIP_INDEX_DIR = re.compile(r"^(smoke|bench_|jev_|serve_bench)")
 
 _SET_FAMILIES = [
     ("evidence", ["snli_test", "snli_null", "snli_test_hyponly", "snli_test_paraphrase",
@@ -248,6 +248,9 @@ def build_runs_index():
         if _SKIP_INDEX_DIR.match(name):
             continue
         d = load(f"runs/{name}/results.json")
+        if not isinstance(d, dict):  # ponytail: non-training artefact under the same filename
+            print(f"  skip runs/{name}/results.json: {type(d).__name__}, not a training run")
+            continue
         eval_out = {}
         for set_key, v in d.get("eval", {}).items():
             raw = v.get("raw", {})

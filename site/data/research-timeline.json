@@ -138,6 +138,6 @@
       "source": "REPORT.md \u00a73ae, \u00a73af"
     }
   ],
-  "run_count": 90,
+  "run_count": 92,
   "run_count_source": "git ls-tree --name-only gpu-runpod-full-experiment:runs | grep -v -E '^(probe_|jev_|bench_|zs_|smoke|dump_|leak_|kb_)' | grep -v '\\.json$' | wc -l -- this worktree only checks out a subset of runs/, so the count is read from the source branch's tree, not the local directory"
 }
