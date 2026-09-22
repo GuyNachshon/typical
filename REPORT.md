@@ -1359,6 +1359,14 @@ calibration val) and its matched `tl1b_nokd`; `tm2` (Release-1 recipe on Qwen3.5
 rendering probe. Pass rule for `typical-large`: hard ≥ .559 or hard Brier ≤ .65, long_policy ≥ .35, CLINC-150 / MMLU
 among-K within 2 of `ladder_14b`.
 
+**Serving latency (public `inference/` package, one H100, warm state = prefix KV cached; `runs/serve_bench2/`).** The
+serving path was deep-copying the whole prefix KV cache on every decision; replaced by a stride-0 view (bit-identical,
+zero bytes) plus cached masks/position tensors and a rendered-option cap. Per warm decision p50: **1.7B 21–25 → 15.5–17
+ms, 4B 26–27 → 19–21 ms**, Qwen3.5-4B 42–53 → 34–46 ms (its DeltaNet layers ran reference kernels on that pod; to be
+re-measured with FLA + causal-conv1d). `torch.compile`/CUDA graphs were tried and rejected: 8 ms on one shape but Δp up
+to .1 across shape buckets and stale-buffer crashes with the mutable HF cache — manual per-bucket graph capture is the
+remaining path to ~10 ms. No quantisation.
+
 **Ops lessons (memory):** a pod created with `--startSSH` never reaches "ready" on this account and bills anyway (12
 stalls, ~$13); `--ports "22/tcp"` boots in 30 s. Stop = wipe without a volume. Never `set -x` across an `.env` source.
 
