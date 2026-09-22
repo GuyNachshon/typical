@@ -7,14 +7,22 @@
 //
 //   mountAscii(host, getSource, opts) -> { stop() }
 //
-// host       element the overlay is absolutely positioned inside (needs position: relative)
+// host       element the overlay is absolutely positioned inside (needs position: relative);
+//            its mask is written by this module, so don't set mask-image on .ascii-layer in CSS
 // getSource  () => HTMLCanvasElement | null, re-read every frame (the iframe may still be booting)
 // opts.cols  character columns (default 150); rows follow from the source aspect ratio
 // opts.fps   sample rate (default 15; the film ticks at 2.5 decisions/s, glyph noise above ~15
 //            reads as static rather than motion)
 
-const RAMP = '  ..:-=+*#%@'; // luminance -> glyph, dark to light (two blanks: a dark frame should read as mostly empty, not as a wall of hashes)
-const INK = '#f0eeeb';
+// Glyph set, dark to light. Not a pure density ramp: the reference look (dense terminal
+// transcription of a frame) mixes letters, brackets and digits, which gives the field texture at
+// small sizes where a ramp of #%@ turns into a flat grey block.
+const BAYER = [0.25, 0.75, 1.0, 0.5]; // 2x2 ordered-dither thresholds
+const RAMP = [
+  ' ', ' ', '.', ',', ':', ';', 'i', 'l', '!', '|', '/', '\\', '1', 'I', '{', '}', '[', ']',
+  '?', 'r', 'c', 'v', 'z', 'x', 'Y', 'U', 'J', 'C', 'L', 'Q', '0', 'O', 'Z', 'm', 'w', 'q',
+  'p', 'd', 'b', 'k', 'h', 'a', 'o', '*', '#', 'M', 'W', '&', '8', '%', '@',
+];
 
 function reduced() {
   return matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -24,7 +32,7 @@ export function mountAscii(host, getSource, opts = {}) {
   // Columns follow the panel's real width: a fixed count that reads as a transcription on a
   // desktop hero is 3px-per-glyph mud on a phone. ~13 CSS px per column keeps a glyph a glyph.
   const maxCols = opts.cols ?? 150;
-  const colsFor = (w) => Math.max(36, Math.min(maxCols, Math.round(w / 13)));
+  const colsFor = (w) => Math.max(44, Math.min(maxCols, Math.round(w / (opts.cellPx ?? 9))));
   let cols = colsFor(host.clientWidth || 1200);
   const fps = reduced() ? 4 : opts.fps ?? 15;
 
@@ -55,7 +63,7 @@ export function mountAscii(host, getSource, opts = {}) {
     dpr = Math.min(2, devicePixelRatio || 1);
     cols = colsFor(w);
     cell = w / cols;
-    rows = Math.max(1, Math.round(h / (cell * 1.8))); // glyph cells are ~1.8x taller than wide
+    rows = Math.max(1, Math.round(h / (cell * 1.55))); // glyph cells are ~1.55x taller than wide
     if (layer.width !== Math.round(w * dpr) || layer.height !== Math.round(h * dpr)) {
       layer.width = Math.round(w * dpr);
       layer.height = Math.round(h * dpr);
@@ -78,26 +86,35 @@ export function mountAscii(host, getSource, opts = {}) {
     lctx.clearRect(0, 0, W, H);
     // no opaque backing: the frame stays faintly visible through its own transcription, which is
     // both better looking and closer to the point (the picture is there; the model isn't reading it)
-    lctx.fillStyle = 'rgba(11,11,11,0.82)';
+    lctx.fillStyle = 'rgba(8,8,9,0.93)';
     lctx.fillRect(0, 0, W, H);
     const cw = W / cols;
     const ch = H / rows;
-    lctx.font = `${(ch * 0.92).toFixed(1)}px "Geist Mono", ui-monospace, monospace`;
+    lctx.font = `${(ch * 1.02).toFixed(1)}px "Geist Mono", ui-monospace, monospace`;
     lctx.textBaseline = 'middle';
     lctx.textAlign = 'center';
-    lctx.fillStyle = INK;
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
         const i = (y * cols + x) * 4;
         // Rec. 601 luma, then a gamma lift: DOOM's palette sits dark and a linear ramp maps most
         // of a corridor onto the same two glyphs.
-        const raw = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) / 255;
+        const r = px[i];
+        const gch = px[i + 1];
+        const bch = px[i + 2];
+        const raw = (r * 0.299 + gch * 0.587 + bch * 0.114) / 255;
         // DOOM's palette sits dark and flat: a linear ramp maps a whole corridor onto two glyphs
         // and the field reads as static. Stretch the band the frame actually occupies.
-        const l = Math.max(0, Math.min(1, (raw - 0.08) / 0.62)) ** 1.25;
-        const g = RAMP[Math.min(RAMP.length - 1, Math.floor(l * RAMP.length))];
+        // A 2x2 ordered dither before the glyph lookup: without it, a large flat wall quantises to
+        // one character and the field draws in horizontal bands of repeated letters.
+        const d = (BAYER[(y & 1) * 2 + (x & 1)] - 0.5) / RAMP.length;
+        const l = Math.max(0, Math.min(1, (raw - 0.05) / 0.62)) ** 1.1 + d;
+        const g = RAMP[Math.max(0, Math.min(RAMP.length - 1, Math.floor(l * RAMP.length)))];
         if (g === ' ') continue;
-        lctx.globalAlpha = 0.3 + 0.7 * l;
+        // keep the frame's own colour, lifted: a monochrome field loses the one thing the picture
+        // still carries at this resolution (a red wall, a green lamp, brown brick)
+        const lift = raw > 0.01 ? Math.min(2.4, 0.55 / raw + 0.55) : 1;
+        lctx.fillStyle = `rgb(${Math.min(255, r * lift) | 0},${Math.min(255, gch * lift) | 0},${Math.min(255, bch * lift) | 0})`;
+        lctx.globalAlpha = 0.45 + 0.55 * l;
         lctx.fillText(g, (x + 0.5) * cw, (y + 0.5) * ch);
       }
     }
@@ -128,17 +145,9 @@ export function mountAscii(host, getSource, opts = {}) {
 
   raf = requestAnimationFrame(frame);
 
-  // Reveal the frame underneath: hover on a pointer device, tap-to-toggle where there is no
-  // hover (on a phone a pointerenter that never gets a matching leave would strand the layer).
-  const reveal = (on) => layer.classList.toggle('is-open', on);
-  if (matchMedia('(hover: hover)').matches) {
-    host.addEventListener('pointerenter', () => reveal(true));
-    host.addEventListener('pointerleave', () => reveal(false));
-    host.addEventListener('focusin', () => reveal(true));
-    host.addEventListener('focusout', () => reveal(false));
-  } else {
-    host.addEventListener('pointerup', () => reveal(!layer.classList.contains('is-open')));
-  }
-
+  // No reveal gesture at all. A whole-stage hover was wrong (the cursor rests over the hero while
+  // you read, so the layer was permanently dissolved), and a cursor lens was a gimmick on top of
+  // it. The transcription is the hero: it stays up, full bleed, and the copy gets its own scrim
+  // rather than a hole cut in the picture.
   return { stop };
 }

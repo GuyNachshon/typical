@@ -409,8 +409,6 @@ function mountFilmAscii(film) {
       const c = film.contentDocument?.getElementById('canvas');
       return c && c.width ? c : null;
     }, { cols: 112, after: film });
-    const hint = document.querySelector('.stage-hint');
-    if (hint && !matchMedia('(hover: hover)').matches) hint.textContent = hint.textContent.replace('Hover to drop', 'Tap to drop');
   }).catch(() => {});
 }
 
