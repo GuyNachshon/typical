@@ -23,6 +23,7 @@ const BODY_GLYPH = 'o';
 const FOOD_GLYPH = '*';
 const DOT_GLYPH = '·';
 const BORDER = { tl: '┌', tr: '┐', bl: '└', br: '┘', h: '─', v: '│' };
+const pad = (n, digits) => String(n).padStart(digits, '0');
 
 export async function mount(el, { decide, mode, ctx } = {}) {
   const refs = mountChrome(el, { label: 'Snake · 10×10 board' });
@@ -202,12 +203,23 @@ export async function mount(el, { decide, mode, ctx } = {}) {
     // the way it did with a flat margin on wide/short panels where height was the binding
     // constraint.
     const topClear = 90;
+    // .gc-foot (exhibits.css) docks the decision bars and the read sentence to the bottom-left,
+    // min(520px, 58%) wide and ~150px tall over a scrim. A centred board puts the play field
+    // under them — the food glyph was disappearing behind a probability bar. Sit the board in
+    // the room that is actually free: to the right of the readout when the panel is wide enough
+    // for that, otherwise above it.
     const sideMargin = 10;
-    const cell = Math.min((w - sideMargin * 2) / outerCols, (h - topClear - sideMargin) / outerRows);
+    const footW = Math.min(520, w * 0.58);
+    const footH = 150;
+    const rightRoom = w - footW - sideMargin * 2;
+    const beside = rightRoom > (h - topClear - sideMargin) * 0.62; // wide enough to stand beside
+    const availW = (beside ? rightRoom : w - sideMargin * 2);
+    const availH = (beside ? h - topClear - sideMargin : h - topClear - footH - sideMargin);
+    const cell = Math.max(6, Math.min(availW / outerCols, availH / outerRows));
     const boardW = cell * outerCols;
     const boardH = cell * outerRows;
-    const ox = (w - boardW) / 2;
-    const oy = topClear + Math.max(0, h - topClear - sideMargin - boardH) / 2;
+    const ox = beside ? footW + sideMargin + (rightRoom - boardW) / 2 : (w - boardW) / 2;
+    const oy = topClear + Math.max(0, availH - boardH) / 2;
     const gx = ox + cell; // interior (play field) origin, inside the frame
     const gy = oy + cell;
 
@@ -247,12 +259,13 @@ export async function mount(el, { decide, mode, ctx } = {}) {
     // this is the one spot on the canvas neither the HUD (top-right) nor the decision/controls
     // (bottom) chrome ever covers. Falls back to a shorter form, then drops entirely, on
     // boards too narrow to fit it rather than spilling past the frame.
-    const pad = (n, digits) => String(n).padStart(digits, '0');
     dctx.font = statusFont;
     dctx.textAlign = 'left';
     const titleAvail = boardW - 3 * cell;
-    let title = `SCORE ${pad(state.score, 3)}  LEN ${pad(state.body.length, 2)}  TICK ${pad(state.steps, 4)}`;
-    if (dctx.measureText(title).width > titleAvail) title = `S${pad(state.score, 3)} L${pad(state.body.length, 2)} T${pad(state.steps, 4)}`;
+    // score/steps are already in the HUD (loop.js, top-right); the title bar carries what the
+    // HUD doesn't: how long the snake is now and which tick it is on
+    let title = `LEN ${pad(state.body.length, 2)}  TICK ${pad(state.steps, 4)}`;
+    if (dctx.measureText(title).width > titleAvail) title = `L${pad(state.body.length, 2)} T${pad(state.steps, 4)}`;
     if (dctx.measureText(title).width > titleAvail) title = '';
     if (title) {
       const titleX = ox + 1.5 * cell;
