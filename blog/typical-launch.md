@@ -40,7 +40,7 @@ repair       .05
 ∅            .02
 ```
 
-(Shape of a real return value; your numbers depend on your state.) The label list is plain text you supply at call time. The model was never trained on this particular set of three words, and there is no classifier head with `refund` baked into index 0. The output space belongs to your program, not to the model.
+(Shape of a real return value.) The label list is plain text you supply at call time. The model was never trained on this particular set of three words, and there is no classifier head with `refund` baked into index 0. The output space belongs to your program, not to the model.
 
 ## Three decision primitives
 
@@ -54,19 +54,19 @@ m.noul(state,   "Is the order still under warranty?")
 m.score(state,  "How urgent is this ticket?", ["0", "1", "2", "3"])
 ```
 
-Each one is a different head on the same backbone, and the difference is structural.
+Each is a different head on the same backbone, and the difference is structural.
 
 Choice reads your label strings, so it can operate over label sets that were never hard-coded into an output head. On CLINC-150 (151 intents) `typical-small` scores .801 and `typical-medium` .847; on 20 Newsgroups, an entirely different label vocabulary, .540 and .588; on held-out workflow families neither model trained on, .818 and .865.
 
 Noul is not `Choice(["yes", "no"])`. It has a dedicated Bernoulli head with no candidate text rendered at all, so its answer cannot change because "yes" and "no" were listed in a different order. On the shipped `typical-small` checkpoint, reversing label order leaves P(yes) exactly unchanged on 10 of 11 held-out test sets and moves it by .009 on the eleventh. Held-out noul accuracy is .710 for Small and .811 for Medium.
 
-Score knows adjacent levels are related. A severity of 2 is closer to 3 than to 0, so we train its probability distribution with ordinal-smoothed targets instead of treating levels as unrelated buckets. In the isolated ablation, ordinal training cut held-out score NLL from 2.07 to 1.23 without changing a single top-1 prediction on the JevBench ordinal items.
+Score knows adjacent levels are related. A severity of 2 is closer to 3 than to 0, so we train it with ordinal-smoothed targets rather than treating levels as unrelated buckets. In the isolated ablation that cut held-out score NLL from 2.07 to 1.23 without changing a single top-1 prediction on the JevBench ordinal items.
 
 ## Abstention is a decision, not a label
 
 All three primitives can say "none of these fit," and that answer comes from a separate head rather than an extra entry in your label list.
 
-The difference is not cosmetic. When we rendered "none of the above" as just another option, the model's abstention behaviour depended on how many candidates you passed it: at 150 candidates it always abstained, at 5 it never did. A null score that means something different at every K cannot be thresholded, which makes it useless for the thing you actually want it for, namely routing the uncertain cases to a human or a slower model. Moving abstention into its own head removed the pathology outright.
+The difference is not cosmetic. When we rendered "none of the above" as just another option, abstention became a function of how many candidates you passed: at 150 it always abstained, at 5 it never did. A null score that means something different at every K cannot be thresholded, which kills the thing you wanted it for, namely routing the uncertain cases to a human or a slower model. Moving abstention into its own head removed the pathology outright.
 
 ## How it works
 
@@ -90,24 +90,24 @@ We train on four kinds of decision: evidence (NLI-style), knowledge (multiple ch
 
 \* Public-subset run against JevBench v1.2.1 (72 standard / 111 hard public ids), not a ranked leaderboard entry. Majority baselines on this split are .311 standard and .336 hard, and at n_eff ≈ 36 on standard, small gaps are noise. Latency is warm p50 per decision on one H100 through the public inference package.
 
-Medium buys a large jump in standard-tier quality for a small latency increase. Neither released model solves the hard compositional tier: long-policy, multi-step, temporal, unit and trade-off decisions sit far below the standard tier for both.
+Medium is the better model for a small latency increase, and consistently so: it leads Small by 5 points on CLINC-150, 11 on MMLU-Pro among-K, 10 on held-out yes/no decisions and 5 on the composition curriculum. The JevBench standard gap (.694 to .806) points the same way, though at 36 independent states that tier alone would not settle it. Neither released model solves the hard compositional tier: long-policy, multi-step, temporal, unit and trade-off decisions sit far below the standard tier for both.
 
 We also trained a 14B research candidate. Before training it we wrote down a release bar (hard-tier accuracy ≥ .559 or hard-tier Brier ≤ .65, and long-document policy accuracy ≥ .35). It reached .931 on the standard tier, the best number this project has produced, and still missed the bar on both counts, narrowly on Brier (.656) and by a wide margin on long-document policy (.158). So it isn't shipping.
 
 ## Rules are part of the input
 
-A decision model that memorises "this kind of ticket gets that label" is useless the moment your policy changes. So a large part of workflow training is counterfactual: the same state and the same options appear under different rubrics with different correct answers, which forces the model to read the rule instead of pattern-matching the state.
+A decision model that memorises "this kind of ticket gets that label" is useless the moment your policy changes. So much of the workflow training is counterfactual: the same state and options appear under different rubrics with different correct answers, forcing the model to read the rule instead of pattern-matching the state.
 
-It works inside the rule grammar we generate and stops at its edge. On held-out rubric-flip items, where the rule is inverted and the state is unchanged, `typical-small` scores .801 and `typical-medium` .833. On level-7 composition, which mixes temporal, unit, expected-value and trade-off reasoning and which our generator never produces, both sit near .49 and .54. What we generate is learned. What we don't generate is not.
+It works inside the rule grammar we generate and stops at its edge. On held-out rubric-flip items, where the rule is inverted and the state unchanged, `typical-small` scores .801 and `typical-medium` .833. On level-7 composition, which mixes temporal, unit, expected-value and trade-off reasoning and which our generator never produces, they sit at .49 and .54. What we generate is learned. What we don't generate is not.
 
 ## Where direct decisions still break
 
-Every model we've trained, at every size, does worse on the hard tier than on the standard tier. This is the project's clearest open problem, and it isn't obviously a capacity problem: a frozen 14B backbone with three examples in its prompt and no training at all scores .559 on that tier, ahead of our trained 14B candidate's .450.
+Every model we've trained, at every size, does worse on the hard tier than on the standard tier. This is the project's clearest open problem, and it isn't obviously a capacity problem: a frozen 14B backbone with three examples in its prompt and no training at all scores .559 on that tier, against .450 for our trained 14B candidate. At 111 items those intervals overlap, so we won't claim the frozen model wins. We will say training bought nothing measurable on this tier, which is not what we expected.
 
 <p align="center"><img src="../figures/fig_hard_families.png" alt="JevBench hard-tier accuracy by family for the 14B candidate and the frozen 14B baseline" width="640"></p>
 <p align="center"><em>Hard-tier accuracy by family. Long-document policy and serial-symbolic composition drag the average down independently.</em></p>
 
-The honest version of the research question is: when is a direct decision enough, and when does the model need intermediate computation to get there? We don't know yet, and we'd rather say so than describe the hard tier as solved.
+The honest version of the question: when is a direct decision enough, and when does a decision need intermediate computation to get there? We don't know yet, and we'd rather say so than describe the hard tier as solved.
 
 Two other places Typical is the wrong tool today: candidate sets in the hundreds or thousands need a retrieval front end feeding a shortlist to the decision head, and Choice keeps some sensitivity to the order you list options in. Noul does not, by construction.
 
@@ -122,9 +122,9 @@ Each of those started as a bug or a failed run. [Read the technical deep dive �
 
 ## What's open today
 
-Open weights and inference code, today, on Hugging Face: [`OzLabs/typical-small`](https://huggingface.co/OzLabs/typical-small) and [`OzLabs/typical-medium`](https://huggingface.co/OzLabs/typical-medium), plus the earlier [`OzLabs/typical-small-preview`](https://huggingface.co/OzLabs/typical-small-preview) kept as the reference point Release 1 is measured against. Each repo carries the weights, the self-contained `inference/` package, and the evaluation artefacts every number in this post is read from (`eval_wf_full.json`, `jevbench_summary.json`), so you can check the tables above against the files rather than against us.
+Open weights and inference code, today, on Hugging Face: [`OzLabs/typical-small`](https://huggingface.co/OzLabs/typical-small) and [`OzLabs/typical-medium`](https://huggingface.co/OzLabs/typical-medium), plus the earlier [`OzLabs/typical-small-preview`](https://huggingface.co/OzLabs/typical-small-preview) as a reference point. Each repo carries the weights, the self-contained `inference/` package, and the evaluation artefacts every number here is read from (`eval_wf_full.json`, `jevbench_summary.json`), so you can check the tables against the files rather than against us.
 
-Both released checkpoints are Apache-2.0 over Apache-2.0 Qwen3 base models. The training recipe is documented, down to the exact flags, in the model cards. Training code and the complete experimental report are not public yet; they're what we're preparing next. A packaged `pip` install doesn't exist yet either.
+Both checkpoints are Apache-2.0 over Apache-2.0 Qwen3 base models, and the training recipe is documented down to the exact flags in the model cards. Training code and the full experimental report are not public yet, and neither is a packaged `pip` install. Those are what we're preparing next.
 
 One data-licensing note we'd rather state than bury: most of the training mix is public NLU data, permissively licensed workflow datasets and in-repo generators, but two portions of the uncertainty corpus (`metaeval/ambient` and `metaeval/chaos-mnli-ambiguity`) declare no license on their Hugging Face cards. We flag that rather than assert it's fine, and it's part of why the data release trails the weights.
 

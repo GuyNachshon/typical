@@ -4,11 +4,11 @@ Two public posts, meant to publish together.
 
 - `typical-launch.md` — **"Typical: Models That Decide, Not Generate."** The launch. Leads with the
   decision primitive, shows the API, the two released models, where they break, and what is open.
-  ~1,900 words.
+  ~1,950 words.
 - `technical-deep-dive.md` — **"We Removed Generation from an LLM. Here's What Broke."** The
   archaeology: the candidate-blind architecture that failed, the wrong tap layer, the "none of the
   above" pathology, the long-state data defect, the calibration results, the KV-cache deep copy.
-  ~3,200 words. The launch links to it twice.
+  ~3,650 words. The launch links to it twice.
 
 Every number in both traces to `REPORT.md`, `RESULTS.md`, `COMPARE.md`, or a `releases/*.md` card.
 Check the cited section before changing a number, not just the number.
@@ -33,14 +33,25 @@ This is the part that goes stale first, so read it before editing.
   (`metaeval/ambient`, `metaeval/chaos-mnli-ambiguity`) declare no license on their HF cards. The
   launch post flags that rather than asserting commercial-use safety. Don't upgrade that wording
   without a licensing review.
-- **The truncation story is in progress.** Deep dive §5 states the data defect (98.8% of long rows
-  lost their facts at a 1,024-token window — verified, countable) and explicitly does *not* claim
-  it caused the long-policy metric movement, because the fix bundled five changes and the first
-  arm of the matched ablation shows a large train/test render-mismatch effect (.615 vs .842 on the
-  same 605 held-out items). That section is written to be updated when the second arm lands.
-- **The frozen teacher contributed nothing.** The matched `--distill_beta 0` control (`tl1b_nokd`)
-  beats the KD arm on hard (.477 vs .450), long-policy (.211 vs .158) and val NLL (0.410 vs
-  0.438). Never re-credit KD for the calibration gains.
+- **The truncation story is a null result, not a cause.** Deep dive §5 states the data defect
+  (98.8% of long rows lost their facts at a 1,024-token window, verified and countable, and
+  truncation keeps the start and drops the end) and explicitly does *not* claim it caused the
+  long-policy metric movement. The matched render-order ablation came back underpowered:
+  long_policy .316 (6/19) facts-first vs .105 (2/19) facts-last, Fisher exact two-sided p = 0.232,
+  bootstrap CI on the difference [−0.053, +0.474] containing zero, and the hard aggregate going
+  the other way (.378 vs .396). The well-powered effect is train/test render mismatch: on 605
+  held-out long-state items with no truncation at eval, moving the case from the end of the state
+  to the start costs the facts-last arm 23 points (.842 → .615, onto its .612 majority floor).
+- **Do not say KD contributed nothing.** The matched `--distill_beta 0` control (`tl1b_nokd`) came
+  out slightly ahead on hard (.477 vs .450), long-policy (.211 vs .158), standard Brier (.127 vs
+  .175) and val NLL (0.410 vs 0.438), but the cluster-bootstrapped hard-tier intervals overlap
+  almost entirely (.450 [.360, .541] vs .477 [.387, .568]). The correct claim is that the
+  direction is consistent and the effect is undetectable at this sample size. Never re-credit KD
+  for the calibration gains either.
+- **Sample size.** JevBench public subset: 72 standard items over only 36 independent states (two
+  paraphrases per state, so it must be clustered) and 111 hard items, roughly ±9 points on hard.
+  Point estimates are fine; comparative claims built on a few points are not. The deep dive
+  carries this caveat in its opening and re-states it wherever a claim leans on a small gap.
 - **The 14B is not a product.** It stays out of the release table in the launch post and appears
   only as a candidate that missed its own pre-registered bar.
 
@@ -97,6 +108,5 @@ blocked, but it needs deciding before any packaged install ships.
 
 If a number changes (a new release, a fixed bug, a benchmark rerun), edit the post directly and
 re-check the specific `REPORT.md`/`RESULTS.md`/`COMPARE.md` section cited next to the claim, rather
-than just bumping the number. Two edits are already queued: deep dive §5 when the render-order
-ablation's second arm lands, and the launch post's 14B paragraph plus the release table if
-`typical-large` ever clears its pass rule.
+than just bumping the number. One edit is already queued: the launch post's 14B paragraph and the release
+table, if `typical-large` ever clears its pass rule.

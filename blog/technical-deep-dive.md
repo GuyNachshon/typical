@@ -11,6 +11,8 @@ That interface sounds like a simplification of a language model. In practice, re
 
 This is the archaeology: the architecture that didn't work, the bugs that looked like results, and the results that looked like bugs. Section references (§3j, §3t and so on) point at our internal experiment report, which publishes with the training code.
 
+One measurement caveat applies throughout. Our JevBench runs are against the public subset, unranked: 72 standard items that come from only 36 independent states (each state appears as two paraphrases), and 111 hard items. Cluster-bootstrapped, that puts roughly ±9 points on any hard-tier number. Where a claim below rests on a small JevBench gap we say so, and we'd rather report a direction we can't resolve than dress it up as a result.
+
 ## 1. The obvious architecture failed
 
 The first design was the clean one. Compute a decision state `Z(state, question)` once, without looking at the candidates, then score each candidate against it with a cheap head. Candidates are then free: their cost is a dot product, K scales for nothing, and you can cache label vectors forever.
@@ -87,9 +89,15 @@ So for a stretch of this project we were training models to answer confidently a
 
 The fixes were to regenerate the corpus facts-first (case position inside the first 8% of the text), and to stop truncating. `--drop_truncated` discards any row that doesn't fit the window rather than quietly cutting it, which is the right default for a training loader handling anything with a payload at a known position.
 
-**Where this stands now, honestly.** The data defect is verified and not in dispute: we can count the rows, and 98.8% is a measurement, not an inference. What is *not* established is that the defect caused the metric movement we saw afterwards. The run that fixed it changed five things at once (facts-first rendering, `--drop_truncated`, a wider window, a Brier term, calibration-based checkpoint selection), so the long-policy recovery from .053 to .211 has five candidate explanations and we've separated none of them (§3ai).
+**Then we tried to prove it mattered, and couldn't.** The data defect is verified and not in dispute: we can count the rows, 98.8% is a measurement, and we confirmed empirically that the tokenizer path keeps the start of a state and drops the end. What is *not* established is that the defect caused the metric movement we saw afterwards. The run that fixed it changed five things at once (facts-first rendering, `--drop_truncated`, a wider window, a Brier term, calibration-based checkpoint selection), so the long-policy recovery had five candidate explanations and we had separated none of them.
 
-A matched ablation is running, and its first arm has already complicated the story. On a held-out long-state set of 605 items, a model trained on facts-last data scores .615 when the eval items are rendered facts-first, which is exactly the .612 majority floor, and .842 when the same 605 items are rendered facts-last. There is no truncation at eval in either case. That gap is train/test render mismatch, not lost evidence, and it's large enough to account for a substantial part of what we had attributed to truncation. We'll update this section with the second arm's numbers when it lands.
+The counterfactual corpus was still on disk, so the ablation was clean to set up: two 1.7B arms, byte-identical flags, a 1,024-token window with `--drop_truncated` deliberately off so truncation bites exactly as it did in Release 1, differing only in which render of the same rows is the training file. Same rows, same labels, same state lengths, `Case:` at the start or at the end.
+
+It came back underpowered. Long-policy accuracy was .316 for the facts-first arm against .105 for facts-last, which is the predicted direction, but that is 6 of 19 items against 2 of 19. Fisher's exact test gives two-sided p = 0.232, the bootstrap interval on the difference is [−0.053, +0.474] and contains zero, and the hard-tier aggregate goes the other way (.378 facts-first against .396 facts-last). Nineteen items cannot settle this.
+
+**What the same experiment measured well is a different effect.** On a held-out long-state set of 605 items, with no truncation at eval in either condition, we rendered each item both ways and scored the facts-last-trained arm on both. It gets .842 when the case sits at the end of the state, where its training data put it, and .615 when the same 605 items put the case at the start. Its majority-class floor on that set is .612. Moving the facts to a position the model wasn't trained to look at costs 23 points and takes it to the floor.
+
+So the honest reading is not the one we started with. The defect is real, the model's long-document failure is real, and the mechanism we can actually demonstrate at adequate sample size is train/test render mismatch: the model learned where in the state to look, and fails when that changes. Whether the truncation itself contributed on top of that is a question our ablation was too small to answer, and we're leaving it open rather than claiming the tidier version.
 
 <p align="center"><img src="../figures/fig_truncation.png" alt="Left: state token length distribution against truncation cutoffs at 256/1024/2048/3072 tokens. Right: long-policy accuracy across checkpoints" width="640"></p>
 <p align="center"><em>Left: how much of a long-policy row survives each token budget. Right: long-policy accuracy across checkpoints.</em></p>
@@ -102,7 +110,7 @@ Raising the evidence share of the training mixture from .35 to .45–.50 brought
 
 Augmenting 20% of workflow rows with the gold answer removed, so the correct answer is ∅, lowered false-abstention on CLINC from .10 to .08 and on TREC from .27 to .12, and *raised* accuracy on CLINC, TREC, HWU64 and 20NG by 2.6, 3.6, 4.3 and 6.0 points. Teaching the model when to abstain made it better at not abstaining.
 
-The hard curriculum is the sharpest case. Adding a rule-engine corpus where the same state and options recur under different rubrics with different gold answers took held-out family, grammar and style accuracy from .481 / .507 / .491 to .827 / .881 / .888, and rubric-flip accuracy from .477 to .710. On JevBench's hard tier, the families that corpus covers moved a lot: adversarial .33 to .83, ambiguous .57 to .71.
+The hard curriculum is the sharpest case. Adding a rule-engine corpus where the same state and options recur under different rubrics with different gold answers took held-out family, grammar and style accuracy from .481 / .507 / .491 to .827 / .881 / .888, and rubric-flip accuracy from .477 to .710. On JevBench's hard tier, the families that corpus covers moved in the same direction, though those are 6 and 7 items respectively and we'd treat them as directional: adversarial .33 to .83, ambiguous .57 to .71.
 
 And level-7 composition, which mixes temporal, unit, expected-value and trade-off reasoning and which the generator never produces, went .477 to .498. What we generated was learned. What we didn't generate was not, and no amount of scale substituted for it.
 
@@ -131,17 +139,19 @@ The Noul head is a structural version of the same idea. A two-way Choice over `[
 <p align="center"><img src="../figures/fig_calibration.png" alt="Held-out score NLL and typed-decisions NLL across checkpoints" width="640"></p>
 <p align="center"><em>Held-out score and typed-decisions NLL across checkpoints.</em></p>
 
-One thing we added and then had to un-credit. The 14B run bundled knowledge distillation from a frozen 14B teacher, on the theory that it would buy hard-tier reasoning. We ran the matched control with `--distill_beta 0`, one flag different and nothing else (§3ai). The control was *better*: hard accuracy .477 against .450, long-document policy .211 against .158, standard Brier .127 against .175, validation NLL 0.410 against 0.438. It gave up 1.4 points of standard accuracy, which is inside the run-to-run spread we've measured between seeds. The teacher bought none of what it was added for, and the calibration gains above belong to the loss and the data.
+One thing we added and then couldn't justify. The 14B run bundled knowledge distillation from a frozen 14B teacher, on the theory that it would buy hard-tier reasoning. We ran the matched control with `--distill_beta 0`, one flag different and nothing else (§3ai). The control came out slightly ahead: hard accuracy .477 against .450, long-document policy .211 against .158, standard Brier .127 against .175, validation NLL 0.410 against 0.438, at the cost of 1.4 points of standard accuracy.
+
+The direction is consistent across those metrics, and it is still not a result. Cluster-bootstrapped, the hard-tier numbers are .450 [.360, .541] with KD and .477 [.387, .568] without, intervals that overlap along almost their whole length. We cannot show the teacher helped and we cannot show it hurt; 111 items is not enough to tell. What we can say is that the change we added specifically to buy hard-tier reasoning bought nothing we can detect, which is reason enough not to credit it for the calibration gains above. Those belong to the loss and the data.
 
 ## 8. Fine-tuning made the hardest cases worse
 
 The uncomfortable number in this project: on JevBench's hard tier, a frozen 14B base model reading letter logits with three examples in its prompt scores .559. Our trained 14B decision checkpoint scores .450, and its no-KD control .477.
 
-We trained a model and it got worse at the thing we most wanted it to do.
+At 111 items those intervals overlap, so we won't call that a defeat. What it rules out is the claim we'd have liked to make. We trained a decision model on top of that backbone and cannot demonstrate that it got any better at the tier we care most about.
 
 The per-family breakdown shows where. On the no-KD control: adversarial .833, trap 1.00, routing 1.00, multi-hop .50, judge-hard .588, probability .50, ambiguous .429, long-policy .211, temporal and numeric .20, trade-off .167. Everything that resembles a workflow decision under a rubric is fine. Everything that requires carrying a value through several steps is near chance.
 
-Two related findings sharpen it. First, backbone generation matters more than our training does on this tier: a frozen Qwen3.5-9B scores .541 hard with three examples, and .595 under a different rendering, better than any checkpoint we've trained at any size. Second, that rendering effect is large on its own. The same frozen Qwen3.5-9B goes from .806 to .931 on the standard tier purely by changing how the state and options are laid out, with zero training. A meaningful share of the public leaderboard's standard-tier numbers is a protocol effect.
+Two related findings sharpen it. First, the backbone generation appears to matter more than our training does here: a frozen Qwen3.5-9B scores .541 hard with three examples and .595 under a different rendering, above the .495 of the best checkpoint we've trained at any size, again with intervals that overlap. Second, that rendering effect is visible on its own. The same frozen Qwen3.5-9B goes from .806 to .931 on the standard tier purely by changing how the state and options are laid out, with zero training, and all three Qwen3.5 sizes we tested moved the same way under the same change. We'd read that as a sign that a meaningful share of the public leaderboard's standard-tier spread is a protocol effect, and as a reason to be careful reading ours.
 
 The lesson we'd generalise: a frozen model with a few examples in context is not a strawman to beat before shipping. It's a ceiling to verify you've actually cleared, per tier, and we publish the tiers where we haven't.
 
