@@ -100,6 +100,7 @@ export function mountFilmFx(host, getSource, opts = {}) {
   let mh = 0;
   let pulseAt = -1e9;
   let nextPatchAt = performance.now() + 2500;
+  let lastBackdrop = '';
   const patches = [];
 
   function size(src) {
@@ -176,7 +177,7 @@ export function mountFilmFx(host, getSource, opts = {}) {
           f[i] = warm ? 150 : 46;
           f[i + 1] = 40;
           f[i + 2] = warm ? 46 : 150;
-          f[i + 3] = Math.round(a * 255 * (0.16 + 0.26 * pulse));
+          f[i + 3] = Math.round(a * 255 * (0.3 + 0.4 * pulse));
           cd[i] = cd[i + 1] = cd[i + 2] = 240;
           cd[i + 3] = Math.round(Math.min(1, mag * 1.2) * 255);
         }
@@ -192,7 +193,7 @@ export function mountFilmFx(host, getSource, opts = {}) {
     if (lines) return lines;
     const step = Math.max(2, Math.round(2 * Math.min(2, devicePixelRatio || 1)));
     const { el, ctx: c } = canvas2d(1, step);
-    c.fillStyle = 'rgba(0,0,0,0.1)';
+    c.fillStyle = 'rgba(0,0,0,0.2)';
     c.fillRect(0, 0, 1, 1);
     lines = ctx.createPattern(el, 'repeat');
     void W;
@@ -261,23 +262,26 @@ export function mountFilmFx(host, getSource, opts = {}) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, W, H);
 
-    // 1. contrast, only while processing: the frame blended over itself through a contrast curve
-    if (pulse > 0.01) {
-      ctx.save();
-      ctx.globalAlpha = 0.5 * pulse;
-      ctx.filter = `contrast(${(1 + 0.22 * pulse).toFixed(3)}) saturate(${(1 + 0.1 * pulse).toFixed(3)})`;
-      ctx.drawImage(src, 0, 0, W, H);
-      ctx.restore();
-      ctx.filter = 'none';
+    // 1. contrast, only while processing. This used to blend the frame over itself, which put a
+    // ghost of a previous camera angle on screen: the WebGL buffer we read can be a frame behind
+    // the one the iframe is showing. A backdrop filter grades what is actually underneath, so
+    // there is only ever one frame on screen.
+    const cf = pulse > 0.01
+      ? `contrast(${(1 + 0.2 * pulse).toFixed(3)}) saturate(${(1 + 0.14 * pulse).toFixed(3)}) brightness(${(1 + 0.05 * pulse).toFixed(3)})`
+      : '';
+    if (cf !== lastBackdrop) {
+      layer.style.backdropFilter = cf;
+      layer.style.webkitBackdropFilter = cf;
+      lastBackdrop = cf;
     }
 
     // 2. RGB separation at edges only
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.3 + 0.3 * pulse;
+    ctx.globalAlpha = 0.45 + 0.35 * pulse;
     const dx = (0.7 + 1.3 * pulse) * (W / mw) * 0.5;
     ctx.drawImage(fringe.el, -dx, 0, W, H);
-    ctx.globalAlpha = 0.22 + 0.26 * pulse;
+    ctx.globalAlpha = 0.34 + 0.3 * pulse;
     ctx.drawImage(fringe.el, dx, 0, W, H);
     ctx.restore();
 
@@ -285,11 +289,11 @@ export function mountFilmFx(host, getSource, opts = {}) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.imageSmoothingEnabled = true;
-    ctx.globalAlpha = 0.34 + 0.4 * pulse;
-    ctx.filter = 'blur(7px)';
+    ctx.globalAlpha = 0.6 + 0.5 * pulse;
+    ctx.filter = 'blur(6px)';
     ctx.drawImage(hot.el, 0, 0, W, H);
-    ctx.globalAlpha = 0.2 + 0.28 * pulse;
-    ctx.filter = 'blur(26px)';
+    ctx.globalAlpha = 0.32 + 0.35 * pulse;
+    ctx.filter = 'blur(24px)';
     ctx.drawImage(hot.el, 0, 0, W, H);
     ctx.restore();
     ctx.filter = 'none';
@@ -298,7 +302,7 @@ export function mountFilmFx(host, getSource, opts = {}) {
     if (!still) {
       if (now > nextPatchAt && patches.length < 2) {
         spawnPatch(now, W, H);
-        nextPatchAt = now + 2600 + Math.random() * 4200;
+        nextPatchAt = now + 1800 + Math.random() * 3000;
       }
       for (let i = patches.length - 1; i >= 0; i--) {
         const p = patches[i];
@@ -324,7 +328,7 @@ export function mountFilmFx(host, getSource, opts = {}) {
       if ((now / 90) % 2 < 1) grain.fill();
       ctx.save();
       ctx.globalCompositeOperation = 'overlay';
-      ctx.globalAlpha = 0.055 + 0.03 * pulse;
+      ctx.globalAlpha = 0.1 + 0.05 * pulse;
       const p = ctx.createPattern(grain.el, 'repeat');
       ctx.translate(-(Math.random() * 90) | 0, -(Math.random() * 90) | 0);
       ctx.fillStyle = p;
