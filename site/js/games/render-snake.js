@@ -1,6 +1,6 @@
 // Real canvas Snake renderer over js/snake.js's pure engine. 10x10 board, ink cells on putty,
 // bone grid gaps, smooth interpolation between ticks, paper death flash.
-import { Snake } from '../snake.js';
+import { Snake, greedyPolicy } from '../snake.js';
 import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, replayFrame, loadJSON, scoreboardLine } from './loop.js';
 
 const TICK_MS = 200;
@@ -33,18 +33,7 @@ export async function mount(el, { decide, mode, ctx } = {}) {
   const human = createHumanOverride(3000);
   let score = { you: 0, model: 0 }; // "you vs model" HUD line — food eaten, reset on restart
 
-  function scriptedMove(e) {
-    const safe = e.safeMoves();
-    if (safe.length === 0) return safe[0];
-    const { head, food } = e.state();
-    const D = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-    return safe
-      .map((m) => {
-        const [dx, dy] = D[m];
-        return { m, dist: Math.abs(food.x - (head.x + dx)) + Math.abs(food.y - (head.y + dy)) };
-      })
-      .sort((a, b) => a.dist - b.dist)[0].m;
-  }
+  const scriptedMove = greedyPolicy; // the rule list applied literally (snake.js RULES)
 
   async function tick() {
     // human override takes priority over everything, including the static-mode replay branch

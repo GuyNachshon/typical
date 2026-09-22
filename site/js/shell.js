@@ -4,7 +4,7 @@
 // Every number that reaches the page comes from data/*.json (precompute output) or a live
 // decide() call — never an invented one.
 import { decide, mode, probeHealth } from './api.js';
-import { inkBars } from './ink.js';
+import { dotText, dotBars } from './dots.js';
 import { lineChart, reliability, ladder } from './charts.js';
 
 async function loadJSON(path) {
@@ -288,10 +288,69 @@ function mountGameScreens(ctx) {
 
 // ---- hero mark mosaic ------------------------------------------------------------------
 
-function mountMark() {
-  const el = document.querySelector('[data-mark]');
+// ---- the dot system: wall (wordmark), numerals, primitive glyphs ----------------------
+
+// inkBars-compatible adapter so the demo modules need no change: rows + nullP -> dotBars rows.
+function inkBars(el, { rows = [], nullP = null } = {}) {
+  const toRows = (rs, np) => [
+    ...rs.map((r) => ({ label: r.label, p: r.p })),
+    ...(np != null ? [{ label: '∅', p: np, isNull: true }] : []),
+  ];
+  const h = dotBars(el, toRows(rows, nullP));
+  return { update: (rs, np) => h.update(toRows(rs, np)) };
+}
+
+let wall = null;
+async function mountWall() {
+  const el = document.getElementById('wall');
   if (!el) return;
-  import('./mark.js').then((m) => m.mount(el));
+  const replays = (await loadJSON('data/replays.json')) || {};
+  // every probability the recorded demos produced, in file order: the wordmark is data
+  const values = [];
+  for (const e of Object.values(replays)) {
+    for (const r of e.results || []) {
+      for (const v of Object.values(r.probs || {})) values.push(v);
+      values.push(r.p_null ?? 0);
+    }
+  }
+  wall = dotText(el, 'TYPICAL', { dot: 22, gap: 8, values });
+  const count = document.getElementById('wall-count');
+  if (count) {
+    const b = document.createElement('b');
+    b.textContent = values.length.toLocaleString();
+    count.textContent = ' recorded probabilities';
+    count.prepend(b);
+  }
+  // static: walk the recorded stream; live: decide() results are pushed in by pushDecision()
+  if (mode() !== 'live' && values.length) {
+    let i = 0;
+    setInterval(() => { wall.push(values.slice(i, i + 6)); i = (i + 6) % values.length; }, 900);
+  }
+}
+// called by the live decide wrapper below
+function pushDecision(res) {
+  if (!wall || !res?.results) return;
+  const vec = [];
+  for (const r of res.results) { for (const v of Object.values(r.probs || {})) vec.push(v); vec.push(r.p_null ?? 0); }
+  wall.push(vec);
+}
+
+function mountNumerals() {
+  document.querySelectorAll('[data-dotnum]').forEach((el) => dotText(el, el.dataset.dotnum, { dot: 14, gap: 5 }));
+}
+
+// Choice / Noul / Score as dot glyphs: a 5-dot row with one lit, two dots, an ascending ladder.
+function mountGlyphs() {
+  const shapes = {
+    choice: { cols: 5, rows: 1, values: [0.05, 0.05, 0.92, 0.05, 0.05] },
+    noul: { cols: 2, rows: 1, values: [0.08, 0.92] },
+    score: { cols: 5, rows: 1, values: [0.1, 0.25, 0.45, 0.7, 0.95] },
+  };
+  document.querySelectorAll('[data-glyph]').forEach((el) => {
+    const sh = shapes[el.dataset.glyph];
+    if (!sh) return;
+    import('./dots.js').then((d) => d.dotField(el, sh.cols, sh.rows, { dot: 18, gap: 8, values: sh.values }));
+  });
 }
 
 // ---- try-it: mounted immediately (not lazy behind a Run/expand toggle) since it's the
@@ -318,9 +377,12 @@ async function boot() {
     loadJSON('data/frozen.json'),
   ]);
 
-  const ctx = { decide, mode, readout, presets, inkBars };
+  const liveDecide = async (...args) => { const res = await decide(...args); pushDecision(res); return res; };
+  const ctx = { decide: liveDecide, mode, readout, presets, inkBars };
 
-  mountMark();
+  mountWall();
+  mountNumerals();
+  mountGlyphs();
   mountResults(models, reliabilityDoc, chanceDoc, frozenDoc);
   mountTryit(ctx);
   wireExhibits(ctx);

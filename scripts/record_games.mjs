@@ -7,7 +7,7 @@
 //
 // Usage: node scripts/record_games.mjs --game snake|doom|drive
 import fs from 'node:fs';
-import { Snake } from '../site/js/snake.js';
+import { Snake, greedyPolicy as snakeRules, QUESTION as SNAKE_QUESTION } from '../site/js/snake.js';
 import { Doom, greedyPolicy as doomRules, QUESTION as DOOM_QUESTION } from '../site/js/games/doom.js';
 import { Drive, greedyPolicy as driveRules, QUESTION as DRIVE_QUESTION } from '../site/js/games/drive.js';
 
@@ -46,7 +46,12 @@ async function recordLoop({ engine, maxTicks, legal, isDone, question, gold }) {
   const frames = [];
   for (let tick = 0; tick < maxTicks; tick++) {
     const candidates = legal(engine);
-    if (candidates.length === 0) break;
+    if (candidates.length === 0) {
+      // trapped (Snake: no safe move) - record the death frame so the replay flashes it
+      if ('dead' in engine) engine.dead = true;
+      frames.push({ tick, state: engine.state(), desc: engine.describe(), candidates: [], probs: [], p_null: 0, move: null, ms: 0 });
+      break;
+    }
 
     const desc = engine.describe();
     let move, probs, p_null, ms;
@@ -87,9 +92,10 @@ async function recordSnake() {
   const frames = await recordLoop({
     engine,
     maxTicks: 300,
-    legal: (e) => e.safeMoves(),
+    legal: (e) => e.candidates(),
     isDone: (e) => e.dead,
-    question: presets.snake.question,
+    question: SNAKE_QUESTION,
+    gold: snakeRules,
   });
 
   for (const f of frames) {
@@ -106,17 +112,24 @@ async function recordSnake() {
   }
 
   const decided = frames.filter((f) => f.move);
+  // rule_agreement: the literal rule answer; rule_agreement_literal also accepts any safe move on
+  // ticks where neither gap move is safe (the rule there is "any safe move", gold = first canonical).
+  const gapTick = (f) => f.desc.includes('close the');
   const summary = {
     game: 'snake',
     seed: SEED,
     ticks: frames.length,
     food_eaten: foodEaten,
     foodward_fraction: decided.length ? foodwardCount / decided.length : 0,
+    decisions: decided.length,
+    rule_agreement: decided.filter((f) => f.move === f.gold).length,
+    rule_agreement_literal: decided.filter((f) => f.move === f.gold || !gapTick(f)).length,
+    default_ticks: decided.filter((f) => !gapTick(f)).length,
     mean_p_null: decided.reduce((s, f) => s + f.p_null, 0) / (decided.length || 1),
     mean_ms: decided.reduce((s, f) => s + f.ms, 0) / (decided.length || 1),
   };
   fs.writeFileSync(new URL('../site/data/replays/snake.json', import.meta.url), JSON.stringify({ frames, summary }));
-  console.log(`[snake] ticks=${frames.length} food_eaten=${foodEaten} foodward_fraction=${summary.foodward_fraction.toFixed(3)}`);
+  console.log(`[snake] ticks=${frames.length} food_eaten=${foodEaten} foodward_fraction=${summary.foodward_fraction.toFixed(3)} rule_agreement=${summary.rule_agreement}/${summary.decisions} (literal ${summary.rule_agreement_literal}/${summary.decisions}, default ticks ${summary.default_ticks})`);
   console.log(`[snake] mean p_null=${summary.mean_p_null.toFixed(3)} mean ms=${summary.mean_ms.toFixed(1)}`);
   console.log(`STATS_JSON ${JSON.stringify(summary)}`);
 }

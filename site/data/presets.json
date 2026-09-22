@@ -347,7 +347,12 @@
       "left",
       "right"
     ],
-    "state_template": "Snake game on a 10 by 10 board. The head is at column {hx}, row {hy} (row 1 is the top). The food is {|dx|} cells to the {left|right} and {|dy|} cells {up|down}. Moving {d} collides with a wall or the body. [one sentence per unsafe direction] Safe moves: {comma list}.",
-    "variant": "plain"
+    "state_template": "[The snake must move {A} to close the {larger gap|gap} to the food.] [The snake can also move {B} to close the smaller gap.] [Moving {d} hits the wall. | Moving {d} hits the snake's body. - one per unsafe direction, canonical order] (only the situations that apply; A = the move along the axis with the larger distance to the food, B = the other axis)",
+    "variant": "situations-v4",
+    "rules": {
+      "close the larger gap": "move along the axis with the larger distance to the food when that move is safe",
+      "close the smaller gap": "else move along the other axis when that move is safe",
+      "any safe move": "else the first safe move in up, down, left, right order"
+    }
   }
 }

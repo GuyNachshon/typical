@@ -110,43 +110,62 @@ export class Snake {
     return [top, ...rows, bottom].join('\n');
   }
 
-  // Exact template (content-spec.md R7), 1-based column/row, row 1 = top:
-  // "Snake game on a {w} by {h} board. The head is at column {hx}, row {hy} (row 1 is
-  // the top). The food is {|dx|} cells to the {left|right} and {|dy|} cells {up|down}.
-  // [Moving {d} collides with a wall or the body. - one per unsafe direction, canonical
-  // order] Safe moves: {comma list}."
-  // {distanceFacts:true} (pre-registered fallback (b), content-spec.md R7) inserts one
-  // sentence per SAFE move - "Moving {d} reduces/increases/does not change the distance
-  // to the food." (Manhattan) - after the collision sentences, before "Safe moves:".
-  // Default (no options) is the plain template, unchanged.
-  describe({ distanceFacts = false } = {}) {
+  // Which single-step moves close the food gap: [larger-axis move, smaller-axis move]; a
+  // missing axis is null, |dx| == |dy| counts the horizontal axis as the larger one.
+  gapMoves() {
     const dx = this.food.x - this.head.x;
     const dy = this.food.y - this.head.y;
-    const sentences = [
-      `Snake game on a ${this.w} by ${this.h} board.`,
-      `The head is at column ${this.head.x + 1}, row ${this.head.y + 1} (row 1 is the top).`,
-    ];
-    const xDesc = dx === 0 ? '' : `${Math.abs(dx)} cells to the ${dx > 0 ? 'right' : 'left'}`;
-    const yDesc = dy === 0 ? '' : `${Math.abs(dy)} cells ${dy > 0 ? 'down' : 'up'}`;
-    const foodDesc = [xDesc, yDesc].filter(Boolean).join(' and ');
-    if (foodDesc) sentences.push(`The food is ${foodDesc}.`);
-    const safeMoves = this.safeMoves();
-    const safe = new Set(safeMoves);
-    MOVES.filter((m) => !safe.has(m)).forEach((m) => {
-      sentences.push(`Moving ${m} collides with a wall or the body.`);
-    });
-    if (distanceFacts) {
-      const distBefore = Math.abs(dx) + Math.abs(dy);
-      MOVES.filter((m) => safe.has(m)).forEach((m) => {
-        const d = DELTA[m];
-        const distAfter = Math.abs(this.food.x - (this.head.x + d.x)) + Math.abs(this.food.y - (this.head.y + d.y));
-        const verb = distAfter < distBefore ? 'reduces' : distAfter > distBefore ? 'increases' : 'does not change';
-        sentences.push(`Moving ${m} ${verb} the distance to the food.`);
-      });
+    const hx = dx > 0 ? 'right' : dx < 0 ? 'left' : null;
+    const vy = dy > 0 ? 'down' : dy < 0 ? 'up' : null;
+    return Math.abs(dx) >= Math.abs(dy) ? [hx, vy] : [vy, hx];
+  }
+
+  // The model's candidates = the safe moves (the legality guardrail), canonical order.
+  candidates() {
+    return this.safeMoves();
+  }
+
+  // Demo-spec v4 grammar: only the situations that apply, as agent-subject sentences that
+  // pre-compute the comparison (which axis is the larger gap), in this fixed order:
+  //   [The snake must move {A} to close the {larger gap|gap} to the food.]   A safe
+  //   [The snake can also move {B} to close the smaller gap.]                B exists and safe
+  //   [Moving {d} hits the wall. | Moving {d} hits the snake's body.]        per unsafe d, canonical
+  // "must" > "can also" is the precedence; the probe (n=62) reads it at .984 with the plain
+  // QUESTION, while every variant that spelled the rules out in the question scored .82-.95 with
+  // p_null ~.9 (four direction rules and no default are off the trained 3-rules+default shape).
+  describe() {
+    const safe = new Set(this.safeMoves());
+    const [a, b] = this.gapMoves();
+    const sentences = [];
+    if (a && safe.has(a)) sentences.push(`The snake must move ${a} to close the ${b ? 'larger gap' : 'gap'} to the food.`);
+    if (b && safe.has(b)) sentences.push(`The snake can also move ${b} to close the smaller gap.`);
+    for (const m of MOVES) {
+      if (safe.has(m)) continue;
+      const { nx, ny } = this._targetBody(m);
+      const wall = nx < 0 || nx >= this.w || ny < 0 || ny >= this.h;
+      sentences.push(`Moving ${m} hits ${wall ? 'the wall' : "the snake's body"}.`);
     }
-    sentences.push(`Safe moves: ${MOVES.filter((m) => safe.has(m)).join(', ')}.`);
     return sentences.join(' ');
   }
+}
+
+// The policy the state sentences encode, in precedence order (documentation + greedyPolicy).
+// Following it literally eats ~28 food in 300 ticks on a 10x10 board (seed 7 simulation).
+export const RULES = {
+  'close the larger gap': 'move along the axis with the larger distance to the food when that move is safe',
+  'close the smaller gap': 'else move along the other axis when that move is safe',
+  'any safe move': 'else the first safe move in up, down, left, right order',
+};
+// Sent verbatim as the query (presets.json snake.question). No rule list: see describe().
+export const QUESTION = 'Which move brings the snake closer to the food without dying?';
+
+// Scripted policy = RULES applied literally; the gold the model is measured against.
+export function greedyPolicy(engine) {
+  const safe = engine.safeMoves();
+  const [a, b] = engine.gapMoves();
+  if (a && safe.includes(a)) return a;
+  if (b && safe.includes(b)) return b;
+  return safe[0] ?? null;
 }
 
 function selfTest() {
@@ -165,32 +184,43 @@ function selfTest() {
   console.assert(s.render().split('\n').length === s.h + 2, 'render has h+2 rows (border)');
   console.assert(s.render().startsWith('┌') && s.render().includes('┘'), 'render has box-drawing border');
 
-  // exact describe() template, 1-based column/row
+  // exact describe() grammar (demo-spec v4)
   const s2 = new Snake({ w: 10, h: 10 });
   s2.body = [{ x: 4, y: 4 }, { x: 3, y: 4 }, { x: 2, y: 4 }];
   s2.dir = 'right';
   s2.food = { x: 7, y: 2 }; // 3 cells right, 2 cells up of head (4,4)
-  const desc = s2.describe();
   console.assert(
-    desc.startsWith('Snake game on a 10 by 10 board. The head is at column 5, row 5 (row 1 is the top). The food is 3 cells to the right and 2 cells up.'),
-    'describe matches the exact spec template'
+    s2.describe() === "The snake must move right to close the larger gap to the food. The snake can also move up to close the smaller gap. Moving left hits the snake's body.",
+    'describe: must (larger gap), can also (smaller gap), reversal counts as the body'
   );
-  console.assert(/Safe moves: [a-z]+(, [a-z]+)*\.$/.test(desc), 'describe ends with a Safe moves list');
-  console.assert(!desc.includes('reduces the distance'), 'default describe() omits distance facts');
+  console.assert(greedyPolicy(s2) === 'right' && s2.candidates().join() === 'up,down,right', 'greedy takes the larger gap; candidates = safe moves');
 
-  // fallback (b): distanceFacts option, one sentence per safe move, before "Safe moves:"
-  const factsDesc = s2.describe({ distanceFacts: true });
-  console.assert(
-    factsDesc.includes('Moving up reduces the distance to the food. Moving down increases the distance to the food. Moving right reduces the distance to the food. Safe moves:'),
-    'distanceFacts inserts one reduces/increases sentence per safe move, canonical order, before Safe moves:'
-  );
-
-  // axis omission: food directly to the right - no "up/down" clause
+  // single axis: "the gap", no smaller-gap sentence
   const s3 = new Snake({ w: 10, h: 10 });
   s3.body = [{ x: 4, y: 4 }, { x: 3, y: 4 }, { x: 2, y: 4 }];
   s3.dir = 'right';
   s3.food = { x: 7, y: 4 };
-  console.assert(s3.describe().includes('The food is 3 cells to the right.'), 'omits the up/down clause when dy is 0');
+  console.assert(s3.describe().startsWith('The snake must move right to close the gap to the food. Moving left'), 'single-axis food says "the gap"');
+
+  // larger-gap move unsafe: only the smaller-gap sentence + the wall fact; greedy falls through
+  const s5 = new Snake({ w: 10, h: 10 });
+  s5.body = [{ x: 9, y: 4 }, { x: 8, y: 4 }, { x: 7, y: 4 }];
+  s5.dir = 'right';
+  s5.food = { x: 6, y: 9 }; // 3 left, 5 down -> A = down, B = left
+  console.assert(greedyPolicy(s5) === 'down', 'larger gap wins');
+  s5.food = { x: 8, y: 9 }; // 1 left, 5 down -> A = down (safe), B = left (reversal, unsafe)
+  console.assert(s5.describe() === "The snake must move down to close the larger gap to the food. Moving left hits the snake's body. Moving right hits the wall.", 'unsafe smaller-gap move is a hit sentence, not a can-also');
+  s5.body = [{ x: 9, y: 9 }, { x: 8, y: 9 }, { x: 7, y: 9 }];
+  s5.food = { x: 8, y: 5 }; // 1 left, 4 up -> A = up
+  s5.dir = 'right';
+  console.assert(greedyPolicy(s5) === 'up', 'up closes the larger gap');
+  s5.body = [{ x: 9, y: 9 }, { x: 9, y: 8 }, { x: 9, y: 7 }];
+  s5.dir = 'down';
+  s5.food = { x: 5, y: 9 }; // 4 left, 0 -> A = left, safe
+  console.assert(s5.describe() === 'The snake must move left to close the gap to the food. Moving up hits the snake\'s body. Moving down hits the wall. Moving right hits the wall.', 'three hit sentences in canonical order');
+  s5.food = { x: 9, y: 2 }; // 0, 7 up -> A = up (unsafe: neck), no B -> default = first safe = left
+  console.assert(s5.describe() === "Moving up hits the snake's body. Moving down hits the wall. Moving right hits the wall." && greedyPolicy(s5) === 'left', 'nothing closes the gap safely -> only hit sentences, greedy = first safe move');
+  console.assert(QUESTION === 'Which move brings the snake closer to the food without dying?' && Object.keys(RULES).length === 3, 'QUESTION/RULES exported');
 
   // drive into a wall deliberately to confirm death + unsafe-move reporting, canonical order
   const s4 = new Snake({ w: 6, h: 6 });
@@ -198,7 +228,7 @@ function selfTest() {
   s4.dir = 'right';
   s4.food = { x: 0, y: 5 };
   console.assert(!s4.safeMoves().includes('right'), 'wall move excluded from safeMoves');
-  console.assert(s4.describe().includes('Moving right collides with a wall or the body.'), 'describe lists the unsafe move with the exact phrase');
+  console.assert(s4.describe().includes('Moving right hits the wall.'), 'describe lists the unsafe move with the exact phrase');
   s4.step('right');
   console.assert(s4.dead === true, 'stepping into a wall kills the snake');
 
