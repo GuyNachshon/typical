@@ -33,7 +33,10 @@ function heroInset() {
   const stage = document.querySelector('.stage');
   if (!ST || !stage) return;
   g.registerPlugin(ST);
-  g.set(stage, { transformOrigin: '50% 0%' });
+  // Pinned: the first stretch of scroll is spent insetting the hero in place, and only once the
+  // card has settled does the page start moving underneath it. ScrollTrigger inserts a spacer of
+  // the pinned distance, so nothing below overlaps.
+  g.set(stage, { transformOrigin: '50% 50%' });
   g.to(stage, {
     scale: 0.93,
     borderRadius: 18,
@@ -41,8 +44,12 @@ function heroInset() {
     scrollTrigger: {
       trigger: stage,
       start: 'top top',
-      end: 'bottom 55%', // done insetting well before the hero has left, so the shape settles
-      scrub: 0.4,
+      end: '+=55%', // 55% of a viewport of scroll to complete the inset
+      scrub: 0.35,
+      pin: true,
+      pinSpacing: true,
+      anticipatePin: 1,
+      invalidateOnRefresh: true,
     },
   });
 }
