@@ -93,10 +93,10 @@ On the public subset of JevBench (the harness's 231 public items; a further 146 
 | OpenJev (26B-A4B) | .972 | .640 |
 | Jev 1.13.0 (closed) | .986 | .730 |
 
-Calibration: in the isolated ablation, ordinal-smoothed Score targets took held-out score NLL from 2.07 to 1.23 with zero decisions changed (`REPORT.md` §3ac). At full scale, the 14B candidate (which bundles the typed heads with a long-state fix and frozen-teacher distillation) posts a held-out score NLL of 0.95, against 2.87 for the same backbone under the prior recipe (`REPORT.md` §3ah).
+Calibration: in the isolated ablation, ordinal-smoothed Score targets took held-out score NLL from 2.07 to 1.23 with zero decisions changed (`REPORT.md` §3ac). At full scale, the 14B candidate (which bundles the typed heads with a long-state fix, a Brier term and calibration-based checkpoint selection) posts a held-out score NLL of 0.95, against 2.87 for the same backbone under the prior recipe (`REPORT.md` §3ah). We also trained that recipe with the frozen-teacher distillation switched off, changing one flag and nothing else: it came out *better* on every hard-tier number (hard .477 against .450, long-document policy .211 against .158) and on validation NLL. The teacher we added to buy hard reasoning bought none of it (`REPORT.md` §3ai).
 
 <p align="center"><img src="../figures/fig_calibration.png" alt="Held-out score NLL and typed-decisions NLL across checkpoints, with the ladder_14b-to-tl1b jump annotated" width="640"></p>
-<p align="center"><em>Figure: held-out score and typed-decisions NLL across checkpoints. The long-state fix plus frozen-teacher distillation cut the 14B's score NLL from 2.87 to 0.95.</em></p>
+<p align="center"><em>Figure: held-out score and typed-decisions NLL across checkpoints. The long-state fix and calibration changes cut the 14B's score NLL from 2.87 to 0.95; a matched control shows the frozen-teacher distillation contributed none of it.</em></p>
 
 Latency, against what a normal LLM call costs depending on how it has to answer:
 
