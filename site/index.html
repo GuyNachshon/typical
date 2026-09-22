@@ -109,38 +109,32 @@
 
 <section class="page chapter" id="results">
   <div class="chapter-head">
-    <p class="t-eyebrow">Measured, with controls</p>
+    <p class="t-eyebrow">Measured, against a baseline</p>
     <div>
       <h2 class="t-section">Small models make useful decision engines.</h2>
-      <p class="lede">Every number here sits beside the same model before training, so you can see what the training bought and what it cost. On the hard tier it bought nothing: both sizes are at chance there, and say so too confidently.</p>
-      <p class="note mt-18">Those JevBench figures come from a public-subset run (72 standard / 48 easy / 111 hard ids), not a ranked leaderboard entry; chance is 31.1% standard, and both models&rsquo; hard tier sits within one standard error of it. The full disclosure is under the table.</p>
+      <p class="lede">Three tasks, each with the number you would get by guessing beside the number the model gets &mdash; and then the same benchmark run against general&#8209;purpose models of every size, prompted the ordinary way.</p>
     </div>
   </div>
-  <div class="media results-panel" style="padding:30px">
+  <div class="media results-panel" style="padding:34px 40px 30px">
     <div id="results-table"></div>
-    <div class="note mt-18 results-disclosure"><blockquote class="disclosure-box">
-        <strong>JevBench disclosure.</strong> JevBench numbers are a public-subset run against
-        <code>fstandhartinger/jevbench</code> v1.2.1 (72 standard / 48 easy / 111 hard public ids), not a
-        submitted or ranked leaderboard entry (the leaderboard requires &ge;95% coverage including 146
-        non-public judge items). Probabilities are the head's softmax conditioned on non-&empty; (mean p_null
-        &asymp; .03). Latency is in-process on one H100, one decision at a time, model load excluded. Option
-        order is the harness's label order; a reversed-order control on a related checkpoint moved standard
-        accuracy &plusmn;4 points, larger than the differences between our own checkpoints. Chance/majority
-        baselines are 31.1% standard / 28.4% easy / 33.6% hard (n = 72 standard, SE &asymp; 5.8 points) &mdash; the hard
-        tier of both released models is within 1 SE of chance.
-      </blockquote></div>
-    <div class="grid gap-30 mt-55 lg:grid-cols-2">
-      <figure><figcaption class="t-eyebrow muted mb-18">Scaling ladder</figcaption><div class="chart" id="chart-g1"></div></figure>
-      
-    </div>
-    <figure class="mt-55"><figcaption class="t-eyebrow muted mb-18">Reliability, JevBench standard and hard</figcaption><div class="grid gap-18 md:grid-cols-2 lg:grid-cols-4" id="chart-g4"></div><div id="g4-caption" class="note mt-18"></div></figure>
-    <div class="note mt-30" id="in-training"></div>
   </div>
-
+  <div class="media results-panel mt-30" style="padding:34px 40px 30px">
+    <p class="t-eyebrow muted" style="margin-bottom:22px">Against general models, prompted</p>
+    <div id="results-compare"></div>
+  </div>
+  <p class="note mt-30"><a class="ul" href="research.html#results">Every table, every source, the scaling ladder and the calibration curves &rarr;</a></p>
+  <div class="note mt-18 results-disclosure"><blockquote class="disclosure-box">
+      <strong>JevBench disclosure.</strong> JevBench numbers are a public-subset run against
+      <code>fstandhartinger/jevbench</code> v1.2.1 (72 standard / 48 easy / 111 hard public ids), not a
+      submitted or ranked leaderboard entry (the leaderboard requires &ge;95% coverage including 146
+      non-public judge items). Probabilities are the head's softmax conditioned on non-&empty; (mean p_null
+      &asymp; .03). Latency is in-process on one H100, one decision at a time, model load excluded. Option
+      order is the harness's label order; a reversed-order control on a related checkpoint moved standard
+      accuracy &plusmn;4 points, larger than the differences between our own checkpoints. Chance/majority
+      baselines are 31.1% standard / 28.4% easy / 33.6% hard (n = 72 standard, SE &asymp; 5.8 points) &mdash; the hard
+      tier of both released models is within 1 SE of chance.
+    </blockquote></div>
 </section>
-
-
-
 
 <section class="page chapter" id="demos">
   <div class="chapter-head">

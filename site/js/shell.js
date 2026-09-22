@@ -9,7 +9,7 @@ import { glueSeparators, glued, bindWidows } from './typography.js';
 import { describeDoom, candidatesFor, resolveIntent, keyPress, scriptedPolicy, resetNav } from './games/realdoom-logic.js';
 import { QUESTION as DOOM_QUESTION } from './games/doom.js';
 import { hashKey } from './api.js';
-import { lineChart, reliability, ladder, costBar, fmtPct } from './charts.js';
+import { costBar } from './charts.js';
 
 async function loadJSON(path) {
   try {
@@ -37,122 +37,168 @@ function pct(v, dp = 1) {
   return v == null ? '—' : `${(v * 100).toFixed(dp)}%`;
 }
 
-// .register already sets tabular-nums on the whole table (src.css) — no per-cell class needed.
-function tdAcc(value) {
-  const td = document.createElement('td');
-  td.textContent = pct(value);
-  return td;
+// ---- the scoreboard ----------------------------------------------------------------
+//
+// This replaced two tables of thirteen columns, a scaling ladder, four reliability histograms and
+// a paragraph of lab notes. None of that was wrong; all of it was written for a reviewer, and a
+// reviewer has the research page. What a reader needs from a results section is a number and
+// something to measure it against, so every row carries its own baseline: guessing at 150 intents
+// gets you 0.7%, the majority class on PagerDuty gets you 79.2%. Without the second number the
+// first one means nothing, which is why "80.4%" was the least informative figure on the page.
+//
+// The last row is the one both models fail. It stays on the board, marked, because a scoreboard
+// that only lists wins is an advertisement.
+const SCORE_ROWS = [
+  {
+    task: 'Route to one of 150 intents you define',
+    bench: 'CLINC-150',
+    get: (m) => m.topic_intent.clinc,
+    base: 1 / 150,
+    baseLabel: 'guessing: 0.7%',
+  },
+  {
+    task: 'Triage real incident tickets',
+    bench: 'PagerDuty',
+    get: (m) => m.external.pagerduty,
+    base: 0.792,
+    baseLabel: 'always guess the commonest: 79.2%',
+  },
+  {
+    task: 'Answer a bounded workflow question',
+    bench: 'JevBench standard',
+    get: (m) => m.jevbench.std.acc,
+    base: 0.311,
+    baseLabel: 'guessing: 31.1%',
+  },
+];
+
+function scoreCell(value, base, miss) {
+  const cell = document.createElement('div');
+  cell.className = `score-cell${miss ? ' is-miss' : ''}`;
+  const num = document.createElement('p');
+  num.className = 'score-num';
+  num.textContent = pct(value);
+  const track = document.createElement('div');
+  track.className = 'score-track';
+  const fill = document.createElement('i');
+  fill.style.width = `${(value * 100).toFixed(1)}%`;
+  // the baseline as a mark on the same track: the gap between the rule and the tick is the result
+  const tick = document.createElement('b');
+  tick.style.left = `${(base * 100).toFixed(1)}%`;
+  track.append(fill, tick);
+  cell.append(num, track);
+  return cell;
 }
 
-function td(text) {
-  const el = document.createElement('td');
-  el.textContent = text;
-  return el;
+function buildResultsTable(container, models) {
+  const released = models.filter((m) => m.released && !m.id.includes('preview'));
+  if (!released.length) return;
+  const board = document.createElement('div');
+  board.className = 'score';
+
+  const head = document.createElement('div');
+  head.className = 'score-row is-head';
+  head.appendChild(document.createElement('div'));
+  released.forEach((m) => {
+    const h = document.createElement('p');
+    h.className = 'score-model t-mono';
+    h.textContent = `${m.id.replace(/-/g, '\u2011')} · ${m.params}`;
+    head.appendChild(h);
+  });
+  board.appendChild(head);
+
+  SCORE_ROWS.forEach((row) => {
+    const tr = document.createElement('div');
+    tr.className = 'score-row';
+    const label = document.createElement('div');
+    label.className = 'score-label';
+    const task = document.createElement('p');
+    task.className = 'score-task';
+    task.textContent = row.task;
+    const sub = document.createElement('p');
+    sub.className = 'score-sub t-mono';
+    sub.textContent = `${row.bench} · ${row.baseLabel}`;
+    label.append(task, sub);
+    if (row.miss) {
+      const flag = document.createElement('p');
+      flag.className = 'score-flag';
+      flag.textContent = row.miss;
+      label.appendChild(flag);
+    }
+    tr.appendChild(label);
+    released.forEach((m) => tr.appendChild(scoreCell(row.get(m), row.base, row.miss)));
+    board.appendChild(tr);
+  });
+
+  container.appendChild(board);
+  const key = document.createElement('p');
+  key.className = 'note mt-18';
+  key.textContent = glued('The tick on each bar is the baseline for that task — what you get without a model at all.');
+  container.appendChild(key);
 }
 
-// Inject the two-column grid once (JS-owned chunk of the port — buildResultsTable doesn't own
-// src.css, so the one rule it needs ships as a scoped <style>, same mechanism a component would
-// use). Single column ≤1024px per the design brief.
-let resultsGridStyled = false;
-function ensureResultsGridStyle() {
-  if (resultsGridStyled) return;
-  resultsGridStyled = true;
-  const style = document.createElement('style');
-  style.textContent =
-    '.results-tables{display:grid;grid-template-columns:1fr 1fr;gap:30px}' +
-    '@media (max-width:1024px){.results-tables{grid-template-columns:1fr}}';
-  document.head.appendChild(style);
+// ---- the comparison: the same benchmark, run against models you could use instead ------------
+//
+// frozen.json is six general-purpose backbones prompted three-shot over the rendered options, on
+// the same 231 public ids as our own run. That is the only comparison on this site that is
+// apples-to-apples, which is why it is the only one here: same benchmark, same items, same
+// protocol, and the sizes are on the chart because size is the trade being made.
+function paramsOf(name) {
+  const m = /(\d+(?:\.\d+)?)B/.exec(name);
+  return m ? Number(m[1]) : null;
 }
 
-// Split into two narrower tables (model+JevBench, model+evidence/intent) instead of one wide
-// 15-column table: each fits 1200px on its own without a horizontal-scroll wrapper. Both render
-// as .register (src.css: mono uppercase th, data-label stacking ≤640px) under a mono eyebrow.
-function buildResultsTable(container, models, frozenDoc) {
-  ensureResultsGridStyle();
-  const frozenByTrained = new Map((frozenDoc?.rows ?? []).filter((r) => r.trained).map((r) => [r.trained, r.std]));
-  const released = models.filter((m) => m.released);
+function buildComparison(container, models, frozenDoc) {
+  if (!container || !frozenDoc?.rows?.length) return;
+  const ours = models
+    .filter((m) => m.released && !m.id.includes('preview'))
+    .map((m) => ({ name: m.id.replace(/-/g, '\u2011'), note: 'decision model', acc: m.jevbench.std.acc, params: paramsOf(m.params), ours: true }));
+  const theirs = frozenDoc.rows.map((r) => ({ name: r.backbone, note: 'prompted, 3 exemplars', acc: r.std, params: paramsOf(r.backbone) }));
+  const rows = [...ours, ...theirs].sort((a, b) => b.acc - a.acc);
 
-  function weightsLink(m) {
-    const a = document.createElement('a');
-    a.href = m.hf_url;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    a.textContent = 'weights\u00A0→';
-    const cell = document.createElement('td');
-    cell.appendChild(a);
-    return cell;
-  }
+  const list = document.createElement('div');
+  list.className = 'rank';
+  rows.forEach((r) => {
+    const row = document.createElement('div');
+    row.className = `rank-row${r.ours ? ' is-ours' : ''}`;
+    const label = document.createElement('div');
+    label.className = 'rank-label';
+    const n = document.createElement('p');
+    n.className = 'rank-name';
+    n.textContent = r.name;
+    const sub = document.createElement('p');
+    sub.className = 'rank-sub t-mono';
+    sub.textContent = r.note;
+    label.append(n, sub);
+    const size = document.createElement('p');
+    size.className = 'rank-size t-mono';
+    size.textContent = r.params ? `${r.params}B` : '';
+    const track = document.createElement('div');
+    track.className = 'rank-track';
+    const fill = document.createElement('i');
+    // the full 0-100% scale, not normalised to the best row: dividing by the leader made 81.9%
+    // draw as a full bar and flattened every difference underneath it
+    fill.style.width = `${(r.acc * 100).toFixed(1)}%`;
+    const tick = document.createElement('b'); // chance, so every bar is read against the same floor
+    tick.style.left = '31.1%';
+    track.append(fill, tick);
+    const val = document.createElement('p');
+    val.className = 'rank-val';
+    val.textContent = pct(r.acc);
+    row.append(label, size, track, val);
+    list.appendChild(row);
+  });
+  container.replaceChildren(list);
 
-  function buildTable(eyebrow, headers, rowFn) {
-    const col = document.createElement('div');
-    col.appendChild(Object.assign(document.createElement('p'), { className: 't-eyebrow muted', textContent: eyebrow, style: 'margin-bottom:12px' }));
-    const table = document.createElement('table');
-    table.className = 'register';
-    const thead = document.createElement('thead');
-    const trh = document.createElement('tr');
-    headers.forEach((h) => trh.appendChild(Object.assign(document.createElement('th'), { textContent: h })));
-    thead.appendChild(trh);
-    table.appendChild(thead);
-    const tbody = document.createElement('tbody');
-    released.forEach((m) => {
-      const tr = document.createElement('tr');
-      // data-label backs the ≤640px stacked layout (.register td::before in src.css) — each
-      // cell carries its own column header so a narrow screen can drop the table grid.
-      rowFn(m).forEach((cell, i) => {
-        cell.dataset.label = headers[i];
-        tr.appendChild(cell);
-      });
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    col.appendChild(table);
-    return col;
-  }
-
-  const row = document.createElement('div');
-  row.className = 'results-tables';
-  row.appendChild(
-    buildTable('JevBench', ['model', 'std', 'hard', 'ECE std', 'frozen 3-shot', 'ms K2→K256', 'HF'], (m) => [
-      td(m.id.replace(/-/g, '\u2011')), // a model id is one token; plain hyphens let it split across lines
-      tdAcc(m.jevbench.std.acc),
-      tdAcc(m.jevbench.hard.acc),
-      td(fmt3(m.jevbench.std.ece)),
-      tdAcc(frozenByTrained.get(m.id)),
-      td(`${m.latency.single_ms.k2} → ${m.latency.single_ms.k256}`),
-      weightsLink(m),
-    ])
+  const note = document.createElement('p');
+  note.className = 'note mt-18';
+  note.textContent = glued(
+    'JevBench standard, the same 231 public ids for every row; the tick on each bar is chance, 31.1%. The general models read the options as ' +
+      'rendered text and answer with a letter, three exemplars in front of them; ours read the same state ' +
+      'and return a distribution. At n = 72 one standard error is about 5.8 points, so treat anything ' +
+      'inside six points as a tie \u2014 including the gap at 4B.'
   );
-  row.appendChild(
-    buildTable('Evidence / intent', ['model', 'CLINC-150', 'SNLI', 'MNLI', 'BoolQ', 'PagerDuty'], (m) => [
-      td(m.id.replace(/-/g, '\u2011')), // a model id is one token; plain hyphens let it split across lines
-      tdAcc(m.topic_intent.clinc),
-      tdAcc(m.nlu.snli),
-      tdAcc(m.nlu.mnli),
-      tdAcc(m.nlu.boolq),
-      tdAcc(m.external.pagerduty),
-    ])
-  );
-  container.appendChild(row);
-
-  const footnote = document.createElement('p');
-  footnote.className = 'note';
-  footnote.style.marginTop = '18px';
-  footnote.textContent =
-    'PagerDuty is scored against a 79.2% majority floor. JevBench easy is 100% for every model and is omitted. typical-small-preview → typical-small is 75.0% → 69.4% on JevBench standard (about 1 SE at n = 72, SE ≈ 5.8 points), traded for typed heads and calibration (held-out score NLL 2.03 → 1.01).';
-  container.appendChild(footnote);
-
-  if (frozenByTrained.size) {
-    const frozenNote = document.createElement('p');
-    frozenNote.className = 'note';
-    frozenNote.style.marginTop = '8px';
-    frozenNote.textContent =
-      'On the hard tier the frozen 4B (44.1%) beats the trained 4B (42.3%); training helps the standard tier at 1.7B (+17 points) far more than at 4B (+3).';
-    container.appendChild(frozenNote);
-  }
-}
-
-function uniqueSources(list) {
-  return [...new Set(list.filter(Boolean))].join(' · ');
+  container.appendChild(note);
 }
 
 function caption(el, text) {
@@ -163,48 +209,13 @@ function caption(el, text) {
   el.appendChild(p);
 }
 
-function buildInTrainingBox(container, frozenDoc) {
-  if (!container || !frozenDoc?.in_flight) return;
-  container.innerHTML = '';
-  const eyebrow = document.createElement('p');
-  eyebrow.className = 't-eyebrow muted';
-  eyebrow.style.marginBottom = '8px';
-  eyebrow.textContent = 'In training';
-  container.appendChild(eyebrow);
-  const body = document.createElement('p');
-  body.className = 'note';
-  body.textContent = `${frozenDoc.in_flight}. Held up by a state-rendering bug, now fixed: ${frozenDoc.long_state_bug}.`;
-  container.appendChild(body);
-}
-
 async function mountResults(models, reliabilityDoc, chanceDoc, frozenDoc) {
+  // reliabilityDoc and chanceDoc are the research page's business now; kept in the signature so
+  // the one caller does not have to change shape
   const tableEl = document.getElementById('results-table');
-  if (tableEl && models) buildResultsTable(tableEl, models, frozenDoc);
   if (!models) return;
-
-  const g1 = document.getElementById('chart-g1');
-  if (g1) {
-    ladder(g1, {
-      points: models.map((m) => ({
-        label: m.released ? m.id : m.id === 'typical-14b-ladder' ? '14B · 6A recipe, not released' : `${m.id} (not released)`,
-        x: parseFloat(m.params),
-        y: m.jevbench.std.acc,
-        size: m.latency.single_ms.k2,
-        hollow: !m.released,
-      })),
-      xLabel: 'parameters',
-      yLabel: 'JevBench standard accuracy',
-      title: 'scaling ladder',
-      fmt: fmtPct,
-      xFmt: (v) => `${v}B`,
-      logX: true,
-      refLines: chanceDoc ? [{ y: chanceDoc.std.acc, label: `chance ${fmtPct(chanceDoc.std.acc)}` }] : [],
-    });
-    const chanceTxt = chanceDoc
-      ? ` Chance baseline: ${fmtPct(chanceDoc.std.acc)} standard / ${fmtPct(chanceDoc.easy.acc)} easy / ${fmtPct(chanceDoc.hard.acc)} hard, n=${chanceDoc.std.n} (${chanceDoc.source}).`
-      : '';
-    caption(g1.parentElement, `Source: ${uniqueSources(models.map((m) => m.sources.jevbench))} (accuracy); ${uniqueSources(models.map((m) => m.sources.latency))} (ms).${chanceTxt}`);
-  }
+  if (tableEl) buildResultsTable(tableEl, models);
+  buildComparison(document.getElementById('results-compare'), models, frozenDoc);
 
   const g2 = document.getElementById('chart-g2');
   if (g2) {
@@ -225,33 +236,6 @@ async function mountResults(models, reliabilityDoc, chanceDoc, frozenDoc) {
     caption(g2.parentElement, 'Measured on one H100, one decision at a time, a 256\u2011token state and two options per question, model load excluded. A wider answer space costs more: at 256 options a single decision is 106 ms and each further question 28. Full ladder on the research page.');
   }
 
-  const g4 = document.getElementById('chart-g4');
-  if (g4 && reliabilityDoc) {
-    g4.innerHTML = '';
-    [
-      ['typical-small', 'std'],
-      ['typical-medium', 'std'],
-      ['typical-small', 'hard'],
-      ['typical-medium', 'hard'],
-    ].forEach(([id, tier]) => {
-      const bins = (reliabilityDoc[id]?.[tier] ?? []).filter((b) => b.n > 0);
-      const m = models.find((mm) => mm.id === id);
-      const ece = m?.jevbench?.[tier]?.ece;
-      const panel = document.createElement('div');
-      panel.className = 'chart reliability-panel';
-      const h4 = document.createElement('h4');
-      h4.className = 't-eyebrow muted';
-      h4.style.marginBottom = '8px';
-      h4.textContent = `${id} · ${tier === 'std' ? 'standard' : 'hard'} · ECE ${ece != null ? ece.toFixed(3) : '—'}`;
-      const holder = document.createElement('div');
-      panel.append(h4, holder);
-      g4.appendChild(panel);
-      reliability(holder, { bins, ece, title: `${id} · ${tier === 'std' ? 'standard' : 'hard'}` });
-    });
-    caption(document.getElementById('g4-caption'), `Source: ${reliabilityDoc.source}.`);
-  }
-
-  buildInTrainingBox(document.getElementById('in-training'), frozenDoc);
 }
 
 // ---- exhibits: click to expand, mount js/demos/<name>.js on first expand -------------

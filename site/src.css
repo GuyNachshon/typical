@@ -244,6 +244,56 @@
   }
   .inst-foot { margin-top: 30px; font-size: 10px; letter-spacing: 0.72px; text-transform: uppercase; color: rgba(240, 238, 235, 0.26); }
 
+  /* ---- the scoreboard: a number is meaningless without the number it beats ---------------------
+     Every row draws the model's score as a rule and the baseline as a tick on the same track, so
+     the result is the gap between them and you can see it without doing arithmetic. The row both
+     models fail is marked rather than dropped. */
+  .score { display: grid; gap: 0; }
+  .score-row { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr); gap: 20px 40px; align-items: start; padding: 26px 0; border-top: 1px solid var(--color-steel); }
+  .score-row.is-head { padding: 0 0 12px; border-top: 0; align-items: baseline; }
+  @media (max-width: 64rem) {
+    .score-row { grid-template-columns: 1fr 1fr; gap: 14px 24px; padding: 20px 0; }
+    .score-label { grid-column: 1 / -1; }
+    .score-row.is-head > div:first-child { display: none; }
+  }
+  .score-model { font-size: 11px; letter-spacing: 0.36px; color: var(--color-mid); }
+  .score-task { font-size: 17px; line-height: 1.25; letter-spacing: -0.19px; max-width: 34ch; }
+  .score-sub { font-size: 11px; color: var(--color-mid); margin-top: 8px; }
+  .score-flag { font-size: 12px; color: var(--color-off); margin-top: 10px; padding-left: 10px; border-left: 2px solid var(--color-off); max-width: 30ch; }
+  .score-num { font-size: 34px; line-height: 1; letter-spacing: -0.9px; font-variant-numeric: tabular-nums; }
+  .score-cell.is-miss .score-num { color: var(--color-mid); }
+  .score-track { position: relative; height: 3px; margin-top: 14px; background: var(--color-lgray); }
+  .score-track i { position: absolute; left: 0; top: 0; height: 3px; background: var(--color-off); }
+  .score-cell.is-miss .score-track i { background: var(--color-mid); }
+  /* the baseline tick: taller than the track and capped, so it reads as a threshold to clear */
+  .score-track b { position: absolute; top: -5px; width: 1px; height: 13px; background: var(--color-off); }
+  .score-track b::after { content: ''; position: absolute; top: -5px; left: -1.5px; width: 4px; height: 4px; border-radius: 50%; background: var(--color-off); }
+
+  /* ---- the comparison: one benchmark, every model you could use instead, ranked ---------------
+     Ours are the only filled rows. The size column is there because size is the trade: a 1.7B
+     decision model placing above an 8B general one is the whole point of the block. */
+  .rank { display: grid; gap: 0; }
+  .rank-row { display: grid; grid-template-columns: minmax(0, 250px) 46px minmax(0, 1fr) 64px; align-items: center; gap: 20px; padding: 13px 0; border-top: 1px solid var(--color-steel); }
+  .rank-row:first-child { border-top: 0; }
+  @media (max-width: 64rem) {
+    .rank-row { grid-template-columns: 1fr 46px 64px; gap: 6px 12px; padding: 14px 0; }
+    .rank-track { grid-column: 1 / -1; }
+  }
+  .rank-name { font-size: 15px; color: var(--color-mid); }
+  .rank-sub { font-size: 10px; letter-spacing: 0.36px; text-transform: uppercase; color: var(--color-steel); margin-top: 4px; }
+  .rank-size { font-size: 11px; color: var(--color-mid); text-align: right; font-variant-numeric: tabular-nums; }
+  .rank-track { position: relative; height: 3px; background: var(--color-lgray); }
+  .rank-track i { position: absolute; left: 0; top: 0; height: 3px; background: var(--color-mid); }
+  .rank-track b { position: absolute; top: -4px; width: 1px; height: 11px; background: var(--color-steel); }
+  .rank-val { font-size: 15px; text-align: right; color: var(--color-mid); font-variant-numeric: tabular-nums; }
+  .rank-row.is-ours .rank-name { color: var(--color-off); font-weight: 700; }
+  .rank-row.is-ours .rank-sub { color: var(--color-mid); }
+  .rank-row.is-ours .rank-val { color: var(--color-off); font-size: 19px; }
+  .rank-row.is-ours .rank-track i { height: 7px; top: -2px; background: var(--color-off); }
+
+  .ul { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--color-steel); }
+  .ul:hover { text-decoration-color: var(--color-off); }
+
   /* ---- the program: the object here is the code, and the model's numbers annotate it -----------
      The section above already shows a state going in and a distribution coming back. Repeating that
      shape taught nothing, so this panel makes ordinary Python the large thing and hangs each call's
@@ -347,12 +397,10 @@
     .register td::before { content: attr(data-label); float: left; margin-right: 16px; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--color-mid); }
   }
   .note { font-size: 14px; color: var(--color-mid); max-width: 90ch; }
-  /* stacked, the results table runs two viewports; the disclosure has to precede the numbers it
-     qualifies rather than sit at the far end of them. */
-  @media (max-width: 64rem) {
-    .results-panel { display: flex; flex-direction: column; }
-    .results-disclosure { order: -1; margin: 0 0 18px; }
-  }
+  /* The disclosure used to be hoisted above a results table that ran two viewports stacked, so it
+     would still sit within one viewport of the numbers it qualifies. The board is four rows now and
+     the disclosure follows it directly, so the hoist only had the effect of putting the fine print
+     in front of the heading that introduces it. */
 
   /* ---- code card ---- */
   .code { background: var(--color-off); color: var(--color-warm); border-radius: var(--radius-card); padding: 30px; }
