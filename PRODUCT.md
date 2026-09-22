@@ -35,7 +35,9 @@ Calm, exact, a little dry. The page should feel like an instrument that is curre
 5. Honesty is the brand: what fails is on the page, tagged.
 
 ## Style reference (client-supplied, binding)
-"Atoms": obsidian black canvas, candlelight cream #fff7dd text, champagne #c8ad86 as the single accent,
-ember ash #66635f, Switzer 400/500 (44px −1.85px headline; 14px body; 10px caps captions), 1200px max,
-hairline borders, 4px cards / 100px pills, no shadows, no gradients, no load animation; the hero is a large
-geometric tile mosaic mark. Similar brands: Figure AI, Physical Intelligence, Nothing, Rivian, VanMoof.
+`designs/BROWSERBASE_DESIGN.md` is the anchor lane (editorial broadsheet meets data terminal: light
+canvas, oversized geometric display type, one signal colour used as a typographic highlight and a
+footer band, pastel grouping surfaces, mono metadata, black pill CTAs, no shadows, digital-native
+imagery). Not a copy: our own signal colour, faces, and imagery. The other files in `designs/`
+(Hume, Together, Runway, OpenWeb) are secondary references for restraint and data presentation.
+The working brief is `PLAN5.md`; the token system lives in `site/src.css`.
