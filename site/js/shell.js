@@ -409,16 +409,20 @@ function mountFilmAscii(film) {
     mountAscii(stage, () => {
       const c = film.contentDocument?.getElementById('canvas');
       return c && c.width ? c : null;
-    }, { cols: 200, after: film });
+    }, { after: film, mode: 'bloom' });
   }).catch(() => {});
 }
 
 // ---- the film: real DOOM in the hero, driven by the model (live) or the rule list (recorded) ----
-function mountFilm(ctx) {
-  const film = document.getElementById('film');
-  mountFilmAscii(film);
-  const rowsEl = document.getElementById('hud-rows'), sentEl = document.getElementById('hud-sentence'), rec = document.getElementById('hud-rec');
+function mountFilm(ctx, ids = {}) {
+  const film = document.getElementById(ids.film || 'film');
+  if (ids.bloom !== false) mountFilmAscii(film);
+  const rowsEl = document.getElementById(ids.rows || 'hud-rows');
+  const sentEl = document.getElementById(ids.sentence || 'hud-sentence');
+  const rec = document.getElementById(ids.rec || 'hud-rec');
   if (!film || !rowsEl) return;
+  // Each film owns its own navigator state; two instances sharing the module-level route counter
+  // would walk each other's waypoints.
   const labels = ['retreat', 'shoot', 'turn left', 'turn right', 'explore'];
   let stopped = false;
   const io = new IntersectionObserver((es) => { stopped = !es[0].isIntersecting; });
@@ -535,6 +539,9 @@ async function boot() {
 
   mountHero(presets);
   mountFilm(ctx);
+  // The same game again in chapter 04, plain: no bloom layer, so the card shows the frame exactly
+  // as the engine draws it. Only one of the two runs at a time — each pauses when off screen.
+  mountFilm(ctx, { film: 'film-card', rows: 'card-rows', sentence: 'card-sentence', rec: 'card-rec', bloom: false });
   import('./motion.js').then((m) => { const go = () => m.mountMotion(); if (window.gsap) go(); else window.addEventListener('load', go); });
   mountFindings();
   mountResults(models, reliabilityDoc, chanceDoc, frozenDoc);

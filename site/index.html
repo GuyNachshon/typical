@@ -16,7 +16,7 @@
 <header class="stage" id="top">
   <iframe class="stage-film" id="film" src="games/doom/index.html?film=1" title="DOOM, played by the model" loading="eager"></iframe>
   <div class="stage-shade"></div>
-  <p class="stage-hint t-mono">Live transcription of the frame. The model never sees it — it reads one sentence per tick.</p>
+  <p class="stage-hint t-mono">typical-small is playing this. It never sees the picture — one sentence per tick, five probabilities out.</p>
   <div class="stage-copy">
     <p class="t-eyebrow hero">Typical — small open decision models · 1.7B / 4B</p>
     <h1 class="t-hero">Models that decide, not generate.</h1>
@@ -123,7 +123,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
   </div>
   <div class="grid gap-18 lg:grid-cols-2" style="margin-bottom:55px">
     <div><div class="media dark"><p class="media-label t-eyebrow">Snake · canvas</p><div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="snake"></div></div></div><p class="note mt-18">One sentence per tick; the candidate set is the safe moves. 98.4% of moves on 62 boards (chance 48%); 24 food in the recorded run. On a keyboard, the arrow keys take it off the model.</p></div>
-    <div><div class="media dark" style="min-height:520px;display:flex;flex-direction:column;justify-content:space-between;padding:30px"><p class="t-eyebrow">DOOM · recorded run · E1M1</p><div><p class="t-figure" style="font-size:96px;letter-spacing:-3.6px">200<span class="t-card" style="letter-spacing:-.5px"> / 200</span></p><p class="t-ui" style="max-width:26ch;margin-top:18px">decisions matched the rule list. 64 shots, 4 kills, health 86 at the end.</p></div><p class="t-mono muted">The live game is the film at the top of this page. site/data/replays/realdoom.json</p></div><p class="note mt-18">Chocolate Doom, shareware 1.9. Two facts per tick (badly hurt? an enemy in sight?), the model picks retreat, engage or explore, and aims from "the player must turn left to face the imp". Recorded against the local model.</p></div>
+    <div><div class="media dark" style="min-height:520px"><p class="media-label t-eyebrow">DOOM · E1M1 · live</p><div class="media-scene"><iframe class="card-film" id="film-card" src="games/doom/index.html?film=1" title="DOOM played by typical-small" loading="lazy"></iframe></div><div class="card-hud t-mono"><p class="rec" id="card-rec"><i></i>REC · typical-small · E1M1</p><div id="card-rows"></div><p class="sentence" id="card-sentence"></p></div></div><p class="note mt-18">Chocolate Doom, shareware 1.9, the frame exactly as the engine draws it. Two facts per tick (badly hurt? an enemy in sight?), the model picks retreat, engage or explore, and aims from &ldquo;the player must turn left to face the imp&rdquo;. Over a recorded 200-decision run it matched the rule list every time: 64 shots, 4 kills, health 86 at the end (site/data/replays/realdoom.json).</p></div>
   </div>
   <div id="tryit">
     <div class="exrow" data-exhibit-card>

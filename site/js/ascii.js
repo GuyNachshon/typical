@@ -18,7 +18,16 @@
 // transcription of a frame) mixes letters, brackets and digits, which gives the field texture at
 // small sizes where a ramp of #%@ turns into a flat grey block.
 const BAYER = [0.25, 0.75, 1.0, 0.5]; // 2x2 ordered-dither thresholds
-const FLOOR = 0.2; // below this share of the frame's own range, a cell stays blank
+// 4x4 Bayer matrix for the 1-bit treatment: ordered dithering keeps structure at one bit per
+// cell far better than a threshold, which is why every 1980s printer used it.
+const BAYER4 = [
+  0, 8, 2, 10,
+  12, 4, 14, 6,
+  3, 11, 1, 9,
+  15, 7, 13, 5,
+].map((v) => (v + 0.5) / 16);
+const FLOOR = 0.2;
+const HOT = 0.78; // luminance above which a dithered cell blooms // below this share of the frame's own range, a cell stays blank
 const RAMP = [
   ' ', ' ', '.', ',', ':', ';', 'i', 'l', '!', '|', '/', '\\', '1', 'I', '{', '}', '[', ']',
   '?', 'r', 'c', 'v', 'z', 'x', 'Y', 'U', 'J', 'C', 'L', 'Q', '0', 'O', 'Z', 'm', 'w', 'q',
@@ -33,7 +42,11 @@ export function mountAscii(host, getSource, opts = {}) {
   // Columns follow the panel's real width: a fixed count that reads as a transcription on a
   // desktop hero is 3px-per-glyph mud on a phone. ~13 CSS px per column keeps a glyph a glyph.
   const maxCols = opts.cols ?? 150;
-  const colsFor = (w) => Math.max(44, Math.min(maxCols, Math.round(w / (opts.cellPx ?? 14))));
+  // Cell size is per treatment: a glyph has to be big enough to read as a character, a dither
+  // cell has to be small enough to disappear into an image.
+  const CELL_PX = { glyphs: 14, dither: 3.4, edges: 4.5, bloom: 2.6 };
+  const modeNow = () => (typeof window !== 'undefined' && window.__heroMode) || opts.mode || 'glyphs';
+  const colsFor = (w) => Math.max(44, Math.min(1400, Math.round(w / (opts.cellPx ?? CELL_PX[modeNow()] ?? 14))));
   let cols = colsFor(host.clientWidth || 1200);
   const fps = reduced() ? 4 : opts.fps ?? 15;
 
@@ -46,11 +59,16 @@ export function mountAscii(host, getSource, opts = {}) {
 
   // one small offscreen buffer, reused: the sample grid is the character grid, so the browser's
   // own downscale does the averaging and no per-frame allocation happens in the loop.
+  const scratchEl = document.createElement('canvas'); // 1:1 bit buffer for the dither treatment
+  const scratch = { el: scratchEl, ctx: scratchEl.getContext('2d') };
+  const hotEl = document.createElement('canvas'); // the bright cells only, for the bloom pass
+  const hotBuf = { el: hotEl, ctx: hotEl.getContext('2d') };
   const sample = document.createElement('canvas');
   const sctx = sample.getContext('2d', { willReadFrequently: true });
   const lctx = layer.getContext('2d');
 
   let rows = 0;
+  let rowsPerCell = 1.55;
   let cell = 0;
   let dpr = 1;
   let raf = 0;
@@ -63,8 +81,9 @@ export function mountAscii(host, getSource, opts = {}) {
     if (!w || !h || !src?.width) return false;
     dpr = Math.min(2, devicePixelRatio || 1);
     cols = colsFor(w);
+    rowsPerCell = modeNow() === 'glyphs' ? 1.55 : 1; // square cells for the pixel treatments
     cell = w / cols;
-    rows = Math.max(1, Math.round(h / (cell * 1.55))); // glyph cells are ~1.55x taller than wide
+    rows = Math.max(1, Math.round(h / (cell * rowsPerCell))); // glyph cells are ~1.55x taller than wide
     if (layer.width !== Math.round(w * dpr) || layer.height !== Math.round(h * dpr)) {
       layer.width = Math.round(w * dpr);
       layer.height = Math.round(h * dpr);
@@ -111,6 +130,15 @@ export function mountAscii(host, getSource, opts = {}) {
     const px = sctx.getImageData(0, 0, cols, rows).data;
     levels(px, px.length);
     const span = Math.max(0.05, hiSm - loSm);
+    const mode = modeNow();
+    if (mode !== 'glyphs') {
+      lctx.setTransform(1, 0, 0, 1, 0, 0);
+      lctx.clearRect(0, 0, layer.width, layer.height);
+      if (mode === 'edges') paintEdges(lctx, px, cols, rows, layer.width, layer.height, loSm, span);
+      else if (mode === 'bloom') paintBloom(lctx, px, cols, rows, layer.width, layer.height, loSm, span, hotBuf);
+      else paintDither(lctx, px, cols, rows, layer.width, layer.height, loSm, span, scratch, hotBuf);
+      return;
+    }
     const W = layer.width;
     const H = layer.height;
     lctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -189,4 +217,122 @@ export function mountAscii(host, getSource, opts = {}) {
   // it. The transcription is the hero: it stays up, full bleed, and the copy gets its own scrim
   // rather than a hole cut in the picture.
   return { stop };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Alternative hero treatments, for picking between. Each takes the sampled frame and paints the
+// layer; they share the sampler, the resize handling and the mount above.
+//
+//   'dither' — one bit per cell, 4x4 ordered. The frame reduced to the least information that
+//              still shows you the room: it reads instantly, and "almost nothing left" is the
+//              point the page is making.
+//   'edges'  — Sobel gradient, drawn as light on black. Machine vision: structure only, no
+//              surfaces. Legible at a glance and unmistakably not a photograph.
+// ---------------------------------------------------------------------------------------------
+
+// Bloom only: no quantisation at all. The layer holds nothing but the halation from the bright
+// parts of the frame, composited additively over the sharp film underneath — what a camera does
+// to a lit corridor, not a filter over it.
+export function paintBloom(lctx, px, cols, rows, W, H, lo, span, hot) {
+  const glow = hot.ctx.createImageData(cols, rows);
+  const g = glow.data;
+  for (let i = 0; i < px.length; i += 4) {
+    const raw = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) / 255;
+    const l = Math.max(0, Math.min(1, (raw - lo) / span));
+    const a = l > HOT ? Math.min(1, (l - HOT) / (1 - HOT)) : 0;
+    // keep the source colour in the glow so a green lamp blooms green, not white
+    g[i] = Math.min(255, px[i] * 1.15);
+    g[i + 1] = Math.min(255, px[i + 1] * 1.15);
+    g[i + 2] = Math.min(255, px[i + 2] * 1.15);
+    g[i + 3] = Math.round(255 * a);
+  }
+  if (hot.el.width !== cols || hot.el.height !== rows) {
+    hot.el.width = cols;
+    hot.el.height = rows;
+  }
+  hot.ctx.putImageData(glow, 0, 0);
+  lctx.save();
+  lctx.globalCompositeOperation = 'lighter';
+  lctx.imageSmoothingEnabled = true;
+  lctx.globalAlpha = 0.55;
+  lctx.filter = 'blur(10px)';
+  lctx.drawImage(hot.el, 0, 0, W, H);
+  lctx.globalAlpha = 0.32;
+  lctx.filter = 'blur(34px)';
+  lctx.drawImage(hot.el, 0, 0, W, H);
+  lctx.restore();
+  lctx.filter = 'none';
+}
+
+export function paintDither(lctx, px, cols, rows, W, H, lo, span, buf, hot) {
+  // One fillRect per cell would be ~100k calls a frame at this resolution. Write the bits into an
+  // ImageData instead and let the compositor scale it up with smoothing off: same picture, one
+  // draw call, and the cell edges stay hard.
+  const img = buf.ctx.createImageData(cols, rows);
+  const glow = hot.ctx.createImageData(cols, rows);
+  const d = img.data;
+  const g = glow.data;
+  for (let y = 0, n = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++, n++) {
+      const i = n * 4;
+      const raw = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) / 255;
+      const l = Math.max(0, Math.min(1, (raw - lo) / span));
+      const on = l > BAYER4[(y & 3) * 4 + (x & 3)];
+      d[i] = d[i + 1] = on ? 240 : 11;
+      d[i + 2] = on ? 235 : 12;
+      d[i + 3] = 255;
+      // Only the genuinely bright cells bloom. Blooming every lit cell — and at this resolution
+      // half of them are lit — just raises the black level and greys the whole frame out.
+      const h = on && l > HOT ? Math.round(255 * Math.min(1, (l - HOT) / (1 - HOT))) : 0;
+      g[i] = g[i + 1] = g[i + 2] = h;
+      g[i + 3] = h;
+    }
+  }
+  for (const b of [buf, hot]) {
+    if (b.el.width !== cols || b.el.height !== rows) {
+      b.el.width = cols;
+      b.el.height = rows;
+    }
+  }
+  buf.ctx.putImageData(img, 0, 0);
+  hot.ctx.putImageData(glow, 0, 0);
+  lctx.imageSmoothingEnabled = false;
+  lctx.drawImage(buf.el, 0, 0, W, H);
+  lctx.save();
+  lctx.imageSmoothingEnabled = true;
+  lctx.globalCompositeOperation = 'lighter';
+  lctx.globalAlpha = 0.55;
+  lctx.filter = 'blur(6px)';
+  lctx.drawImage(hot.el, 0, 0, W, H);
+  lctx.globalAlpha = 0.3;
+  lctx.filter = 'blur(22px)';
+  lctx.drawImage(hot.el, 0, 0, W, H);
+  lctx.restore();
+  lctx.filter = 'none';
+}
+
+export function paintEdges(lctx, px, cols, rows, W, H, lo, span) {
+  const cw = W / cols;
+  const ch = H / rows;
+  lctx.fillStyle = '#0b0b0c';
+  lctx.fillRect(0, 0, W, H);
+  const lum = new Float32Array(cols * rows);
+  for (let i = 0, n = 0; i < px.length; i += 4, n++) {
+    const raw = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) / 255;
+    lum[n] = Math.max(0, Math.min(1, (raw - lo) / span));
+  }
+  const at = (x, y) => lum[Math.min(rows - 1, Math.max(0, y)) * cols + Math.min(cols - 1, Math.max(0, x))];
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      // Sobel, both axes
+      const gx = at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x - 1, y) - at(x - 1, y + 1);
+      const gy = at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1);
+      const m = Math.min(1, Math.hypot(gx, gy) * 0.9);
+      if (m < 0.12) continue;
+      lctx.globalAlpha = 0.25 + 0.75 * m;
+      lctx.fillStyle = '#f0eeeb';
+      lctx.fillRect(x * cw, y * ch, Math.max(1, cw * 0.9), Math.max(1, ch * 0.9));
+    }
+  }
+  lctx.globalAlpha = 1;
 }
