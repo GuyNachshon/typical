@@ -1,13 +1,4 @@
-// Three.js chase-cam renderer over js/games/drive.js's pure engine: a JevPilot-style daylight
-// city street (asphalt, kerbs, sidewalks, buildings, street lamps), a sedan ego with wheels and
-// brake lights, and an "intent ribbon" that draws the model's chosen manoeuvre on the road ahead
-// of the car with its winning probability printed at the tip.
-//
-// Daylight exception (client-directed): TOKENS is the site's dark-scene palette and stays
-// exactly as-is for the chrome (HUD/bars/buttons, all styled from exhibits.css - untouched by
-// this file). The 3D scene below deliberately does NOT use TOKENS: a bright, real-world street
-// palette is what was asked for after the dark version read as an empty void. Do not "fix" this
-// back to TOKENS; it is intentional.
+// Neutral architectural street study. Geometry and distance carry the scene.
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js';
 import { Drive, greedyPolicy, QUESTION, ROAD_LENGTH, DEST_POS } from './drive.js';
 import { mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, replayFrame, loadJSON } from './loop.js';
@@ -22,34 +13,34 @@ const LANE_W = 3.2;
 // (by projecting the ego's world position through this exact camera, not by eye) so the car
 // lands ~60% down the frame with the street receding into the upper third. See the composition
 // note in mount()'s resize() for the viewSize math.
-const CAM_HEIGHT = 4.6; // metres above the road
+const CAM_HEIGHT = 6.5; // metres above the road
 const CAM_BACK = 15.5; // metres behind the ego
 const CAM_AHEAD = 34; // metres ahead the camera aims at
 const CAM_OFFSET_X = 2.6; // metres the camera rides left of the ego
-const CAM_LOOK_Y = -6.5; // aim low: a camera tilted down puts the car higher in frame, clear of the readout
-const SKY = '#bcd6e6';
-const ASPHALT = '#6b6b6e';
-const KERB = '#b8b2a6';
-const SIDEWALK = '#cfc9bd';
-const LANE_MARK = '#f2f2ee';
-const POST_DARK = '#2b2b2e';
-const LIGHT_RED = '#e2453b';
-const LIGHT_GREEN = '#3fae5c';
-const LAMP_GLOW = '#ffe9a8';
-const CONE_ORANGE = '#e2691b';
-const PED_CLOTHES = '#3d5a80';
-const PED_SKIN = '#e0ac69';
-const WHEEL_DARK = '#1c1c1e';
-const CABIN_DARK = '#33383d';
-const GLASS_TINT = '#aeb9c2';
-const EGO_BODY = '#f2f1ec';
-const TAIL_OFF = '#7a2b28';
-const TAIL_ON = '#ff3b30';
-const HAZARD_WARN = '#e2691b';
-const INTENT_COLOR = '#ffb100';
-const TRAFFIC_COLORS = ['#b23b3b', '#2e5fa3', '#3f8f5f', '#c9c9c9', '#8a7fae'];
-const FOG_NEAR = 14;
-const FOG_FAR = 85;
+const CAM_LOOK_Y = -3; // aim low: a camera tilted down puts the car higher in frame, clear of the readout
+const SKY = '#f0eeeb';
+const ASPHALT = '#292827';
+const KERB = '#938f89';
+const SIDEWALK = '#c2bfba';
+const LANE_MARK = '#f0eeeb';
+const POST_DARK = '#292827';
+const LIGHT_RED = '#f0eeeb';
+const LIGHT_GREEN = '#938f89';
+const LAMP_GLOW = '#f0eeeb';
+const CONE_INK = '#292827';
+const PED_CLOTHES = '#292827';
+const PED_SKIN = '#c2bfba';
+const WHEEL_DARK = '#000000';
+const CABIN_DARK = '#292827';
+const GLASS_TINT = '#938f89';
+const EGO_BODY = '#f0eeeb';
+const TAIL_OFF = '#938f89';
+const TAIL_ON = '#f0eeeb';
+const HAZARD_WARN = '#292827';
+const INTENT_COLOR = '#c2bfba';
+const TRAFFIC_COLORS = ['#938f89', '#c2bfba', '#292827'];
+const FOG_NEAR = 35;
+const FOG_FAR = 150;
 
 const KEYMAP = {
   ArrowLeft: 'change lane left', ArrowRight: 'change lane right',
@@ -103,25 +94,39 @@ function buildShadow(shadowTex, w, d) {
 function buildRing() {
   const ring = new THREE.Mesh(
     new THREE.RingGeometry(0.6, 0.85, 28),
-    new THREE.MeshBasicMaterial({ color: '#ffffff', side: THREE.DoubleSide, transparent: true, opacity: 0.95, depthTest: false })
+    new THREE.MeshBasicMaterial({ color: '#f0eeeb', side: THREE.DoubleSide, transparent: true, opacity: 0.95, depthTest: false })
   );
   ring.rotation.x = -Math.PI / 2;
   ring.renderOrder = 1;
   return ring;
 }
 
-// Two stacked boxes (body + cabin) is the low-poly "sedan" the brief asks for: rounded enough to
-// read as a car, four wheels, a tinted windscreen, and rear lamps that light on braking (ego
-// only - `tailMat` is the material both lamps share, toggled in draw()).
+// Bevelled coachwork, a tapered glasshouse and a pale roof read at card scale.
 function buildCar(bodyColor, cabinColor) {
   const group = new THREE.Group();
-  const lower = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.55, 4.2), new THREE.MeshLambertMaterial({ color: bodyColor, flatShading: true }));
+  const lower = new THREE.Mesh((() => {
+    const profile = new THREE.Shape();
+    profile.moveTo(-0.8, -1.95); profile.lineTo(0.8, -1.95);
+    profile.lineTo(0.88, 1.65); profile.lineTo(0.65, 1.95);
+    profile.lineTo(-0.65, 1.95); profile.lineTo(-0.88, 1.65); profile.closePath();
+    const geometry = new THREE.ExtrudeGeometry(profile, { depth: 0.42, bevelEnabled: true, bevelSegments: 1, steps: 1, bevelSize: 0.12, bevelThickness: 0.12 });
+    geometry.rotateX(-Math.PI / 2);
+    return geometry;
+  })(), new THREE.MeshLambertMaterial({ color: bodyColor, flatShading: true }));
   lower.position.y = 0.275;
   group.add(lower);
 
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.5, 2.5), new THREE.MeshLambertMaterial({ color: cabinColor, flatShading: true }));
-  cabin.position.set(0, 0.8, -0.2);
+  const cabin = new THREE.Mesh(new THREE.CylinderGeometry(0.86, 1.08, 0.6, 4, 1), new THREE.MeshLambertMaterial({ color: cabinColor, flatShading: true }));
+  cabin.rotation.y = Math.PI / 4;
+  cabin.scale.set(1, 1, 1.7);
+  cabin.position.set(0, 1.0, -0.2);
   group.add(cabin);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 1.9), lower.material);
+  roof.position.set(0, 1.32, -0.2);
+  group.add(roof);
+  const bumper = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.12, 0.12), new THREE.MeshBasicMaterial({ color: POST_DARK }));
+  bumper.position.set(0, 0.35, -2.08);
+  group.add(bumper);
 
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.4), new THREE.MeshBasicMaterial({ color: GLASS_TINT }));
   glass.position.set(0, 0.86, 1.02);
@@ -151,12 +156,15 @@ function buildCar(bodyColor, cabinColor) {
 
 function buildCone() {
   const group = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.7, 8), new THREE.MeshLambertMaterial({ color: CONE_ORANGE, flatShading: true }));
+  const body = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.7, 8), new THREE.MeshLambertMaterial({ color: CONE_INK, flatShading: true }));
   body.position.y = 0.35;
   group.add(body);
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.08, 0.8), body.material);
+  base.position.y = 0.04;
+  group.add(base);
   const band = new THREE.Mesh(
     new THREE.CylinderGeometry(0.19, 0.22, 0.12, 8, 1, true),
-    new THREE.MeshLambertMaterial({ color: '#ffffff', side: THREE.DoubleSide })
+    new THREE.MeshLambertMaterial({ color: '#f0eeeb', side: THREE.DoubleSide })
   );
   band.position.y = 0.4;
   group.add(band);
@@ -166,11 +174,20 @@ function buildCone() {
 function buildPedestrian() {
   const group = new THREE.Group();
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.55, 4, 8), new THREE.MeshLambertMaterial({ color: PED_CLOTHES }));
-  body.position.y = 0.55;
+  body.position.y = 1.05;
   group.add(body);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshLambertMaterial({ color: PED_SKIN }));
-  head.position.y = 1.0;
+  head.position.y = 1.65;
   group.add(head);
+  for (const side of [-1, 1]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.7, 6), body.material);
+    leg.position.set(side * 0.16, 0.35, 0);
+    leg.rotation.z = side * 0.16;
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.65, 6), body.material);
+    arm.position.set(side * 0.34, 1.05, 0);
+    arm.rotation.z = side * 0.4;
+    group.add(leg, arm);
+  }
   return group;
 }
 
@@ -183,7 +200,11 @@ function buildLight(pos) {
   group.add(post, lamp);
   const x = laneToX(LANES) + LANE_W / 2 + 0.6;
   group.position.set(x, 0, pos);
-  return { group, lamp };
+  const sign = buildLabelSprite();
+  sign.sprite.scale.set(2.4, 1.1, 1);
+  sign.sprite.position.set(0, 4.1, 0);
+  group.add(sign.sprite);
+  return { group, lamp, sign };
 }
 
 // Simple extruded block with a two-tone "glass-grid" facade (a handful of contrasting horizontal
@@ -193,12 +214,21 @@ function buildBuilding(w, d, h, baseColor, glassColor) {
   const base = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color: baseColor, flatShading: true }));
   base.position.y = h / 2;
   group.add(base);
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(base.geometry), new THREE.LineBasicMaterial({ color: POST_DARK, transparent: true, opacity: 0.35 }));
+  edges.position.copy(base.position);
+  group.add(edges);
   const bands = Math.max(2, Math.round(h / 4));
   const glassMat = new THREE.MeshLambertMaterial({ color: glassColor });
   for (let i = 0; i < bands; i++) {
-    const band = new THREE.Mesh(new THREE.BoxGeometry(w * 0.94, h / (bands * 2.2), d * 1.01), glassMat);
+    const band = new THREE.Mesh(new THREE.BoxGeometry(w * 0.94, h / (bands * 3.5), d * 1.01), glassMat);
     band.position.y = ((i + 0.5) / bands) * h;
     group.add(band);
+  }
+  const mullionMat = new THREE.MeshLambertMaterial({ color: baseColor });
+  for (let x = -w / 2 + 1; x < w / 2; x += 1.8) {
+    const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.14, h, d * 1.025), mullionMat);
+    mullion.position.set(x, h / 2, 0);
+    group.add(mullion);
   }
   return group;
 }
@@ -223,7 +253,7 @@ function buildLampPost(side) {
 function buildStreetProp(kind) {
   const group = new THREE.Group();
   if (kind === 'bench') {
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.4), new THREE.MeshLambertMaterial({ color: '#6b5a4a' }));
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.4), new THREE.MeshLambertMaterial({ color: '#938f89' }));
     seat.position.y = 0.42;
     group.add(seat);
     const legMat = new THREE.MeshLambertMaterial({ color: POST_DARK });
@@ -255,8 +285,8 @@ function buildScene() {
   scene.background = new THREE.Color(SKY);
   scene.fog = new THREE.Fog(SKY, FOG_NEAR, FOG_FAR);
 
-  scene.add(new THREE.AmbientLight('#ffffff', 0.95));
-  const sun = new THREE.DirectionalLight('#fff6e2', 0.55);
+  scene.add(new THREE.AmbientLight('#f0eeeb', 0.75));
+  const sun = new THREE.DirectionalLight('#f0eeeb', 1.2);
   sun.position.set(-20, 40, -10);
   scene.add(sun);
 
@@ -313,6 +343,18 @@ function buildScene() {
   dashes.instanceMatrix.needsUpdate = true;
   scene.add(dashes);
 
+  // Stop bars and striped crossings anchor each signal to an actual road position.
+  for (let z = 300; z < DEST_POS; z += 300) {
+    const stopBar = new THREE.Mesh(new THREE.BoxGeometry(roadHalfW * 2, 0.02, 0.35), markMat);
+    stopBar.position.set(0, 0.04, z - 3);
+    scene.add(stopBar);
+    for (let x = -roadHalfW + 0.5; x < roadHalfW; x += 1) {
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.02, 2.4), markMat);
+      stripe.position.set(x, 0.04, z + 1.5);
+      scene.add(stripe);
+    }
+  }
+
   // exit ramp: a widening wedge peeling off the right shoulder near DEST_POS
   const rightEdge = laneToX(LANES) + LANE_W / 2;
   const rz0 = DEST_POS - 140;
@@ -331,7 +373,7 @@ function buildScene() {
   const buildingX = roadHalfW + kerbW + sidewalkW + 2;
   const lampX = roadHalfW + kerbW + sidewalkW - 0.4;
   const palette = [
-    ['#8b93a0', '#5c6672'], ['#9a9186', '#6b6259'], ['#7f8b86', '#526059'], ['#93888b', '#645a5d'],
+    ['#c2bfba', '#938f89'], ['#f0eeeb', '#938f89'], ['#c2bfba', '#292827'], ['#938f89', '#292827'],
   ];
   for (let z = 20; z < ROAD_LENGTH + 60; z += 42) {
     for (const side of [-1, 1]) {
@@ -375,10 +417,10 @@ function buildLabelSprite() {
     if (text === last) return;
     last = text;
     ctx.clearRect(0, 0, c.width, c.height);
-    ctx.fillStyle = 'rgba(24,20,12,0.82)';
+    ctx.fillStyle = 'rgba(41,40,39,0.82)';
     roundRect(ctx, 4, 14, c.width - 8, c.height - 28, 12);
     ctx.fill();
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#f0eeeb';
     ctx.font = 'bold 34px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -440,7 +482,7 @@ function injectStyle() {
     }
     .gc-drive .gc-hazards-label {
       font-family: var(--font-mono, monospace); font-size: 10px; letter-spacing: 0.36px;
-      text-transform: uppercase; color: rgba(255,255,255,0.85); text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+      text-transform: uppercase; color: rgba(240,238,235,0.85); text-shadow: 0 1px 3px rgba(0,0,0,0.7);
     }
     .gc-drive .gc-hazards { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
   `;
@@ -516,6 +558,7 @@ export async function mount(el, { decide, mode } = {}) {
   let lastDecision = { candidates: engine.candidates(), probs: {}, p_null: null, sentence: engine.describe() };
   const human = createHumanOverride(3000);
   let pendingRestart = false;
+  let deciding = false;
 
   function restart() {
     pendingRestart = false;
@@ -530,7 +573,7 @@ export async function mount(el, { decide, mode } = {}) {
   }
 
   async function tick() {
-    if (pendingRestart) return;
+    if (pendingRestart || deciding) return;
     if (policyName === 'model' && mode() !== 'live') {
       const f = replayFrame(replay, replayIndex);
       if (!f) return;
@@ -564,9 +607,21 @@ export async function mount(el, { decide, mode } = {}) {
       move = greedyPolicy(engine);
       decision = { candidates: legal, probs: { [move]: 1 }, p_null: 0, sentence: engine.describe() };
     } else {
-      const r = await modelPolicy({ decide, engine, question: QUESTION });
-      move = r?.move ?? greedyPolicy(engine);
-      decision = { candidates: legal, probs: r?.probs ?? {}, p_null: r?.p_null ?? null, sentence: engine.describe() };
+      const tickEngine = engine;
+      const sentence = engine.describe();
+      deciding = true;
+      let r;
+      try {
+        r = await modelPolicy({ decide, engine, question: QUESTION });
+      } catch {
+        return; // unavailable model: wait for the next tick, never invent a manoeuvre
+      } finally {
+        deciding = false;
+      }
+      if (engine !== tickEngine) return; // restart while inference was pending
+      if (!r || !legal.some((action) => Number.isFinite(r.probs?.[action]) && r.probs[action] > 0)) return;
+      move = r.move;
+      decision = { candidates: legal, probs: r.probs, p_null: r.p_null, sentence };
     }
 
     prevState = engine.state();
@@ -688,10 +743,11 @@ export async function mount(el, { decide, mode } = {}) {
       coneRings[i].visible = Boolean(c.placed);
     });
 
-    lightMeshes.forEach(({ lamp }, i) => {
+    lightMeshes.forEach(({ lamp, sign }, i) => {
       const l = currState.lights[i];
       if (!l) return;
       lamp.material.color.set(l.state === 'green' ? LIGHT_GREEN : LIGHT_RED);
+      sign.update(l.state === 'red' ? 'STOP' : 'GO');
     });
 
     renderer.render(scene, camera);

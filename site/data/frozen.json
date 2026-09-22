@@ -1,6 +1,6 @@
 {
   "protocol": "frozen backbone, letter logits over the rendered options, 3 exemplars, same 231 public ids",
-  "source": "gpu-runpod-full-experiment:REPORT.md#\u00a73ag-frozen-controls",
+  "source": "gpu-runpod-full-experiment:REPORT.md#\u00a73ag-frozen-controls (rows carrying their own source key are from buffalo:RESULTS.md \u00a75)",
   "rows": [
     {
       "backbone": "Qwen3-1.7B-Base",
@@ -43,12 +43,30 @@
       "trained": "typical-14b-ladder"
     },
     {
+      "backbone": "Qwen3.5-2B-Base",
+      "std": 0.583,
+      "easy": 0.979,
+      "hard": 0.387,
+      "brier_hard": 0.67,
+      "trained": null,
+      "source": "buffalo:RESULTS.md#5-jevbench (jev_zs3_q35_2b)"
+    },
+    {
       "backbone": "Qwen3.5-4B-Base",
       "std": 0.764,
       "easy": 1.0,
       "hard": 0.495,
       "brier_hard": 0.6,
       "trained": null
+    },
+    {
+      "backbone": "Qwen3.5-9B-Base",
+      "std": 0.806,
+      "easy": 1.0,
+      "hard": 0.541,
+      "brier_hard": 0.55,
+      "trained": null,
+      "source": "buffalo:RESULTS.md#5-jevbench (jev_zs3_q35_9b)"
     }
   ],
   "in_flight": "a 14B release candidate, not yet a release (Qwen3-14B, facts-first long rows, 3,072-token states, frozen-14B distillation) and tm2 (Qwen3.5-4B); pass rule: hard >= .559 or hard Brier <= .65, long_policy >= .35 (REPORT \u00a73ag)",

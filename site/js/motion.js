@@ -12,14 +12,12 @@ function heroEnter() {
   if (!copy) return;
   const parts = [...copy.children];
   const hud = document.querySelector('.stage-hud');
-  const nav = document.querySelector('.nav');
   if (reduced() || sessionStorage.getItem('typical_hero')) return;
   sessionStorage.setItem('typical_hero', '1');
-  g.set([...parts, hud, nav].filter(Boolean), { opacity: 0 });
+  g.set([...parts, hud].filter(Boolean), { opacity: 0 });
   g.set(parts, { y: 18 });
   const tl = g.timeline({ defaults: { ease: 'expo.out' } });
-  tl.to(nav, { opacity: 1, duration: 0.4 }, 0)
-    .to(parts, { opacity: 1, y: 0, duration: 0.7, stagger: 0.08 }, 0.15)
+  tl.to(parts, { opacity: 1, y: 0, duration: 0.7, stagger: 0.08 }, 0.15)
     .to(hud, { opacity: 1, duration: 0.5 }, 0.7);
 }
 

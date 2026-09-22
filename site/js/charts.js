@@ -8,7 +8,8 @@ const NS = 'http://www.w3.org/2000/svg';
 export const INK = '#292827'; // off-black — primary marks, primary text
 export const MID = '#938f89'; // mid-gray — axis/legend text, secondary series
 export const STEEL = '#c2bfba'; // steel — gridlines, axis rules, reference lines... except ref lines are mid-gray per spec
-const WHITE = '#ffffff';
+const WHITE = '#ffffff'; // still used for knockout strokes/labels drawn ON an ink mark
+const SURFACE = '#f0eeeb'; // the page canvas: charts draw straight onto paper, not onto a panel
 export const FONT_MONO = '"Geist Mono", ui-monospace, "SF Mono", Menlo, monospace';
 
 // Fixed style slots (never cycled by data order) plus a name-keyed lookup so the same model
@@ -97,7 +98,7 @@ export function fitWidth(el, designW) {
 
 function baseSvg(container, w, h, titleStr) {
   container.innerHTML = '';
-  container.style.background = WHITE;
+  container.style.background = SURFACE;
   // Cap to the chart's own natural width so a wide parent column (research.html's content
   // rail) can't stretch a 320px donut into an 900px blob — keeps every chart in the legible
   // 560-640px band the brief asks for (donut/reliability are intentionally narrower).

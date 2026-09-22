@@ -86,11 +86,22 @@
   /* ---- layout ---- */
   .page { max-width: var(--container-page); margin-inline: auto; padding-inline: 50px; }
   @media (max-width: 48rem) { .page { padding-inline: 20px; } }
-  .chapter { padding-block: 100px; }
-  .chapter-head { display: grid; grid-template-columns: 220px 1fr; gap: 30px; margin-bottom: 55px; }
-  @media (max-width: 64rem) { .chapter-head { grid-template-columns: 1fr; gap: 18px; } }
-  .chapter-head .t-section { max-width: 24ch; }
-  .chapter-head .lede { margin-top: 30px; font-size: var(--text-ui); line-height: 1.2; letter-spacing: -0.19px; color: var(--color-mid); max-width: 56ch; }
+  .chapter { padding-block: 128px; }
+  #results { padding-block: 180px 128px; }
+  /* The side rail is gone. It put every h2 at x=330 while every panel below it started at x=80, so
+     the two dominant objects in a section never shared an edge, and it left a 250px column empty in
+     eight sections out of eight. The heading is now flush with its own panel, the rule is the hard
+     top edge of the section (whitespace alone was signalling every boundary), and the lede sits in
+     a second column bottom-aligned so its last line meets the heading's. */
+  .chapter-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 46ch); column-gap: 60px; row-gap: 28px; border-top: 1px solid var(--color-steel); padding-top: 16px; margin-bottom: 64px; }
+  .chapter-head .t-eyebrow { grid-column: 1 / -1; color: var(--color-mid); }
+  .chapter-head .t-section { grid-column: 1; max-width: 18ch; font-size: clamp(40px, 4.4vw, 58px); line-height: 0.98; letter-spacing: -2.2px; }
+  .chapter-head .lede { grid-column: 2; align-self: end; margin-top: 0; font-size: var(--text-ui); line-height: 1.25; letter-spacing: -0.19px; color: var(--color-mid); }
+  @media (max-width: 64rem) {
+    .chapter-head { grid-template-columns: 1fr; row-gap: 16px; margin-bottom: 40px; }
+    .chapter-head .t-section { font-size: clamp(30px, 8vw, 40px); letter-spacing: -1.2px; max-width: 22ch; }
+    .chapter-head .lede { grid-column: 1; align-self: start; }
+  }
 
   /* ---- floating translucent nav ---- */
   .nav { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 14px; border-radius: var(--radius-card); background: rgba(232, 227, 216, 0.72); backdrop-filter: blur(57px); -webkit-backdrop-filter: blur(57px); color: var(--color-off); font-size: var(--text-nav); letter-spacing: -0.14px; max-width: calc(100vw - 28px); }
@@ -141,10 +152,17 @@
   .card-hud { box-shadow: inset 0 0 0 1px rgba(200,255,225,0.07); }
   .stage-hud, .card-hud { text-shadow: 0 0 6px rgba(170,255,210,0.22); }
 
-  /* held back while the tube runs its cold start (js/filmfx.js clears .booting when it ends) */
-  .booting .nav, .booting .stage-copy, .booting .stage-hud, .booting .stage-shade { opacity: 0; }
-  .nav, .stage-copy, .stage-hud, .stage-shade { transition: opacity 520ms var(--ease-out), transform 520ms var(--ease-out); }
-  .booting .stage-copy, .booting .stage-hud { transform: scaleY(0.985); }
+  /* Held back while the tube runs its cold start (js/filmfx.js clears .booting when it ends).
+     The class now ships in the markup: it used to be added from shell.js after an await, ~400ms
+     in, so the page rendered the headline and then took it back. The nav is deliberately not in
+     this list — site navigation is not a beat in a film, and it was unreachable for seven
+     seconds. .stage-hud is GSAP's to animate; a CSS transition on the same property made its
+     authored 500ms entrance take 1240. */
+  .booting .stage-copy, .booting .stage-hud, .booting .stage-shade { opacity: 0; }
+  /* .stage-copy and .stage-shade only: GSAP animates .stage-hud's and the nav's opacity, and a CSS
+     transition on the same property makes the browser chase each frame GSAP writes — the hud's
+     authored 500ms entrance measured 1240. No transform here; the scaleY it paired with is gone. */
+  .stage-copy, .stage-shade { transition: opacity 520ms var(--ease-out); }
 
   /* the treatment layer: over the film, under the shade, copy and HUD, which stay sharp */
   .film-fx { position: absolute; inset: 0; pointer-events: none; }
@@ -157,11 +175,6 @@
   /* the 14B is not a release: it is set apart from the two sizes you can download today, so the
      eyebrow cannot be read as naming three of them */
   .soon { padding: 3px 7px; border-radius: var(--radius-icon); border: 1px solid rgba(240, 238, 235, 0.3); color: rgba(240, 238, 235, 0.62); font-size: 10px; letter-spacing: 0.72px; white-space: nowrap; }
-  /* statements, not labels: set in caps they read as a wall */
-  .proof { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 26px; margin: 22px 0 0; padding: 0; font-size: 11.5px; line-height: 1.5; letter-spacing: 0.2px; color: rgba(240, 238, 235, 0.6); }
-  .proof li { max-width: 34ch; } /* full statements now, so they wrap; the gap keeps them apart */
-  @media (max-width: 64rem) { .proof { flex-direction: column; gap: 4px; } .proof li { max-width: none; } }
-  .sub-note { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.72px; text-transform: uppercase; color: rgba(240, 238, 235, 0.75); margin-bottom: 8px; }
   .watching { font-size: 13px; line-height: 1.45; color: rgba(240, 238, 235, 0.58); margin-bottom: 26px; max-width: 46ch; }
   .stage-copy { position: absolute; left: 40px; right: auto; bottom: 44px; max-width: 585px; padding: 30px 32px; border-radius: var(--radius-card); background: rgba(9, 9, 10, 0.88); backdrop-filter: blur(2px); }
   .stage-copy .t-hero { margin: 18px 0 22px; max-width: 20ch; font-size: clamp(34px, 3.6vw, 52px); letter-spacing: -1.5px; text-wrap: balance; } /* 62px in a 585px card fits ~11 characters, which stranded "generate." on its own line */
@@ -175,26 +188,20 @@
   .stage-hud .sentence { margin-top: 12px; opacity: 0.75; font-family: var(--font-sans); font-size: 13px; letter-spacing: 0; }
   @media (max-width: 64rem) { .stage-hud { display: none; } .stage-copy { left: 20px; right: 20px; bottom: 40px; } }
 
-  /* the same film again in chapter 04, plain: no bloom layer, HUD docked inside the card */
-  .card-film { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
-  .card-hud { position: absolute; left: 18px; right: 18px; bottom: 18px; z-index: 3; font-size: 11px; letter-spacing: 0.36px; line-height: 1.5; padding: 14px 16px; border-radius: var(--radius-card); background: rgba(9, 9, 10, 0.86); }
-  .card-hud .rec { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; }
-  .card-hud .rec i { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--color-warm); display: inline-block; }
-  .card-hud .rec-sub { margin: -4px 0 8px; opacity: 0.55; }
-  .card-hud .line { display: flex; justify-content: space-between; gap: 12px; opacity: 0.55; }
-  .card-hud .line.on { opacity: 1; font-weight: 700; }
-  .card-hud .sentence { margin-top: 10px; opacity: 0.75; font-family: var(--font-sans); font-size: 12px; letter-spacing: 0; }
-
   /* ---- media panels (12px, clipped, no shadow) ---- */
-  .media { background: var(--color-white); border-radius: var(--radius-card); overflow: hidden; position: relative; }
-  .media.dark { background: #0b0b0b; color: var(--color-warm); }
+  /* Two materials, one rule. A black panel means something is running right now; bare warm paper
+     means something measured and still. Nothing else gets a box. The page used to have four
+     surfaces — warm canvas, white panel, black panel, light-grey card — carrying no meaning at
+     all, which is why nine near-identical rounded rectangles read as clutter rather than as
+     structure. Only .media.dark keeps the shell. */
+  .media { background: none; border-radius: 0; padding: 0; position: relative; }
+  /* the dark panel keeps the whole shell, including the overflow clip its canvases and the film
+     rely on — stripping that from the base rule pushed a phone 167px wide */
+  .media.dark { background: #0b0b0b; color: var(--color-warm); border-radius: var(--radius-card); overflow: hidden; }
   .media-label { position: absolute; left: 18px; top: 18px; z-index: 2; }
-  .media-split { display: grid; grid-template-columns: 1fr 1fr; min-height: 560px; }
-  @media (max-width: 64rem) { .media-split { grid-template-columns: 1fr; } }
+  .media-split { display: grid; grid-template-columns: 1fr; }
   .media-scene { position: relative; background: #0b0b0b; min-height: 360px; }
   .media-scene > * { position: absolute; inset: 0; }
-  .media-read { padding: 60px 50px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
-  @media (max-width: 48rem) { .media-read { padding: 30px 20px; } }
 
   /* ---- the instrument -----------------------------------------------------------------------
      The claim of this panel is that one state supports many typed decisions, so the questions are
@@ -249,18 +256,24 @@
      the result is the gap between them and you can see it without doing arithmetic. The row both
      models fail is marked rather than dropped. */
   .score { display: grid; gap: 0; }
-  .score-row { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr); gap: 20px 40px; align-items: start; padding: 26px 0; border-top: 1px solid var(--color-steel); }
+  .score-row { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 1fr); gap: 18px 40px; align-items: end; padding: 34px 0 30px; border-top: 1px solid var(--color-steel); }
   .score-row.is-head { padding: 0 0 12px; border-top: 0; align-items: baseline; }
   @media (max-width: 64rem) {
-    .score-row { grid-template-columns: 1fr 1fr; gap: 14px 24px; padding: 20px 0; }
+    .score-row { grid-template-columns: 1fr 1fr; gap: 12px 20px; padding: 22px 0; }
     .score-label { grid-column: 1 / -1; }
     .score-row.is-head > div:first-child { display: none; }
   }
   .score-model { font-size: 11px; letter-spacing: 0.36px; color: var(--color-mid); }
   .score-task { font-size: 17px; line-height: 1.25; letter-spacing: -0.19px; max-width: 34ch; }
-  .score-sub { font-size: 11px; color: var(--color-mid); margin-top: 8px; }
+  /* js/typography.js glues the separator to its neighbours with non-breaking spaces, which turns
+     "PagerDuty \u00b7 always guess the commonest: 79.2%" into one run too wide for a phone. break-word
+     cannot split an nbsp sequence; anywhere can, and this is 11px fine print. */
+  .score-sub { font-size: 11px; color: var(--color-mid); margin-top: 8px; overflow-wrap: anywhere; }
   .score-flag { font-size: 12px; color: var(--color-off); margin-top: 10px; padding-left: 10px; border-left: 2px solid var(--color-off); max-width: 30ch; }
-  .score-num { font-size: 34px; line-height: 1; letter-spacing: -0.9px; font-variant-numeric: tabular-nums; }
+  .score-num { font-size: clamp(64px, 6.6vw, 104px); line-height: 0.88; letter-spacing: -3.2px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  /* Must sit after the base rule, not in the earlier media block: same specificity, so source order
+     decides and the base was winning. Two 64px figures plus a gap do not fit a 390px phone. */
+  @media (max-width: 64rem) { .score-num { font-size: clamp(34px, 9.5vw, 56px); line-height: 0.92; letter-spacing: -1.4px; } }
   .score-cell.is-miss .score-num { color: var(--color-mid); }
   .score-track { position: relative; height: 3px; margin-top: 14px; background: var(--color-lgray); }
   .score-track i { position: absolute; left: 0; top: 0; height: 3px; background: var(--color-off); }
@@ -305,7 +318,13 @@
   .program-tag { font-size: 10px; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); }
   .program-foot { font-size: 10px; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); min-height: 12px; }
 
-  .program-code { font-family: var(--font-mono); font-size: 14px; line-height: 1.95; color: var(--color-mid); }
+  /* Code lines are `white-space: pre` and genuinely wider than a phone. The panel's overflow clip
+     used to hide that, which is not the same as handling it — the lines were simply cut off.
+     The block scrolls sideways instead, the way code is expected to. */
+  .program-code { font-family: var(--font-mono); font-size: 14px; line-height: 1.95; color: var(--color-mid); overflow-x: auto; min-width: 0; }
+  /* min-width:0 is load-bearing: .program is a grid, so this track defaults to min-width:auto and
+     sizes to its widest pre-formatted line, and overflow-x never gets a chance to scroll. */
+  .program-line, .program-expand { min-width: 100%; width: max-content; }
   @media (max-width: 64rem) { .program-code { font-size: 11.5px; line-height: 1.85; } }
   .program-line { display: flex; align-items: baseline; gap: 18px; white-space: pre; border-left: 2px solid transparent; padding-left: 16px; transition: color 340ms var(--ease-out), border-color 340ms var(--ease-out); }
   .program-line.is-gap { height: 0.9em; }
@@ -342,15 +361,9 @@
   .is-running .program-code { opacity: 0.35; }
   @media (prefers-reduced-motion: reduce) { .program-track i { transition: none; } }
 
-  /* ---- utility cards ---- */  /* ---- utility cards ---- */
-  .ucard { background: var(--color-lgray); border-radius: var(--radius-card); padding: 88px 18px 18px; min-height: 300px; display: flex; flex-direction: column; justify-content: space-between; gap: 30px; }
-  .ucard .t-card { margin-bottom: 10px; }
+  /* ---- utility cards ---- */
   .fit { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; font-size: 14px; color: var(--color-off); }
   .fit li::before { content: '— '; color: var(--color-mid); }
-  .ucard p { max-width: 32ch; }
-  .ucard .figure-src { max-width: none; } /* .ucard p caps prose at 32ch = 211px, narrower than the paths this line carries */
-  .ucard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-  @media (max-width: 64rem) { .ucard-grid { grid-template-columns: 1fr; } .ucard { padding-top: 40px; min-height: 0; } }
   .diagram { display: flex; gap: 6px; align-items: flex-end; }
   .diagram i { display: block; height: 28px; flex: 1; border: 1px solid var(--color-off); border-radius: var(--radius-icon); }
   .diagram i.on { background: var(--color-off); }
@@ -408,15 +421,6 @@
   .code pre { margin: 0; font-family: var(--font-mono); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; }
   .code + .code { margin-top: 18px; }
 
-  /* ---- destination panels ---- */
-  .dest { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-  @media (max-width: 48rem) { .dest { grid-template-columns: 1fr; } }
-  .dest a { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; min-height: 220px; padding: 18px; border-radius: var(--radius-pill); background: var(--color-graphite); color: var(--color-warm); border: 1px solid var(--color-warm); transition: background var(--duration-tap) var(--ease-out); }
-  .dest a:hover { background: var(--color-charcoal); }
-  .dest .t-card { max-width: 14ch; }
-  .dest a .t-eyebrow { transition: transform var(--duration-tap) var(--ease-out); }
-  .dest a:hover .t-eyebrow { transform: translateX(3px); }
-  @media (prefers-reduced-motion: reduce) { .dest a:hover .t-eyebrow { transform: none; } }
 
   .exlist { border-bottom: 1px solid var(--color-steel); }
 

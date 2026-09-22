@@ -53,9 +53,12 @@ const BOOT_LINES = [
   'state read once, cached · choice · yes/no · score · ∅',
   'now playing: DOOM E1M1, one sentence per tick',
 ];
-const BOOT_CPS = 85; // characters a second for the lines under the word
+const BOOT_CPS = 130; // characters a second for the lines under the word
 const BOOT_WORD_MS = 1100; // the word rasterises in over this
-const BOOT_HOLD = 1500; // after the last character, so there is time to read it
+// After the last character. It was 1500, which is a second and a half spent holding a screen that
+// has finished saying what it says — and every one of those milliseconds is time the headline is
+// not readable, because the hero copy waits on this to finish.
+const BOOT_HOLD = 700;
 // The hand-over is the switch on an old set, not a cross-fade: the picture collapses to a
 // scan line, the line flares, and the next picture opens back out of it.
 const SW_COLLAPSE = 260;

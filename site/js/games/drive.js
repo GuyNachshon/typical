@@ -2,13 +2,12 @@
 // machine, no DOM, no deps - matches site/js/snake.js's shape: state()/describe()/render()/
 // candidates()/step()/selfTest().
 
-// Demo-spec v3 grammar (70/70 on the probe set, chance .16): the state lists only the situations
-// that apply, phrased exactly as the rule conditions; one condition per rule; the candidate set
-// is the legality guardrail (a lane change is only offered when that lane exists and is clear).
+// The state reports observed distances; the model evaluates the distance limits in RULES.
+// Candidates gate lane-change legality only, never whether to brake for an observed signal.
 // RULES order = precedence order = candidate order.
 export const RULES = {
-  stop: "applies when a pedestrian is crossing the car's lane",
-  brake: 'applies when the traffic light ahead is red',
+  stop: "applies when a pedestrian is crossing the car's lane within 15 m ahead",
+  brake: 'applies when the traffic light within 25 m ahead is red',
   'change lane right': 'applies when the car must move to the right lane',
   accelerate: 'applies when the road ahead is clear for 50 m', // speeds up to the limit; no-op at it
   'change lane left': 'applies when the car must move to the left lane',
@@ -42,8 +41,8 @@ const ACCEL = 8; // km/h per tick
 const BRAKE = 15; // km/h per tick
 const STOP_DECEL = 30; // km/h per tick
 const LANE_CLEAR_GAP = 15; // m - a lane is "clear" with no vehicle within this, ahead or behind
-const PED_RANGE = 20; // m - "a pedestrian is crossing the car's lane"
-const LIGHT_RANGE = 60; // m - "the traffic light ahead is red"
+const PED_RANGE = 120; // m - observation range, not a stop trigger
+const LIGHT_RANGE = 120; // m - observation range, not a brake trigger
 const CLOSING_RANGE = 20; // m - "closing on a slower vehicle ahead": slower lead within this
 const LEAD_RANGE = 50; // m - lead vehicle reported (else "the road ahead is clear for 50 m")
 const EXIT_RANGE = 300; // m - "the car must take the exit on the right"
@@ -293,9 +292,7 @@ export class Drive {
     return this.state();
   }
 
-  // Situations-only grammar (demo-spec v3): the ego line, then one sentence per situation that
-  // applies, worded exactly as its rule condition, in this fixed order. Sentence order matters to
-  // the model (shuffled orders scored .89-.93 vs 1.00 on the probe set) - keep it.
+  // Keep observation order stable; include distances even outside the action ranges.
   describe() {
     const e = this.ego;
     const sit = this.situations();
@@ -400,8 +397,8 @@ export function greedyPolicy(engine) {
   if (legal.length === 0) return null;
   const sit = engine.situations();
   const fires = {
-    stop: Boolean(sit.ped),
-    brake: sit.red,
+    stop: Boolean(sit.ped && sit.ped.pos - engine.ego.position <= 15),
+    brake: sit.red && sit.light.pos - engine.ego.position <= 25,
     'change lane right': sit.mustExit || (sit.canPass && sit.passSide === 'right'),
     accelerate: sit.roadClear,
     'change lane left': sit.canPass && sit.passSide === 'left',
@@ -432,11 +429,11 @@ function selfTest() {
     { lane: 2, position: 1018, speed: 30 }, // 18 m ahead in own lane, slower
     { lane: 3, position: 995, speed: 40 }, // 5 m behind in lane 3 -> not clear
   ];
-  d2.lights = [{ pos: 1060, state: 'red', timer: 5 }];
+  d2.lights = [{ pos: 1025, state: 'red', timer: 5 }];
   d2.pedestrians = [];
   console.assert(
     d2.describe() ===
-      'The car is in lane 2 of 3 at 45 km/h, below the speed limit of 60 km/h. The traffic light 60 m ahead is red. The car must move to the left lane to pass the vehicle ahead. The lane to the left is clear.',
+      'The car is in lane 2 of 3 at 45 km/h, below the speed limit of 60 km/h. The traffic light 25 m ahead is red. The car must move to the left lane to pass the vehicle ahead. The lane to the left is clear.',
     'describe() lists only the situations that apply, in the fixed order'
   );
   console.assert(!d2.candidates().includes('change lane right'), 'lane change blocked by a car within 15 m');
@@ -543,6 +540,31 @@ function selfTest() {
   d9.traffic[1].position = 200; // the blocking car in lane 1 moves well clear
   console.assert(d9.situations().canPass && d9.situations().passSide === 'left', 'once the left lane clears the car re-evaluates and can pass, even at matched speed 0');
   console.assert(greedyPolicy(d9) === 'change lane left', 'passing resumes instead of sitting behind the blocker forever');
+
+  const crossing = new Drive({ seed: 1 });
+  crossing.traffic = [];
+  crossing.lights = [];
+  crossing.placeHazard('pedestrian', 2, 120);
+  console.assert(crossing.describe().includes("A pedestrian is crossing the car's lane 120 m ahead."), 'distant placed pedestrian retains its distance');
+  console.assert(greedyPolicy(crossing) === 'accelerate', 'reference policy approaches a distant pedestrian');
+  crossing.ego.position = 108;
+  console.assert(greedyPolicy(crossing) === 'stop', 'reference policy stops near a pedestrian');
+
+  // Distance is an observation, never an override of the selected action.
+  const approach = new Drive({ seed: 1 });
+  approach.ego = { lane: 2, speed: 60, position: 0 };
+  approach.traffic = [];
+  approach.lights = [{ pos: 120, state: 'red', timer: 100 }];
+  approach.rng = () => 1; // no random pedestrians in this signal check
+  console.assert(approach.describe().includes('The traffic light 120 m ahead is red.'), 'distant signal is reported with distance');
+  console.assert(greedyPolicy(approach) === 'accelerate', 'reference policy approaches a distant red');
+  for (let i = 0; i < 20 && approach.ego.speed > 0; i++) approach.step(greedyPolicy(approach));
+  console.assert(approach.ego.speed === 0 && 120 - approach.ego.position > 0 && 120 - approach.ego.position < 15, 'reference policy stops near the signal');
+  console.assert(approach.violations === 0, 'stops before the signal');
+  approach.ego = { lane: 2, speed: 60, position: 0 };
+  approach.lights = [{ pos: 20, state: 'red', timer: 100 }];
+  approach.step('accelerate');
+  console.assert(approach.ego.speed === 60, 'engine does not veto an action at a red light');
 
   // determinism
   function run(seed) {

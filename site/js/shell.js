@@ -139,7 +139,7 @@ function buildResultsTable(container, models) {
 
 // ---- the comparison: the same benchmark, run against models you could use instead ------------
 //
-// frozen.json is six general-purpose backbones prompted three-shot over the rendered options, on
+// frozen.json is the general-purpose backbones prompted three-shot over the rendered options, on
 // the same 231 public ids as our own run. That is the only comparison on this site that is
 // apples-to-apples, which is why it is the only one here: same benchmark, same items, same
 // protocol, and the sizes are on the chart because size is the trade being made.
@@ -338,13 +338,6 @@ function heroPool(presets, replays) {
   return pool;
 }
 
-// The read path (js/arch.js), replacing a box-drawing diagram whose probabilities were invented.
-async function mountFlow() {
-  const host = document.getElementById('chart-flow');
-  if (!host) return;
-  (await import('./arch.js')).mountFlow(host);
-}
-
 let heroLive = null; // set by pushDecision in live mode
 // One state, three questions, resolving together (js/primitives.js).
 async function mountPrimitives(presets) {
@@ -467,7 +460,7 @@ function mountFilm(ctx, ids = {}) {
   // The cards arrive a beat after the picture does, not with it: the switch should land on the
   // game alone, and only then does the page assemble itself around it.
   const fx = ids.fx === true
-    ? mountFilmFxOn(film, () => setTimeout(() => document.documentElement.classList.remove('booting'), 700))
+    ? mountFilmFxOn(film, () => document.documentElement.classList.remove('booting'))
     : { pulse() {} };
   if (ids.fx === true && typeof window !== 'undefined') { window.__fxPulse = () => fx.pulse(); window.__fxGrade = () => fx.grade?.(); window.__fxPhase = () => fx.phase?.(); } // probe hooks for the effect check
   const rowsEl = document.getElementById(ids.rows || 'hud-rows');
@@ -617,14 +610,9 @@ async function boot() {
 
   mountHero(presets);
   mountPrimitives(presets);
-  mountFlow();
   // set before the film mounts; filmfx clears it the moment the cold start is over (or at once,
   // if it is skipped for a repeat visit or for reduced motion)
-  document.documentElement.classList.add('booting');
   mountFilm(ctx, { fx: true });
-  // The same game again in chapter 04, plain: no bloom layer, so the card shows the frame exactly
-  // as the engine draws it. Only one of the two runs at a time — each pauses when off screen.
-  mountFilm(ctx, { film: 'film-card', rows: 'card-rows', sentence: 'card-sentence', rec: 'card-rec' });
   import('./motion.js').then((m) => {
     const go = () => {
       if (!document.documentElement.classList.contains('booting')) {

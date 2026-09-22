@@ -113,6 +113,16 @@
   .scrub-tick.is-on { display: block; text-align: left; font-weight: 700; color: var(--color-off); }
 }
 
+/* .ucard moved here from src.css when index.html stopped using it. research.html still has nine,
+   and they were styled by a rule the home page's cut pass deleted. The 88px top padding is not
+   reproduced: it existed to push three home-page card titles down and left a hole here. */
+.ucard { background: var(--color-lgray); border-radius: var(--radius-card); padding: 40px 18px 18px; min-height: 300px; display: flex; flex-direction: column; justify-content: space-between; gap: 30px; }
+.ucard .t-card { margin-bottom: 10px; }
+.ucard p { max-width: 32ch; }
+.ucard .figure-src { max-width: none; } /* .ucard p caps prose at 32ch = 211px, narrower than the paths this line carries */
+.ucard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+@media (max-width: 64rem) { .ucard-grid { grid-template-columns: 1fr; } .ucard { min-height: 0; } }
+
 /* findings cards: .ucard's space-between + equal grid heights left 120px holes between a short
    title and its body. These cards are prose, not figures — pack them from the top. */
 #findings .ucard { justify-content: flex-start; gap: 12px; min-height: 0; }
