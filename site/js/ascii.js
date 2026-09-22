@@ -18,6 +18,7 @@
 // transcription of a frame) mixes letters, brackets and digits, which gives the field texture at
 // small sizes where a ramp of #%@ turns into a flat grey block.
 const BAYER = [0.25, 0.75, 1.0, 0.5]; // 2x2 ordered-dither thresholds
+const FLOOR = 0.34; // below this share of the frame's own range, a cell stays blank
 const RAMP = [
   ' ', ' ', '.', ',', ':', ';', 'i', 'l', '!', '|', '/', '\\', '1', 'I', '{', '}', '[', ']',
   '?', 'r', 'c', 'v', 'z', 'x', 'Y', 'U', 'J', 'C', 'L', 'Q', '0', 'O', 'Z', 'm', 'w', 'q',
@@ -32,7 +33,7 @@ export function mountAscii(host, getSource, opts = {}) {
   // Columns follow the panel's real width: a fixed count that reads as a transcription on a
   // desktop hero is 3px-per-glyph mud on a phone. ~13 CSS px per column keeps a glyph a glyph.
   const maxCols = opts.cols ?? 150;
-  const colsFor = (w) => Math.max(44, Math.min(maxCols, Math.round(w / (opts.cellPx ?? 9))));
+  const colsFor = (w) => Math.max(44, Math.min(maxCols, Math.round(w / (opts.cellPx ?? 14))));
   let cols = colsFor(host.clientWidth || 1200);
   const fps = reduced() ? 4 : opts.fps ?? 15;
 
@@ -77,16 +78,46 @@ export function mountAscii(host, getSource, opts = {}) {
     return true;
   }
 
+  // Per-frame auto-levels. A fixed tone curve was the reason the field read as texture and not as
+  // a scene: DOOM's palette is dark and narrow, so a corridor, a wall and a doorway all landed in
+  // the same two or three glyphs. Stretching each frame's own 2nd–98th percentile across the full
+  // ramp gives the scene back its structure, and smoothing the bounds across frames stops the
+  // picture pumping when a fireball lights the room.
+  const HIST = new Uint32Array(64);
+  let loSm = 0;
+  let hiSm = 1;
+  function levels(px, n) {
+    HIST.fill(0);
+    for (let i = 0; i < n; i += 4) {
+      const l = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) / 255;
+      HIST[Math.min(63, (l * 64) | 0)] += 1;
+    }
+    const total = n / 4;
+    const want = total * 0.02;
+    let acc = 0;
+    let lo = 0;
+    let hi = 63;
+    for (let b = 0; b < 64; b++) { acc += HIST[b]; if (acc >= want) { lo = b; break; } }
+    acc = 0;
+    for (let b = 63; b >= 0; b--) { acc += HIST[b]; if (acc >= want) { hi = b; break; } }
+    const loV = lo / 64;
+    const hiV = Math.max(loV + 0.08, (hi + 1) / 64);
+    loSm += (loV - loSm) * 0.25; // ~4-frame smoothing
+    hiSm += (hiV - hiSm) * 0.25;
+  }
+
   function draw(src) {
     sctx.drawImage(src, 0, 0, cols, rows);
     const px = sctx.getImageData(0, 0, cols, rows).data;
+    levels(px, px.length);
+    const span = Math.max(0.05, hiSm - loSm);
     const W = layer.width;
     const H = layer.height;
     lctx.setTransform(1, 0, 0, 1, 0, 0);
     lctx.clearRect(0, 0, W, H);
     // no opaque backing: the frame stays faintly visible through its own transcription, which is
     // both better looking and closer to the point (the picture is there; the model isn't reading it)
-    lctx.fillStyle = 'rgba(8,8,9,0.93)';
+    lctx.fillStyle = 'rgba(8,8,9,0.6)'; // the frame stays faintly readable under its transcription
     lctx.fillRect(0, 0, W, H);
     const cw = W / cols;
     const ch = H / rows;
@@ -107,14 +138,19 @@ export function mountAscii(host, getSource, opts = {}) {
         // A 2x2 ordered dither before the glyph lookup: without it, a large flat wall quantises to
         // one character and the field draws in horizontal bands of repeated letters.
         const d = (BAYER[(y & 1) * 2 + (x & 1)] - 0.5) / RAMP.length;
-        const l = Math.max(0, Math.min(1, (raw - 0.05) / 0.62)) ** 1.1 + d;
-        const g = RAMP[Math.max(0, Math.min(RAMP.length - 1, Math.floor(l * RAMP.length)))];
+        const l = Math.max(0, Math.min(1, (raw - loSm) / span)) ** 0.95 + d;
+        // Everything below the floor draws nothing. This is what makes the field legible as a
+        // scene rather than a wall of characters: unlit geometry stays empty, so the shapes that
+        // are lit — a doorway, a lamp, a wall the player is facing — are the only things written.
+        if (l < FLOOR) continue;
+        const t = (l - FLOOR) / (1 - FLOOR);
+        const g = RAMP[Math.max(0, Math.min(RAMP.length - 1, Math.floor(t * RAMP.length)))];
         if (g === ' ') continue;
         // keep the frame's own colour, lifted: a monochrome field loses the one thing the picture
         // still carries at this resolution (a red wall, a green lamp, brown brick)
-        const lift = raw > 0.01 ? Math.min(2.4, 0.55 / raw + 0.55) : 1;
+        const lift = raw > 0.01 ? Math.min(2.8, (0.45 + 0.8 * t) / raw) : 1;
         lctx.fillStyle = `rgb(${Math.min(255, r * lift) | 0},${Math.min(255, gch * lift) | 0},${Math.min(255, bch * lift) | 0})`;
-        lctx.globalAlpha = 0.45 + 0.55 * l;
+        lctx.globalAlpha = 0.55 + 0.45 * t;
         lctx.fillText(g, (x + 0.5) * cw, (y + 0.5) * ch);
       }
     }

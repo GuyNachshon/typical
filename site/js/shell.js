@@ -409,7 +409,7 @@ function mountFilmAscii(film) {
     mountAscii(stage, () => {
       const c = film.contentDocument?.getElementById('canvas');
       return c && c.width ? c : null;
-    }, { cols: 112, after: film });
+    }, { cols: 200, after: film });
   }).catch(() => {});
 }
 
@@ -423,12 +423,43 @@ function mountFilm(ctx) {
   let stopped = false;
   const io = new IntersectionObserver((es) => { stopped = !es[0].isIntersecting; });
   io.observe(film);
+  // The run has to survive itself: a player that walks into nukage loses health every tick, and
+  // "badly hurt → retreat" against a wall is a loop that ends in a corpse on the hero of the
+  // page. Restart when the player dies, leaves the level, or stops making progress while taking
+  // damage — and start the route again from the top.
+  const STUCK_TICKS = 45; // ~18 s at the 380 ms loop
+  let anchor = null;
+  let stuckFor = 0;
+  let lastHealth = 100;
+  function restart(D) {
+    stuckFor = 0;
+    anchor = null;
+    lastHealth = 100;
+    resetNav();
+    try { D.newGame(3); } catch {}
+  }
+
   async function loop() {
     if (stopped) return setTimeout(loop, 800); // do not drive the game (or the model) while the hero is off screen
     const D = film.contentWindow?.Doom;
     if (!D || !D.ready) return setTimeout(loop, 500);
     const st = D.state();
-    if (!st.in_level) return setTimeout(loop, 500);
+    if (!st.in_level || (st.health ?? 100) <= 0) {
+      restart(D);
+      return setTimeout(loop, 1500);
+    }
+    if (!anchor || Math.hypot(st.x - anchor.x, st.y - anchor.y) > 90) {
+      anchor = { x: st.x, y: st.y };
+      stuckFor = 0;
+    } else {
+      stuckFor += 1;
+    }
+    const losing = (st.health ?? 100) < lastHealth;
+    lastHealth = st.health ?? lastHealth;
+    if (stuckFor > STUCK_TICKS && (losing || (st.health ?? 100) < 40)) {
+      restart(D);
+      return setTimeout(loop, 1500);
+    }
     const cands = candidatesFor(st);
     const sentence = describeDoom(st);
     let move = scriptedPolicy(st), probs = null, source = 'rule list';

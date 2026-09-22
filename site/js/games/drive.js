@@ -9,11 +9,10 @@
 export const RULES = {
   stop: "applies when a pedestrian is crossing the car's lane",
   brake: 'applies when the traffic light ahead is red',
-  'swerve left': "applies when a cone blocks the car's lane ahead", // visitor-placed hazard (site interactivity)
   'change lane right': 'applies when the car must take the exit on the right',
   accelerate: 'applies when the road ahead is clear for 50 m', // speeds up to the limit; no-op at it
-  'change lane left': 'applies when the car is closing on a slower vehicle ahead',
-  follow: 'applies when the car is closing on a slower vehicle ahead',
+  'change lane left': 'applies when the car must change lane to pass an obstruction ahead',
+  follow: 'applies when the car cannot pass an obstruction ahead and must slow down',
   'hold speed': 'applies when none of the above rules fire',
 };
 // Rendered exactly like inference/typical/core.py::query_text (instructions + "\n" + "label: desc"
@@ -114,15 +113,28 @@ export class Drive {
     };
   }
 
+  // A lane is "clear" with no vehicle OR cone within LANE_CLEAR_GAP, ahead or behind - a cone
+  // sitting in the target lane blocks a lane change into it exactly like a car would.
   _laneClear(lane) {
-    return !this.traffic.some((c) => c.lane === lane && Math.abs(c.position - this.ego.position) <= LANE_CLEAR_GAP);
+    const near = (pos) => Math.abs(pos - this.ego.position) <= LANE_CLEAR_GAP;
+    return !this.traffic.some((c) => c.lane === lane && near(c.position)) && !this.cones.some((c) => c.lane === lane && near(c.pos));
+  }
+
+  // Nearest thing occupying the car's own lane ahead - a traffic car (its real speed) or a cone
+  // (a static, zero-speed obstruction) - closest one wins. Unifying these means a cone runs
+  // through the exact same pass/follow/collision logic a stalled car already does: nothing the
+  // ego can drive through without either changing lane or slowing to its pace.
+  _obstacles() {
+    const e = this.ego;
+    const traffic = this.traffic.map((c) => ({ position: c.position, speed: c.speed, lane: c.lane, isCone: false }));
+    const cones = this.cones.map((c) => ({ position: c.pos, speed: 0, lane: c.lane, isCone: true }));
+    return [...traffic, ...cones]
+      .filter((o) => o.lane === e.lane && o.position > e.position && o.position - e.position <= LEAD_RANGE)
+      .sort((a, b) => a.position - b.position);
   }
 
   _lead() {
-    const e = this.ego;
-    return this.traffic
-      .filter((c) => c.lane === e.lane && c.position > e.position && c.position - e.position <= LEAD_RANGE)
-      .sort((a, b) => a.position - b.position)[0] ?? null;
+    return this._obstacles()[0] ?? null;
   }
 
   // The situations describe() reports and candidates() gates on - one boolean per rule condition.
@@ -131,23 +143,30 @@ export class Drive {
     const lead = this._lead();
     const light = this.lights.find((l) => l.pos >= e.position && l.pos - e.position <= LIGHT_RANGE);
     const ped = this.pedestrians.find((p) => p.lane === e.lane && p.pos >= e.position && p.pos - e.position <= PED_RANGE);
-    const cone = this.cones.find((c) => c.lane === e.lane && c.pos >= e.position && c.pos - e.position <= PED_RANGE);
     const exitIn = DEST_POS - e.position;
+    const exitNear = exitIn > 0 && exitIn <= EXIT_RANGE;
+    const leftClear = e.lane > 1 && this._laneClear(e.lane - 1);
+    const rightClear = e.lane < LANES && this._laneClear(e.lane + 1);
+    // "blocked": something slower than the limit sits close enough ahead that the car must pass
+    // it or slow to its pace - checked against SPEED_LIMIT, not the car's own current speed, so a
+    // car that has already matched a stopped obstruction's pace (speed 0 == lead's speed 0) keeps
+    // re-evaluating whether it can now pass, instead of latching into "hold speed" forever the
+    // moment the gap stops closing (the bug behind "stops dead instead of overtaking").
+    const blocked = Boolean(lead && lead.speed < SPEED_LIMIT && lead.position - e.position <= CLOSING_RANGE);
     return {
       lead,
       light,
       ped,
-      cone,
       exitIn,
       red: Boolean(light && light.state === 'red'),
-      coneAhead: Boolean(cone),
-      closing: Boolean(lead && lead.speed < e.speed && lead.position - e.position <= CLOSING_RANGE),
-      exitNear: exitIn > 0 && exitIn <= EXIT_RANGE,
-      mustExit: exitIn > 0 && exitIn <= EXIT_RANGE && e.lane < LANES,
+      blocked,
+      canPass: blocked && leftClear && !exitNear,
+      exitNear,
+      mustExit: exitNear && e.lane < LANES,
       roadClear: !lead,
       belowLimit: e.speed < SPEED_LIMIT,
-      leftClear: e.lane > 1 && this._laneClear(e.lane - 1),
-      rightClear: e.lane < LANES && this._laneClear(e.lane + 1),
+      leftClear,
+      rightClear,
     };
   }
 
@@ -161,7 +180,6 @@ export class Drive {
     return ACTIONS.filter((a) => {
       if (a === 'change lane right') return sit.rightClear;
       if (a === 'change lane left') return sit.leftClear && !sit.exitNear;
-      if (a === 'swerve left') return sit.leftClear;
       return true;
     });
   }
@@ -177,10 +195,12 @@ export class Drive {
   // engine can't represent: off-road lane, or behind/at the car.
   placeHazard(kind, lane, pos) {
     if (this.done || lane < 1 || lane > LANES || pos <= this.ego.position || pos >= ROAD_LENGTH) return false;
-    if (kind === 'pedestrian') this.pedestrians.push({ pos, lane, ticksLeft: 20 }); // longer-lived than a
-    // spawned pedestrian's 4 ticks - a visitor-placed one should stick around long enough to watch.
-    else if (kind === 'cone') this.cones.push({ pos, lane });
-    else if (kind === 'car') this.traffic.push({ lane, position: pos, speed: 0, cruise: 0 });
+    // `placed: true` distinguishes a visitor-placed hazard from a procedurally spawned one so
+    // the renderer can draw a marker ring only under what the visitor actually did.
+    if (kind === 'pedestrian') this.pedestrians.push({ pos, lane, ticksLeft: 20, placed: true }); // longer-lived
+    // than a spawned pedestrian's 4 ticks - a visitor-placed one should stick around to watch.
+    else if (kind === 'cone') this.cones.push({ pos, lane, placed: true });
+    else if (kind === 'car') this.traffic.push({ lane, position: pos, speed: 0, cruise: 0, placed: true });
     else return false;
     return true;
   }
@@ -193,7 +213,7 @@ export class Drive {
     else if (action === 'follow') {
       const lead = this._lead();
       if (lead) e.speed = Math.max(0, Math.min(e.speed, lead.speed));
-    } else if (action === 'change lane left' || action === 'swerve left') e.lane -= 1;
+    } else if (action === 'change lane left') e.lane -= 1;
     else if (action === 'change lane right') e.lane += 1;
     // 'hold speed' and unrecognised/illegal actions: no-op.
   }
@@ -243,7 +263,17 @@ export class Drive {
       }
     });
 
-    if (this.traffic.some((c) => c.lane === this.ego.lane && Math.abs(c.position - this.ego.position) <= COLLISION_GAP)) {
+    // Collision/occupancy test: a cone is exactly as solid as a traffic car here. This is the
+    // backstop for "driving through a cone" - the rules above should stop the car first, but if
+    // a model ignores them the run ends instead of sailing through for free. Checked as a swept
+    // interval (prevPos..position, widened by COLLISION_GAP), not just the final gap: a static
+    // cone plus a fast, accelerating car can cover more than COLLISION_GAP in one 0.5 s tick and
+    // step clean over an end-of-tick-only check without either position ever landing within it.
+    const hitLane = (lane, objPos) =>
+      lane === this.ego.lane && objPos + COLLISION_GAP >= prevPos && objPos - COLLISION_GAP <= this.ego.position;
+    const hitTraffic = this.traffic.some((c) => hitLane(c.lane, c.position));
+    const hitCone = this.cones.some((c) => hitLane(c.lane, c.pos));
+    if (hitTraffic || hitCone) {
       this.collisions += 1;
       this.done = true;
     }
@@ -270,9 +300,17 @@ export class Drive {
     ];
     if (sit.ped) sentences.push(`A pedestrian is crossing the car's lane ${Math.round(sit.ped.pos - e.position)} m ahead.`);
     if (sit.red) sentences.push(`The traffic light ${Math.round(sit.light.pos - e.position)} m ahead is red.`);
-    if (sit.coneAhead) sentences.push(`A cone blocks the car's lane ${Math.round(sit.cone.pos - e.position)} m ahead.`);
-    if (sit.closing) sentences.push(`The car is closing on a slower vehicle ${Math.round(sit.lead.position - e.position)} m ahead.`);
-    else if (sit.lead) sentences.push(`The lead vehicle is ${Math.round(sit.lead.position - e.position)} m ahead at ${sit.lead.speed} km/h.`);
+    // Unambiguous, agent-subject, precomputed: a slower vehicle and a static cone both "obstruct"
+    // the lane, so both feed the same change-lane-left/follow pair - one sentence when passing is
+    // legal, a different one when it isn't, never the same wording for both rules (that ambiguity
+    // was why the model sat behind slower traffic instead of overtaking).
+    if (sit.lead) {
+      const obstacle = sit.lead.isCone ? 'cone' : 'vehicle';
+      if (sit.canPass) sentences.push(`The car must change lane to pass the ${obstacle} ahead.`);
+      else if (sit.blocked) sentences.push(`The car cannot pass the ${obstacle} ahead and must slow down.`);
+      else if (sit.lead.isCone) sentences.push(`A cone is ${Math.round(sit.lead.position - e.position)} m ahead.`);
+      else sentences.push(`The lead vehicle is ${Math.round(sit.lead.position - e.position)} m ahead at ${sit.lead.speed} km/h.`);
+    }
     if (sit.mustExit) sentences.push(`The car must take the exit on the right in ${Math.round(sit.exitIn)} m.`);
     if (sit.roadClear) sentences.push(`The road ahead is clear for ${LEAD_RANGE} m.`);
     if (sit.leftClear) sentences.push('The lane to the left is clear.');
@@ -360,11 +398,10 @@ export function greedyPolicy(engine) {
   const fires = {
     stop: Boolean(sit.ped),
     brake: sit.red,
-    'swerve left': sit.coneAhead,
     'change lane right': sit.mustExit,
     accelerate: sit.roadClear,
-    'change lane left': sit.closing,
-    follow: sit.closing,
+    'change lane left': sit.canPass,
+    follow: sit.blocked,
     'hold speed': true,
   };
   return legal.find((a) => fires[a]);
@@ -395,16 +432,17 @@ function selfTest() {
   d2.pedestrians = [];
   console.assert(
     d2.describe() ===
-      'The car is in lane 2 of 3 at 45 km/h, below the speed limit of 60 km/h. The traffic light 60 m ahead is red. The car is closing on a slower vehicle 18 m ahead. The lane to the left is clear.',
+      'The car is in lane 2 of 3 at 45 km/h, below the speed limit of 60 km/h. The traffic light 60 m ahead is red. The car must change lane to pass the vehicle ahead. The lane to the left is clear.',
     'describe() lists only the situations that apply, in the fixed order'
   );
   console.assert(!d2.candidates().includes('change lane right'), 'lane change blocked by a car within 15 m');
   console.assert(d2.candidates().includes('change lane left'), 'clear lane offered');
   console.assert(greedyPolicy(d2) === 'brake', 'red light outranks the lane change');
   d2.lights = [];
-  console.assert(greedyPolicy(d2) === 'change lane left', 'closing on a slower vehicle with a clear left lane -> change lane left');
+  console.assert(greedyPolicy(d2) === 'change lane left', 'slower vehicle ahead with a clear left lane -> change lane left (overtake)');
   d2.traffic.push({ lane: 1, position: 1005, speed: 40 });
   console.assert(greedyPolicy(d2) === 'follow', 'no clear lane -> follow');
+  console.assert(d2.describe().includes('The car cannot pass the vehicle ahead and must slow down.'), 'unpassable obstruction renders the follow sentence, not the ambiguous "closing" one');
   d2.step('follow');
   console.assert(d2.ego.speed === 30, 'follow matches the lead speed');
 
@@ -433,7 +471,8 @@ function selfTest() {
   d3.ego.lane = 3;
   console.assert(!d3.candidates().includes('change lane right'), 'cannot change lane right off the road');
 
-  // visitor-placed hazards flow through the same pipeline as spawned ones
+  // visitor-placed hazards flow through the same pipeline as spawned ones, including the
+  // pass/follow logic - a cone is a static, zero-speed obstruction, not a special case.
   const d6 = new Drive({ seed: 1 });
   d6.ego = { lane: 2, speed: 40, position: 500 };
   d6.traffic = [];
@@ -443,12 +482,59 @@ function selfTest() {
   console.assert(!d6.placeHazard('cone', 2, 480), 'hazard behind the car is rejected');
   console.assert(!d6.placeHazard('cone', 4, 520), 'hazard off-road is rejected');
   console.assert(d6.placeHazard('cone', 2, 515), 'on-road hazard ahead of the car is accepted');
-  console.assert(d6.describe().includes("A cone blocks the car's lane 15 m ahead."), 'placed cone renders the same sentence style as a spawned hazard');
-  console.assert(d6.candidates().includes('swerve left'), 'swerve left is offered with the left lane clear');
-  console.assert(greedyPolicy(d6) === 'swerve left', 'cone in the lane outranks the default');
-  console.assert(d6.placeHazard('pedestrian', 1, 510), 'pedestrian hazard accepted ahead in a different lane');
+  console.assert(d6.cones[0].placed === true, "placed hazards are flagged so the renderer can ring-mark only what the visitor placed");
+  console.assert(d6.describe().includes('The car must change lane to pass the cone ahead.'), 'a passable cone renders the unambiguous change-lane sentence');
+  console.assert(greedyPolicy(d6) === 'change lane left', 'cone with a clear lane -> change lane left (not driven through)');
+  d6.traffic.push({ lane: 1, position: 510, speed: 40, cruise: 40 }); // block the only clear lane
+  console.assert(d6.describe().includes('The car cannot pass the cone ahead and must slow down.'), 'an unpassable cone renders the follow sentence');
+  console.assert(greedyPolicy(d6) === 'follow', 'cone with no clear lane -> follow (slows toward a stop, never a pass-through)');
+  console.assert(d6.placeHazard('pedestrian', 3, 510), 'pedestrian hazard accepted ahead in a different lane');
   console.assert(d6.placeHazard('car', 3, 530), 'stopped-car hazard accepted (reuses the traffic array)');
-  console.assert(d6.traffic.length === 1 && d6.traffic[0].speed === 0, 'stopped-car hazard has zero speed');
+  console.assert(d6.traffic.some((c) => c.speed === 0 && c.placed), 'stopped-car hazard has zero speed and is flagged as placed');
+
+  // a cone the car cannot pass must stop it, not let it cruise through at speed. Both neighbour
+  // lanes stay permanently blocked by stationary (speed 0) cars near where the ego will stop, so
+  // the test isn't accidentally passing because the blockers drove off.
+  const d7 = new Drive({ seed: 1 });
+  d7.ego = { lane: 2, speed: 50, position: 0 };
+  d7.traffic = [
+    { lane: 1, position: 10, speed: 0, cruise: 0 },
+    { lane: 3, position: 30, speed: 0, cruise: 0 },
+  ];
+  d7.lights = [];
+  d7.pedestrians = [];
+  d7.cones = [{ lane: 2, pos: 40 }];
+  for (let i = 0; i < 40 && !d7.done; i++) d7.step(greedyPolicy(d7));
+  console.assert(d7.ego.position < 40, "following the rule list, the car never reaches an unavoidable cone's position");
+  console.assert(d7.ego.speed === 0, 'the car stops for the cone instead of driving through it');
+
+  // the same cone, driven through on purpose (model ignoring the rules): the collision/occupancy
+  // test has to catch it exactly like it catches a traffic car - no free pass-through.
+  const d8 = new Drive({ seed: 1 });
+  d8.ego = { lane: 2, speed: 50, position: 0 };
+  d8.traffic = [];
+  d8.lights = [];
+  d8.pedestrians = [];
+  d8.cones = [{ lane: 2, pos: 20 }];
+  for (let i = 0; i < 10 && !d8.done; i++) d8.step('accelerate');
+  console.assert(d8.done && d8.collisions === 1, 'driving through a cone registers a collision, same as hitting traffic');
+
+  // overtaking resumes once the lane clears, even after the car has already matched a blocker's
+  // speed to zero - the bug that made it "stop dead" instead of ever passing.
+  const d9 = new Drive({ seed: 1 });
+  d9.ego = { lane: 2, speed: 0, position: 0 };
+  d9.traffic = [
+    { lane: 2, position: 10, speed: 0, cruise: 0 }, // stopped dead ahead, ego already matched its pace
+    { lane: 1, position: 5, speed: 40, cruise: 40 }, // left lane currently blocked
+  ];
+  d9.lights = [];
+  d9.pedestrians = [];
+  d9.cones = [];
+  console.assert(d9.situations().blocked && !d9.situations().canPass, 'boxed in: blocked but cannot pass yet');
+  console.assert(greedyPolicy(d9) === 'follow', 'follow (hold at the blocker\'s pace) while boxed in');
+  d9.traffic[1].position = 200; // the blocking car in lane 1 moves well clear
+  console.assert(d9.situations().canPass, 'once the left lane clears the car re-evaluates and can pass, even at matched speed 0');
+  console.assert(greedyPolicy(d9) === 'change lane left', 'passing resumes instead of sitting behind the blocker forever');
 
   // determinism
   function run(seed) {
