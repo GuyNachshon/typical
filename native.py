@@ -387,7 +387,8 @@ def _fit_chunks(tok, query, cand_texts, max_suffix, render="letters"):
     """Consecutive option index chunks whose rendered suffix fits max_suffix tokens (per-line
     counts are exact for single-token letters; +2/option slack covers numeric labels)."""
     if render == "semif":
-        per = '{"letter": "A", "description": "{}"}, '
+        # literal JSON braces must be escaped ({{/}}) so .format() only fills the description slot
+        per = '{{"letter": "A", "description": "{}"}}, '
         lens = [len(x) for x in tok([per.format(c) for c in cand_texts], add_special_tokens=False)["input_ids"]]
         _, tail_text = _semif_head_tail(tok)
         head_text = '", "criterion": ' + json.dumps(query) + ', "options": ['

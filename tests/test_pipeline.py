@@ -2375,6 +2375,18 @@ def test_semif_smoke_trains(tied_mcq_head):
     assert losses[-1] < losses[0]
 
 
+def test_semif_fit_chunks_when_suffix_overflows(tied_mcq_head):
+    """tl1b_semif regression (2026-09-22): _fit_chunks' semif branch built its per-option
+    length-probe template with unescaped literal JSON braces ('{"letter": ...}'), which
+    str.format() parsed as extra format fields -> KeyError('"letter"') the first time a real
+    run hit K > MAXK_DIRECT under --nc_render semif (data_kb). Mirrors
+    test_native_chunked_when_suffix_overflows but forces the chunked path with render=semif."""
+    examples = _mcq_examples(ks=(9, 2))
+    tok = tied_mcq_head.backbone.tokenizer
+    chunks = _fit_chunks(tok, examples[0]["query"], examples[0]["candidates"], max_suffix=40, render="semif")
+    assert len(chunks) > 1 and sorted(i for c in chunks for i in c) == list(range(9))
+
+
 @pytest.mark.parametrize("null", ["softmax", "factored"])
 def test_semif_kv_decide_matches_run_batch(tied_mcq_head, null):
     """native_kv_decide's semif prefix/suffix split must reproduce run_batch_native's full-row
