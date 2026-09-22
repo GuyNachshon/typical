@@ -4,7 +4,7 @@
 // terminal status line baked into the same canvas so the panel reads as one machine.
 import { Snake, greedyPolicy } from '../snake.js';
 import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, replayFrame, loadJSON, scoreboardLine } from './loop.js';
-import { drawScanlines, drawGlyphBloom, phosphorDecay, prefersReducedMotion } from './crt.js';
+import { drawScanlines, drawGlyphBloom, phosphorDecay, prefersReducedMotion, drawBezel, drawGlass, drawFringe } from './crt.js';
 
 const TICK_MS = 200;
 const FADE_MS = TICK_MS * 2; // phosphor persistence window
@@ -202,15 +202,15 @@ export async function mount(el, { decide, mode, ctx } = {}) {
     // frame's own top border (and the status line embedded in it) never sits under that text,
     // the way it did with a flat margin on wide/short panels where height was the binding
     // constraint.
-    const topClear = 90;
+    const topClear = 58;
     // .gc-foot (exhibits.css) docks the decision bars and the read sentence to the bottom-left,
     // min(520px, 58%) wide and ~150px tall over a scrim. A centred board puts the play field
     // under them — the food glyph was disappearing behind a probability bar. Sit the board in
     // the room that is actually free: to the right of the readout when the panel is wide enough
     // for that, otherwise above it.
-    const sideMargin = 10;
+    const sideMargin = 14;
     const footW = Math.min(520, w * 0.58);
-    const footH = 150;
+    const footH = 158; // .gc-foot: four bars + the two-line sentence, measured — the tube must clear it
     const rightRoom = w - footW - sideMargin * 2;
     const beside = rightRoom > (h - topClear - sideMargin) * 0.62; // wide enough to stand beside
     const availW = (beside ? rightRoom : w - sideMargin * 2);
@@ -231,9 +231,19 @@ export async function mount(el, { decide, mode, ctx } = {}) {
       statusFont = `${Math.round(cell * 0.46)}px ${family}`;
     }
 
-    // CRT glass - same near-black TOKENS.putty the other game cards sit on.
-    dctx.fillStyle = TOKENS.putty;
+    // the tube: bezel around the glass, then the near-black screen itself
+    drawBezel(dctx, ox, oy, boardW, boardH, { radius: 14, bezel: Math.max(6, cell * 0.45) });
+    dctx.fillStyle = '#060807';
     dctx.fillRect(ox, oy, boardW, boardH);
+    dctx.save();
+    dctx.font = `${Math.max(8, Math.round(cell * 0.32))}px ui-monospace, monospace`;
+    dctx.fillStyle = 'rgba(240,238,235,0.22)';
+    dctx.textAlign = 'right';
+    dctx.textBaseline = 'top';
+    dctx.fillText('TYPICAL-1', ox + boardW, oy + boardH + Math.max(3, cell * 0.12));
+    dctx.restore();
+    dctx.textAlign = 'center';
+    dctx.textBaseline = 'middle';
 
     dctx.textAlign = 'center';
     dctx.textBaseline = 'middle';
@@ -300,6 +310,7 @@ export async function mount(el, { decide, mode, ctx } = {}) {
           const color = phos(lit.hot ? 1 : 0.85);
           if (lit.hot) {
             drawGlyphBloom(dctx, lit.ch, cx, cy, { font, haloFont, color, haloColor: phos(0.28) });
+            if (!reducedMotion) drawFringe(dctx, lit.ch, cx, cy, { spread: Math.max(0.6, cell * 0.035) });
           } else {
             dctx.font = font;
             dctx.fillStyle = color;
@@ -330,6 +341,7 @@ export async function mount(el, { decide, mode, ctx } = {}) {
     }
 
     drawScanlines(dctx, ox, oy, boardW, boardH);
+    drawGlass(dctx, ox, oy, boardW, boardH, { t: now, roll: !reducedMotion });
     dctx.restore();
   }
 

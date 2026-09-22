@@ -54,3 +54,69 @@ if (typeof process !== 'undefined' && typeof window === 'undefined' && import.me
 }
 
 export { selfTest };
+
+// ---------------------------------------------------------------------------------------------
+// The tube itself. Without these the phosphor grid is just green text on black; a CRT reads as a
+// CRT because of the glass around it — a bezel, a vignette into the corners, the slow refresh
+// band, and the colour fringe where the three guns fail to converge.
+// ---------------------------------------------------------------------------------------------
+
+// Rounded bezel + inner vignette around a screen rect. Draw before the glyphs (the vignette is
+// drawn again after, as `drawGlass`, so the corners darken the content too).
+export function drawBezel(ctx, x, y, w, h, { radius = 14, bezel = 10 } = {}) {
+  ctx.save();
+  ctx.fillStyle = '#17181a';
+  roundRect(ctx, x - bezel, y - bezel, w + bezel * 2, h + bezel * 2, radius + 4);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = '#05070600';
+  ctx.restore();
+}
+
+// Vignette + refresh band + a faint scan glow, drawn over the glyphs. `t` is a timestamp in ms.
+export function drawGlass(ctx, x, y, w, h, { t = 0, radius = 14, roll = true } = {}) {
+  ctx.save();
+  roundRect(ctx, x, y, w, h, radius);
+  ctx.clip();
+  // corner falloff: a radial darkening, the curvature cue that costs nothing
+  const g = ctx.createRadialGradient(x + w / 2, y + h / 2, Math.min(w, h) * 0.22, x + w / 2, y + h / 2, Math.max(w, h) * 0.72);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, w, h);
+  if (roll) {
+    // refresh band: one soft bright line sweeping down about every 7 s
+    const bandY = y + ((t / 7000) % 1) * (h + 120) - 60;
+    const band = ctx.createLinearGradient(0, bandY - 60, 0, bandY + 60);
+    band.addColorStop(0, 'rgba(180,255,210,0)');
+    band.addColorStop(0.5, 'rgba(180,255,210,0.045)');
+    band.addColorStop(1, 'rgba(180,255,210,0)');
+    ctx.fillStyle = band;
+    ctx.fillRect(x, bandY - 60, w, 120);
+  }
+  ctx.restore();
+}
+
+// Misconvergence: the same glyph smeared a fraction of a pixel left in red and right in blue.
+// Call instead of a plain fillText for the brightest cells only — it is three draws per glyph.
+export function drawFringe(ctx, ch, cx, cy, { spread = 0.8, alpha = 0.22 } = {}) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = `rgba(255,60,60,${alpha})`;
+  ctx.fillText(ch, cx - spread, cy);
+  ctx.fillStyle = `rgba(60,120,255,${alpha})`;
+  ctx.fillText(ch, cx + spread, cy);
+  ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
