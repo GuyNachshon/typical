@@ -414,6 +414,7 @@ function mountFilmFxOn(film) {
     }, { after: film });
     handle.pulse = fx.pulse;
     handle.stop = fx.stop;
+    handle.grade = fx.grade;
   }).catch(() => {});
   return handle;
 }
@@ -423,7 +424,7 @@ function mountFilm(ctx, ids = {}) {
   const film = document.getElementById(ids.film || 'film');
   // The treatment is the hero's alone: the card in chapter 04 shows the frame untouched.
   const fx = ids.fx === true ? mountFilmFxOn(film) : { pulse() {} };
-  if (ids.fx === true && typeof window !== 'undefined') window.__fxPulse = () => fx.pulse(); // probe hook for the effect check
+  if (ids.fx === true && typeof window !== 'undefined') { window.__fxPulse = () => fx.pulse(); window.__fxGrade = () => fx.grade?.(); } // probe hooks for the effect check
   const rowsEl = document.getElementById(ids.rows || 'hud-rows');
   const sentEl = document.getElementById(ids.sentence || 'hud-sentence');
   const rec = document.getElementById(ids.rec || 'hud-rec');

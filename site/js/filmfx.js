@@ -1,39 +1,34 @@
-// filmfx.js — the hero film, seen through the decision machine.
+// filmfx.js — the hero film shown on a CRT.
 //
-// The film itself stays where it is: a sharp iframe underneath. Everything here is additive, drawn
-// into one overlay canvas that sits over the film and under the page's own chrome, so navigation,
-// type and cards are never touched.
+// The frame is not filtered in place: it is redrawn here, strip by strip, with a barrel warp, and
+// the iframe behind is left running but invisible. That matters for two reasons. A canvas can be
+// warped and an iframe cannot, and compositing anything on top of a live iframe put two different
+// frames on screen at once — the WebGL buffer we read back can lag the one being displayed, which
+// is what produced the ghost of a previous camera angle.
 //
-// What it adds, in draw order:
-//   1. a contrast lift, only while a decision is being processed
-//   2. RGB separation — red and blue fringes, and only where the frame has a hard edge
-//   3. phosphor bloom, weighted by luminance so a lit lamp halates and a dark corridor does not
-//   4. patches: small sparse regions that briefly resolve into tiny characters or edge contours
-//      and then reconstruct into the pixels underneath
-//   5. fine scanlines
-//   6. a little animated grain
+// Drawn per frame, into one canvas:
+//   1. the frame, in horizontal strips, each swelled by its distance from the centre
+//   2. bloom: the same frame blurred through a curve so only the lit parts survive, added back
+//   3. scanlines, and a much fainter vertical grille behind them
+//   4. vignette, then the tube mask — rounded corners and the dark surround outside the glass
+//   5. a little grain
 //
-// The masks (edges, highlights) are computed at half the film's resolution in one pass over an
-// ImageData and composited back up. Full resolution would be ~500k iterations a frame for no
-// visible gain: the separation is a pixel wide and the bloom is blurred anyway.
+// A decision that rewrites the probability panel calls pulse(): ~420ms of extra contrast, bloom
+// and scanline depth that settles back on its own.
 //
-//   const fx = mountFilmFx(host, getSource, { after });
-//   fx.pulse();   // a decision landed: 300-500ms of heightened contrast, bloom and separation
-//   fx.stop();
+//   const fx = mountFilmFx(host, getSource, { after });  fx.pulse();  fx.stop();
 
-const FPS = 30; // the film ticks at ~2.5 decisions/s; 30 is plenty and leaves the CPU alone
-const SCALE = 0.4; // mask resolution relative to the source frame
-const EDGE_T = 0.3; // gradient magnitude above which a pixel counts as an edge
-const HOT_T = 0.62; // luminance above which a pixel blooms
-const PULSE_MS = 420; // inside the 300-500ms the brief asks for
-
-const GLYPHS = ' .:-=+*#%@';
+const FPS = 26; // the game ticks at ~2.5 decisions/s; this is a film rate, not a game rate
+const STRIPS = 64; // horizontal slices the warp is built from
+const BULGE = 0.05; // how far the glass swells at the centre, as a share of width
+const PULSE_MS = 320; // decisions land every ~380ms, so a longer pulse would never finish and the
+// film would read as permanently graded instead of pulsing once per decision
 
 function reduced() {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-// Pulse envelope: a fast attack and a long settle, normalised to [0,1]. Exported for the test.
+// Pulse envelope: fast attack, long settle, normalised to [0,1].
 export function envelope(elapsed, dur = PULSE_MS) {
   if (elapsed < 0 || elapsed > dur) return 0;
   const t = elapsed / dur;
@@ -41,13 +36,10 @@ export function envelope(elapsed, dur = PULSE_MS) {
   return t < attack ? t / attack : (1 - (t - attack) / (1 - attack)) ** 1.6;
 }
 
-// Patch envelope: fade in, hold, fade out.
-export function patchAlpha(elapsed, dur) {
-  if (elapsed < 0 || elapsed > dur) return 0;
-  const t = elapsed / dur;
-  if (t < 0.25) return t / 0.25;
-  if (t > 0.65) return Math.max(0, 1 - (t - 0.65) / 0.35);
-  return 1;
+// Barrel profile: 1 at the middle of the glass, 0 at its rim.
+export function bulgeAt(v) {
+  const d = (v - 0.5) * 2; // -1 .. 1
+  return 1 - d * d;
 }
 
 function canvas2d(w = 1, h = 1, opts) {
@@ -57,15 +49,13 @@ function canvas2d(w = 1, h = 1, opts) {
   return { el, ctx: el.getContext('2d', opts) };
 }
 
-// A tile of monochrome noise, redrawn every few frames and scrolled between redraws so the grain
-// moves without costing a new tile each time.
 function noiseTile(size = 96) {
   const { el, ctx } = canvas2d(size, size);
   const img = ctx.createImageData(size, size);
   const fill = () => {
     const d = img.data;
     for (let i = 0; i < d.length; i += 4) {
-      const v = 118 + ((Math.random() * 74) | 0);
+      const v = 120 + ((Math.random() * 70) | 0);
       d[i] = d[i + 1] = d[i + 2] = v;
       d[i + 3] = 255;
     }
@@ -82,259 +72,170 @@ export function mountFilmFx(host, getSource, opts = {}) {
   const layer = document.createElement('canvas');
   layer.className = 'film-fx';
   layer.setAttribute('aria-hidden', 'true');
-  if (opts.after?.parentNode === host) host.insertBefore(layer, opts.after.nextSibling);
+  const film = opts.after;
+  if (film?.parentNode === host) host.insertBefore(layer, film.nextSibling);
   else host.appendChild(layer);
   const ctx = layer.getContext('2d');
+  // the iframe keeps running and keeps being readable; it just is not what you are looking at
+  if (film) film.style.opacity = '0';
 
-  const work = canvas2d(1, 1, { willReadFrequently: true }); // source at mask resolution
-  const fringe = canvas2d(); // red/blue edge fringes
-  const hot = canvas2d(); // highlights only, for the bloom
-  const contour = canvas2d(); // edge contours, for the patches that resolve into lines
+  const warp = canvas2d(); // the frame, warped, before the glass treatment
+  const bloom = canvas2d(); // the lit parts only, at a quarter scale: blur cost is per pixel
   const grain = noiseTile();
-  let lines = null; // cached scanline pattern, rebuilt on resize
+  let scan = null;
+  let grille = null;
+  let vignette = null;
+  let grainPat = null;
 
   let raf = 0;
   let last = 0;
   let stopped = false;
-  let mw = 0;
-  let mh = 0;
   let pulseAt = -1e9;
-  let nextPatchAt = performance.now() + 2500;
-  let lastBackdrop = '';
-  const patches = [];
+  let lastFilter = 'none'; // what the pulse is currently grading with, for verification
 
   function size(src) {
     const w = host.clientWidth;
     const h = host.clientHeight;
     if (!w || !h || !src?.width) return false;
     const dpr = Math.min(2, devicePixelRatio || 1);
-    if (layer.width !== Math.round(w * dpr) || layer.height !== Math.round(h * dpr)) {
-      layer.width = Math.round(w * dpr);
-      layer.height = Math.round(h * dpr);
+    const W = Math.round(w * dpr);
+    const H = Math.round(h * dpr);
+    if (layer.width !== W || layer.height !== H) {
+      layer.width = W;
+      layer.height = H;
       layer.style.width = `${w}px`;
       layer.style.height = `${h}px`;
-      lines = null;
-    }
-    const nw = Math.max(2, Math.round(src.width * SCALE));
-    const nh = Math.max(2, Math.round(src.height * SCALE));
-    if (nw !== mw || nh !== mh) {
-      mw = nw;
-      mh = nh;
-      [work, fringe, hot, contour].forEach((c) => {
-        c.el.width = mw;
-        c.el.height = mh;
-      });
+      // The source is 800x600; warping into a 2880-wide buffer just costs fill rate. Build the
+      // picture at roughly source scale and let the final composite do the upscale.
+      const ww = Math.min(W, 1024);
+      warp.el.width = ww;
+      warp.el.height = Math.round((H / W) * ww);
+      bloom.el.width = Math.max(2, Math.round(W / 4));
+      bloom.el.height = Math.max(2, Math.round(H / 4));
+      scan = null;
+      grille = null;
+      vignette = null;
     }
     return true;
   }
 
-  // One pass over the frame: luminance, Sobel magnitude and sign, and the three masks that come
-  // out of them. Writing three ImageDatas in the same loop keeps this to a single read.
-  function masks(src, pulse) {
-    work.ctx.drawImage(src, 0, 0, mw, mh);
-    const px = work.ctx.getImageData(0, 0, mw, mh).data;
-    const fImg = fringe.ctx.createImageData(mw, mh);
-    const hImg = hot.ctx.createImageData(mw, mh);
-    const cImg = contour.ctx.createImageData(mw, mh);
-    const f = fImg.data;
-    const hd = hImg.data;
-    const cd = cImg.data;
-    const lum = new Float32Array(mw * mh);
-    for (let i = 0, n = 0; n < lum.length; i += 4, n++) {
-      lum[n] = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) / 255;
+  function patterns(dpr) {
+    if (!scan) {
+      const step = Math.max(3, Math.round(3 * dpr));
+      const { el, ctx: c } = canvas2d(1, step);
+      c.fillStyle = 'rgba(0,0,0,0.85)';
+      c.fillRect(0, 0, 1, Math.max(1, Math.round(step / 3)));
+      scan = ctx.createPattern(el, 'repeat');
     }
-    // Interior pixels only, indexed arithmetically: the clamped accessor this used to call six
-    // times per pixel was most of the frame budget, and a one-pixel border carries no edges worth
-    // fringing. The highlight mask still covers the whole frame (its loop has no neighbours).
-    for (let n = 0; n < lum.length; n++) {
-      const l0 = lum[n];
-      if (l0 > HOT_T) {
-        const i0 = n * 4;
-        const a = ((l0 - HOT_T) / (1 - HOT_T)) ** 0.9;
-        hd[i0] = px[i0];
-        hd[i0 + 1] = px[i0 + 1];
-        hd[i0 + 2] = px[i0 + 2];
-        hd[i0 + 3] = Math.round(a * 255);
-      }
+    if (!grille) {
+      const step = Math.max(3, Math.round(3 * dpr));
+      const { el, ctx: c } = canvas2d(step, 1);
+      c.fillStyle = 'rgba(0,0,0,0.5)';
+      c.fillRect(0, 0, 1, 1);
+      grille = ctx.createPattern(el, 'repeat');
     }
-    for (let y = 1; y < mh - 1; y++) {
-      const row = y * mw;
-      for (let x = 1; x < mw - 1; x++) {
-        const n = row + x;
-        const i = n * 4;
-        const tl = lum[n - mw - 1], tc = lum[n - mw], tr = lum[n - mw + 1];
-        const ml = lum[n - 1], mr = lum[n + 1];
-        const bl = lum[n + mw - 1], bc = lum[n + mw], br = lum[n + mw + 1];
-        const gx = tr + 2 * mr + br - tl - 2 * ml - bl;
-        const gy = bl + 2 * bc + br - tl - 2 * tc - tr;
-        const mag = Math.abs(gx) + Math.abs(gy); // cheaper than hypot and the threshold absorbs the difference
-        if (mag > EDGE_T) {
-          const a = Math.min(1, (mag - EDGE_T) * 1.5);
-          // the side the edge falls on decides the colour: a horizontal step gets a red fringe on
-          // one flank and a blue one on the other, which is what lens/electron misconvergence does
-          const warm = gx > 0;
-          // dim and desaturated: a hint of misconvergence, not a colour-separated glitch
-          f[i] = warm ? 150 : 46;
-          f[i + 1] = 40;
-          f[i + 2] = warm ? 46 : 150;
-          f[i + 3] = Math.round(a * 255 * (0.3 + 0.4 * pulse));
-          cd[i] = cd[i + 1] = cd[i + 2] = 240;
-          cd[i + 3] = Math.round(Math.min(1, mag * 1.2) * 255);
-        }
-      }
-    }
-    fringe.ctx.putImageData(fImg, 0, 0);
-    hot.ctx.putImageData(hImg, 0, 0);
-    contour.ctx.putImageData(cImg, 0, 0);
-    return { px };
+    return { scan, grille };
   }
 
-  function scanlines(W, H) {
-    if (lines) return lines;
-    const step = Math.max(2, Math.round(2 * Math.min(2, devicePixelRatio || 1)));
-    const { el, ctx: c } = canvas2d(1, step);
-    c.fillStyle = 'rgba(0,0,0,0.2)';
-    c.fillRect(0, 0, 1, 1);
-    lines = ctx.createPattern(el, 'repeat');
-    void W;
-    void H;
-    return lines;
-  }
-
-  // A patch: a small region that resolves into characters, or into its own edge contours, and
-  // then reconstructs. Positions avoid the bottom-left copy card and the bottom-right HUD.
-  function spawnPatch(now, W, H) {
-    const kind = Math.random() < 0.55 ? 'glyphs' : 'contour';
-    const w = (0.07 + Math.random() * 0.1) * W;
-    const h = w * (0.55 + Math.random() * 0.5);
-    const x = Math.random() * (W - w);
-    const y = Math.random() * (H * 0.62);
-    patches.push({ kind, x, y, w, h, born: now, dur: 900 + Math.random() * 700 });
-  }
-
-  function drawGlyphPatch(p, a, px) {
-    const cell = 7 * Math.min(2, devicePixelRatio || 1);
-    const cols = Math.max(1, Math.round(p.w / cell));
-    const rows = Math.max(1, Math.round(p.h / (cell * 1.6)));
-    ctx.save();
-    ctx.globalAlpha = a * 0.85;
-    ctx.fillStyle = 'rgba(8,8,9,0.72)'; // the pixels step back so the characters can be read
-    ctx.fillRect(p.x, p.y, p.w, p.h);
-    ctx.font = `${(p.h / rows).toFixed(1)}px "Geist Mono", ui-monospace, monospace`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(240,238,235,0.92)';
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const sx = Math.min(mw - 1, Math.round(((p.x + (c + 0.5) * (p.w / cols)) / layer.width) * mw));
-        const sy = Math.min(mh - 1, Math.round(((p.y + (r + 0.5) * (p.h / rows)) / layer.height) * mh));
-        const i = (sy * mw + sx) * 4;
-        const l = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) / 255;
-        const g = GLYPHS[Math.min(GLYPHS.length - 1, Math.floor(l ** 0.8 * GLYPHS.length))];
-        if (g === ' ') continue;
-        ctx.fillText(g, p.x + (c + 0.5) * (p.w / cols), p.y + (r + 0.5) * (p.h / rows));
-      }
+  // Strip-wise barrel warp. Each horizontal slice is drawn wider the closer it is to the middle of
+  // the glass, which bows the verticals outwards, and shifted slightly away from the centre line,
+  // which bows the horizontals. At this scale it is indistinguishable from a real lens warp and
+  // costs a hundred drawImage calls instead of a per-pixel remap.
+  function drawWarped(src, W, H, pulse) {
+    const c = warp.ctx;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, W, H);
+    c.imageSmoothingEnabled = false;
+    c.filter = pulse > 0.01
+      ? `contrast(${(1 + 0.22 * pulse).toFixed(3)}) saturate(${(1 + 0.16 * pulse).toFixed(3)})`
+      : 'none';
+    lastFilter = c.filter;
+    const sh = src.height / STRIPS;
+    const ampX = BULGE * W;
+    const ampY = BULGE * H * 0.55;
+    for (let i = 0; i < STRIPS; i++) {
+      const v0 = i / STRIPS;
+      const v1 = (i + 1) / STRIPS;
+      // vertical bow: rows near the middle sit slightly further from the centre line
+      const y0 = v0 * H + Math.sign(v0 - 0.5) * ampY * bulgeAt(v0) * 0.5;
+      const y1 = v1 * H + Math.sign(v1 - 0.5) * ampY * bulgeAt(v1) * 0.5;
+      // horizontal bow: the widest strips are the ones halfway down
+      const over = ampX * bulgeAt((v0 + v1) / 2);
+      c.drawImage(src, 0, i * sh, src.width, sh, -over, y0, W + over * 2, Math.max(1, y1 - y0) + 1);
     }
-    ctx.restore();
-  }
-
-  function drawContourPatch(p, a) {
-    ctx.save();
-    ctx.globalAlpha = a * 0.5;
-    ctx.fillStyle = 'rgba(8,8,9,0.5)';
-    ctx.fillRect(p.x, p.y, p.w, p.h);
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = a * 0.75;
-    const sx = (p.x / layer.width) * mw;
-    const sy = (p.y / layer.height) * mh;
-    const sw = (p.w / layer.width) * mw;
-    const sh = (p.h / layer.height) * mh;
-    ctx.drawImage(contour.el, sx, sy, sw, sh, p.x, p.y, p.w, p.h);
-    ctx.restore();
+    c.filter = 'none';
   }
 
   function draw(src, now) {
     const W = layer.width;
     const H = layer.height;
+    const dpr = Math.min(2, devicePixelRatio || 1);
     const pulse = envelope(now - pulseAt);
-    const { px } = masks(src, pulse);
+    drawWarped(src, warp.el.width, warp.el.height, pulse);
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, W, H);
-
-    // 1. contrast, only while processing. This used to blend the frame over itself, which put a
-    // ghost of a previous camera angle on screen: the WebGL buffer we read can be a frame behind
-    // the one the iframe is showing. A backdrop filter grades what is actually underneath, so
-    // there is only ever one frame on screen.
-    const cf = pulse > 0.01
-      ? `contrast(${(1 + 0.2 * pulse).toFixed(3)}) saturate(${(1 + 0.14 * pulse).toFixed(3)}) brightness(${(1 + 0.05 * pulse).toFixed(3)})`
-      : '';
-    if (cf !== lastBackdrop) {
-      layer.style.backdropFilter = cf;
-      layer.style.webkitBackdropFilter = cf;
-      lastBackdrop = cf;
-    }
-
-    // 2. RGB separation at edges only
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.45 + 0.35 * pulse;
-    const dx = (0.7 + 1.3 * pulse) * (W / mw) * 0.5;
-    ctx.drawImage(fringe.el, -dx, 0, W, H);
-    ctx.globalAlpha = 0.34 + 0.3 * pulse;
-    ctx.drawImage(fringe.el, dx, 0, W, H);
-    ctx.restore();
+    // No inset and no bezel: the tube fills the panel. The hero's own rounded corners come from
+    // the stage (it clips, and the scroll inset rounds it), so the glass does not need its own.
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(warp.el, 0, 0, W, H);
 
-    // 3. phosphor bloom
+    // bloom, from the picture itself: pushed through a curve so only what was actually lit
+    // survives, blurred at a quarter scale and added back. Blurring at full resolution cost three
+    // quarters of the frame budget for a halo that is soft by definition.
+    const bw = bloom.el.width;
+    const bh = bloom.el.height;
+    const bc = bloom.ctx;
+    bc.setTransform(1, 0, 0, 1, 0, 0);
+    bc.clearRect(0, 0, bw, bh);
+    bc.filter = 'brightness(1.45) contrast(2.2) blur(2px)';
+    bc.drawImage(warp.el, 0, 0, warp.el.width, warp.el.height, 0, 0, bw, bh);
+    bc.filter = 'none';
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.imageSmoothingEnabled = true;
-    ctx.globalAlpha = 0.6 + 0.5 * pulse;
+    ctx.globalAlpha = 0.34 + 0.3 * pulse;
+    ctx.drawImage(bloom.el, 0, 0, W, H);
+    ctx.globalAlpha = 0.16 + 0.2 * pulse;
     ctx.filter = 'blur(6px)';
-    ctx.drawImage(hot.el, 0, 0, W, H);
-    ctx.globalAlpha = 0.32 + 0.35 * pulse;
-    ctx.filter = 'blur(24px)';
-    ctx.drawImage(hot.el, 0, 0, W, H);
+    ctx.drawImage(bloom.el, -W * 0.01, -H * 0.01, W * 1.02, H * 1.02);
     ctx.restore();
     ctx.filter = 'none';
 
-    // 4. patches
-    if (!still) {
-      if (now > nextPatchAt && patches.length < 2) {
-        spawnPatch(now, W, H);
-        nextPatchAt = now + 1800 + Math.random() * 3000;
-      }
-      for (let i = patches.length - 1; i >= 0; i--) {
-        const p = patches[i];
-        const a = patchAlpha(now - p.born, p.dur);
-        if (a <= 0) {
-          patches.splice(i, 1);
-          continue;
-        }
-        if (p.kind === 'glyphs') drawGlyphPatch(p, a, px);
-        else drawContourPatch(p, a);
-      }
-    }
-
-    // 5. scanlines
+    const pat = patterns(dpr);
     ctx.save();
     ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = scanlines(W, H);
+    ctx.globalAlpha = 0.5 + 0.18 * pulse;
+    ctx.fillStyle = pat.scan;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = pat.grille;
     ctx.fillRect(0, 0, W, H);
     ctx.restore();
 
-    // 6. grain
+    if (!vignette) {
+      vignette = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.22, W / 2, H / 2, Math.max(W, H) * 0.72);
+      vignette.addColorStop(0, 'rgba(0,0,0,0)');
+      vignette.addColorStop(0.7, 'rgba(0,0,0,0.2)');
+      vignette.addColorStop(1, 'rgba(0,0,0,0.6)');
+    }
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, W, H);
+
     if (!still) {
-      if ((now / 90) % 2 < 1) grain.fill();
+      if ((now / 120) % 2 < 1) grain.fill();
+      if (!grainPat) grainPat = ctx.createPattern(grain.el, 'repeat');
       ctx.save();
       ctx.globalCompositeOperation = 'overlay';
-      ctx.globalAlpha = 0.1 + 0.05 * pulse;
-      const p = ctx.createPattern(grain.el, 'repeat');
+      ctx.globalAlpha = 0.07;
       ctx.translate(-(Math.random() * 90) | 0, -(Math.random() * 90) | 0);
-      ctx.fillStyle = p;
+      ctx.fillStyle = grainPat;
       ctx.fillRect(0, 0, W + 96, H + 96);
       ctx.restore();
     }
+
+    ctx.restore();
   }
 
   function frame(t) {
@@ -349,12 +250,14 @@ export function mountFilmFx(host, getSource, opts = {}) {
     } catch {
       stop();
       layer.remove();
+      if (film) film.style.opacity = ''; // fall back to the plain film rather than a blank hero
     }
   }
 
   function stop() {
     stopped = true;
     cancelAnimationFrame(raf);
+    if (film) film.style.opacity = '';
   }
 
   raf = requestAnimationFrame(frame);
@@ -363,6 +266,7 @@ export function mountFilmFx(host, getSource, opts = {}) {
     pulse() {
       pulseAt = performance.now();
     },
+    grade: () => lastFilter,
     stop,
   };
 }
@@ -371,8 +275,8 @@ export function selfTest() {
   console.assert(envelope(-1) === 0 && envelope(PULSE_MS + 1) === 0, 'the pulse is silent outside its window');
   console.assert(Math.abs(envelope(PULSE_MS * 0.18) - 1) < 1e-6, 'the pulse peaks at the end of the attack');
   console.assert(envelope(PULSE_MS * 0.6) < envelope(PULSE_MS * 0.3), 'and settles after it');
-  console.assert(patchAlpha(0, 1000) === 0 && patchAlpha(1000, 1000) === 0, 'a patch starts and ends invisible');
-  console.assert(patchAlpha(500, 1000) === 1, 'and is fully resolved in the middle');
+  console.assert(bulgeAt(0.5) === 1 && bulgeAt(0) === 0 && bulgeAt(1) === 0, 'the glass swells in the middle and is flat at the rim');
+  console.assert(Math.abs(bulgeAt(0.25) - 0.75) < 1e-9, 'and eases between');
   console.log('filmfx.js self-test OK');
   return true;
 }
