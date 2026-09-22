@@ -57,7 +57,7 @@ TEMPLATE = """<!doctype html>
 <title>Research — Typical</title>
 <meta name="description" content="Architecture, data, pipeline, findings, and limitations behind Typical.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;700&family=Geist+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Geist+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="research.css">
 </head>

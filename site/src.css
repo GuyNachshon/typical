@@ -14,7 +14,7 @@
   --color-mid: #938f89;       /* secondary copy, numerals, hairlines */
   --color-steel: #c2bfba;     /* borders, outlines */
 
-  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   --text-eyebrow: 12px;   /* mono 700, tracking .72 / .96 */
