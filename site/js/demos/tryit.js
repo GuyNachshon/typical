@@ -96,7 +96,7 @@ export async function mount(host, ctx) {
   const actionRow = el('div', 'tryit-action-row');
   const runBtn = document.createElement('button');
   runBtn.type = 'button';
-  runBtn.className = 'ex-btn';
+  runBtn.className = 'btn ghost';
   runBtn.textContent = 'Run →';
   const randomBtn = document.createElement('button');
   randomBtn.type = 'button';
@@ -104,26 +104,26 @@ export async function mount(host, ctx) {
   randomBtn.textContent = 'Randomize';
   actionRow.append(runBtn, randomBtn);
 
-  const bars = el('div', 'tryit-bars');
-  const readout = el('p', 'ex-readout');
+  const barsEl = el('div', 'tryit-bars');
+  const readout = el('p', 't-mono muted');
   const notice = el('p', 'tryit-notice');
 
   wrap.append(
-    el('label', 'ex-caption', 'State'),
+    el('label', 't-eyebrow muted', 'State'),
     stateInput,
-    el('label', 'ex-caption', 'Question'),
+    el('label', 't-eyebrow muted', 'Question'),
     questionInput,
-    el('label', 'ex-caption', 'Options (comma-separated)'),
+    el('label', 't-eyebrow muted', 'Options (comma-separated)'),
     optionsInput,
     typeRow,
     actionRow,
-    bars,
+    barsEl,
     readout,
     notice
   );
   host.appendChild(wrap);
 
-  const field = ctx.inkBars(bars, { rows: [] });
+  const field = ctx.inkBars(barsEl, { rows: [] });
 
   if (flip) {
     const order = flip.orders[0];

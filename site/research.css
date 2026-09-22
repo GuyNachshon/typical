@@ -1,64 +1,45 @@
-/* research.html only. Nav, .wrap, h1/h2, .lede, tables, .code pre, .disclosure-box, and
-   .footer all come from style.css (same tokens, same idioms as index.html) — this file is
-   only the sticky-TOC article layout and the chart/legend classes js/charts.js renders into. */
+/* research.html only. Nav, .page, .chapter, .chapter-head, .t-*, .media, .ucard, .code,
+   .register, .note, .dest, .footer all come from style.css (site/src.css, the v11 Agility
+   lane) — this file adds only what src.css has no component for: the 64ch prose column
+   offset in the chapter-head's 220px+1fr grid, this page's h1 mobile size, and the chart
+   legend/source hooks js/charts.js renders into. */
 
-/* ---- page header: dot-matrix title + 44px standfirst ---- */
+/* ---- chapter body: 64ch prose column, offset right in the chapter-head's grid ---- */
 
-.page-header { padding-top: 56px; }
-.title-dots { margin-bottom: 20px; }
-.standfirst {
-  font-weight: 400; font-size: 44px; line-height: 1.13; letter-spacing: -1.85px;
-  color: var(--cream); max-width: 720px; margin: 0 0 12px;
+.chapter-body { display: grid; grid-template-columns: 220px 1fr; gap: 30px; }
+.chapter-body .body { grid-column: 2; display: grid; gap: 30px; }
+@media (max-width: 64rem) {
+  .chapter-body { grid-template-columns: 1fr; }
+  .chapter-body .body { grid-column: 1; }
 }
-@media (max-width: 800px) { .standfirst { font-size: 32px; letter-spacing: -1.2px; } }
+.chapter-body .prose { max-width: 64ch; display: grid; gap: 16px; font-size: 15px; line-height: 1.5; }
+.chapter-body .prose ul, .chapter-body .prose ol { margin: 0; padding-left: 20px; display: grid; gap: 10px; }
+.chapter-body .prose a { border-bottom: 1px solid var(--color-steel); }
+.chapter-body .prose a:hover { border-color: var(--color-off); }
+.chapter-body .prose code { background: var(--color-lgray); padding: 1px 4px; border-radius: var(--radius-icon); }
+/* Fig. N / Specimen: captions - a lone *italic* paragraph right after a code or chart panel */
+.chapter-body .prose p:has(> em:only-child) { font-size: 12px; color: var(--color-mid); }
 
-/* ---- sticky left TOC + article ---- */
-
-.layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 56px; align-items: start; padding: 48px 0 96px; }
-.toc { position: sticky; top: 24px; }
-.toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.toc a.active { color: var(--champagne); }
-.content { min-width: 0; }
-@media (max-width: 900px) {
-  .layout { grid-template-columns: 1fr; padding-top: 24px; }
-  .toc { position: static; border-bottom: 1px solid var(--hair); padding-bottom: 24px; margin-bottom: 8px; }
-  .toc ul { flex-direction: row; flex-wrap: wrap; gap: 16px; }
+/* the opening chapter-head's title sits inside a 1fr column narrower than the full-bleed
+   hero .stage - drop to .t-section's mobile size rather than .t-hero's */
+@media (max-width: 48rem) {
+  header.chapter .chapter-head h1.t-hero { font-size: 28px; line-height: 1; letter-spacing: -0.7px; }
 }
 
-/* ---- article prose: only what style.css's h2/.lede/table/.code/.disclosure-box don't cover ---- */
-
-.content h2 { margin: 64px 0 20px; scroll-margin-top: 24px; }
-.content > h2:first-child { margin-top: 0; }
-.content h3 { margin: 32px 0 12px; scroll-margin-top: 24px; }
-.content strong { color: var(--cream); font-weight: 500; }
-.content a { border-bottom: 1px solid var(--hair); }
-.content a:hover { border-color: var(--champagne); }
-.content code { color: var(--cream); background: var(--hair-soft); padding: 1px 4px; border-radius: 3px; }
-
-.content ul, .content ol { margin: 0 0 16px; padding-left: 20px; max-width: 66ch; color: var(--cream-70); font-size: 14px; }
-.content ol { list-style: none; counter-reset: item; padding-left: 0; }
-.content ol > li { counter-increment: item; position: relative; padding-left: 32px; margin-bottom: 20px; }
-.content ol > li::before { content: counter(item); position: absolute; left: 0; color: var(--champagne); font-variant-numeric: tabular-nums; }
-.content ul > li { margin-bottom: 10px; }
-.content ul > li::marker { color: var(--cream-60); }
-
-/* figure captions: a lone *italic* paragraph right after a code fence */
-.content p:has(> em:only-child) { margin-top: -8px; font-size: 11px; color: var(--ash); font-style: normal; }
-
-/* the D1 blockquote reuses .disclosure-box (style.css); its <p> also picked up .lede — reset it */
-.disclosure-box p { margin: 0; max-width: none; color: inherit; font-size: inherit; }
-
-/* ---- charts: research.js / js/charts.js mount into these ---- */
-
-.chart { margin: 8px 0 32px; }
-.chart-source { font-size: 11px; color: var(--ash); margin-top: 8px; }
-.donut-legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 14px; justify-content: center; }
-.donut-key { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--cream-70); }
-.donut-key i { width: 11px; height: 11px; display: inline-block; border-radius: 1px; }
-.timeline-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 32px; margin: 16px 0 0; padding-left: 20px; font-size: 12px; color: var(--cream-70); }
-.timeline-legend li { padding-left: 4px; }
-.timeline-legend b { font-weight: 500; color: var(--cream); }
-.timeline-legend-label { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 20px; color: var(--ash); }
+/* ---- charts: js/research.js mounts js/charts.js SVGs into .chart, inside a white .media
+   panel (charts.js already draws the v11 ink-on-white palette; only the surrounding HTML
+   legend/source hooks need CSS, src.css has no component for them). */
+.chart-source { font-family: var(--font-mono); font-size: 11px; color: var(--color-mid); margin-top: 8px; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 14px; font-size: 12px; color: var(--color-mid); }
+.legend-key { display: inline-flex; align-items: center; gap: 6px; }
+.legend-swatch { flex: none; }
+.donut-legend { justify-content: center; }
+.donut-key { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-mid); }
+.donut-key i { width: 11px; height: 11px; display: inline-block; border-radius: 1px; background: var(--color-off); }
+.timeline-legend { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 32px; margin: 16px 0 0; padding: 0; font-size: 12px; color: var(--color-mid); }
+.timeline-legend b { font-weight: 700; color: var(--color-off); }
+.timeline-legend .dim { color: var(--color-mid); }
+.timeline-legend-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.72px; text-transform: uppercase; margin-top: 20px; color: var(--color-mid); }
 
 /* ASCII plates never scroll: shrink the type until the widest line fits the column */
 @media (max-width: 760px) {

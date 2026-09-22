@@ -1,13 +1,29 @@
 // 04 SQL - `SELECT * FROM tickets WHERE typical(body, '<condition>')`. 129 rows, one Noul
-// query each. Atoms register: query line, ghost-link conditions, each row a dot-strip
-// readout (js/demos/rowdots.js) - champagne dots once it's a match. The scan animates only
+// query each. Register: query line, ghost-link conditions, each row a bars() readout
+// (js/bars.js, one candidate wide) - is-winner once it's a match. The scan animates only
 // by the rows filling in as they're decided - no glow.
 //
 // TEMPLATE (mirrored verbatim in scripts/record_data_demos.py's sql_question()):
 //   state = row text, verbatim
 //   query = {type:'noul', question:`Does this row satisfy the condition: ${condition}? Answer
 //            yes if ${criterion}; otherwise answer no.`, labels:['no','yes']}
-import { dotRow } from './rowdots.js';
+import { bars } from '../bars.js';
+
+// One ticket's row: the full text as the bar's label (compact bars in exhibits.css give it the
+// room), p as the fill. is-winner is our own >0.5 predicate, not bars.js's "max of the row" (a
+// single-row bars() call is trivially its own max) - set by hand after each update.
+function scanRow(text) {
+  const el = document.createElement('div');
+  el.title = text;
+  const h = bars(el, [{ label: text, p: 0 }]);
+  return {
+    el,
+    update(p, { isWinner = p != null && p >= 0.5 } = {}) {
+      h.update([{ label: text, p: p ?? 0 }]);
+      el.querySelector('.bar')?.classList.toggle('is-winner', isWinner);
+    },
+  };
+}
 
 function sqlQuestion(condition, criterion) {
   return `Does this row satisfy the condition: ${condition}? Answer yes if ${criterion}; otherwise answer no.`;
@@ -24,7 +40,7 @@ export async function mount(el, ctx) {
   const res = await fetch('data/demos/sql.json');
   const pool = res.ok ? await res.json() : null;
   if (!pool) {
-    el.innerHTML = '<p class="ex-muted">sql pool unavailable.</p>';
+    el.innerHTML = '<p class="muted">sql pool unavailable.</p>';
     return;
   }
 
@@ -50,7 +66,7 @@ export async function mount(el, ctx) {
   el.appendChild(chips);
 
   const readoutLine = document.createElement('p');
-  readoutLine.className = 'ex-readout';
+  readoutLine.className = 't-mono muted';
   readoutLine.textContent = 'Pick a condition to scan the table.';
   el.appendChild(readoutLine);
 
@@ -70,7 +86,7 @@ export async function mount(el, ctx) {
     "129 rows, one forward pass each, no embeddings. Four conditions score precision 1.00 and recall .69–1.00 against hand labels. It keys on the words in the rule: 'charged once' lit up 'duplicate charge'.";
   el.appendChild(caption);
 
-  const rowEls = pool.rows.map((row) => dotRow(row.text, { dots: 16, title: row.text }));
+  const rowEls = pool.rows.map((row) => scanRow(row.text));
 
   // 12 rows shown by default (no scroll box); "Show all N →" renders the rest inline.
   let order = pool.rows.map((_, i) => i);

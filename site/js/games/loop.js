@@ -1,25 +1,31 @@
 // Shared plumbing for the three game-card renderers (render-snake.js, render-drive.js,
-// render-doom.js): design tokens (feeding the renderers' own canvas/THREE.js scenes - not
-// reskinned here, out of scope), DOM chrome (HUD/buttons/decision strip), model-vs-scripted
-// policy helpers, viewport pausing and keyboard override. Keeps the three renderers from
-// re-deriving the same mount() contract three times. Chrome styles (.gc-*) live in
-// exhibits.css; the decision strip is a dotBars readout (js/dots.js), the take-over hint
-// and MODEL/SCRIPTED/RESTART are .ghost links (style.css) - see the "game chrome" section
-// in exhibits.css.
-// Atoms palette (keys kept so the renderers need no edits): canvas black, cream strokes,
-// champagne for the one emphasised element, ash for muted surfaces.
-import { dotBars } from '../dots.js';
+// render-doom.js / render-realdoom.js): design tokens (feeding the renderers' own canvas/
+// THREE.js scenes - not reskinned here, out of scope), DOM chrome (HUD/buttons/decision
+// strip), model-vs-scripted policy helpers, viewport pausing and keyboard override. Keeps the
+// three renderers from re-deriving the same mount() contract three times.
+//
+// Chrome lives inside a `.media.dark > .media-scene` box (site/index.html): the canvas fills
+// the scene, the HUD sits top-right (the `.media-label` owns top-left), the decision strip -
+// a bars() readout (js/bars.js), same primitive as everywhere else on the page - docks
+// bottom-left over a scrim, and the take-over hint + MODEL/RESTART controls dock bottom-right
+// as small `.btn.outline`s. Chrome styles (.gc-*) live in exhibits.css.
+import { bars } from '../bars.js';
+
+// v11 dark-scene palette (designs/AGILITY_DESIGN.md lane). Keys kept so the renderers need no
+// edits: putty = ground/field, ink = primary marks, bone = secondary objects, vellum =
+// hairlines/grid, graphite = muted surfaces (road), paper = brightest accent.
 export const TOKENS = {
-  putty: '#000000',   // field / ground
-  ink: '#fff7dd',     // primary marks (snake body, ego car, wall edges)
-  bone: '#8f8b83',    // secondary objects (traffic, floor)
-  vellum: '#2a2825',  // hairlines / grid
-  graphite: '#66635f',// muted surfaces (road)
-  paper: '#fff7dd',
+  putty: '#0b0b0b',
+  ink: '#f0eeeb',
+  bone: '#938f89',
+  vellum: '#2a2a2a',
+  graphite: '#3a3a3a',
+  paper: '#ffffff',
 };
 
-// Builds the shared DOM inside `el`: canvas + HUD + policy/restart buttons + decision strip +
-// read sentence. Returns refs the renderer draws into every frame/tick.
+// Builds the shared DOM inside `el`: canvas stage (fills the box) + HUD (top-right) + decision
+// strip/sentence (bottom-left, over a scrim) + hint/policy/restart controls (bottom-right).
+// Returns refs the renderer draws into every frame/tick.
 export function mountChrome(el, { label } = {}) {
   el.innerHTML = '';
   el.classList.add('gc-root');
@@ -31,39 +37,40 @@ export function mountChrome(el, { label } = {}) {
   stage.appendChild(canvas);
 
   const hud = document.createElement('div');
-  hud.className = 'gc-hud';
+  hud.className = 'gc-hud t-eyebrow';
   hud.textContent = label ?? '';
 
-  stage.append(hud);
-
-  const controls = document.createElement('div');
-  controls.className = 'gc-controls';
-  const policyBtn = document.createElement('button');
-  policyBtn.className = 'ghost gc-btn';
-  policyBtn.type = 'button';
-  const restartBtn = document.createElement('button');
-  restartBtn.className = 'ghost gc-btn';
-  restartBtn.type = 'button';
-  restartBtn.textContent = 'Restart';
-  controls.append(policyBtn, restartBtn);
-
+  // decision strip + sentence, docked bottom-left over a scrim - refs.sentence.parentElement
+  // is `foot`, which a renderer may append its own extra status lines into (same .gc-sentence
+  // class), stacking below the read sentence.
   const foot = document.createElement('div');
   foot.className = 'gc-foot';
-  // hint + MODEL/RESTART share one row below the canvas, not overlaid on it - the overlay used
-  // to sit on top of the canvas and could cover an engine's own status bar (DOOM's HUD).
+  const decision = document.createElement('div');
+  decision.className = 'gc-decision';
+  const sentence = document.createElement('div');
+  sentence.className = 'gc-sentence';
+  foot.append(decision, sentence);
+
+  // hint + MODEL/RESTART, docked bottom-right - kept separate from `foot` so the two never
+  // collide as the scrim's content grows.
   const footTop = document.createElement('div');
   footTop.className = 'gc-foot-top';
   const hint = document.createElement('div');
   hint.className = 'gc-hint';
   hint.textContent = '← → ↑ ↓ to take over · the model resumes after 3 s';
+  const controls = document.createElement('div');
+  controls.className = 'gc-controls';
+  const policyBtn = document.createElement('button');
+  policyBtn.className = 'btn outline gc-btn';
+  policyBtn.type = 'button';
+  const restartBtn = document.createElement('button');
+  restartBtn.className = 'btn outline gc-btn';
+  restartBtn.type = 'button';
+  restartBtn.textContent = 'Restart';
+  controls.append(policyBtn, restartBtn);
   footTop.append(hint, controls);
-  const decision = document.createElement('div');
-  decision.className = 'gc-decision';
-  const sentence = document.createElement('div');
-  sentence.className = 'gc-sentence';
-  foot.append(footTop, decision, sentence);
 
-  el.append(stage, foot);
+  el.append(stage, hud, foot, footTop);
 
   return { root: el, stage, canvas, hud, policyBtn, restartBtn, decision, sentence };
 }
@@ -76,14 +83,14 @@ export function scoreboardLine(counts, unit = '') {
   return `YOU ${counts.you} · MODEL ${counts.model}${unit ? ' ' + unit : ''}`;
 }
 
-// Paints the decision strip as a dotBars readout (js/dots.js): candidate · 24-dot strip ·
-// tabular numeral, plus the ∅ row (hollow dots), and the read sentence underneath. `probs`
-// is a plain {label: p} map. The highest-p row (candidate or ∅) gets the champagne dots -
-// it's the winner. One dotBars instance per game mount, reused across ticks via .update().
+// Paints the decision strip as a bars() readout (js/bars.js): candidate · ink-on-dark bar ·
+// tabular value, plus the ∅ row, and the read sentence underneath. `probs` is a plain
+// {label: p} map. Capped at 5 candidate rows (+ ∅) so Drive's longer rule lists never overflow
+// the scene box. One bars() instance per game mount, reused across ticks via .update().
 export function paintDecision(refs, { candidates = [], probs = {}, p_null = null, sentence = '' } = {}) {
-  const rows = candidates.map((c) => ({ label: c, p: probs[c] ?? 0 }));
+  const rows = candidates.slice(0, 5).map((c) => ({ label: c, p: probs[c] ?? 0 }));
   if (p_null != null) rows.push({ label: '∅', p: p_null, isNull: true });
-  if (!refs.decisionBars) refs.decisionBars = dotBars(refs.decision, rows, { dots: 24 });
+  if (!refs.decisionBars) refs.decisionBars = bars(refs.decision, rows);
   else refs.decisionBars.update(rows);
   refs.sentence.textContent = sentence;
 }

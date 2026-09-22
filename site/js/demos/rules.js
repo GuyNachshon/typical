@@ -3,6 +3,8 @@
 // question prefix, the two recorded orders) lives in data/presets.json's "flip" - already
 // loaded by shell.js into ctx.presets, read from there rather than duplicated here.
 // data/demos/rules.json only adds the 6 hand-written applicants for the second panel.
+import { bars } from '../bars.js';
+
 const OUTCOME_ORDER = ['deny', 'approve', 'approve_with_conditions', 'refer_to_underwriter'];
 
 function el(tag, className, text) {
@@ -44,23 +46,23 @@ export async function mount(host, ctx) {
   const panel1 = el('div', 'rules-panel1');
 
   const left = el('div');
-  left.appendChild(el('p', 'ex-subhead', 'The facts (fixed)'));
+  left.appendChild(el('p', 't-eyebrow muted', 'The facts (fixed)'));
   const factsList = el('ol', 'rules-facts');
   flip.state.split(/(?<=\.)\s+/).forEach((sentence) => factsList.appendChild(el('li', null, sentence)));
   left.appendChild(factsList);
 
-  left.appendChild(el('p', 'ex-subhead', 'The rules (reorder them)'));
+  left.appendChild(el('p', 't-eyebrow muted', 'The rules (reorder them)'));
   const ruleList = el('div', 'rules-order');
   left.appendChild(ruleList);
   const staticNote = el('p', 'ex-caption');
   left.appendChild(staticNote);
 
   const right = el('div');
-  const bars = el('div', 'rules-live-bars');
-  right.appendChild(bars);
-  const readoutLine = el('p', 'ex-readout');
+  const liveBars = el('div', 'rules-live-bars');
+  right.appendChild(liveBars);
+  const readoutLine = el('p', 't-mono muted');
   right.appendChild(readoutLine);
-  const field = ctx.inkBars(bars, { rows: [] });
+  const field = ctx.inkBars(liveBars, { rows: [] });
 
   panel1.append(left, right);
   wrap.appendChild(panel1);
@@ -122,7 +124,7 @@ export async function mount(host, ctx) {
   // ---- panel 2: 6 hand-written applicants x 2 orders, one decide() call each ----
   const panel2 = el('div', 'rules-panel2');
   panel2.style.marginTop = '8px';
-  panel2.appendChild(el('p', 'ex-subhead', 'Same rubric, 6 applicants'));
+  panel2.appendChild(el('p', 't-eyebrow muted', 'Same rubric, 6 applicants'));
   const tableWrap = el('div', 'table-scroll');
   const table = document.createElement('table');
   table.className = 'ex-table';
@@ -153,18 +155,13 @@ export async function mount(host, ctx) {
       const flipped = denyFirst.argmax !== approveFirst.argmax;
       [denyFirst, approveFirst].forEach((r, i) => {
         const td = document.createElement('td');
-        const cell = el('div', 'ex-cell ex-cell--col');
+        const cell = el('div', 'ex-cell');
         const word = el('span', 'ex-cell-word', r.argmax);
         word.title = r.argmax;
-        const barRow = el('span', 'ex-cell-barrow');
-        const strip = el('span', 'dotbars-strip');
-        const dots = 10;
-        const lit = Math.round(r.probs[r.argmax] * dots);
-        for (let d = 0; d < dots; d++) strip.appendChild(el('i', d < lit ? 'on' : null));
-        const num = el('span', 'ex-num', r.probs[r.argmax].toFixed(2));
-        barRow.append(strip, num);
-        cell.append(word, barRow);
-        if (i === 1 && flipped) cell.appendChild(el('span', 'ex-tag ex-tag--flip', 'FLIP'));
+        const barWrap = el('div', 'rules-cell-bar');
+        bars(barWrap, [{ label: '', p: r.probs[r.argmax] ?? 0 }]);
+        cell.append(word, barWrap);
+        if (i === 1 && flipped) cell.appendChild(el('span', 'tag', 'FLIP'));
         td.appendChild(cell);
         tr.appendChild(td);
       });

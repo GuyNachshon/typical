@@ -29,9 +29,9 @@ function fmt3(v) {
   return v == null ? '—' : v.toFixed(3);
 }
 
+// .register already sets tabular-nums on the whole table (src.css) — no per-cell class needed.
 function tdAcc(value) {
   const td = document.createElement('td');
-  td.className = 'acc-cell';
   td.textContent = fmt3(value);
   return td;
 }
@@ -42,9 +42,25 @@ function td(text) {
   return el;
 }
 
+// Inject the two-column grid once (JS-owned chunk of the port — buildResultsTable doesn't own
+// src.css, so the one rule it needs ships as a scoped <style>, same mechanism a component would
+// use). Single column ≤1024px per the design brief.
+let resultsGridStyled = false;
+function ensureResultsGridStyle() {
+  if (resultsGridStyled) return;
+  resultsGridStyled = true;
+  const style = document.createElement('style');
+  style.textContent =
+    '.results-tables{display:grid;grid-template-columns:1fr 1fr;gap:30px}' +
+    '@media (max-width:1024px){.results-tables{grid-template-columns:1fr}}';
+  document.head.appendChild(style);
+}
+
 // Split into two narrower tables (model+JevBench, model+evidence/intent) instead of one wide
-// 15-column table: each fits 1200px on its own without a horizontal-scroll wrapper.
+// 15-column table: each fits 1200px on its own without a horizontal-scroll wrapper. Both render
+// as .register (src.css: mono uppercase th, data-label stacking ≤640px) under a mono eyebrow.
 function buildResultsTable(container, models, frozenDoc) {
+  ensureResultsGridStyle();
   const frozenByTrained = new Map((frozenDoc?.rows ?? []).filter((r) => r.trained).map((r) => [r.trained, r.std]));
   const released = models.filter((m) => m.released);
 
@@ -53,19 +69,17 @@ function buildResultsTable(container, models, frozenDoc) {
     a.href = m.hf_url;
     a.target = '_blank';
     a.rel = 'noopener';
-    a.className = 'ghost-link';
     a.textContent = 'weights →';
     const cell = document.createElement('td');
     cell.appendChild(a);
     return cell;
   }
 
-  function buildTable(heading, headers, rowFn) {
+  function buildTable(eyebrow, headers, rowFn) {
     const col = document.createElement('div');
-    col.className = 'results-table-col';
-    col.appendChild(Object.assign(document.createElement('h3'), { className: 'chart-title', textContent: heading }));
+    col.appendChild(Object.assign(document.createElement('p'), { className: 't-eyebrow muted', textContent: eyebrow, style: 'margin-bottom:12px' }));
     const table = document.createElement('table');
-    table.className = 'results-table';
+    table.className = 'register';
     const thead = document.createElement('thead');
     const trh = document.createElement('tr');
     headers.forEach((h) => trh.appendChild(Object.assign(document.createElement('th'), { textContent: h })));
@@ -74,8 +88,8 @@ function buildResultsTable(container, models, frozenDoc) {
     const tbody = document.createElement('tbody');
     released.forEach((m) => {
       const tr = document.createElement('tr');
-      // data-label backs the ≤600px stacked layout (results-table td::before in style.css) —
-      // each cell carries its own column header so a narrow screen can drop the table grid.
+      // data-label backs the ≤640px stacked layout (.register td::before in src.css) — each
+      // cell carries its own column header so a narrow screen can drop the table grid.
       rowFn(m).forEach((cell, i) => {
         cell.dataset.label = headers[i];
         tr.appendChild(cell);
@@ -113,14 +127,16 @@ function buildResultsTable(container, models, frozenDoc) {
   container.appendChild(row);
 
   const footnote = document.createElement('p');
-  footnote.className = 'chart-caption';
+  footnote.className = 'note';
+  footnote.style.marginTop = '18px';
   footnote.textContent =
     'JevBench easy is 1.000 for every model and is omitted. typical-small-preview → typical-small is .750 → .694 on JevBench standard (about 1 SE at n = 72, SE ≈ .058), traded for typed heads and calibration (held-out score NLL 2.03 → 1.01).';
   container.appendChild(footnote);
 
   if (frozenByTrained.size) {
     const frozenNote = document.createElement('p');
-    frozenNote.className = 'chart-caption';
+    frozenNote.className = 'note';
+    frozenNote.style.marginTop = '8px';
     frozenNote.textContent =
       'On the hard tier the frozen 4B (.441) beats the trained 4B (.423); training helps the standard tier at 1.7B (+.17) far more than at 4B (+.03).';
     container.appendChild(frozenNote);
@@ -134,7 +150,7 @@ function uniqueSources(list) {
 function caption(el, text) {
   if (!el) return;
   const p = document.createElement('p');
-  p.className = 'chart-caption';
+  p.className = 'note';
   p.textContent = text;
   el.appendChild(p);
 }
@@ -142,10 +158,13 @@ function caption(el, text) {
 function buildInTrainingBox(container, frozenDoc) {
   if (!container || !frozenDoc?.in_flight) return;
   container.innerHTML = '';
-  const strong = document.createElement('strong');
-  strong.textContent = 'In training. ';
-  container.appendChild(strong);
-  const body = document.createElement('span');
+  const eyebrow = document.createElement('p');
+  eyebrow.className = 't-eyebrow muted';
+  eyebrow.style.marginBottom = '8px';
+  eyebrow.textContent = 'In training';
+  container.appendChild(eyebrow);
+  const body = document.createElement('p');
+  body.className = 'note';
   body.textContent = `${frozenDoc.in_flight}. Held up by a state-rendering bug, now fixed: ${frozenDoc.long_state_bug}.`;
   container.appendChild(body);
 }
@@ -206,7 +225,8 @@ async function mountResults(models, reliabilityDoc, chanceDoc, frozenDoc) {
       const panel = document.createElement('div');
       panel.className = 'chart reliability-panel';
       const h4 = document.createElement('h4');
-      h4.className = 'chart-title';
+      h4.className = 't-eyebrow muted';
+      h4.style.marginBottom = '8px';
       h4.textContent = `${id} · ${tier === 'std' ? 'standard' : 'hard'} · ECE ${ece != null ? ece.toFixed(3) : '—'}`;
       const holder = document.createElement('div');
       panel.append(h4, holder);

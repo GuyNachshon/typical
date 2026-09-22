@@ -1,62 +1,42 @@
-// Hand-rolled SVG charts. No libraries. Atoms palette on black: cream marks, ash for axes/
-// dim labels, hairline cream grid rules. Series are told apart by dash pattern + marker
-// shape, never colour — champagne is reserved for a released model's primary series (see
-// FG_ACCENT / accentFor below), never used as a full-surface fill.
+// Hand-rolled SVG charts. No libraries. v11 neutral palette (designs/AGILITY_DESIGN.md) on a
+// white chart surface: off-black ink for primary marks, mid-gray for axis text and a secondary
+// series, steel for gridlines/rules. Series are told apart by dash pattern + marker shape (never
+// colour alone, colour is only ever off-black vs mid-gray) — see seriesStyleFor below, keyed off
+// the model name in the label: typical-small solid, typical-medium dashed+square, preview
+// dotted+mid-gray, an unreleased model (14B) a hollow dashed outline.
 const NS = 'http://www.w3.org/2000/svg';
-const DIM = '#66635f'; // ember ash
-const RULE = 'rgba(255,247,221,0.12)'; // --hair-soft
-const FG = '#fff7dd'; // candlelight cream
-const ACCENT = '#c8ad86'; // champagne gold — released models' primary series only
+const INK = '#292827'; // off-black — primary marks, primary text
+const MID = '#938f89'; // mid-gray — axis/legend text, secondary series
+const STEEL = '#c2bfba'; // steel — gridlines, axis rules, reference lines... except ref lines are mid-gray per spec
+const WHITE = '#ffffff';
+const FONT_MONO = '"Geist Mono", ui-monospace, "SF Mono", Menlo, monospace';
 
-// A series is "accented" (champagne) only when its label names a released model (no
-// "(not released)" suffix) — everything else (unreleased points, axes, grid) stays cream/ash.
-function accentFor(label) {
-  return typeof label === 'string' && !label.includes('not released') ? ACCENT : FG;
+// Fixed style slots (never cycled by data order) plus a name-keyed lookup so the same model
+// always gets the same treatment across every chart on the page.
+const STYLE_SMALL = { color: INK, dash: 'none', shape: 'circle', hollow: false };
+const STYLE_MEDIUM = { color: INK, dash: '6 3', shape: 'square', hollow: false };
+const STYLE_PREVIEW = { color: MID, dash: '2 3', shape: 'circle', hollow: false };
+const STYLE_UNRELEASED = { color: INK, dash: '1 5', shape: 'circle', hollow: true };
+const STYLE_SLOTS = [STYLE_SMALL, STYLE_MEDIUM, STYLE_PREVIEW, STYLE_UNRELEASED];
+
+function seriesStyleFor(label, i = 0) {
+  const l = String(label || '').toLowerCase();
+  if (l.includes('preview')) return STYLE_PREVIEW;
+  if (l.includes('14b') || l.includes('not released')) return STYLE_UNRELEASED;
+  if (l.includes('medium')) return STYLE_MEDIUM;
+  if (l.includes('small')) return STYLE_SMALL;
+  return STYLE_SLOTS[i % STYLE_SLOTS.length]; // generic (non-model) series: fixed order, never re-cycled per filter
 }
 
-const DASH = ['none', '6 3', '2 3', '9 3 2 3'];
-const SHAPES = ['circle', 'square', 'triangle', 'diamond'];
-
-function seriesStyle(i) {
-  return { dash: DASH[i % DASH.length], shape: SHAPES[i % SHAPES.length] };
-}
-
-// One shape vocabulary for every series marker, so lines are readable without colour.
-function markerEl(shape, cx, cy, r, fill) {
+// One shape vocabulary for every series marker, so lines are readable without colour. `hollow`
+// draws an outline only (14B / not-released), matching the model's fill state everywhere else.
+function markerEl(shape, cx, cy, r, fill, hollow = false) {
+  const style = hollow ? { fill: 'none', stroke: fill, 'stroke-width': 1.6 } : { fill };
   if (shape === 'square') {
     const s = r * 1.6;
-    return svgEl('rect', { x: cx - s / 2, y: cy - s / 2, width: s, height: s, fill });
+    return svgEl('rect', { x: cx - s / 2, y: cy - s / 2, width: s, height: s, ...style });
   }
-  if (shape === 'triangle') {
-    const s = r * 1.9;
-    const pts = `${cx},${cy - s * 0.62} ${cx + s * 0.56},${cy + s * 0.46} ${cx - s * 0.56},${cy + s * 0.46}`;
-    return svgEl('polygon', { points: pts, fill });
-  }
-  if (shape === 'diamond') {
-    const s = r * 1.3;
-    const pts = `${cx},${cy - s} ${cx + s},${cy} ${cx},${cy + s} ${cx - s},${cy}`;
-    return svgEl('polygon', { points: pts, fill });
-  }
-  return svgEl('circle', { cx, cy, r, fill });
-}
-
-// A "bar" is a column of stacked 7px dots (3px gaps) growing up from the baseline - the
-// value is how many dots are lit, not a continuous fill height (no opacity-as-magnitude
-// gradients; the dot system quantizes). `fill` picks cream (default) vs champagne for an
-// emphasised series.
-function dotColumn(g, cx, baseline, top, { dot = 7, gap = 3, fill = FG, opacity = 0.85 } = {}) {
-  const step = dot + gap;
-  for (let y = baseline - dot; y >= top - 0.5; y -= step) {
-    g.appendChild(svgEl('rect', { x: cx - dot / 2, y, width: dot, height: dot, rx: 1.5, fill, 'fill-opacity': opacity }));
-  }
-}
-
-// Horizontal counterpart (hbarFloor's rows) - dots grow rightward from the axis.
-function dotRowMeter(g, y0, left, right, { dot = 7, gap = 3, fill = FG, opacity = 0.85 } = {}) {
-  const step = dot + gap;
-  for (let x = left; x <= right - dot + 0.5; x += step) {
-    g.appendChild(svgEl('rect', { x, y: y0, width: dot, height: dot, rx: 1.5, fill, 'fill-opacity': opacity }));
-  }
+  return svgEl('circle', { cx, cy, r, ...style });
 }
 
 function svgEl(tag, attrs = {}) {
@@ -66,13 +46,18 @@ function svgEl(tag, attrs = {}) {
 }
 
 function svgText(x, y, str, attrs = {}) {
-  const t = svgEl('text', { x, y, fill: FG, 'font-size': 12, ...attrs });
+  const t = svgEl('text', { x, y, fill: INK, 'font-size': 12, 'font-family': FONT_MONO, ...attrs });
   t.textContent = str;
   return t;
 }
 
 function baseSvg(container, w, h, titleStr) {
   container.innerHTML = '';
+  container.style.background = WHITE;
+  // Cap to the chart's own natural width so a wide parent column (research.html's content
+  // rail) can't stretch a 320px donut into an 900px blob — keeps every chart in the legible
+  // 560-640px band the brief asks for (donut/reliability are intentionally narrower).
+  container.style.maxWidth = `${w}px`;
   const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, width: '100%', role: 'img' });
   if (titleStr) {
     const t = svgEl('title');
@@ -86,18 +71,23 @@ function baseSvg(container, w, h, titleStr) {
 // Default tick formatter: at most 2 decimals, no float noise.
 export const fmtNum = (v) => (Number.isInteger(v) ? String(v) : Number(v.toFixed(2)).toString());
 
-// Legend key is an 8px dot in the series' own marker shape (still told apart by shape, not
-// colour, for series that share cream) - the same dot vocabulary as the chart itself.
+// Legend key: a 10px square swatch (solid fill, or a hollow ring for an unreleased model) + the
+// series label in 11px mono mid-gray — plain inline styles, this chart doesn't depend on any
+// stylesheet shipping a .chart-legend rule.
 function legend(container, series) {
   if (series.length < 2) return;
   const leg = document.createElement('div');
   leg.className = 'chart-legend';
+  leg.style.cssText = `display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-family:${FONT_MONO};font-size:11px;color:${MID};`;
   series.forEach((s, i) => {
-    const { shape } = seriesStyle(i);
+    const st = seriesStyleFor(s.label, i);
     const key = document.createElement('span');
     key.className = 'legend-key';
-    const swatch = svgEl('svg', { class: 'legend-swatch', width: 8, height: 8, viewBox: '0 0 8 8' });
-    swatch.appendChild(markerEl(shape, 4, 4, 3, accentFor(s.label)));
+    key.style.cssText = 'display:inline-flex;align-items:center;gap:6px;';
+    const swatch = document.createElement('span');
+    swatch.style.cssText = st.hollow
+      ? `width:10px;height:10px;display:inline-block;border-radius:2px;border:1.6px solid ${st.color};box-sizing:border-box;`
+      : `width:10px;height:10px;display:inline-block;border-radius:2px;background:${st.color};`;
     key.append(swatch, document.createTextNode(s.label));
     leg.appendChild(key);
   });
@@ -137,13 +127,25 @@ export function niceTicks(min, max, count = 5) {
 }
 
 function axisPair(g, iw, ih) {
-  g.appendChild(svgEl('line', { x1: 0, x2: 0, y1: 0, y2: ih, stroke: DIM }));
-  g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: ih, y2: ih, stroke: DIM }));
+  g.appendChild(svgEl('line', { x1: 0, x2: 0, y1: 0, y2: ih, stroke: STEEL }));
+  g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: ih, y2: ih, stroke: STEEL }));
 }
 
 function gridRow(g, iw, y, label, fmt) {
-  g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y, y2: y, stroke: RULE, 'stroke-dasharray': '2,3' }));
-  g.appendChild(svgText(-8, y + 3, fmt(label), { fill: DIM, 'font-size': 10, 'text-anchor': 'end' }));
+  g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y, y2: y, stroke: STEEL, 'stroke-dasharray': '2,3' }));
+  g.appendChild(svgText(-8, y + 3, fmt(label), { fill: MID, 'font-size': 12, 'text-anchor': 'end' }));
+}
+
+// A reference line (chance baseline etc.): mid-gray dashed rule with an 11px mono label.
+function refLine(g, iw, y, label) {
+  g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y, y2: y, stroke: MID, 'stroke-dasharray': '4,3' }));
+  if (label) g.appendChild(svgText(iw - 4, y - 5, label, { fill: MID, 'font-size': 11, 'text-anchor': 'end' }));
+}
+
+// A solid bar, rounded on every corner at 4px (SVG auto-clamps rx for short bars, so this stays
+// correct even when a bar is thinner than 8px) — the "no dot columns" mark from here on.
+function bar(g, x, y, w, h, fill, opacity = 1) {
+  return svgEl('rect', { x, y, width: Math.max(0, w), height: Math.max(0, h), rx: 4, fill, 'fill-opacity': opacity });
 }
 
 const M = { t: 20, r: 24, b: 50, l: 56 };
@@ -173,19 +175,17 @@ export function barChart(container, { series, yLabel = '', fmt = fmtNum, title =
       const bw = barW * 0.85;
       const bx = ci * groupW + barW * (si + 0.5);
       const by = y(v);
-      dotColumn(g, bx + bw / 2, ih, by, { fill: accentFor(s.label) });
-      // transparent hit area under the dots keeps the hover title working over the bar's
-      // full footprint, not just the lit dots
-      const hit = svgEl('rect', { x: bx, y: by, width: bw, height: Math.max(0, ih - by), fill: 'transparent' });
+      const fill = seriesStyleFor(s.label, si).color;
+      const rect = bar(g, bx, by, bw, ih - by, fill);
       const ttl = svgEl('title');
       ttl.textContent = `${s.label} · ${cat}: ${fmt(v)}`;
-      hit.appendChild(ttl);
-      g.appendChild(hit);
+      rect.appendChild(ttl);
+      g.appendChild(rect);
     });
-    g.appendChild(svgText(ci * groupW + groupW / 2, ih + 18, String(cat), { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }));
+    g.appendChild(svgText(ci * groupW + groupW / 2, ih + 18, String(cat), { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
   });
 
-  if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: DIM, 'font-size': 10 }));
+  if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: MID, 'font-size': 12 }));
   legend(container, series);
   return svg;
 }
@@ -208,18 +208,17 @@ export function lineChart(container, { series, xLabel = '', yLabel = '', logX = 
   niceTicks(0, yMax, 5).forEach((t) => gridRow(g, iw, y(t), t, fmt));
   // log-x: label the actual data points (K = 2, 32, 256), not interpolated nonsense
   const xTicks = logX ? [...new Set(allX)].sort((a, b) => a - b) : niceTicks(xMin, xMax, 5);
-  xTicks.forEach((t) => g.appendChild(svgText(x(t), ih + 18, fmt(t), { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' })));
+  xTicks.forEach((t) => g.appendChild(svgText(x(t), ih + 18, fmt(t), { fill: MID, 'font-size': 12, 'text-anchor': 'middle' })));
   axisPair(g, iw, ih);
 
   series.forEach((s, si) => {
-    const { dash, shape } = seriesStyle(si);
-    const color = accentFor(s.label);
+    const { dash, shape, color, hollow } = seriesStyleFor(s.label, si);
     const pts = s.values.map((v) => `${x(v.x)},${y(v.y)}`).join(' ');
     const lineAttrs = { points: pts, fill: 'none', stroke: color, 'stroke-width': 2 };
     if (dash !== 'none') lineAttrs['stroke-dasharray'] = dash;
     g.appendChild(svgEl('polyline', lineAttrs));
     s.values.forEach((v) => {
-      const dot = markerEl(shape, x(v.x), y(v.y), 4.5, color);
+      const dot = markerEl(shape, x(v.x), y(v.y), 4, color, hollow); // 8px markers
       const ttl = svgEl('title');
       ttl.textContent = `${s.label}: ${fmt(v.x)}, ${fmt(v.y)}`;
       dot.appendChild(ttl);
@@ -227,8 +226,8 @@ export function lineChart(container, { series, xLabel = '', yLabel = '', logX = 
     });
   });
 
-  if (xLabel) g.appendChild(svgText(iw / 2, ih + 38, xLabel, { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }));
-  if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: DIM, 'font-size': 10 }));
+  if (xLabel) g.appendChild(svgText(iw / 2, ih + 38, xLabel, { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
+  if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: MID, 'font-size': 12 }));
   legend(container, series);
   return svg;
 }
@@ -248,12 +247,13 @@ export function reliability(container, { bins, ece, title = 'Reliability' }) {
   svg.appendChild(g);
 
   [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
-    g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(t), y2: y(t), stroke: RULE, 'stroke-dasharray': '2,3' }));
-    g.appendChild(svgEl('line', { x1: x(t), x2: x(t), y1: 0, y2: ih, stroke: RULE, 'stroke-dasharray': '2,3' }));
-    g.appendChild(svgText(-8, y(t) + 3, t.toFixed(2), { fill: DIM, 'font-size': 10, 'text-anchor': 'end' }));
-    g.appendChild(svgText(x(t), ih + 16, t.toFixed(2), { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }));
+    g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(t), y2: y(t), stroke: STEEL, 'stroke-dasharray': '2,3' }));
+    g.appendChild(svgEl('line', { x1: x(t), x2: x(t), y1: 0, y2: ih, stroke: STEEL, 'stroke-dasharray': '2,3' }));
+    g.appendChild(svgText(-8, y(t) + 3, t.toFixed(2), { fill: MID, 'font-size': 12, 'text-anchor': 'end' }));
+    g.appendChild(svgText(x(t), ih + 16, t.toFixed(2), { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
   });
-  g.appendChild(svgEl('line', { x1: x(0), y1: y(0), x2: x(1), y2: y(1), stroke: DIM, 'stroke-dasharray': '4,3' }));
+  // ideal-calibration diagonal: steel dashed
+  g.appendChild(svgEl('line', { x1: x(0), y1: y(0), x2: x(1), y2: y(1), stroke: STEEL, 'stroke-width': 1.5, 'stroke-dasharray': '4,3' }));
 
   const maxN = Math.max(...bins.map((b) => b.n), 1);
   const slot = iw / bins.length;
@@ -261,18 +261,17 @@ export function reliability(container, { bins, ece, title = 'Reliability' }) {
     const bw = slot * 0.8 * (b.n / maxN || 0.05);
     const bx = i * slot + (slot - bw) / 2;
     const by = y(b.accuracy);
-    dotColumn(g, i * slot + slot / 2, ih, by);
-    const hit = svgEl('rect', { x: bx, y: by, width: bw, height: Math.max(0, ih - by), fill: 'transparent' });
+    const rect = bar(g, bx, by, bw, ih - by, INK, 0.85);
     const ttl = svgEl('title');
     ttl.textContent = `[${b.lo.toFixed(2)}–${b.hi.toFixed(2)}] n=${b.n} acc=${b.accuracy.toFixed(3)} conf=${b.mean_confidence.toFixed(3)}`;
-    hit.appendChild(ttl);
-    g.appendChild(hit);
-    if (b.n > 0) g.appendChild(svgText(i * slot + slot / 2, by - 4, `n=${b.n}`, { fill: DIM, 'text-anchor': 'middle', 'font-size': 10 }));
+    rect.appendChild(ttl);
+    g.appendChild(rect);
+    if (b.n > 0) g.appendChild(svgText(i * slot + slot / 2, by - 4, `n=${b.n}`, { fill: MID, 'text-anchor': 'middle', 'font-size': 11 }));
   });
 
   axisPair(g, iw, ih);
-  g.appendChild(svgText(iw / 2, ih + 36, 'confidence', { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }));
-  g.appendChild(svgText(-mm.l + 4, -8, 'accuracy', { fill: DIM, 'font-size': 10 }));
+  g.appendChild(svgText(iw / 2, ih + 36, 'confidence', { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
+  g.appendChild(svgText(-mm.l + 4, -8, 'accuracy', { fill: MID, 'font-size': 12 }));
   return svg;
 }
 
@@ -291,40 +290,38 @@ export function ladder(container, { points, xLabel = 'latency (ms)', yLabel = 'a
 
   niceTicks(Math.min(...ys, ...refYs) * 0.9, Math.max(...ys) * 1.1, 6).forEach((t) => gridRow(g, iw, y(t), t, fmt));
   niceTicks(Math.min(...xs) * 0.9, Math.max(...xs) * 1.1, 5).forEach((t) =>
-    g.appendChild(svgText(x(t), ih + 18, fmt(t), { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }))
+    g.appendChild(svgText(x(t), ih + 18, fmt(t), { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }))
   );
   axisPair(g, iw, ih);
 
   const maxSize = Math.max(...points.map((p) => p.size ?? 1));
   points.forEach((p) => {
     const norm = (p.size ?? 1) / maxSize;
-    const r = 4 + 6 * norm;
+    const r = 4 + 6 * norm; // 8px minimum marker diameter
     const cx = x(p.x);
     const cy = y(p.y);
-    const color = accentFor(p.label);
-    const dot = p.hollow
-      ? svgEl('circle', { cx, cy, r, fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-dasharray': '3,2' })
-      : svgEl('circle', { cx, cy, r, fill: color });
+    const style = seriesStyleFor(p.label);
+    const hollow = p.hollow ?? style.hollow;
+    const dot = markerEl('circle', cx, cy, r, style.color, hollow);
+    if (hollow) dot.setAttribute('stroke-dasharray', '3,2');
     const ttl = svgEl('title');
     ttl.textContent = `${p.label}: ${fmt(p.x)}, ${fmt(p.y)}`;
     dot.appendChild(ttl);
     g.appendChild(dot);
-    // labels flip to the left of the dot near the right edge so they never clip
+    // labels flip to the left of the dot near the right edge so they never clip. Direct labels
+    // always wear text ink (mid-gray), never the marker's own colour.
     const flip = cx > iw * 0.8;
-    g.appendChild(svgText(flip ? cx - r - 4 : cx + r + 4, cy + 3, p.label, { fill: p.hollow ? DIM : color, 'text-anchor': flip ? 'end' : 'start' }));
+    g.appendChild(svgText(flip ? cx - r - 4 : cx + r + 4, cy + 3, p.label, { fill: MID, 'text-anchor': flip ? 'end' : 'start' }));
   });
-  refLines.forEach((rl) => {
-    g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(rl.y), y2: y(rl.y), stroke: DIM, 'stroke-dasharray': '4,3' }));
-    if (rl.label) g.appendChild(svgText(iw - 4, y(rl.y) - 5, rl.label, { fill: DIM, 'text-anchor': 'end', 'font-size': 10 }));
-  });
+  refLines.forEach((rl) => refLine(g, iw, y(rl.y), rl.label));
 
-  if (xLabel) g.appendChild(svgText(iw / 2, ih + 38, xLabel, { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }));
-  if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: DIM, 'font-size': 10 }));
+  if (xLabel) g.appendChild(svgText(iw / 2, ih + 38, xLabel, { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
+  if (yLabel) g.appendChild(svgText(-M.l + 4, -8, yLabel, { fill: MID, 'font-size': 12 }));
   return svg;
 }
 
 // donut(el, {segments:[{label, value}], title}) -- fixed-order categorical donut (never
-// cycled: segment i always gets the same fill-opacity step).
+// cycled: segment i always gets the same fill-opacity step of off-black).
 export function donut(container, { segments, title = 'Mix' }) {
   const w = 320;
   const h = 320;
@@ -353,7 +350,8 @@ export function donut(container, { segments, title = 'Mix' }) {
     const xi1 = cx + rInner * Math.cos(a0);
     const yi1 = cy + rInner * Math.sin(a0);
     const d = `M ${x0} ${y0} A ${rOuter} ${rOuter} 0 ${large} 1 ${x1} ${y1} L ${xi0} ${yi0} A ${rInner} ${rInner} 0 ${large} 0 ${xi1} ${yi1} Z`;
-    const path = svgEl('path', { d, fill: FG, 'fill-opacity': opacity, stroke: '#000000', 'stroke-width': 1.5 });
+    // 2px white ring separates adjacent wedges on the white chart surface
+    const path = svgEl('path', { d, fill: INK, 'fill-opacity': opacity, stroke: WHITE, 'stroke-width': 2 });
     const ttl = svgEl('title');
     ttl.textContent = `${s.label}: ${(frac * 100).toFixed(0)}%`;
     path.appendChild(ttl);
@@ -362,18 +360,24 @@ export function donut(container, { segments, title = 'Mix' }) {
   // legend below, in fixed segment order (never cycled)
   const leg = document.createElement('div');
   leg.className = 'chart-legend donut-legend';
-  leg.innerHTML = segments
-    .map((s, i) => {
-      const opacity = (0.3 + 0.6 * (segments.length > 1 ? i / (segments.length - 1) : 0.5)).toFixed(2);
-      return `<span class="donut-key"><i style="background:${FG};opacity:${opacity}"></i>${s.label} (${((s.value / total) * 100).toFixed(0)}%)</span>`;
-    })
-    .join('');
+  leg.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:14px;justify-content:center;';
+  segments.forEach((s, i) => {
+    const opacity = (0.3 + 0.6 * (segments.length > 1 ? i / (segments.length - 1) : 0.5)).toFixed(2);
+    const key = document.createElement('span');
+    key.className = 'donut-key';
+    key.style.cssText = `display:inline-flex;align-items:center;gap:8px;font-family:${FONT_MONO};font-size:11px;color:${MID};`;
+    const swatch = document.createElement('i');
+    swatch.style.cssText = `width:10px;height:10px;display:inline-block;border-radius:2px;background:${INK};opacity:${opacity};`;
+    key.append(swatch, document.createTextNode(`${s.label} (${((s.value / total) * 100).toFixed(0)}%)`));
+    leg.appendChild(key);
+  });
   container.appendChild(leg);
   return svg;
 }
 
 // hbarFloor(el, {rows:[{label, small, medium, floor}], xLabel, title})
-// horizontal grouped bars (small vs medium) with a floor tick per row.
+// horizontal grouped bars (small vs medium) with a floor tick per row. Solid off-black
+// (typical-small) / mid-gray (typical-medium) bars at 4px radius — no dot meters.
 export function hbarFloor(container, { rows, xLabel = 'accuracy', title = '' }) {
   const rowH = 34;
   const h = rows.length * rowH + 50;
@@ -387,31 +391,30 @@ export function hbarFloor(container, { rows, xLabel = 'accuracy', title = '' }) 
   const x = scale([0, 1], [0, iw]);
 
   [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
-    g.appendChild(svgEl('line', { x1: x(t), x2: x(t), y1: 0, y2: rows.length * rowH, stroke: RULE, 'stroke-dasharray': '2,3' }));
-    g.appendChild(svgText(x(t), rows.length * rowH + 16, t.toFixed(2), { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }));
+    g.appendChild(svgEl('line', { x1: x(t), x2: x(t), y1: 0, y2: rows.length * rowH, stroke: STEEL, 'stroke-dasharray': '2,3' }));
+    g.appendChild(svgText(x(t), rows.length * rowH + 16, t.toFixed(2), { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
   });
 
   rows.forEach((row, i) => {
     const y0 = i * rowH;
     const barH = 10;
-    g.appendChild(svgText(-8, y0 + rowH / 2 + 4, row.label, { fill: FG, 'text-anchor': 'end' }));
+    g.appendChild(svgText(-8, y0 + rowH / 2 + 4, row.label, { fill: INK, 'text-anchor': 'end' }));
     [
-      { key: 'small', dy: 3, label: 'typical-small', opacity: 1 },
-      { key: 'medium', dy: 3 + barH + 3, label: 'typical-medium', opacity: 0.5 },
-    ].forEach(({ key, dy, label, opacity }) => {
+      { key: 'small', dy: 3, label: 'typical-small', fill: STYLE_SMALL.color },
+      { key: 'medium', dy: 3 + barH + 3, label: 'typical-medium', fill: MID },
+    ].forEach(({ key, dy, label, fill }) => {
       const v = row[key];
       if (v == null) return;
       const vw = Math.max(0, x(v));
-      dotRowMeter(g, y0 + dy + (barH - 7) / 2, 0, vw, { opacity });
-      const hit = svgEl('rect', { x: 0, y: y0 + dy, width: vw, height: barH, fill: 'transparent' });
+      const rect = bar(g, 0, y0 + dy, vw, barH, fill);
       const ttl = svgEl('title');
       ttl.textContent = `${label} · ${row.label}: ${v.toFixed(3)}${row.floor != null ? ` (floor ${row.floor.toFixed(3)})` : ''}`;
-      hit.appendChild(ttl);
-      g.appendChild(hit);
+      rect.appendChild(ttl);
+      g.appendChild(rect);
     });
     if (row.floor != null) {
       const fx = x(row.floor);
-      const line = svgEl('line', { x1: fx, x2: fx, y1: y0 + 1, y2: y0 + rowH - 5, stroke: FG, 'stroke-width': 2 });
+      const line = svgEl('line', { x1: fx, x2: fx, y1: y0 + 1, y2: y0 + rowH - 5, stroke: INK, 'stroke-width': 2 });
       const ttl = svgEl('title');
       ttl.textContent = `floor (majority/constant-prediction) · ${row.label}: ${row.floor.toFixed(3)}`;
       line.appendChild(ttl);
@@ -419,10 +422,11 @@ export function hbarFloor(container, { rows, xLabel = 'accuracy', title = '' }) 
     }
   });
 
-  if (xLabel) g.appendChild(svgText(iw / 2, rows.length * rowH + 34, xLabel, { fill: DIM, 'font-size': 10, 'text-anchor': 'middle' }));
+  if (xLabel) g.appendChild(svgText(iw / 2, rows.length * rowH + 34, xLabel, { fill: MID, 'font-size': 12, 'text-anchor': 'middle' }));
   const leg = document.createElement('div');
   leg.className = 'chart-legend';
-  leg.textContent = 'upper bar = typical-small   ·   lower bar = typical-medium   ·   | tick = floor (majority / constant-prediction baseline)';
+  leg.style.cssText = `font-family:${FONT_MONO};font-size:11px;color:${MID};margin-top:8px;`;
+  leg.textContent = 'upper bar = typical-small (off-black)   ·   lower bar = typical-medium (mid-gray)   ·   | tick = floor (majority / constant-prediction baseline)';
   container.appendChild(leg);
   return svg;
 }
@@ -456,85 +460,85 @@ export function timeline(container, { lineage, bugs = [], verdicts = [], title =
   };
 
   [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
-    g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(t), y2: y(t), stroke: RULE, 'stroke-dasharray': '2,3' }));
-    g.appendChild(svgText(-8, y(t) + 3, t.toFixed(2), { fill: DIM, 'font-size': 10, 'text-anchor': 'end' }));
+    g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(t), y2: y(t), stroke: STEEL, 'stroke-dasharray': '2,3' }));
+    g.appendChild(svgText(-8, y(t) + 3, t.toFixed(2), { fill: MID, 'font-size': 12, 'text-anchor': 'end' }));
   });
-  // chance baseline
-  g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(0.311), y2: y(0.311), stroke: DIM, 'stroke-dasharray': '4,3' }));
-  g.appendChild(svgText(iw - 4, y(0.311) - 5, 'chance (.311)', { fill: DIM, 'font-size': 10, 'text-anchor': 'end' }));
+  refLine(g, iw, y(0.311), 'chance (.311)');
 
   // lineage line + numbered dots. Same-date points sit at very different x
   // but sometimes close y; rather than fight label collisions inline, each
   // dot gets a small index number and the full label lives in the legend
   // list below the chart (also satisfies "a legend is always present").
   const pts = lineage.map((p) => `${x(toDay(p.date))},${y(p.std)}`).join(' ');
-  g.appendChild(svgEl('polyline', { points: pts, fill: 'none', stroke: FG, 'stroke-width': 2 }));
+  g.appendChild(svgEl('polyline', { points: pts, fill: 'none', stroke: INK, 'stroke-width': 2 }));
   lineage.forEach((p, i) => {
     const cx = x(toDay(p.date));
     const cy = y(p.std);
-    const dot = svgEl('circle', { cx, cy, r: 8, fill: FG, stroke: '#000000', 'stroke-width': 1.5 });
+    const dot = svgEl('circle', { cx, cy, r: 8, fill: INK, stroke: WHITE, 'stroke-width': 2 });
     const ttl = svgEl('title');
     ttl.textContent = `${i + 1}. ${p.date} · ${p.label}: JevBench standard ${p.std.toFixed(3)} (${p.source})`;
     dot.appendChild(ttl);
     g.appendChild(dot);
-    g.appendChild(
-      svgText(cx, cy + 3.5, String(i + 1), { fill: '#000000', 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700 })
-    );
+    g.appendChild(svgText(cx, cy + 3.5, String(i + 1), { fill: WHITE, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700 }));
   });
 
   // x-axis date ticks, one per day of the 6-day window
   for (let day = 0; day <= 5; day++) {
     const tx = x(day);
-    g.appendChild(svgEl('line', { x1: tx, x2: tx, y1: ih, y2: ih + 5, stroke: DIM }));
-    g.appendChild(svgText(tx, ih + 17, fmtDay(day), { fill: DIM, 'text-anchor': 'middle', 'font-size': 10 }));
+    g.appendChild(svgEl('line', { x1: tx, x2: tx, y1: ih, y2: ih + 5, stroke: STEEL }));
+    g.appendChild(svgText(tx, ih + 17, fmtDay(day), { fill: MID, 'text-anchor': 'middle', 'font-size': 12 }));
   }
 
-  // bug ticks below axis (square marker), verdict ticks further below (triangle marker) -
-  // shape, not colour, tells the two apart.
+  // bug ticks below axis (square marker), verdict ticks further below (triangle-free, circle
+  // marker) — a distinct row label tells the two apart rather than a shape only readers of the
+  // legend see.
   const bugY = ih + 36;
-  bugs.forEach((b, i) => {
+  bugs.forEach((b) => {
     const bx = x(toDay(b.date));
-    g.appendChild(svgEl('line', { x1: bx, x2: bx, y1: ih, y2: bugY, stroke: FG, 'stroke-width': 1.5 }));
-    const dot = markerEl('square', bx, bugY, 3, FG);
+    g.appendChild(svgEl('line', { x1: bx, x2: bx, y1: ih, y2: bugY, stroke: INK, 'stroke-width': 1.5 }));
+    const dot = markerEl('square', bx, bugY, 3, INK);
     const ttl = svgEl('title');
     ttl.textContent = `bug · ${b.date}: ${b.label} (${b.source})`;
     dot.appendChild(ttl);
     g.appendChild(dot);
   });
-  g.appendChild(svgText(0, bugY + 14, 'bugs found (square ticks)', { fill: DIM, 'font-size': 10 }));
+  g.appendChild(svgText(0, bugY + 14, 'bugs found (square ticks)', { fill: MID, 'font-size': 11 }));
 
   const verdictY = bugY + 34;
   verdicts.forEach((v) => {
     const vx = x(toDay(v.date));
-    g.appendChild(svgEl('line', { x1: vx, x2: vx, y1: ih, y2: verdictY, stroke: FG, 'stroke-width': 1.5, opacity: 0.7 }));
-    const dot = markerEl('triangle', vx, verdictY, 3, FG);
+    g.appendChild(svgEl('line', { x1: vx, x2: vx, y1: ih, y2: verdictY, stroke: MID, 'stroke-width': 1.5 }));
+    const dot = markerEl('circle', vx, verdictY, 3, MID);
     const ttl = svgEl('title');
     ttl.textContent = `verdict · ${v.date}: ${v.label} (${v.source})`;
     dot.appendChild(ttl);
     g.appendChild(dot);
   });
-  g.appendChild(svgText(0, verdictY + 14, 'section verdicts (triangle ticks)', { fill: DIM, 'font-size': 10 }));
+  g.appendChild(svgText(0, verdictY + 14, 'section verdicts (round ticks, mid-gray)', { fill: MID, 'font-size': 11 }));
 
   axisPair(g, iw, ih);
-  g.appendChild(svgText(-mm.l + 4, -10, 'JevBench standard', { fill: DIM, 'font-size': 10 }));
+  g.appendChild(svgText(-mm.l + 4, -10, 'JevBench standard', { fill: MID, 'font-size': 12 }));
 
   const leg = document.createElement('ol');
   leg.className = 'timeline-legend';
   leg.innerHTML = lineage
     .map((p) => `<li><b>${p.date}</b> — ${p.label}: <b>${p.std.toFixed(3)}</b> <span class="dim">(${p.source})</span></li>`)
     .join('');
+  leg.style.cssText = `color:${INK};`;
+  leg.querySelectorAll('.dim').forEach((el) => (el.style.color = MID));
   container.appendChild(leg);
 
   if (bugs.length) {
     const bugLabel = document.createElement('div');
     bugLabel.className = 'timeline-legend-label';
     bugLabel.textContent = 'bugs found (square ticks above)';
+    bugLabel.style.color = MID;
     container.appendChild(bugLabel);
     const bugLeg = document.createElement('ol');
     bugLeg.className = 'timeline-legend timeline-legend-bugs';
-    bugLeg.innerHTML = bugs
-      .map((b) => `<li><b>${b.date}</b> — ${b.label} <span class="dim">(${b.source})</span></li>`)
-      .join('');
+    bugLeg.innerHTML = bugs.map((b) => `<li><b>${b.date}</b> — ${b.label} <span class="dim">(${b.source})</span></li>`).join('');
+    bugLeg.style.cssText = `color:${INK};`;
+    bugLeg.querySelectorAll('.dim').forEach((el) => (el.style.color = MID));
     container.appendChild(bugLeg);
   }
   return svg;

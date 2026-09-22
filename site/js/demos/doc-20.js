@@ -4,13 +4,29 @@
 // ponytail: skipped hover-highlight-the-relevant-sentence (spec allows skipping it "if
 // cheap, else skip" - precise sentence attribution per question isn't cheap here); add a
 // per-question sentence-index field to data/demos/doc20.json if that lands later.
-import { dotRow } from './rowdots.js';
+import { bars } from '../bars.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text != null) node.textContent = text;
   return node;
+}
+
+// One question's row: a bars() mount, one candidate wide (compact bars in exhibits.css). Label
+// starts as the question text and is replaced with "<question> — <answer>" once decided;
+// isWinner is "matched the gold answer", not a probability threshold.
+function qRow(label, title) {
+  const wrap = document.createElement('div');
+  if (title) wrap.title = title;
+  const h = bars(wrap, [{ label, p: 0 }]);
+  return {
+    el: wrap,
+    update(p, nextLabel, { isWinner = false } = {}) {
+      h.update([{ label: nextLabel, p: p ?? 0 }]);
+      wrap.querySelector('.bar')?.classList.toggle('is-winner', isWinner);
+    },
+  };
 }
 
 function isHit(question, result) {
@@ -51,7 +67,7 @@ export async function mount(host, ctx) {
   host.appendChild(wrap);
 
   const rows = data.questions.map((question) => {
-    const r = dotRow(question.display, { dots: 14, title: question.display });
+    const r = qRow(question.display, question.display);
     register.appendChild(r.el);
     return r;
   });
@@ -72,17 +88,14 @@ export async function mount(host, ctx) {
     const hit = isHit(question, result);
     if (hit) correct += 1;
     const p = result.probs[result.argmax] ?? 0;
-    // champagne (isWinner) marks a hit, not just p >= .5 - the mark this exhibit cares about
-    // is "matched the gold answer", carried over from the old hit/miss dot.
-    rows[i].update(p, { isWinner: hit });
-    const label = rows[i].el.querySelector('.dotbars-label');
-    label.textContent = `${question.display} — ${result.argmax}`;
-    label.title = label.textContent;
+    // isWinner marks a hit, not just p >= .5 - the mark this exhibit cares about is "matched
+    // the gold answer".
+    rows[i].update(p, `${question.display} — ${result.argmax}`, { isWinner: hit });
   });
 
   function statPair(target, seconds, label) {
     target.innerHTML = '';
-    target.append(el('span', 'ex-stat-num', `${seconds.toFixed(1)} s`), el('span', 'ex-stat-label', label));
+    target.append(el('span', 'ex-stat-num', `${seconds.toFixed(1)} s`), el('span', 't-eyebrow muted', label));
   }
   statPair(onePass, full.ms / 1000, 'one pass, here');
   if (single) statPair(oneAt, (single.ms * data.questions.length) / 1000, 'one at a time');

@@ -1,15 +1,8 @@
-// research.html bootstrap: the dot-matrix "Research" title, mounts the data-mix (donut +
-// corpus bars), held-out/external bars, JevBench-per-family bars, and timeline charts from
-// data/research-*.json, plus a scroll-spy on the left table of contents. No GSAP, no load
-// animation (Atoms: "placed, not kinetic") — charts are js/charts.js as-is: monochrome,
-// series told apart by dash/marker, never colour.
-import { dotText } from './dots.js';
+// research.html bootstrap: mounts the data-mix (donut + corpus bars), held-out/external bars,
+// JevBench-per-family bars, and the timeline chart from data/research-*.json into the .chart
+// mounts scripts/build_research.py wraps in white .media panels. Charts are js/charts.js as-is
+// (hand-rolled SVG, no animation). No sticky TOC on this page (the Agility lane has none).
 import { donut, barChart, hbarFloor, timeline } from './charts.js';
-
-function mountTitle() {
-  const el = document.getElementById('title-dots');
-  if (el) dotText(el, 'RESEARCH', { dot: 14, gap: 5 });
-}
 
 async function loadJSON(path) {
   try {
@@ -96,34 +89,8 @@ async function mountTimeline() {
   if (captionEl && d.run_count != null) captionEl.textContent = String(d.run_count);
 }
 
-// ---- table of contents: highlight the section currently in view -------------------------
-
-function wireToc() {
-  const links = Array.from(document.querySelectorAll('.toc a'));
-  if (!links.length) return;
-  const targets = links
-    .map((a) => document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1))))
-    .filter(Boolean);
-  if (!targets.length) return;
-  const io = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        const i = targets.indexOf(entry.target);
-        if (i === -1) return;
-        links.forEach((a) => a.classList.remove('active'));
-        links[i].classList.add('active');
-      });
-    },
-    { rootMargin: '-10% 0px -70% 0px' }
-  );
-  targets.forEach((t) => io.observe(t));
-}
-
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
-    mountTitle();
-    wireToc();
     mountMix();
     mountHeldout();
     mountJevFamily();
