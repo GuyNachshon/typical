@@ -16,8 +16,9 @@ Score, and an order-invariant Bernoulli Noul -- by changing only the target dist
 head. Scaled across Qwen3 (1.7B/4B/8B/14B) and once on Qwen3.5-4B with matched frozen controls, the recipe
 reaches .931 standard-tier accuracy on the public subset of JevBench, a third-party typed-decision
 benchmark, at 14B (.861 at Qwen3.5-4B) at 15--60\,ms per decision on our single-stream harness, and
-calibration-shaped checkpoint selection with frozen-teacher distillation takes held-out soft-target
-negative log-likelihood from 2.87 to 0.95 at the same size. Against these gains, we report the honest
+calibration-shaped checkpoint selection takes held-out soft-target negative log-likelihood from 2.87 to
+0.95 at the same size; a same-backbone frozen-teacher distillation term tested with its own matched
+control adds nothing measurable and is mildly negative on the hard tier. Against these gains, we report the honest
 limit: a harder tier of compositional, multi-step decisions stays at or near chance for every checkpoint
 we trained, including a same-size frozen backbone read with a few exemplars and no training, which still
 beats our best trained model there -- a comparison we report with its own confound, since state/option

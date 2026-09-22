@@ -4,30 +4,18 @@
 \subsection{Where the hard tier's remaining gap lives}
 \label{sec:analysis:hard}
 
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\linewidth]{figures/fig_hard_families.pdf}
-  \caption{Per-family JevBench-hard accuracy for \texttt{ladder\_14b}, \texttt{tl1b}, and the frozen-14B
-  3-shot control, sorted by \texttt{tl1b}'s value, chance line at .336. Per-family values are re-derived
-  directly from each run's JSON artefact rather than transcribed from prose, and differ slightly from
-  \Cref{sec:results:kd}'s aggregate table in a small number of cells as a result; the JSON is the source
-  of truth.}
-  \label{fig:hard_families}
-\end{figure}
-
-Breaking JevBench's hard tier down by sub-family isolates where training helps and where it does not.
-Held-out rubric styles, families, and grammars inside our own generators' distributions move by
-9--65 points under DecisionMix v2 and workflow training (\Cref{sec:results:kd}); rubric-flip accuracy, which
-is only achievable if the model actually conditions on the rubric rather than the state or candidates
-alone, rises from .48 to .71 within the trained rule grammar. None of this transfers to \emph{level-7}
-composition -- decisions requiring temporal arithmetic, unit conversion, expected-value reasoning, or
-multi-attribute trade-offs -- which sits at chance ($\approx$.50) for every checkpoint trained on this
-project's data, including the 14B model that otherwise leads the JevBench leaderboard comparison on the
-standard tier. This is not a capacity story: the frozen 14B backbone with three in-context exemplars does
-no better on these families than our trained models. It is a data-coverage story -- our generators produce
-boolean rule composition up to six levels deep but never produce the specific compositional operations
-level-7 and JevBench's long\_policy/temporal/probability/tradeoff sub-families require, and no model in
-this project has been shown to acquire that composition from data that does not contain it.
+Breaking JevBench's hard tier down by sub-family (\Cref{fig:hard_families}, \Cref{app:extra-figures})
+isolates where training helps and where it does not.
+Held-out rubric styles, families, and grammars inside our own generators' distributions move sharply under
+workflow training (\Cref{sec:results:kd}, \Cref{app:decisionmix}), but none of it transfers to
+\emph{level-7} composition -- decisions requiring temporal arithmetic, unit conversion, expected-value
+reasoning, or multi-attribute trade-offs -- which sits at chance for every checkpoint trained on this
+project's data, including the 14B model that otherwise leads the JevBench standard-tier comparison. This
+is not a capacity story: the frozen 14B backbone with three in-context exemplars does no better on these
+families. It is a data-coverage story -- our generators produce boolean rule composition up to six levels
+deep but never produce the specific compositional operations level-7 and JevBench's
+long\_policy/temporal/probability/tradeoff sub-families require, and no model here acquires that
+composition from data that does not contain it.
 
 \subsection{Constant-depth computation without intermediate steps}
 \label{sec:analysis:depth}
@@ -70,21 +58,24 @@ frozen Qwen3.5-9B checkpoint scores .806 standard under our own rendering and .9
 published system's rendering of the identical items, a 12.5-point swing from rendering choice alone. We
 did not sweep rendering for the frozen 14B hard-tier control, so part of its .559-vs-.450 advantage over
 our trained model could be a rendering effect rather than a training-vs-no-training effect; we do not have
-the controlled comparison to rule this out, and it is a specific, cheap follow-up. Every fix we identified
-and applied -- the long-state truncation bug
-(\Cref{sec:results:mixture}), calibration-shaped checkpoint selection, and frozen-teacher distillation
-(\Cref{sec:results:kd}) -- narrows this gap on probability quality (hard-tier Brier moves from .85 to .66,
-past the frozen model's .60 is close) without closing it on accuracy (.450 vs.\ .559). Two readings are
-consistent with the data we have. One is that training sharpens the model's confidence everywhere,
-including on exactly the items the training distribution does not cover well, so the trained model is
-\emph{more confidently wrong} on hard items than a frozen model that has seen three examples and otherwise
-falls back on broader pretraining -- consistent with the Brier-vs-accuracy split (probability-quality
-metrics move much more than argmax accuracy under every fix we tried) and with \Cref{sec:analysis:depth}'s
-argument that the uncovered items are specifically the compositional ones a single forward pass structurally
-struggles with. The other reading is that the fixes we applied at 14B (long states, calibration-shaped
-selection, frozen-teacher KD) each targeted a different diagnosed defect and none of them targeted
-compositional coverage directly, so the tension may simply reflect that the right fix has not been tried
-yet. Weak evidence against the tension being architecture-specific: at Qwen3.5-4B, the same recipe reaches
+the controlled comparison to rule this out, and it is a specific, cheap follow-up. The fixes we identified
+and applied at 14B -- the long-state fix, DecisionMix v2, the typed heads, and calibration-shaped
+checkpoint selection (\Cref{sec:results:mixture}, \Cref{sec:results:kd}) -- narrow this gap on probability
+quality (hard-tier Brier moves from .85 to .66, past the frozen model's .60 is close) without closing it
+on accuracy (.450 vs.\ .559). Frozen-teacher distillation, the one component of that bundle with its own
+matched control, is not the source of the narrowing: removing it (\texttt{tl1b\_nokd}) improves hard-tier
+accuracy, \texttt{long\_policy}, and standard-tier Brier over \texttt{tl1b} rather than costing them
+(\Cref{sec:results:kd}), so at 14B pushing the model toward its own frozen few-shot judgment is a small net
+negative for exactly the items this tension is about, not a fix for it. Two readings are consistent with
+the data we have. One is that training sharpens the model's confidence everywhere, including on exactly
+the items the training distribution does not cover well, so the trained model is \emph{more confidently
+wrong} on hard items than a frozen model that has seen three examples and otherwise falls back on broader
+pretraining -- consistent with the Brier-vs-accuracy split (probability-quality metrics move much more
+than argmax accuracy under every fix we tried) and with \Cref{sec:analysis:depth}'s argument that the
+uncovered items are specifically the compositional ones a single forward pass structurally struggles with.
+The other reading is that the fixes we applied at 14B each targeted a different diagnosed defect and none
+of them targeted compositional coverage directly, so the tension may simply reflect that the right fix has
+not been tried yet. Weak evidence against the tension being architecture-specific: at Qwen3.5-4B, the same recipe reaches
 hard-tier accuracy .495 -- above every Qwen3 checkpoint at any size we trained, including 14B -- at a
 fraction of the parameters, suggesting the pretraining distribution of the backbone, not the decision
 architecture, may set an upper bound the recipe has not yet reached at 14B. We do not have a controlled

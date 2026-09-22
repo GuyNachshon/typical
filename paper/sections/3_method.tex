@@ -58,35 +58,11 @@ literal rendered ``none of the above'' option.
 \label{sec:method:typed}
 
 Choice, Score, and Noul share one backbone, tap, and N3 readout, differing only in target distribution and
-terminal head, routed per row rather than by a global flag.
-
-\textbf{Choice} is the $\numcands$-way readout above, unchanged. \textbf{Score} is ordinal (severity,
-quality, urgency): plain Choice penalizes a one-level miss as much as an opposite-end miss, so we use an
-\textbf{ordinal-smoothed target},
-\begin{equation}
-  \label{eq:ordinal-smooth}
-  \tilde{t}_j \propto \exp\!\left(-\frac{|j - y|}{\tauord}\right), \qquad \tauord = 0.7,
-\end{equation}
-normalized over valid levels, $\tauord{=}0$ recovering one-hot Choice -- a pure target change, no
-architecture change. \textbf{Noul} is a yes/no proposition; rendered as 2-way Choice it is not guaranteed
-order-invariant, since ``yes''/``no'' still occupy two different suffix positions with two different
-contextual states. We give Noul a dedicated \textbf{Bernoulli head} reading the query alone, no candidate
-text,
-\begin{equation}
-  \label{eq:bernoulli-noul}
-  P(\text{yes}) = \sigma(w_n \cdot \hD),
-\end{equation}
-exactly order-invariant by construction, verified empirically as an exact-zero reversed-label control
-(\Cref{sec:results:typed}); the remaining mass $1{-}P(\text{yes})$ spreads over the other candidate(s),
-and the factored-null gate above still applies.
-
-\textbf{Per-row routing, not a global flag.} A row is Noul-eligible iff its candidate set is exactly
-$\{\text{yes},\text{no}\}$; every other row scores as ordinary Choice, bit-identical to a run with Noul
-disabled. This boundary matters operationally: an early release candidate applying the Bernoulli head at
-the \emph{model} level rather than per row collapsed to chance, because Choice- and Score-typed rows in
-the same batch were then scored with no candidate text at all. Fixing the routing per row (verified by 140
-unit tests) restored it -- a typed-decision interface is a contract on the input, not a labeling
-convenience, and violating it does not degrade gracefully.
+terminal head, routed per row rather than by a global flag: Score uses an ordinal-smoothed target over the
+rendered levels, Noul uses a dedicated Bernoulli head over the query alone (no candidate text) that is
+exactly order-invariant by construction, and the factored-null gate of \Cref{eq:factored-null} applies to
+both. \Cref{app:typed-primitives} gives the exact parameterization, the equations, and an operational
+lesson from a routing bug that collapsed an early release candidate to chance.
 
 \subsection{Candidate-blind factorization: what does not work, and why}
 \label{sec:method:blind-closure}
@@ -146,10 +122,8 @@ from states that no longer contained the evidence for the answer. The fix re-ren
 cut, any still-over-length row. Both are general lessons about decision-model training data: a
 fixed-length window interacts with \emph{where} the load-bearing content sits, not only how long the
 render is, and a truncation-length ablation alone would not surface this, since the fix is orthogonal to
-length. We report this fix as a diagnosed mechanism, not a demonstrated cause: it shipped in the same
-training run as frozen-teacher distillation, a Brier-score term, calibration-based checkpoint selection,
-and the longer window itself (\Cref{sec:results:kd}), and no matched facts-first-vs-facts-last pair at an
-identical window and seed isolates its individual contribution.
+length. \Cref{sec:results:mixture} reports a matched facts-first-vs-facts-last ablation isolating this fix
+from the other changes it shipped alongside at 14B.
 
 \subsection{Checkpoint selection}
 \label{sec:method:selection}

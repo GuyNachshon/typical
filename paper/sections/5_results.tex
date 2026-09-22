@@ -127,160 +127,115 @@ independent of tap depth. No further candidate-blind variants were run after thi
 \label{sec:results:null}
 
 An early native-choice model rendered a literal ``none of the above'' line as one more option in the
-suffix and let it compete for softmax mass. Full numbers for this comparison, on an otherwise identical
-checkpoint (same tap, same mixture, same steps), are in \Cref{tab:app-null-fix}. Removing the rendered
-$\nullsym$ line and replacing it with a gate computed from permutation-invariant statistics of the
-candidate scores fixes the null's $K$-dependent pathology essentially for free: the $K$-sweep of null
-AUROC becomes monotone (no collapse at small $K$, no always-abstain at large $K$), MMLU-Pro false-abstain
-drops from .692 to .003 with accuracy rising from .133 to .353, CLINC-OOS accuracy/null AUROC rise from
-.639/.840 to .798/.973, and Banking77 goes from unusable (.063 accuracy, .924 false-abstain) to .579 --
-all with $\dqsh$ unchanged (.118 $\to$ .122) and evidence tasks at the same level as the rendered-line
-version. The remaining costs are smaller and specific: intent/topic label spaces with tightly clustered
-options lose 2--7 points of accuracy, and order sensitivity rises slightly (reorder $\Delta p$ .077 $\to$
-.123), because with no null line the letter position is the only identity signal left in the suffix. This
-is the single-model, no-workflow-training candidate that scores .694 standard / .378 hard on JevBench and
-is the base for every workflow-trained checkpoint reported below.
+suffix and let it compete for softmax mass. Removing it and replacing it with the factored gate of
+\Cref{eq:factored-null} fixes the null's $K$-dependent pathology essentially for free (full numbers in
+\Cref{tab:app-null-fix}): the $K$-sweep of null AUROC becomes monotone, MMLU-Pro false-abstain drops from
+.692 to .003 with accuracy rising from .133 to .353, and Banking77 goes from unusable to .579 -- all with
+$\dqsh$ unchanged and evidence tasks at the same level as the rendered-line version. The remaining costs
+are smaller and specific: intent/topic label spaces lose 2--7 points, and order sensitivity rises slightly,
+because with no null line the letter position is the only identity signal left in the suffix. This is the
+single-model, no-workflow-training candidate that scores .694 standard / .378 hard on JevBench and is the
+base for every workflow-trained checkpoint below.
 
 \subsection{Training the mixture: family ratio, null augmentation, and the long-state truncation fix}
 \label{sec:results:mixture}
 
 Adding rubric-conditioned workflow data ($W$) and an uncertainty corpus ($U$) to the evidence/knowledge
-mixture of \Cref{sec:results:null} without adjusting sampling ratios costs evidence accuracy: at $E{:}0.35$,
-CLINC-150 falls 11 points and TREC-fine 10 points, driven almost entirely by increased false abstention
-(CLINC false-abstain .05 $\to$ .17) rather than lost discrimination (CLINC-K accuracy is unchanged; paired
-null AUROC is unchanged). \Cref{tab:mixture} sweeps $E$ from .35 to .50 at fixed $K{+}W$ and adds a null
-augmentation ablation ($W{:}0.20$ of workflow rows duplicated with their gold removed, target $\nullsym$).
+mixture of \Cref{sec:results:null} without adjusting sampling ratios costs evidence accuracy (CLINC-150
+$-11$, TREC-fine $-10$ points), driven almost entirely by increased false abstention, not lost
+discrimination. A sweep of $E$ from .35 to .50 (\Cref{tab:app-mixture}) shows raising $E$ to .45--.50
+restores evidence accuracy to within 1 point of an $E$-only base and intent/topic accuracy to within 3--4
+points, with $W$ metrics unchanged within 1--4 points: mixing, not architecture, caused the regression.
+Null augmentation ($W{:}0.20$ of workflow rows duplicated with their gold removed, target $\nullsym$) does
+what a post-hoc calibration offset cannot (\Cref{sec:results:calibration}): it lowers false-abstain rates
+and raises MMLU-Pro accuracy to the $E$-only base's level with the highest $\dqsh$ of any mixture tested.
+Training at a longer state window recovers the long-state families specifically but at a 4$\times$ smaller
+batch size, confounding length with under-fitting; a full-batch version combining every lever is the basis
+for the released recipe (\Cref{sec:method:mixture}).
 
-\begin{table}[t]
-  \centering
-  \caption{Mixture sweep at 1.7B, matched steps. ``6A'' is the $E{:}0.35/K{:}0.25/W{:}0.40$ point;
-  ``e45+null'' adds \texttt{null\_aug W:0.20} to $E{:}0.45/K{:}0.20/W{:}0.35$.}
-  \label{tab:mixture}
-  \small
-  \begin{tabular}{lrrrrr}
-    \toprule
-    & Base ($E$ only) & 6A & e45 & \textbf{e45+null} & long$_{e45}$ (1024 tok) \\
-    \midrule
-    CLINC-150 acc / false-abstain & .845/.05 & .734/.17 & .779/.10 & \textbf{.805}/\textbf{.08} & .741/.13 \\
-    MMLU-Pro among-$K$ / $\dqsh$ & .353/.122 & .330/.119 & .338/.115 & \textbf{.353}/\textbf{.143} & .329/.116 \\
-    Held-out score NLL & -- & 2.03 & 1.52 & 2.04 & \textbf{1.26} \\
-    JevBench std / hard & .694/.378 & .750/.387 & \textbf{.833}/.396 & .806/.396 & .806/\textbf{.450} \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-Raising $E$ to .45--.50 restores evidence accuracy to within 1 point of the $E$-only base and intent/topic
-accuracy to within 3--4 points, with $W$ metrics unchanged within 1--4 points: mixing, not architecture, was
-the cause of the evidence regression. Null augmentation of $W$ does what a post-hoc calibration offset
-cannot (\Cref{sec:results:calibration}): it lowers false-abstain rates and raises MMLU-Pro accuracy to the
-$E$-only base's level with the highest $\dqsh$ of any mixture tested. Training at a longer state window
-(1{,}024 tokens, 25\% long-policy rows) recovers the long-state families specifically -- before the
-facts-first fix described next, this run's long\_policy score rose from .16 to .37 and multi\_hop from .17
-to .28 -- and gives the best soft-target NLLs of the sweep, but at a 4$\times$ smaller batch size, which
-confounds length with under-fitting; a full-batch version combining every lever (\texttt{r1\_cand}) is the
-basis for the released recipe (\Cref{sec:method:mixture}).
-
-\textbf{The long-state truncation bug} (state-length histogram and the fix's effect on long\_policy
-accuracy in \Cref{fig:truncation}, \Cref{app:extra-figures}). The long-state generator originally rendered
-supporting facts \emph{after} the request text. At the released 1{,}024-token training window this
-truncated away the supporting facts on 98.8\% of long-policy rows (100\% at the 256-token window used
-earlier in the project), consistent with -- though not, on its own, proven to cause -- the long\_policy
-score of .05 at 14B (\Cref{sec:results:headline}) and .21 at 4B: re-rendering facts-first and adding
-\texttt{--drop\_truncated} shipped in the same 14B run as frozen-teacher distillation, a Brier-score term,
-calibration-based checkpoint selection, and a longer window itself (\Cref{sec:results:kd}), so no matched
-single-variable ablation isolates the truncation fix's individual contribution to the long\_policy gain
-reported there; we report it as a diagnosed data defect with a plausible mechanism, not a demonstrated
-cause.
+\textbf{The long-state truncation bug} (state-length histogram in \Cref{fig:truncation},
+\Cref{app:extra-figures}). The long-state generator originally rendered supporting facts \emph{after} the
+request text. At the released 1{,}024-token training window this truncated away the supporting facts on
+98.8\% of long-policy rows (100\% at the 256-token window used earlier in the project) -- an exact,
+unconfounded measurement of the bug, independent of its downstream effect. The 14B long-state candidate
+(\Cref{sec:results:kd}) re-renders facts-first and adds \texttt{--drop\_truncated} alongside four other
+changes in the same run (frozen-teacher distillation, a Brier-score term, calibration-based checkpoint
+selection, and the longer window itself), so \Cref{tab:tl1b} alone cannot attribute its long\_policy gain
+to the rendering fix specifically. A matched ablation isolates it directly: two 1.7B arms identical in
+every flag except whether \texttt{data\_wf\_long} renders facts at 0\% or 97.6\% of the state text (same
+rows, same labels, matched state length, $p50 = 8{,}702$ characters both arms), \texttt{--max\_state 1024}
+with \texttt{--drop\_truncated} off in both arms so truncation bites exactly as it did at release, scored
+on JevBench hard \texttt{long\_policy}. This ablation was in progress at the time of writing; we report the
+mechanism above as an exact, measured fact about the data and leave its causal contribution to the
+\Cref{tab:tl1b} result open pending that comparison, rather than attribute the gain to it now.
 
 \subsection{Typed primitives}
 \label{sec:results:typed}
 
-\Cref{tab:typed} compares plain $K$-way Choice against the ordinal-smoothed Score target
-(\Cref{eq:ordinal-smooth}, $\tauord{=}0.7$) and against the Bernoulli Noul head
-(\Cref{eq:bernoulli-noul}), each a matched fine-tune from the same checkpoint on only that type's rows.
-
-\begin{table}[t]
-  \centering
-  \caption{Typed primitives vs.\ their $K$-way Choice control, matched fine-tunes.}
-  \label{tab:typed}
-  \small
-  \begin{tabular}{lrr}
-    \toprule
-    Score & $K$-way Choice & Ordinal-smoothed ($\tauord{=}0.7$) \\
-    \midrule
-    Held-out urgency: acc / NLL / ECE & .505 / 2.07 / .35 & .508 / \textbf{1.23} / \textbf{.19} \\
-    JevBench hard: acc / Brier & .360 / .88 & \textbf{.459} / \textbf{.70} \\
-    JevBench ordinal items (12), decisions changed & -- & 0 of 12 \\
-    \midrule
-    Noul & 2-way Choice & Bernoulli \\
-    \midrule
-    PagerDuty (floor .792): acc / NLL & .602 / 1.04 & \textbf{.886} / \textbf{.28} \\
-    Reversed-label max $|\Delta P(\mathrm{yes})|$ & .55 & \textbf{0} (exact, all sets) \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-Ordinal smoothing changes \emph{no} decision on JevBench's 12 ordinal items relative to plain Choice --
-identical per-item argmax predictions -- while improving every probability-quality metric (held-out score
-NLL 2.07 $\to$ 1.23, ECE .35 $\to$ .19, JevBench hard Brier .88 $\to$ .70 with hard accuracy .360 $\to$
-.459), confirming it acts purely as a calibration change to the target distribution rather than an
-accuracy intervention. The Bernoulli Noul head is exactly order-invariant by construction, verified as a
-literal zero reversed-label swing on every evaluated set (against up to .55 for the $K$-way Choice
-rendering of the same yes/no question), and is the first head in this project to clear an untouched
-external floor by a wide margin (PagerDuty .602 $\to$ .886 against a .792 floor). Both are additive flags
-on the same frozen architecture and routed per row (\Cref{sec:method:typed}); the released recipe trains
-with both on.
+Matched fine-tunes (\Cref{app:typed-primitives} for full numbers) show ordinal smoothing changes
+\emph{no} decision on JevBench's 12 ordinal items relative to plain Choice while improving every
+probability-quality metric (held-out score NLL 2.07 $\to$ 1.23) -- a pure calibration change -- and the
+Bernoulli Noul head is exactly order-invariant by construction and the first head in this project to clear
+an untouched external floor by a wide margin (PagerDuty .602 $\to$ .886 against a .792 floor).
 
 \subsection{DecisionMix v2 and frozen-teacher distillation}
 \label{sec:results:kd}
 
 Adding the DecisionMix v2 hard curriculum (\texttt{data\_wh}) and uncertainty corpus (\texttt{data\_u},
 \Cref{sec:experiments:data}) moves held-out rule-grammar generalization sharply within the generator's own
-world (held-out family/grammar/style accuracy .48/.51/.49 $\to$ .83/.88/.89; rubric-flip accuracy .48
-$\to$ .71) but leaves level-7 compositional items -- the reasoning the generator never produces -- at
-chance for every model tested, matching the JevBench hard tier's own
-temporal/probability/trade-off items. The uncertainty corpus improves likelihood (ChaosNLI NLL 1.27 $\to$
-1.00, typed-decisions NLL 2.06 $\to$ 1.71) while top-1 argmax accuracy on the same sets is flat or slightly
-lower -- consistent with soft targets teaching the model to spread probability mass rather than sharpen it.
+world but leaves level-7 compositional items -- the reasoning the generator never produces -- at chance
+for every model tested, matching the JevBench hard tier's own temporal/probability/trade-off items
+(\Cref{app:decisionmix} gives the full numbers); we treat this as an evaluation-protocol result, not a
+generalization claim, since the held-out families and the training generator share one rule engine. The
+uncertainty corpus improves likelihood (ChaosNLI NLL 1.27 $\to$ 1.00) while top-1 argmax accuracy is flat
+or slightly lower, consistent with soft targets spreading probability mass rather than sharpening it.
 
 At 14B, combining the facts-first long-state fix, \texttt{--drop\_truncated}, DecisionMix v2, the typed
-heads, calibration-shaped checkpoint selection (\Cref{sec:method:selection}), and \textbf{frozen-teacher
-distillation} -- a KL term against the \emph{same} backbone's own frozen three-shot letter distribution,
-not a larger or external model -- against the previous-recipe 14B checkpoint gives the largest single-run
-swing in probability quality observed in this project (\Cref{tab:tl1b}). These five changes shipped
-together in one run, so \Cref{tab:tl1b} is evidence for the bundle, not for any one component; a
-matched-seed run with distillation removed (\texttt{tl1b\_nokd}) was designed to isolate the KD term
-specifically but had not completed evaluation at the time of writing, and no run isolates the long-state
-fix alone (\Cref{sec:method:mixture}).
+heads, and calibration-shaped checkpoint selection (\Cref{sec:method:selection}) against the
+previous-recipe 14B checkpoint (\texttt{ladder\_14b}) gives the largest single-run swing in probability
+quality observed in this project (\Cref{tab:tl1b}). \textbf{Frozen-teacher distillation} -- a KL term
+against the \emph{same} backbone's own frozen three-shot letter distribution, not a larger or external
+model -- is the one component of that bundle with its own clean control: \texttt{tl1b\_nokd} is identical
+to \texttt{tl1b} in every flag except \texttt{--distill\_beta 0}. On that matched pair, KD contributes
+nothing measurable and is mildly negative on the hard tier: \texttt{tl1b\_nokd} beats \texttt{tl1b} on
+JevBench hard accuracy (.477 vs.\ .450), \texttt{long\_policy} (.211 vs.\ .158), training validation NLL
+(0.410 vs.\ 0.438), and standard-tier Brier (.127 vs.\ .175), while \texttt{tl1b} leads only on JevBench
+standard accuracy (.931 vs.\ .917). This is one seed pair, not a sweep, but it is a clean matched
+comparison, unlike the long-state fix (\Cref{sec:results:mixture}): the calibration and long-state gains
+in \Cref{tab:tl1b} come from the other four changes in the bundle, not from distillation.
 
 \begin{table}[t]
   \centering
-  \caption{14B: previous recipe vs.\ the long-state fix + frozen-teacher KD (\texttt{tl1b}) vs.\ the frozen
-  backbone with three exemplars and no training at all.}
+  \caption{14B: previous recipe (\texttt{ladder\_14b}) vs.\ the long-state-fix + DecisionMix v2 +
+  calibration-selection bundle with (\texttt{tl1b}) and without (\texttt{tl1b\_nokd},
+  \texttt{--distill\_beta 0}) frozen-teacher KD, vs.\ the frozen backbone with three exemplars and no
+  training at all.}
   \label{tab:tl1b}
   \small
-  \begin{tabular}{lrrr}
+  \begin{tabular}{lrrrr}
     \toprule
-    & Previous recipe & \texttt{tl1b} & Frozen, 3-shot \\
+    & \texttt{ladder\_14b} & \texttt{tl1b} & \texttt{tl1b\_nokd} & Frozen, 3-shot \\
     \midrule
-    JevBench std / hard & .875 / .468 & \textbf{.931} / .450 & .819 / \textbf{.559} \\
-    JevBench Brier (std / hard) & .17 / .85 & .18 / \textbf{.66} & .30 / .60 \\
-    Held-out score NLL & 2.87 & \textbf{0.95} & -- \\
-    Typed-decisions NLL & 1.96 & \textbf{1.04} & -- \\
-    Long\_policy / multi\_hop (hard subfamilies) & .05 / .44 & .158 / .611 & -- \\
-    Level-7 composition & -- & \textbf{.620} & -- \\
+    JevBench std / hard & .875 / .468 & .931 / .450 & \textbf{.917} / \textbf{.477} & .819 / \textbf{.559} \\
+    JevBench Brier std (hard) & .173 (.85) & .175 (.66) & \textbf{.127} (--) & .30 (.60) \\
+    Long\_policy (hard subfamily) & .053 & .158 & \textbf{.211} & -- \\
+    Training val NLL & -- & .438 & \textbf{.410} & -- \\
+    Held-out score NLL & 2.87 & \textbf{0.95} & -- & -- \\
+    Level-7 composition & -- & \textbf{.620} & -- & -- \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-JevBench standard rises from .875 to .931 -- level with the strongest open sub-4B entry on the public
-leaderboard -- with knowledge, NLI, and latency unchanged; held-out score NLL falls from 2.87 (the worst
-point on the whole size ladder) to 0.95; long\_policy triples and level-7 composition reaches .620, the
-first time any checkpoint in this project is clearly above chance there. Hard-tier \emph{accuracy} does
-not move (.468 $\to$ .450, within the noise of $n{=}111$) and remains below the frozen 14B's .559 with
-three exemplars, even though hard-tier \emph{Brier} improves past it (.66 vs.\ .60 is close, and every
-finer-grained probability metric moves far more than accuracy does). We treat this as the clearest
-statement of the project's central open tension and discuss it in \Cref{sec:analysis}.
+JevBench standard rises from .875 to .931 at \texttt{tl1b} -- level with the strongest open sub-4B entry
+on the public leaderboard -- with knowledge, NLI, and latency unchanged; held-out score NLL falls from
+2.87 (the worst point on the whole size ladder) to 0.95; level-7 composition reaches .620, the first time
+any checkpoint in this project is clearly above chance there. Hard-tier \emph{accuracy} does not improve
+over the previous recipe at either KD setting (.468 $\to$ .450/.477, within the noise of $n{=}111$) and
+stays below the frozen 14B's .559 with three exemplars; \texttt{tl1b\_nokd}'s better hard-tier and
+calibration numbers say the bundle's gains are not coming from distillation, and that at 14B forcing the
+model toward its own frozen few-shot judgment costs a little of exactly the hard-tier headroom the rest of
+the paper is trying to close. We treat the remaining standard-vs-hard split as the clearest statement of
+the project's central open tension and discuss it in \Cref{sec:analysis}.
 
 \subsection{Calibration}
 \label{sec:results:calibration}
@@ -313,48 +268,13 @@ was the binding constraint.
 \subsection{Efficiency}
 \label{sec:results:latency}
 
-We report the numbers below as an engineering measurement of this architecture class, not as a benchmarked
-systems result: every latency number is a single-stream, Python-level harness with no comparison against
-an optimized serving runtime (e.g.\ vLLM or TensorRT-LLM) or a saturated multi-request server, so the
-absolute numbers should be read as evidence that a cached-state, no-decode-loop design is viable at these
-sizes, not as a tuned lower bound.
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\linewidth]{figures/fig_latency_quality.pdf}
-  \caption{JevBench standard accuracy vs.\ measured single-decision latency (ms, log scale) for our
-  trained models, with generative-LLM decode-latency comparison bands.}
-  \label{fig:latency_quality}
-\end{figure}
-
-\textbf{Per-decision latency is close to $K$-independent for bounded candidate sets.} On one H100 (apples-
-to-apples, same pod and PyTorch build, 256-token state), a single decision costs 45, 56, and 60\,ms at
-1.7B, 4B, and 14B respectively at $K{=}2$, and only rises to 106, 118, and 157\,ms by $K{=}256$ -- an
-8$\times$ larger backbone is 1.3$\times$ slower per decision, because the cached state and a short suffix
-dominate cost, not backbone depth. Batched marginal cost (cost per query when many queries share one
-cached state) scales more steeply with both size and $K$: 2.7\,ms at 1.7B/$K{=}2$ rising to 110\,ms at
-14B/$K{=}256$, so the energy-scoring, candidate-blind front end (used to pre-filter very large candidate
-sets down to a bounded shortlist before the native readout scores it) matters more at scale, not less.
-
-\textbf{Native choice vs.\ an energy-scoring front end vs.\ a batched log-probability baseline.} At $M{=}256$
-queries against one cached 256-token state (transcribed from the run's log; the corresponding
-\texttt{bench.json} was lost to an out-of-memory crash, so we report these as a table rather than a
-figure), native choice's per-query marginal cost is 1.07, 1.55, 3.38, and 43.8\,ms at $K{=}2, 10, 32, 256$;
-a candidate-blind energy-scoring path is flat at $\approx$1\,ms across the same range; and a baseline that
-re-runs the backbone once per candidate costs 2.1, 4.6, 12.2, and 101.7\,ms. Native choice is 10--60\%
-more expensive than the energy path per query up to $K{\approx}10$ and roughly $3.4\times$ at $K{=}32$ in
-this throughput regime, but for a single bounded decision at a time -- the regime most of this paper's
-numbers are measured in -- native choice is the cheapest path for $K \le 32$, because its fixed per-call
-overhead is lower than the energy path's own front-end cost. The operating rule we adopt is: native choice
-directly for bounded sets, energy-scoring $\to$ top-$r$ shortlist $\to$ native choice for very large or
-unbounded candidate sets, with $r$ set by the latency budget.
-
-\textbf{Serving-path optimization} (before/after latency by model in \Cref{fig:serving}, \Cref{app:extra-figures}). The public inference package initially deep-copied the entire cached
-prefix's key-value tensors on every decision. Replacing this with a zero-copy strided view plus cached
-attention masks and position tensors reduced warm per-decision latency from 21--27\,ms to
-\textbf{15.5--17\,ms} (\texttt{typical-small}, 1.7B) and \textbf{19--21\,ms} (\texttt{typical-medium}, 4B)
-on one H100. We also attempted \texttt{torch.compile}/CUDA-graph capture for a further speedup: a single
-fixed input shape reached 8\,ms, but probabilities shifted by up to .1 across the shape buckets the serving
-path actually sees, and the mutable key-value cache produced stale-buffer crashes under the standard
-capture-and-replay pattern; we reverted this and report it as a rejected optimization. Manual per-bucket
-graph capture remains an open path toward $\sim$10\,ms decisions but was not pursued further within budget.
+We report this as an engineering measurement, not a benchmarked systems result: every number is a
+single-stream, Python-level harness with no optimized-runtime or saturated-server baseline
+(\Cref{app:latency-sweep,app:serving} give the full $K$-sweep and the serving-path fix). On one H100
+(apples-to-apples, same pod and build, 256-token state), a single decision costs 45, 56, and 60\,ms at
+1.7B, 4B, and 14B at $K{=}2$ -- an 8$\times$ larger backbone is 1.3$\times$ slower per decision, because
+the cached state and a short suffix dominate cost, not depth -- rising to 106, 118, and 157\,ms by
+$K{=}256$. Native choice is the cheapest path for a single decision at $K \le 32$; a candidate-blind
+energy-scoring front end that pre-filters larger sets to a bounded shortlist is cheaper in throughput mode
+at $K \gtrsim 32$. Removing a per-decision key-value deep copy from the public serving path cuts warm
+latency to 15.5--21\,ms across our released sizes.

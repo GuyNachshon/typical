@@ -46,9 +46,11 @@ The resulting recipe scales close to monotonically with backbone size on standar
 \textbf{JevBench} standard-tier accuracy, on the benchmark's public item subset, rises from .694 at 1.7B to
 \textbf{.931} at 14B, and .861 at a same-recipe Qwen3.5-4B checkpoint, at 15--60\,ms per decision regardless
 of size, because a single decision's cost is dominated by the cached state and a short suffix rather than
-backbone depth. Calibration-shaped checkpoint selection and a frozen-teacher distillation term take the
-model's held-out soft-target negative log-likelihood from 2.87 -- the worst point on our own size ladder --
-to 0.95 at the same backbone size, with no change to model capacity. Against this, we report the honest
+backbone depth. Calibration-shaped checkpoint selection takes the model's held-out soft-target negative
+log-likelihood from 2.87 -- the worst point on our own size ladder -- to 0.95 at the same backbone size,
+with no change to model capacity; a same-backbone frozen-teacher distillation term tested against its own
+matched control adds nothing measurable and is mildly negative on the hard tier. Against this, we report
+the honest
 limit as clearly as the headline numbers: JevBench's hard tier of compositional, multi-step decisions
 remains at or near chance for every checkpoint we trained, including our best 14B model, which a
 same-size \emph{frozen} backbone with three in-context exemplars and no training at all beats on hard-tier
@@ -60,39 +62,27 @@ rendered moves a frozen backbone's score by a similar margin (\Cref{sec:analysis
   \item A closed negative result: under six tested factorizations and distillation objectives, and at
   every backbone depth, a candidate-blind decision state absorbs a teacher's candidate priors and
   calibration but never its question-conditioned parametric knowledge, established with a
-  question-shuffling control that separates the two (\Cref{sec:method:blind-closure},
-  \Cref{sec:results:candidate-blind}). We state this as a scoped finding -- under these factorizations,
-  objectives, and budget -- not an impossibility result.
-  \item A direct decision interface that reads calibrated, typed probabilities from a cached
-  language-model state with no answer generation and no per-candidate forward pass, building on evidence
-  that a decoder already encodes the correct multiple-choice option before emitting its symbol
-  \citep{wong2026models}: the interface-level pair showing a candidate-blind semantic scorer over the
-  same terminal state loses 13 points of knowledge-probe accuracy while a readout over candidates' own
-  contextual hidden states matches the letter interface with a quarter of its order sensitivity
-  (\Cref{sec:method:pass}, \Cref{sec:results:readout}), plus a factored null gate with an exact
+  question-shuffling control (\Cref{sec:method:blind-closure}, \Cref{sec:results:candidate-blind}). We
+  state this as a scoped finding -- under these factorizations, objectives, and budget -- not an
+  impossibility result.
+  \item A direct decision interface reading calibrated, typed probabilities from a cached language-model
+  state with no answer generation, building on evidence that a decoder already encodes the correct
+  multiple-choice option before emitting its symbol \citep{wong2026models}: the interface-level pair
+  showing a candidate-blind semantic scorer loses 13 points of knowledge-probe accuracy while a readout
+  over candidates' own contextual hidden states matches the letter interface with a quarter of its order
+  sensitivity (\Cref{sec:method:pass}, \Cref{sec:results:readout}), plus a factored null gate with an exact
   independence-of-irrelevant-alternatives property (\Cref{eq:factored-null}).
-  \item Typed output primitives (ordinal-smoothed Score, order-invariant Bernoulli Noul,
-  \Cref{sec:method:typed}) that reuse the same backbone and readout and change only the target distribution
-  and terminal head, with a per-row routing rule whose violation we show breaks the model outright rather
-  than degrading gracefully.
   \item An empirical scaling ladder (1.7B--14B, one additional backbone family) with matched frozen
   controls and a calibration-objective isolation (checkpoint selection and target distribution, not
   capacity, is the binding constraint on soft-target probability quality), alongside a hard-tier tension
-  that training does not resolve at any size tested and that we report together with its own rendering
-  confound (\Cref{sec:results:headline}, \Cref{sec:analysis:tension}).
-  \item Diagnosis of two failure modes invisible to aggregate accuracy alone -- a last-layer tap and a
-  rendered abstain option -- each isolated with a matched control, plus a documented data-truncation
-  defect whose fix was bundled with other changes in the run that improved on it, reported as a diagnosed
-  mechanism rather than a demonstrated cause (\Cref{sec:results:readout}, \Cref{sec:results:null},
+  that training does not resolve at any size tested, reported together with its own rendering confound
+  (\Cref{sec:results:headline}, \Cref{sec:analysis:tension}).
+  \item Diagnosis of three failure modes invisible to aggregate accuracy alone -- a last-layer tap, a
+  rendered abstain option, and a facts-last truncation bug in long-context training data -- the first two
+  isolated with a matched control and the third with an exact measurement plus a matched
+  facts-first-vs-facts-last ablation (\Cref{sec:results:readout}, \Cref{sec:results:null},
   \Cref{sec:results:mixture}).
 \end{enumerate}
-
-The rest of the paper: \Cref{sec:related} positions this work against prior late-interaction, dynamic-label,
-and selective-classification systems; \Cref{sec:method} describes the decision pass, typed primitives, and
-training recipe; \Cref{sec:experiments} describes the corpora, held-out design, and evaluation protocol;
-\Cref{sec:results} reports the scaling ladder, ablations, calibration, and efficiency results;
-\Cref{sec:analysis} discusses where the hard-tier gap lives and the training/frozen-model tension; and
-\Cref{sec:limitations} states limitations explicitly before concluding.
 
 \begin{figure}[t]
   \centering

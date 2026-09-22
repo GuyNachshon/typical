@@ -5,8 +5,20 @@
 
 \Cref{tab:app-blind-closure,tab:app-null-fix} give the full numbers for the candidate-blind closure
 (\Cref{sec:results:candidate-blind}) and the rendered-null-line ablation (\Cref{sec:results:null})
-summarized in the main text. \Cref{fig:truncation,fig:serving} give the long-state truncation histogram
-and the serving-latency fix referenced from \Cref{sec:results:mixture,sec:results:latency}.
+summarized in the main text. \Cref{fig:truncation} gives the long-state truncation histogram referenced
+from \Cref{sec:results:mixture}; the serving-path engineering section and \Cref{fig:serving} referenced
+from \Cref{sec:results:latency} follow in \Cref{app:serving}.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig_hard_families.pdf}
+  \caption{Per-family JevBench-hard accuracy for \texttt{ladder\_14b}, \texttt{tl1b}, and the frozen-14B
+  3-shot control, sorted by \texttt{tl1b}'s value, chance line at .336. Per-family values are re-derived
+  directly from each run's JSON artefact rather than transcribed from prose, and differ slightly from
+  \Cref{sec:results:kd}'s aggregate table in a small number of cells as a result; the JSON is the source
+  of truth. Referenced from \Cref{sec:analysis:hard}.}
+  \label{fig:hard_families}
+\end{figure}
 
 \begin{table}[h]
   \centering
@@ -51,6 +63,39 @@ and the serving-latency fix referenced from \Cref{sec:results:mixture,sec:result
   \label{fig:truncation}
 \end{figure}
 
+\subsection{Native choice vs.\ energy scoring vs.\ batched log-probability, full $K$-sweep}
+\label{app:latency-sweep}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig_latency_quality.pdf}
+  \caption{JevBench standard accuracy vs.\ measured single-decision latency (ms, log scale) for our
+  trained models, with generative-LLM decode-latency comparison bands. Referenced from
+  \Cref{sec:results:latency}.}
+  \label{fig:latency_quality}
+\end{figure}
+
+At $M{=}256$ queries against one cached 256-token state (transcribed from the run's log; the corresponding
+\texttt{bench.json} was lost to an out-of-memory crash, so we report these as a table rather than a
+figure), native choice's per-query marginal cost is 1.07, 1.55, 3.38, and 43.8\,ms at $K{=}2, 10, 32, 256$;
+a candidate-blind energy-scoring path is flat at $\approx$1\,ms across the same range; and a baseline that
+re-runs the backbone once per candidate costs 2.1, 4.6, 12.2, and 101.7\,ms. Batched marginal cost at
+$M{=}256$ scales more steeply with both size and $K$ than single-decision cost: 2.7\,ms at 1.7B/$K{=}2$
+rising to 110\,ms at 14B/$K{=}256$, so the energy-scoring front end matters more at scale, not less.
+
+\subsection{Serving-path engineering}
+\label{app:serving}
+
+The public inference package initially deep-copied the entire cached prefix's key-value tensors on every
+decision. Replacing this with a zero-copy strided view plus cached attention masks and position tensors
+reduced warm per-decision latency from 21--27\,ms to \textbf{15.5--17\,ms} (\texttt{typical-small}, 1.7B)
+and \textbf{19--21\,ms} (\texttt{typical-medium}, 4B) on one H100 (\Cref{fig:serving}). We also attempted
+\texttt{torch.compile}/CUDA-graph capture for a further speedup: a single fixed input shape reached
+8\,ms, but probabilities shifted by up to .1 across the shape buckets the serving path actually sees, and
+the mutable key-value cache produced stale-buffer crashes under the standard capture-and-replay pattern;
+we reverted this and report it as a rejected optimization. Manual per-bucket graph capture remains an open
+path toward $\sim$10\,ms decisions but was not pursued further within budget.
+
 \begin{figure}[h]
   \centering
   \includegraphics[width=\linewidth]{figures/fig_serving.pdf}
@@ -59,6 +104,93 @@ and the serving-latency fix referenced from \Cref{sec:results:mixture,sec:result
   256-token state.}
   \label{fig:serving}
 \end{figure}
+
+\subsection{Mixture sweep, full table}
+\label{app:mixture}
+
+\begin{table}[h]
+  \centering
+  \caption{Mixture sweep at 1.7B, matched steps, referenced from \Cref{sec:results:mixture}. ``6A'' is the
+  $E{:}0.35/K{:}0.25/W{:}0.40$ point; ``e45+null'' adds \texttt{null\_aug W:0.20} to
+  $E{:}0.45/K{:}0.20/W{:}0.35$.}
+  \label{tab:app-mixture}
+  \small
+  \begin{tabular}{lrrrrr}
+    \toprule
+    & Base ($E$ only) & 6A & e45 & \textbf{e45+null} & long$_{e45}$ (1024 tok) \\
+    \midrule
+    CLINC-150 acc / false-abstain & .845/.05 & .734/.17 & .779/.10 & \textbf{.805}/\textbf{.08} & .741/.13 \\
+    MMLU-Pro among-$K$ / $\dqsh$ & .353/.122 & .330/.119 & .338/.115 & \textbf{.353}/\textbf{.143} & .329/.116 \\
+    Held-out score NLL & -- & 2.03 & 1.52 & 2.04 & \textbf{1.26} \\
+    JevBench std / hard & .694/.378 & .750/.387 & \textbf{.833}/.396 & .806/.396 & .806/\textbf{.450} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Before the facts-first fix (\Cref{sec:results:mixture}), the long-state row (long$_{e45}$, 1{,}024 tokens,
+25\% long-policy rows) alone raised \texttt{long\_policy} from .16 to .37 and \texttt{multi\_hop} from .17
+to .28 relative to 6A, and gave the best soft-target NLLs of the sweep.
+
+\subsection{Typed primitives: parameterization, routing, and full results}
+\label{app:typed-primitives}
+
+\textbf{Choice} is the $\numcands$-way readout of \Cref{sec:method:pass}, unchanged: a hard one-of-$K$
+target trained with soft cross-entropy against \Cref{eq:factored-null}. \textbf{Score} is ordinal
+(severity, quality, urgency): plain Choice penalizes a one-level miss as much as an opposite-end miss, so
+we use an ordinal-smoothed target,
+\begin{equation}
+  \label{eq:ordinal-smooth}
+  \tilde{t}_j \propto \exp\!\left(-\frac{|j - y|}{\tauord}\right), \qquad \tauord = 0.7,
+\end{equation}
+normalized over valid levels, $\tauord{=}0$ recovering one-hot Choice -- a pure target change, no
+architecture change. \textbf{Noul} is a yes/no proposition; rendered as 2-way Choice it is not guaranteed
+order-invariant, since ``yes''/``no'' still occupy two different suffix positions with two different
+contextual states. We give Noul a dedicated Bernoulli head reading the query alone, no candidate text,
+\begin{equation}
+  \label{eq:bernoulli-noul}
+  P(\text{yes}) = \sigma(w_n \cdot \hD),
+\end{equation}
+exactly order-invariant by construction, verified empirically as an exact-zero reversed-label control; the
+remaining mass $1{-}P(\text{yes})$ spreads over the other candidate(s), and the factored-null gate still
+applies.
+
+\textbf{Per-row routing, not a global flag.} A row is Noul-eligible iff its candidate set is exactly
+$\{\text{yes},\text{no}\}$; every other row scores as ordinary Choice, bit-identical to a run with Noul
+disabled. This boundary matters operationally: an early release candidate applying the Bernoulli head at
+the \emph{model} level rather than per row collapsed to chance, because Choice- and Score-typed rows in
+the same batch were then scored with no candidate text at all. Fixing the routing per row (verified by 140
+unit tests) restored it -- a typed-decision interface is a contract on the input, not a labeling
+convenience, and violating it does not degrade gracefully.
+
+\begin{table}[h]
+  \centering
+  \caption{Typed primitives vs.\ their $K$-way Choice control, matched fine-tunes, referenced from
+  \Cref{sec:results:typed}.}
+  \label{tab:app-typed}
+  \small
+  \begin{tabular}{lrr}
+    \toprule
+    Score & $K$-way Choice & Ordinal-smoothed ($\tauord{=}0.7$) \\
+    \midrule
+    Held-out urgency: acc / NLL / ECE & .505 / 2.07 / .35 & .508 / \textbf{1.23} / \textbf{.19} \\
+    JevBench hard: acc / Brier & .360 / .88 & \textbf{.459} / \textbf{.70} \\
+    JevBench ordinal items (12), decisions changed & -- & 0 of 12 \\
+    \midrule
+    Noul & 2-way Choice & Bernoulli \\
+    \midrule
+    PagerDuty (floor .792): acc / NLL & .602 / 1.04 & \textbf{.886} / \textbf{.28} \\
+    Reversed-label max $|\Delta P(\mathrm{yes})|$ & .55 & \textbf{0} (exact, all sets) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{DecisionMix v2, full numbers}
+\label{app:decisionmix}
+
+Held-out family/grammar/style accuracy moves .48/.51/.49 (matched control, never trained on
+\texttt{data\_wh}) to .83/.88/.89 (DecisionMix v2), and rubric-flip accuracy moves .48 to .71, within the
+generator's own rule engine (\Cref{sec:results:kd}). Level-7 composition and typed-decisions NLL
+(2.06 $\to$ 1.71 with the uncertainty corpus) are reported in \Cref{sec:results:kd}.
 
 \subsection{Full hyperparameters}
 \label{app:hyperparams}
@@ -97,8 +229,41 @@ and null augmentation are described in \Cref{sec:method:mixture}.
 uncertainty-plus-curriculum validation NLL (\texttt{--best\_on}) rather than in-distribution loss. Final
 fitted temperature and null offset for \texttt{ts1b}: $T{=}1.124$, offset $0$ (post-hoc, applied at eval).
 
-\subsection{Corpus tables}
+\subsection{Corpus construction detail}
 \label{app:corpora}
+
+\textbf{\texttt{data\_v5}} (633{,}213 train / 4{,}001 val rows) covers evidence tasks and classification
+with a deliberately wide span of label vocabularies at low rows-per-source, so the model cannot memorize a
+fixed small set of label sets and must read the rendered options. \textbf{\texttt{data\_kb}} (147{,}447
+train / 3{,}001 val) is distilled from ARC-Easy/Challenge, OpenBookQA, CommonsenseQA, SciQ, QASC, LogiQA,
+AQuA-RAT, MedMCQA, and MMLU-auxiliary-train, with TruthfulQA-MC1 held out entirely and two items excluded
+from all MMLU-Pro numbers after a leakage audit against that evaluation set. \textbf{\texttt{data\_wf}}
+(72{,}006 train / 3{,}000 val) is our own rubric-conditioned workflow generator, 15 families of
+Noul/Choice/Score decisions (policy checks, adequacy, support, fact verification, eligibility, routing,
+action selection, enumeration extraction, categorical judgment, tool selection, and four ordinal
+quality/severity/relevance/completeness scales, plus urgency); three whole families (eligibility,
+tool\_select, urgency, one per type) are held out of training entirely, and 26{,}513 of the 72{,}006 rows
+belong to \emph{rubric groups} -- the same state and candidate set rendered under two or three different
+rubrics with different gold answers, built specifically to measure and train rubric dependence rather than
+state/candidate pattern-matching. \textbf{\texttt{data\_wf\_hf}} (86{,}600 train rows) adds three
+externally sourced sets in the same typed shape: \texttt{cua-s1-forms} (60{,}000 rows, procedural GUI-form
+option-scoring, MIT license, with a form-signature-disjoint 24{,}370-row test split and a 196-row
+real-usage demo split held out), \texttt{systemone-lite-general} (20{,}000 rows, rule-labeled typed
+decisions, MIT, with a 5{,}400-row hard split held out), and \texttt{jev-4b-distill-data} (6{,}600 rows,
+programmatic gold, Apache-2.0, with a 600-row adversarial split held out). \textbf{\texttt{data\_wf\_long}}
+(23{,}318 train rows) is a longer-state variant of the workflow generator for multi-paragraph policy
+documents, rendered facts-first (\Cref{sec:method:mixture}). \textbf{\texttt{data\_wh}} (60{,}605 train /
+3{,}000 val) is a second, independent rubric-conditioned generator (DecisionMix v2): a programmatic rule
+engine over 12 domains and six boolean conditions at seven levels of compositional depth, where levels
+1--6 are trained and level 7 -- compositions requiring temporal, unit-conversion, expected-value, or
+trade-off reasoning that the generator does not otherwise produce -- is evaluation-only; every trained row
+belongs to a counterfactual rubric group. One whole domain/level pair, three whole domains, and two rubric
+styles are held out. \textbf{\texttt{data\_u}} (31{,}029 train / 2{,}000 val) is a soft-target uncertainty
+corpus: the validation split of UNLI, the ambiguous rows of AmbiEnt (uniform target over the listed
+labels), and four synthetic generators with exact closed-form posteriors (partial-evidence combination, a
+noisy-sensor Bayesian update, ordinal confusion via an inverted confusion matrix, and conflicting-sources
+log-odds pooling), each with a held-out parameter range; ChaosNLI-ambiguity (MNLI portion) is
+evaluation-only.
 
 \begin{table}[h]
   \centering

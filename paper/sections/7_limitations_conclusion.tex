@@ -31,10 +31,10 @@ provisionally. \textit{Latency methodology.} Every latency number (\Cref{sec:res
 a single-stream, Python-level harness with no comparison against an optimized serving runtime or a
 saturated multi-request server; we report these as engineering evidence that the architecture is viable at
 these sizes, not as tuned lower bounds. \textit{Bundled fixes.} The 14B long-state result
-(\Cref{sec:results:kd}) combines five changes in one run with no matched ablation isolating the
-facts-first truncation fix specifically, and the frozen-vs-trained hard-tier comparison
-(\Cref{sec:analysis:tension}) is not controlled for state/option rendering, which we separately show can
-move a frozen model's score by a comparable margin.
+(\Cref{sec:results:kd}) combines four changes in one run; \Cref{sec:results:mixture} reports the matched
+ablation that isolates the facts-first truncation fix from the rest of the bundle. \textit{Rendering
+confound.} The frozen-vs-trained hard-tier comparison (\Cref{sec:analysis:tension}) is not controlled for
+state/option rendering, which we separately show can move a frozen model's score by a comparable margin.
 
 \textbf{Conclusion.} We showed that a pretrained causal language model can be read as a typed, calibrated
 decision engine without generating any output tokens: a state is encoded once and cached, a query and a
