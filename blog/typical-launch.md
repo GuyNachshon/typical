@@ -55,25 +55,25 @@ The released family, on the public subset of JevBench (a decision-focused benchm
 | `typical-medium` | Qwen3-4B-Base | .806 | .423 | 19-21 ms | released |
 | `typical-large` candidate (`tl1b`) | Qwen3-14B-Base | **.931** | .450 | 59 ms (in-process, pre-serving-optimization) | candidate, not released |
 
-<p align="center"><img src="../figures/fig_ladder.png" alt="Scaling ladder: JevBench standard accuracy vs latency across 1.7B, 4B, 14B" width="640"></p>
-<p align="center"><em>Figure: capability per millisecond across the size ladder. 4B is the knee, 14B is the ceiling we haven't shipped yet.</em></p>
+<p align="center"><img src="../figures/fig_ladder.png" alt="JevBench standard and hard accuracy across backbone size, Qwen3 vs Qwen3.5, frozen vs trained, with dotted reference lines for the rest of the leaderboard" width="640"></p>
+<p align="center"><em>Figure: JevBench standard and hard accuracy across the size ladder, against the rest of the leaderboard (dotted lines). 4B is the knee of the Qwen3 line; 14B is the ceiling we haven't shipped yet.</em></p>
 
 A word on "JevBench standard": the harness has 231 public decision items across standard, easy, and hard tiers, plus 146 held-out judge items we don't have access to. We run the 231 public ones, a real evaluation but not a ranked leaderboard entry, since the harness only ranks runs with ≥95% coverage including the private items. Chance on this split is .311 standard / .284 easy / .336 hard, with an effective sample size around 36 on the standard tier, so treat any gap under a couple of points between our own checkpoints as noise (`COMPARE.md` §4a).
 
 Against the rest of the field on those same 231 items, we sit above untrained classifiers (a DeBERTa-v3 baseline scores .431 standard), roughly level with `system-one-open` (a Gemma-E2B LoRA at .931 standard, .486 hard), and behind the leaders: SemIf and OpenJev (open, .97-.99 standard, .61-.64 hard) and the closed Jev 1.13.0 (.986 standard, .730 hard). We're not claiming the top of that board. We're claiming a specific, useful spot on it: open weights, a documented recipe, and a latency number the closed leaders don't publish.
 
-<p align="center"><img src="../figures/fig_latency_quality.png" alt="Latency vs JevBench standard accuracy across the field" width="640"></p>
-<p align="center"><em>Figure: where Typical sits on latency vs. accuracy against the rest of the JevBench field.</em></p>
+<p align="center"><img src="../figures/fig_latency_quality.png" alt="Single-decision latency vs JevBench standard accuracy for the Typical family, plotted against the latency bands for one-letter decode, JSON or label decode, and chain-of-thought" width="640"></p>
+<p align="center"><em>Figure: the Typical family's latency vs. accuracy, next to what a normal LLM call costs depending on how it answers.</em></p>
 
 Calibration is where the typed heads earn their keep. In an isolated ablation on the 1.7B backbone, switching Score from a plain K-way Choice to ordinal-smoothed targets cuts held-out score NLL from 2.07 to 1.23, with zero decisions changed on the 12 ordinal items in JevBench itself (`REPORT.md` §3ac). At full scale, the `typical-large` candidate checkpoint (which bundles the typed heads with the fixes described below) posts a held-out score NLL of 0.95 against 2.87 for the same backbone under the prior recipe (`REPORT.md` §3ah). That's a probability you can put a threshold on, versus one you can't.
 
-<p align="center"><img src="../figures/fig_calibration.png" alt="Calibration curve before and after typed heads: NLL and Brier score by model" width="640"></p>
-<p align="center"><em>Figure: typed heads (ordinal Score, Bernoulli Noul) cut held-out score NLL by roughly 40-65% across checkpoints.</em></p>
+<p align="center"><img src="../figures/fig_calibration.png" alt="Held-out score NLL and typed-decisions NLL across checkpoints, with the ladder_14b-to-tl1b jump annotated" width="640"></p>
+<p align="center"><em>Figure: held-out score and typed-decisions NLL across checkpoints. The long-state fix plus frozen-teacher distillation cut the 14B's score NLL from 2.87 to 0.95.</em></p>
 
 **The 14B checkpoint (`tl1b`) is not released.** It posts the best standard-tier number in the project, .931, level with the best open entry on the leaderboard. But we set a pass rule before training it (hard-tier accuracy ≥ .559 or hard-tier Brier ≤ .65, long-document policy questions ≥ .35), and it misses on both: narrowly on Brier (.66 against a .65 bar), and by a wide margin on long-document accuracy (.158). Worse, the same 14B backbone, frozen, with three examples in the prompt and no training at all, scores .559 on the hard tier, higher than our trained model's .450, and better calibrated (Brier .60 vs .66). Training this model made it more confident and more accurate on the easy stuff, and worse than doing nothing on the hard stuff. We'd rather tell you that than ship it.
 
-<p align="center"><img src="../figures/fig_hard_families.png" alt="JevBench hard-tier accuracy by family: long-document policy, multi-hop, temporal reasoning" width="640"></p>
-<p align="center"><em>Figure: the hard tier isn't one problem. Long-document policy and multi-step composition drag the average down independently.</em></p>
+<p align="center"><img src="../figures/fig_hard_families.png" alt="JevBench hard-tier accuracy by family for ladder_14b, tl1b, and the frozen 14B with three examples" width="640"></p>
+<p align="center"><em>Figure: hard-tier accuracy by family. Long-document policy and multi-step composition drag the average down independently, and the frozen 14B beats both trained checkpoints on most of them.</em></p>
 
 ## What we learned that you can use even if you never touch this model
 
@@ -83,13 +83,13 @@ Calibration is where the typed heads earn their keep. In an isolated ablation on
 
 **Fine-tuning can make the hardest cases worse than not fine-tuning at all.** That's the 14B result above, restated as a warning: training buys accuracy and calibration everywhere your distribution actually covers the task, and can cost both exactly where it doesn't. And "where it doesn't" tends to concentrate in whatever you'd call the hard tier. A frozen model with a few examples in context isn't a strawman to beat before you ship; it's a ceiling to check you've actually cleared.
 
-**A third of our serving latency was one deep copy.** The serving path cloned the entire cached KV state on every decision: correct, safe, and much slower than it needed to be. Swapping the clone for a zero-copy view (bit-identical output, verified) cut warm p50 from 21-25 ms to 15.5-17 ms on the 1.7B model and 26-27 ms to 19-21 ms on the 4B (`runs/serve_bench2/results.json`; `REPORT.md` §3ag). Before reaching for a bigger GPU or a smaller model, profile what your serving code does with state you're supposed to be reusing.
+**A quarter to a third of our serving latency was one deep copy.** The serving path cloned the entire cached KV state on every decision: correct, safe, and much slower than it needed to be. Swapping the clone for a zero-copy view (bit-identical output, verified) cut warm p50 from 21-25 ms to 15.5-17 ms on the 1.7B model and 26-27 ms to 19-21 ms on the 4B (`runs/serve_bench2/results.json`; `REPORT.md` §3ag). Before reaching for a bigger GPU or a smaller model, profile what your serving code does with state you're supposed to be reusing.
 
-<p align="center"><img src="../figures/fig_truncation.png" alt="Long-policy accuracy before and after the facts-first truncation fix" width="640"></p>
-<p align="center"><em>Figure: same model, same eval. Moving the facts to the front of the training rows more than doubled long-policy accuracy.</em></p>
+<p align="center"><img src="../figures/fig_truncation.png" alt="Left: state token length distribution against truncation cutoffs at 256/1024/2048/3072 tokens. Right: long-policy accuracy for ladder_14b, typical-medium, tl1b, and the frozen 14B" width="640"></p>
+<p align="center"><em>Figure: left, how much of a long-policy row gets truncated at each token budget (98% of rows lost their facts at 1,024 tokens). Right, long-policy accuracy after the fix: ladder_14b .05 to tl1b .16, still short of the frozen 14B's .42.</em></p>
 
-<p align="center"><img src="../figures/fig_serving.png" alt="Serving p50 latency before and after removing the per-decision KV cache deep copy" width="640"></p>
-<p align="center"><em>Figure: one zero-copy view instead of a deep copy, roughly a third off warm p50 latency at every model size.</em></p>
+<p align="center"><img src="../figures/fig_serving.png" alt="Cold and warm p50 latency before and after removing the per-decision KV cache deep copy, for typical-small, typical-medium, and tm2" width="640"></p>
+<p align="center"><em>Figure: one zero-copy view instead of a deep copy took roughly a quarter to a third off warm p50 latency, across every model in the family.</em></p>
 
 ## Two-minute quickstart
 
