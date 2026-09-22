@@ -111,6 +111,22 @@ The honest version of the question: when is a direct decision enough, and when d
 
 Two other places Typical is the wrong tool today: candidate sets in the hundreds or thousands need a retrieval front end feeding a shortlist to the decision head, and Choice keeps some sensitivity to the order you list options in. Noul does not, by construction.
 
+## One thing to know before you call it
+
+If your state is a long document, put the case facts **after** the policy text, not before.
+
+All three public checkpoints were trained on a corpus whose long states rendered the case last, and they picked up that ordering. We measured it on 605 held-out long policy states, identical content in both conditions, only the position of the case block different, with no truncation at scoring time:
+
+| model | facts last | facts first |
+|---|---|---|
+| `typical-small-preview` | .744 | .534 |
+| `typical-small` | .798 | .598 |
+| `typical-medium` | .866 | .612 |
+
+Twenty to twenty-five points, and on the yes/no subset the preview model drops below the majority-class floor, meaning you would do better answering "yes" to everything than calling it that way. Short states are unaffected.
+
+We found this while testing whether a data bug we had already fixed was the cause of a separate problem. Retrained checkpoints without the bias exist and reach .947 and .950 in the same test, giving up nothing in the other column, and they will supersede these. Until they do, the ordering above is the caveat, and it is on each model card.
+
 ## Four things that surprised us
 
 1. The last layer of the language model was the wrong layer to decide from.
