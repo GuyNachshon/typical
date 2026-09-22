@@ -99,7 +99,8 @@
   .nav .brand { font-weight: 700; padding-right: 14px; }
   .nav .cta { background: var(--color-off); color: var(--color-warm); }
   .nav .cta:hover { background: var(--color-charcoal); }
-  @media (max-width: 48rem) { .nav .links a { display: none; } .nav .links a[href='#results'], .nav .links a[href='research.html'] { display: inline; padding: 8px 6px; } }
+  /* on a phone the bar keeps the three that matter: the numbers, the paper, the weights */
+  @media (max-width: 48rem) { .nav .links a { display: none; } .nav .links a[href='#results'], .nav .links a[href='research.html'], .nav .links a[href^='https://huggingface.co'] { display: inline; padding: 8px 6px; } }
 
   /* ---- buttons ---- */
   .btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 15px; border-radius: var(--radius-btn); background: var(--color-warm); color: var(--color-off); font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; line-height: 1; white-space: nowrap; transition: background var(--duration-tap) var(--ease-out); }

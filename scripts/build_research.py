@@ -38,7 +38,7 @@ LI_RE = re.compile(r"<li>\s*(?:<p>)?(.*?)(?:</p>)?\s*</li>", re.S)
 BLOCK_START_RE = re.compile(r'(?=^<(?:h3|p|ul|ol|table|div)\b)', re.M)
 SETPIECE_PREFIXES = ('<table', '<div class="code', '<div class="media"', '<div class="ucard')
 
-NAV = """<nav class="nav"><a class="brand" href="index.html">Typical</a><span class="links"><a href="index.html#results">Results</a><a href="index.html#how">How it works</a><a href="index.html#demos">Demos</a><a href="research.html" aria-current="page">Research</a><a href="https://huggingface.co/OzLabs/typical-small/tree/main/inference">Code</a></span><a class="cta" href="index.html#tryit">Try it live</a></nav>"""
+NAV = """<nav class="nav"><a class="brand" href="index.html">Typical</a><span class="links"><a href="index.html#results">Results</a><a href="index.html#how">How it works</a><a href="index.html#demos">Demos</a><a href="research.html" aria-current="page">Research</a><a href="https://huggingface.co/OzLabs/typical-small">Weights</a></span><a class="cta" href="index.html#tryit">Try it live</a></nav>"""
 
 FOOTER = """<footer class="footer"><div class="page">
   <div class="cols">
