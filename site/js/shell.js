@@ -9,7 +9,7 @@ import { glueSeparators, glued, bindWidows } from './typography.js';
 import { describeDoom, candidatesFor, resolveIntent, keyPress, scriptedPolicy, resetNav } from './games/realdoom-logic.js';
 import { QUESTION as DOOM_QUESTION } from './games/doom.js';
 import { hashKey } from './api.js';
-import { lineChart, reliability, ladder, fmtPct } from './charts.js';
+import { lineChart, reliability, ladder, costBar, fmtPct } from './charts.js';
 
 async function loadJSON(path) {
   try {
@@ -206,17 +206,21 @@ async function mountResults(models, reliabilityDoc, chanceDoc, frozenDoc) {
 
   const g2 = document.getElementById('chart-g2');
   if (g2) {
-    lineChart(g2, {
-      series: models.map((m) => ({
-        label: m.released ? m.id : `${m.id} (not released)`,
-        values: ['k2', 'k32', 'k256'].map((k) => ({ x: Number(k.slice(1)), y: m.latency.single_ms[k] })),
+    // Released models only. The 14B is not out, and a fourth near-identical line was the reason
+    // this chart said nothing — the point is where the time goes, not which checkpoint wins by 3 ms.
+    costBar(g2, {
+      m: 32,
+      // the preview borrows typical-small's ladder (latency.note), so plotting it would draw the
+      // same bar twice under two names
+      rows: models.filter((m) => m.released && m.latency.marginal_ms_m32 && !m.latency.note).map((m) => ({
+        model: m.id.replace(/-/g, '\u2011'),
+        one: m.latency.single_ms.k2,
+        marginal: m.latency.marginal_ms_m32.k2,
       })),
-      xLabel: 'K (log scale)',
-      yLabel: 'ms',
-      logX: true,
-      title: 'single-decision latency vs K',
+      title: 'one decision, and thirty-two on the same state',
     });
-    caption(g2.parentElement, `Source: ${uniqueSources(models.map((m) => m.sources.latency))}.`);
+    // A repo path is not a source a reader can check; the conditions are what the number means.
+    caption(g2.parentElement, 'Measured on one H100, one decision at a time, a 256\u2011token state and two options per question, model load excluded. A wider answer space costs more: at 256 options a single decision is 106 ms and each further question 28. Full ladder on the research page.');
   }
 
   const g4 = document.getElementById('chart-g4');

@@ -664,3 +664,71 @@ if (typeof process !== 'undefined' && import.meta.url === `file://${process.argv
 }
 
 export { selfTest };
+
+// costBar(el, {rows:[{model, one, marginal, m}], unit}) — where the time actually goes.
+//
+// This replaced a line chart of latency vs K. K is the size of the answer space, which the page
+// never defines, so the axis read as jargon and the four near-identical lines answered a question
+// nobody had. The claim this section makes is that reading the state is the work and it happens
+// once, so the drawing is that sentence: one bar for a single decision, one for M decisions on the
+// same state, split at the point where the read ends and the extra questions begin.
+const COST_W = 1040;
+export function costBar(container, opts) {
+  const { rows, m = 32, title = '' } = opts;
+  const w = fitWidth(container, COST_W);
+  const labelW = Math.min(196, w * 0.22);
+  const pad = { t: 16, r: 92, b: 78 }; // b leaves room for the axis, its ticks and the key under it
+  const barH = 24;
+  const rowGap = 12;
+  const groupGap = 34;
+  const h = pad.t + rows.length * (20 + 2 * barH + rowGap + groupGap) + pad.b;
+  const iw = w - labelW - pad.r;
+  const svg = baseSvg(container, w, h, title);
+  const totals = rows.map((r) => r.one + (m - 1) * r.marginal);
+  const x = scale([0, Math.max(...totals) * 1.04], [0, iw]);
+  const g = svgEl('g', { transform: `translate(${labelW},${pad.t})` });
+  svg.appendChild(g);
+
+  let y = 0;
+  rows.forEach((r) => {
+    const total = r.one + (m - 1) * r.marginal;
+    g.appendChild(svgText(-labelW, y + 12, r.model, { 'font-size': 12, fill: INK }));
+    y += 20;
+    [
+      { n: 1, width: x(r.one), extra: 0, value: `${r.one} ms`, sub: 'one decision' },
+      { n: m, width: x(r.one), extra: x(total) - x(r.one), value: `${Math.round(total)} ms`, sub: `${(total / m).toFixed(1)} ms each` },
+    ].forEach((b, i) => {
+      const yy = y + i * (barH + rowGap);
+      g.appendChild(svgText(-labelW, yy + barH / 2 + 4, `${b.n} question${b.n > 1 ? 's' : ''}`, { 'font-size': 12, fill: MID }));
+      g.appendChild(bar(g, 0, yy, b.width, barH, INK));
+      if (b.extra > 0) {
+        g.appendChild(bar(g, b.width + 2, yy, b.extra - 2, barH, MID, 0.34));
+        // the seam: everything right of it is the questions after the first, at marginal cost
+        g.appendChild(svgEl('line', { x1: b.width + 1, x2: b.width + 1, y1: yy - 4, y2: yy + barH + 4, stroke: INK, 'stroke-width': 1 }));
+      }
+      // the value sits at the end of its own bar, not in a tidy column far to the right of it
+      const end = b.width + b.extra + 10;
+      g.appendChild(svgText(end, yy + barH / 2 + 4, b.value, { 'font-size': 13, fill: INK }));
+      if (b.sub) g.appendChild(svgText(end, yy + barH / 2 + 19, b.sub, { 'font-size': 11, fill: MID }));
+    });
+    y += 2 * barH + rowGap + groupGap;
+  });
+
+  const axisY = h - pad.t - pad.b + 8;
+  g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: axisY, y2: axisY, stroke: STEEL }));
+  niceTicks(0, Math.max(...totals), 5).forEach((t) => {
+    g.appendChild(svgEl('line', { x1: x(t), x2: x(t), y1: axisY, y2: axisY + 5, stroke: STEEL }));
+    g.appendChild(svgText(x(t), axisY + 20, `${t}`, { fill: MID, 'font-size': 11, 'text-anchor': 'middle' }));
+  });
+  g.appendChild(svgText(iw, axisY + 20, 'ms', { fill: MID, 'font-size': 11, 'text-anchor': 'end' }));
+  // the two segments need naming once: without it the split reads as decoration
+  const key = [{ fill: INK, op: 1, text: 'the state, read once' }, { fill: MID, op: 0.34, text: `the other ${m - 1} questions` }];
+  let kx = 0;
+  key.forEach((k) => {
+    g.appendChild(svgEl('rect', { x: kx, y: axisY + 34, width: 11, height: 11, rx: 2, fill: k.fill, 'fill-opacity': k.op }));
+    g.appendChild(svgText(kx + 17, axisY + 44, k.text, { fill: MID, 'font-size': 11 }));
+    kx += 28 + k.text.length * 6.6;
+  });
+  registerChart(container, () => costBar(container, opts));
+  return svg;
+}

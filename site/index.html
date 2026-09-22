@@ -29,7 +29,7 @@
     <div class="btns"><a class="btn" href="#results">See the results</a><a class="btn outline" href="research.html">Read the research</a></div>
     <ul class="proof t-mono">
       <li>Same facts, different rule, different decision</li>
-      <li>16&nbsp;ms a decision, warm</li>
+      <li>45&nbsp;ms a decision, 2.7&nbsp;ms for the next</li>
       <li>80.4% across 150 labels you define</li>
       <li>Choice · Noul · Score</li>
     </ul>
@@ -96,12 +96,12 @@
   <div class="chapter-head">
     <p class="t-eyebrow">Latency</p>
     <div>
-      <h2 class="t-section">So decisions stay cheap.</h2>
-      <p class="lede">About 16 ms warm for a decision, and a couple of milliseconds for each extra question on a state already read. Cheap enough to sit in the loop rather than at the edges of it.</p>
+      <h2 class="t-section">The second question is nearly free.</h2>
+      <p class="lede">Reading the state is the work, and it happens once. A decision on a fresh state takes 45&nbsp;ms; every further question against that same state adds 2.7. Thirty&#8209;two questions on one ticket come to 129&nbsp;ms — four milliseconds a decision.</p>
     </div>
   </div>
   <div class="media" style="padding:30px">
-    <figure><figcaption class="t-eyebrow muted mb-18">Single-decision latency vs K</figcaption><div class="chart" id="chart-g2"></div></figure></figure>
+    <figure><figcaption class="t-eyebrow muted mb-18">Where the time goes</figcaption><div class="chart" id="chart-g2"></div></figure>
   </div>
   <p class="lede muted mt-30" style="max-width:56ch">Typical is built for bounded decisions, not open-ended generation or multi-step planning. The released models work on states up to about 1k tokens; serial arithmetic, temporal composition and long-horizon reasoning are still weak.</p>
 
