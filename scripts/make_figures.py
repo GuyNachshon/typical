@@ -34,6 +34,7 @@ HF_REPO = "guychuk/pcdm-runs"
 BLUE = "#0072B2"
 ORANGE = "#D55E00"
 GREEN = "#009E73"
+PURPLE = "#8C64B4"
 GRAY = "#767676"
 YELLOW = "#E69F00"
 SKY = "#56B4E9"
@@ -275,12 +276,26 @@ def fig_ladder():
 # fig_latency_quality — JevBench standard vs single-decision latency
 # ---------------------------------------------------------------------------
 def fig_latency_quality():
+    # Latency here is the warm per-decision p50 from the public inference package
+    # (runs/serve_bench2/results.json, K=2, 256-token state, prefix KV already cached) --
+    # the same quantity the launch post's release table quotes. The older
+    # runs/bench_*/bench.json ladder measures a different thing (a cold single decision
+    # including the state encode, on an unoptimised serving path) and plotting it here
+    # put every released model to the *right* of the "one-letter decode" band, which is
+    # the opposite of what the measurement says.
+    serve = load_json(RUNS / "serve_bench2" / "results.json")
+
+    def warm_p50(model, k=2, state_tokens=256):
+        m = next((e for e in serve if e["model"] == model), None)
+        if m is None:
+            return None
+        cfg = next((c for c in m["configs"]
+                    if c["K"] == k and c["state_tokens"] == state_tokens), None)
+        return cfg["warm"]["p50_ms"] if cfg else None
+
     points = [
-        ("typical-small (1.7B)", "jev_native_ts1b", "bench_ts1c", "ts1b has no bench.json; "
-         "latency proxy = bench_ts1c, same backbone/tap-20 re-run"),
-        ("typical-medium (4B)", "jev_native_tm1b", "bench_tm1b", None),
-        ("8B (ladder_8b, untyped baseline)", "jev_native_ladder_8b", "bench_ladder_8b", None),
-        ("tl1b (14B, in-flight)", "jev_native_tl1b", "bench_tl1b", None),
+        ("typical-small (1.7B)", "jev_native_ts1b", "typical-small"),
+        ("typical-medium (4B)", "jev_native_tm1b", "typical-medium"),
     ]
     fig, ax = plt.subplots(figsize=(6.4, 4.4))
 
@@ -295,23 +310,24 @@ def fig_latency_quality():
                  ha="center", va="top", transform=ax.get_xaxis_transform())
 
     used_sources = []
-    for label, jev_dir, bench_dir, note in points:
+    for label, jev_dir, serve_model in points:
         s = jev_summary(jev_dir)
-        ms = bench_single_decision_ms(bench_dir, "32")
+        ms = warm_p50(serve_model)
         if s is None or ms is None:
-            note_omitted(f"fig_latency_quality: {label} missing summary or bench data")
+            note_omitted(f"fig_latency_quality: {label} missing summary or serve_bench2 data")
             continue
         acc = s["original"]["accuracy"]
         ax.scatter([ms], [acc], color=BLUE, zorder=5, s=45)
         ax.annotate(label, (ms, acc), textcoords="offset points", xytext=(6, 5), fontsize=7.8)
-        used_sources.append(f"{jev_dir}/summary.json + {bench_dir}/bench.json (K=32, state=256, m=1 total_ms)"
-                             + (f" [{note}]" if note else ""))
+        used_sources.append(
+            f"{jev_dir}/summary.json original.accuracy + serve_bench2/results.json "
+            f"[{serve_model}] K=2, state_tokens=256, warm.p50_ms")
 
     ax.set_xscale("log")
-    ax.set_xlabel("single-decision latency (ms, log scale)")
+    ax.set_xlabel("warm p50 per decision (ms, log scale; state already cached)")
     ax.set_ylabel("JevBench standard accuracy")
     ax.set_ylim(0.5, 1.0)
-    ax.set_xlim(15, 100000)
+    ax.set_xlim(8, 100000)
 
     save(
         fig, "fig_latency_quality",
@@ -320,8 +336,8 @@ def fig_latency_quality():
             "(one-letter decode ~25-40ms, JSON/label decode ~60-200ms, CoT ~3-60s), not a "
             "measured artefact",
         ],
-        desc="JevBench standard accuracy vs measured single-decision latency (ms, log scale) "
-             "for our trained models, with generative-LLM decode-latency comparison bands.",
+        desc="JevBench standard accuracy vs warm per-decision p50 latency (ms, log scale) for "
+             "the two released models, with generative-LLM decode-latency comparison bands.",
     )
 
 
@@ -375,8 +391,13 @@ def fig_calibration():
 # fig_hard_families — per-family JevBench-hard accuracy, 3 models
 # ---------------------------------------------------------------------------
 def fig_hard_families():
-    models = [("ladder_14b", "jev_native_ladder_14b", BLUE),
-              ("tl1b", "jev_native_tl1b", ORANGE),
+    # The released models first: this figure is cited from the launch post, whose failure
+    # section is about typical-small/medium. tl1b is kept as the best checkpoint we trained
+    # and the frozen 14B as the control it loses to; ladder_14b is dropped (it is superseded
+    # by tl1b and made the chart unreadable at five series).
+    models = [("typical-small (1.7B)", "jev_native_ts1b", BLUE),
+              ("typical-medium (4B)", "jev_native_tm1b", ORANGE),
+              ("tl1b (14B, unreleased)", "jev_native_tl1b", PURPLE),
               ("frozen-14B (3-shot)", "jev_zs3_14b", GREEN)]
     data = {}
     families = None
@@ -389,15 +410,16 @@ def fig_hard_families():
         data[label] = {fam: v["accuracy"] for fam, v in pf.items()}
         families = set(pf.keys()) if families is None else families & set(pf.keys())
 
-    families = sorted(families, key=lambda f: data["tl1b"].get(f, 0))
-    fig, ax = plt.subplots(figsize=(7.0, 5.0))
+    sort_key = next(l for l, _, _ in models if l in data)
+    families = sorted(families, key=lambda f: data[sort_key].get(f, 0))
+    fig, ax = plt.subplots(figsize=(7.0, 5.4))
     y = range(len(families))
-    h = 0.25
-    for i, (label, _, color) in enumerate(models):
-        if label not in data:
-            continue
+    drawn = [m for m in models if m[0] in data]
+    h = 0.8 / max(len(drawn), 1)
+    for i, (label, _, color) in enumerate(drawn):
+        off = (i - (len(drawn) - 1) / 2) * h
         vals = [data[label][f] for f in families]
-        ax.barh([yi + (i - 1) * h for yi in y], vals, height=h, color=color, label=label)
+        ax.barh([yi + off for yi in y], vals, height=h, color=color, label=label)
 
     ax.axvline(0.336, color="#333333", linestyle="--", linewidth=1.0)
     ax.text(0.336, len(families) - 0.3, "chance (.336)", rotation=90, fontsize=7.5,
@@ -411,15 +433,14 @@ def fig_hard_families():
     save(
         fig, "fig_hard_families",
         sources=[
-            "runs/jev_native_ladder_14b/summary.json hard.per_family.<family>.accuracy",
+            "runs/jev_native_ts1b/summary.json hard.per_family.<family>.accuracy",
+            "runs/jev_native_tm1b/summary.json hard.per_family.<family>.accuracy",
             "runs/jev_native_tl1b/summary.json hard.per_family.<family>.accuracy",
             "runs/jev_zs3_14b/summary.json hard.per_family.<family>.accuracy (pulled from HF hub)",
         ],
-        desc="Per-family JevBench-hard accuracy (10 families) for ladder_14b, tl1b, and the "
-             "frozen-14B 3-shot control, sorted by tl1b's value, with the chance line at .336. "
-             "Note: ladder_14b's temporal_numeric/probability values here (.333/.50, "
-             "re-derived from hard/results.jsonl) differ from REPORT.md 3ah's prose "
-             "(.20/.40) -- the JSON artefact is used as the source of truth.",
+        desc="Per-family JevBench-hard accuracy (10 families) for the two released models, "
+             "the unreleased 14B, and the frozen-14B 3-shot control, with the chance line "
+             "at .336. Per-family n ranges from 4 to 19 items; no single family separates.",
     )
 
 

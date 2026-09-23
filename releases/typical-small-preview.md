@@ -152,9 +152,14 @@ tier is within 1 SE of chance.
 ## License
 
 - Backbone (`Qwen/Qwen3-1.7B-Base`): Apache-2.0.
-- Training data: per-source licenses triaged in PLAN6.md's dataset-survey table (mostly MIT /
-  Apache-2.0 / CC-BY-4.0 for the trained sources; `jevlogs` is research-licensed and used only as a
-  caveated held-out sanity eval, never trained on, never used in commercial claims).
+- Training data: per-source licenses triaged in PLAN6.md's dataset-survey table. **Two trained
+  sources are non-commercial and were previously mis-summarised here as permissive:
+  ANLI (`facebook/anli`, in the E mix) is CC BY-NC 4.0, and SciQ (11.7k rows of `data_kb`) is
+  CC BY-NC 3.0.** The rest of the trained mix is MIT / Apache-2.0 / CC-BY-4.0 or generated in-repo.
+  `jevlogs` is research-licensed and used only as a caveated held-out sanity eval, never trained
+  on, never used in commercial claims. Whether non-commercially-licensed training data constrains
+  use of the Apache-2.0 weights is unsettled; this card states what went in and does not assert a
+  conclusion. LogiQA2, MedMCQA and AQuA have not yet been re-triaged to this standard.
 - JevBench numbers in this card are a **public-subset run** against `fstandhartinger/jevbench`
   v1.2.1 (72 standard / 48 easy / 111 hard public ids) — not a submitted or ranked leaderboard entry.
   The 72 MIT-licensed original JevBench items are the only public JevBench material that is

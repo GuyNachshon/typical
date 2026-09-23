@@ -12,11 +12,13 @@ from \Cref{sec:train:latency} follow in \Cref{app:serving}.
 \begin{figure}[h]
   \centering
   \includegraphics[width=\linewidth]{figures/fig_hard_families.pdf}
-  \caption{\textbf{Public subset, unranked.} Per-family JevBench-hard accuracy for \texttt{ladder\_14b}, \texttt{tl1b}, and the frozen-14B
-  3-shot control, sorted by \texttt{tl1b}'s value, chance line at .336. Per-family values are re-derived
-  directly from each run's JSON artefact rather than transcribed from prose, and differ slightly from
-  \Cref{sec:boundary:frozen}'s aggregate table in a small number of cells as a result; the JSON is the source
-  of truth. Referenced from \Cref{sec:boundary:hard}.}
+  \caption{\textbf{Public subset, unranked.} Per-family JevBench-hard accuracy for the two released
+  models (\texttt{ts1b}, \texttt{tm1b}), the unreleased \texttt{tl1b}, and the frozen-14B 3-shot
+  control, chance line at .336. Per-family $n$ ranges from 4 to 19 items and no single family
+  separates; the uniform direction across the serial families is the observation
+  (\Cref{sec:boundary:hard}). Per-family values are re-derived directly from each run's JSON artefact
+  rather than transcribed from prose, and differ slightly from \Cref{sec:boundary:frozen}'s aggregate
+  table in a small number of cells as a result; the JSON is the source of truth.}
   \label{fig:hard_families}
 \end{figure}
 
@@ -71,8 +73,12 @@ from \Cref{sec:train:latency} follow in \Cref{app:serving}.
 \begin{figure}[h]
   \centering
   \includegraphics[width=\linewidth]{figures/fig_latency_quality.pdf}
-  \caption{\textbf{Public subset, unranked.} JevBench standard accuracy vs.\ measured single-decision latency (ms, log scale) for our
-  trained models, with generative-LLM decode-latency comparison bands. Referenced from
+  \caption{\textbf{Public subset, unranked.} JevBench standard accuracy vs.\ \emph{warm} per-decision
+  p50 latency (ms, log scale) for the two released models, with generative-LLM decode-latency
+  comparison bands. Latency is the served path with the state prefix already cached
+  (\texttt{runs/serve\_bench2}, $\numcands{=}2$, 256-token state, one stream, in process, model load
+  excluded), i.e.\ the same quantity as \Cref{app:serving}, not the single-decision ladder of
+  \Cref{tab:app-latency}, which includes the state encode on the unoptimized path. Referenced from
   \Cref{sec:train:latency}.}
   \label{fig:latency_quality}
 \end{figure}
@@ -536,19 +542,26 @@ completed evaluation (in-flight checkpoints are omitted per \Cref{sec:limitation
 
 \begin{table}[h]
   \centering
-  \caption{Held-out workflow and external floors, full-row \texttt{eval\_wf} pass.}
+  \caption{Held-out workflow and external floors. Rows marked \emph{full} are the post-hoc
+  \texttt{eval\_wf} pass over every row at full state length (4{,}096-token window,
+  \texttt{--limit 0}); rows marked \emph{train-time} are the 1{,}500-row, 256-token pass emitted
+  during training, which truncates the long external sets and is not comparable to the full pass.
+  The distinction is load-bearing on the external sets: on \texttt{ts1b}, PagerDuty reads .560 at
+  train time and .817 at full length, because the 256-token window removes the incident text.
+  Numbers in parentheses after held-out score are NLL.}
   \label{tab:app-wf-eval}
   \small
   \setlength{\tabcolsep}{2.5pt}
-  \begin{tabular}{lrrrrrr}
+  \begin{tabular}{llrrrrrr}
     \toprule
-    Model & \shortstack{Held-out\\noul} & \shortstack{Held-out\\score (NLL)} & \shortstack{Held-out\\style} & \shortstack{PagerDuty\\(.792)} & \shortstack{jevlogs\\(.697)} & \shortstack{Mind2Web\\(.427)} \\
+    Model & Pass & \shortstack{Held-out\\noul} & \shortstack{Held-out\\score (NLL)} & \shortstack{Held-out\\style} & \shortstack{PagerDuty\\(.792)} & \shortstack{jevlogs\\(.697)} & \shortstack{Mind2Web\\(.427)} \\
     \midrule
-    \texttt{ts1b} & .710 & .522 (1.01) & .861 & .560 & .500 & .351 \\
-    \texttt{tm1b} & .811 & .528 (1.03) & .861 & .553 & .480 & .547 \\
-    \texttt{ladder\_8b} & .681 & .543 (1.67) & .882 & .321 & .501 & .404 \\
-    \texttt{tl1b} & .831 & .621 (0.95) & .882 & .805 & .514 & .564 \\
-    \texttt{tm2} & .858 & .586 (0.97) & .842 & .757 & .518 & .497 \\
+    \texttt{ts1b} & full & .715 & .520 (1.01) & .859 & \textbf{.817} & \textbf{.710} & .357 \\
+    \texttt{tm1b} & full & .811 & .528 (1.03) & .859 & \textbf{.838} & .673 & .544 \\
+    \texttt{tl1b} & full & .831 & .623 (0.95) & .880 & \textbf{.878} & .546 & .563 \\
+    \midrule
+    \texttt{ladder\_8b} & train-time & .681 & .543 (1.72) & .882 & .321 & .501 & .404 \\
+    \texttt{tm2} & train-time & .858 & .586 (0.97) & .842 & .757 & .518 & .497 \\
     \bottomrule
   \end{tabular}
 \end{table}

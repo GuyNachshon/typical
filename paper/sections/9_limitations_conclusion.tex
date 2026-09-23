@@ -53,6 +53,17 @@ protocol move scores by more than the differences between many entries
 or model-assisted gold labels that we did not independently re-verify. Latency numbers come from a
 single-stream Python harness with no optimized-runtime or saturated-server baseline.
 
+\paragraph{The released checkpoints carry the defect this paper diagnoses.} Both public models were
+trained before the facts-first corpus fix, so they inherit its positional bias, and a reader who
+downloads them inherits it too. On the 605-item held-out long-state set, moving the case block from
+after the policy body to before it costs \texttt{typical-small} 20.0 points (.798 $\to$ .598) and
+\texttt{typical-medium} 25.5 (.866 $\to$ .612), with \texttt{typical-small} landing on the
+majority-class floor of the yes/no family. Since the caller writes the state text, the operational
+consequence is a rendering instruction --- evidence last --- and the correct fix is retraining on the
+corrected corpus, which \Cref{sec:boundary:truncation} values at 8--11 points and which we have not
+yet done for the released sizes. We state this rather than deferring it to the model cards because it
+is the same mechanism the paper reports, observed in the artifacts the paper ships.
+
 \paragraph{Reproducibility and licensing.} Inference code, the released checkpoints, and every run
 manifest (harness commit, checkpoint hash, dependency lock) are public. Training code and several
 generated corpora carry licence constraints from their upstream sources; \Cref{app:corpora} records
