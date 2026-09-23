@@ -527,4 +527,7 @@
   .footer a:hover { text-decoration: underline; text-underline-offset: 4px; }
   .footer .rule { border-top: 1px solid var(--color-mid); margin-top: 55px; padding-top: 18px; }
   .offline { color: var(--color-mid); font-size: 14px; }
+
+  /* ---- release.html placeholders: unfilled draft brackets, impossible to miss ---- */
+  .todo { background: var(--color-lgray); color: var(--color-off); padding: 1px 6px; border-radius: 2px; font-family: var(--font-mono); font-size: 12px; }
 }

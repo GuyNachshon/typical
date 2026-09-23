@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en" class="booting">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Introducing Typical — open decision models</title>
+<meta name="description" content="Typical: open 1.7B and 4B decision models. One pass over the text, a probability for every option, and an explicit abstain. Results with controls, real demos.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Geist+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="exhibits.css">
+</head>
+<body>
+<nav class="nav"><a class="brand" href="index.html">Typical</a><span class="links"><a href="index.html#results">Results</a><a href="index.html#demos">Demos</a><a href="research.html">Research</a><a href="release.html" aria-current="page">Launch</a><a href="https://huggingface.co/OzLabs/typical-small">Weights</a></span><a class="cta" href="#tryit">Try it live</a></nav>
+
+<div class="stage-track"><header class="stage" id="top">
+  <iframe class="stage-film" id="film" src="games/doom/index.html?film=1" title="DOOM, played by the model" loading="eager"></iframe>
+  <div class="stage-shade"></div>
+  <div class="stage-copy">
+    <ul class="t-eyebrow hero brow">
+      <li>Open decision models</li>
+      <li>1.7B and 4B</li>
+      <li>Open weights</li>
+    </ul>
+    <h1 class="t-hero">Models that decide, not generate.</h1>
+    <p class="sub">Give Typical some state, a question, and the options your software can take. Get a probability for each one back, including none of the above.</p>
+    <p class="watching">On screen: Typical playing DOOM, reading one sentence a tick and picking one of five moves.</p>
+    <div class="btns"><a class="btn" href="#results">See the results</a><a class="btn outline" href="research.html">Read the research</a></div>
+  </div>
+  <div class="stage-hud" id="hud">
+    <div class="rec"><i></i><span id="hud-rec">REC · typical-small · E1M1</span></div>
+    <div class="rec-sub t-mono" id="hud-rec2">booting</div>
+    <div id="hud-rows"></div>
+    <div class="sentence" id="hud-sentence">booting…</div>
+  </div>
+</header></div>
+
+<section class="page chapter" id="why">
+  <div class="claim">
+    <h2>Why decision models</h2>
+    <p>A week ago TypeSafe launched Jev and made a strong case for a different interface between models and software. Instead of generating a string that code then has to parse, the model returns typed probabilities over outcomes the program already knows. TypeSafe calls this a System One model. We think <em>decision model</em> is the more useful name for the category.</p>
+    <p><span class="todo">One or two sentences on the reaction to Jev.</span></p>
+    <p>The idea deserves an open implementation: weights you can inspect, run on your own hardware, adapt to your domain, and keep next to your own data. Today we're releasing <strong>Typical</strong>, two open-weight decision models: <code>typical-small</code> (1.7B) and <code>typical-medium</code> (4B).</p>
+    <p>You give Typical a state once. That can be a support ticket, a policy document, an agent trace, or a game frame rendered as text. You can then ask it as many questions as you like, each with options you define at call time. Every answer is a probability distribution over those options, plus an explicit "none of the above." Nothing is generated and nothing needs parsing. A decision takes tens of milliseconds on a single GPU, and each further question about the same state costs a few more.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="shape">
+  <div class="claim">
+    <h2>The shape of a decision</h2>
+    <p>Look at where language models sit inside production code and the same loop appears. A prompt asks a question, the model writes an answer, and a parser tries to turn that answer back into something the program can branch on.</p>
+    <p>That loop is a poor fit for what the program actually wants. The program already knows the possible outcomes: route to one of four queues, approve or don't, assign urgency 0 to 3. What it lacks is a calibrated sense of which outcome is right. The program should own the outputs, and the model should own the probabilities.</p>
+    <p>A generated string gets both halves wrong:</p>
+  </div>
+  <ul class="fit">
+    <li><strong>The output space is open.</strong> A string can be malformed, off-list, or a refusal.</li>
+    <li><strong>The probability arrives as prose,</strong> if it arrives at all, and it is rarely calibrated.</li>
+    <li><strong>The state is re-read for every question.</strong> You pay for it again each time you ask.</li>
+  </ul>
+</section>
+
+<section class="page chapter" id="onestate">
+  <div class="claim">
+    <h2>One state, many decisions</h2>
+    <p>Typical starts from a pretrained base model and changes what happens at the end.</p>
+  </div>
+  <ol class="mt-18 mb-18" style="max-width:64ch;padding-left:22px;line-height:1.55">
+    <li>The state is encoded once into the model's key-value cache.</li>
+    <li>Each question, together with its options, becomes a short suffix read against that cache.</li>
+    <li>At the end of the suffix, a small head reads the model's final hidden state and scores it against each option's own representation.</li>
+  </ol>
+  <div class="mt-18 mb-18" style="max-width:64ch">
+    <p>The probabilities come from those scores directly. No token is ever sampled. The answer is always one of the options you passed or an explicit abstention, by construction rather than by validation.</p>
+    <p class="mt-18">The same model handles both kinds of question software asks. Some are grounded in the state ("does this contract include a termination clause?"). Others lean on what the model already knows ("which of these libraries is for plotting?").</p>
+  </div>
+  <figure class="fig">
+    <div class="chart" id="chart-arch"></div>
+    <figcaption><b>Fig. 1.</b> The read path: the state is encoded once, each question is a short suffix appended to the cache, and a head at the end reads the terminal hidden state against each option's own representation.</figcaption>
+  </figure>
+</section>
+
+<section class="page chapter" id="options">
+  <div class="claim">
+    <h2>The options are part of the question</h2>
+    <p>Our first design was more efficient. It computed one reusable representation of the state and question, then scored any candidate against it afterwards, so new options were nearly free.</p>
+    <p>It failed a simple control. When we replaced each question with an unrelated one, the model performed almost the same. It had learned which answers looked plausible in general, not which answer matched the question.</p>
+    <p>Putting the options inside the decision pass restored the question-dependent signal. The candidate set isn't just an output vocabulary; it's part of the question.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="types">
+  <div class="claim">
+    <h2>Types are contracts</h2>
+    <p>Different decisions deserve different probability spaces.</p>
+  </div>
+  <div style="max-width:72ch">
+    <div><h3 class="t-feature">Choice</h3><p class="mt-18">Picks one of K options defined at call time, as a categorical distribution.</p></div>
+    <div class="mt-30"><h3 class="t-feature">Noul</h3><p class="mt-18">Answers yes or no with a single Bernoulli probability, from a head that never sees the labels. That makes it exactly invariant to which label you call "yes." When we treated yes/no as a two-way Choice instead, reversing the label order moved P(yes) by as much as .55. In a matched comparison, the dedicated head also generalized better: on PagerDuty incidents, a dataset never used in training, accuracy rose from .60 to .89.</p></div>
+    <div class="mt-30"><h3 class="t-feature">Score</h3><p class="mt-18">Returns a distribution over ordered levels, trained so that probability concentrates near the true level instead of spreading over every wrong one. In a matched comparison this halved negative log-likelihood on held-out Score tasks (2.07 to 1.23) without changing any top answer.</p></div>
+    <div class="mt-30"><h3 class="t-feature">Abstain</h3><p class="mt-18">Attaches a probability to every Choice and Score answer that none of the options fit. It is a judgment about the set as a whole, not an extra label you have to remember to add.</p></div>
+  </div>
+</section>
+
+<section class="page chapter" id="cost">
+  <div class="claim">
+    <h2>Cheap enough to sit inside the loop</h2>
+    <p>Most software doesn't make one decision about a piece of state; it makes many. Is this a refund? Is it still under warranty? How severe is it? Which team owns it?</p>
+  </div>
+  <div class="mb-18" style="max-width:72ch">
+    <p>Asking a generative model each of those means re-reading the ticket each time. With Typical, the state is paid for once. On <code>typical-small</code>, with the state cached and 32 questions batched against it, each question costs about 3 ms for up to 32 options. A single cold decision, including reading the state, is in the tens of milliseconds. Cost grows with the total length of the option text, so for hundreds of options, narrow the set first.</p>
+    <p class="mt-18"><span class="todo">Methodology line: hardware, state length, which measurement applies to which model.</span></p>
+  </div>
+  <div class="figband">
+    <div class="page figband-row">
+      <p><span class="t-figure">45</span><i>ms</i><em>one decision, cold state</em></p>
+      <p><span class="t-figure">2.7</span><i>ms</i><em>every question after it</em></p>
+      <p><span class="t-figure">129</span><i>ms</i><em>thirty&#8209;two on one ticket</em></p>
+    </div>
+  </div>
+  <div class="mt-18 mb-18" style="max-width:72ch">
+    <p>That per-question cost is what lets a decision model live inside a loop rather than at the end of a pipeline.</p>
+  </div>
+  <figure class="fig">
+    <div class="media mt-30"><div class="chart" id="chart-g2"></div></div>
+    <figcaption><b>Fig. 2.</b> A breakdown of where a single decision call spends its time.</figcaption>
+  </figure>
+</section>
+
+<section class="page chapter" id="watch">
+  <div class="claim">
+    <h2>Watch it decide</h2>
+    <p>Games are a good stress test for a decision model. The state changes every tick, the questions repeat, and a slow answer is a wrong answer.</p>
+  </div>
+  <figure class="fig">
+    <div class="media dark">
+      <p class="media-label t-eyebrow">The road · Three.js</p>
+      <div class="media-split"><div class="media-scene"><div class="game-mount" data-game="drive"></div></div></div>
+    </div>
+    <figcaption><b>Drive.</b> <span class="todo">State, questions per tick, model, hardware, ms per tick.</span> Several decision types run against the same state on every tick.</figcaption>
+  </figure>
+  <div class="gamepair">
+    <figure class="fig">
+      <div class="media dark">
+        <p class="media-label t-eyebrow">Snake · canvas</p>
+        <div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="snake"></div></div>
+      </div>
+      <figcaption><b>Snake.</b> <span class="todo">State per tick, questions per tick, model, hardware, ms per tick.</span> This is the simplest loop: one state, one bounded action, repeated.</figcaption>
+    </figure>
+    <figure class="fig">
+      <div class="media dark">
+        <p class="media-label t-eyebrow">DOOM · E1M1 · live</p>
+        <div class="media-scene" style="min-height:520px"><iframe class="card-film" id="film-card" src="games/doom/index.html?film=1" title="DOOM played by typical-small" loading="lazy"></iframe></div>
+        <div class="card-hud t-mono"><p class="rec"><i></i><span id="card-rec">REC · typical-small · E1M1</span></p><p class="rec-sub" id="card-rec2">booting</p><div id="card-rows"></div><p class="sentence" id="card-sentence"></p></div>
+      </div>
+      <figcaption><b>Doom.</b> <span class="todo">State, questions per tick, model, hardware, ms per tick.</span> TypeSafe used Doom to make the Jev interface visible. We liked the idea enough to build our own with Typical: one text state per tick, one bounded action distribution back.</figcaption>
+    </figure>
+  </div>
+  <p class="note mt-18">In all three games the model does not see pixels. The game produces a structured text state, and Typical decides from that.</p>
+</section>
+
+<section class="page chapter" id="models">
+  <div class="claim">
+    <h2>Two open models</h2>
+  </div>
+  <table class="register">
+    <thead>
+      <tr><th>Model</th><th>Backbone</th><th>JevBench standard / hard (public subset)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td data-label="Model"><code>typical-small</code></td>
+        <td data-label="Backbone">Qwen3-1.7B-Base</td>
+        <td data-label="JevBench standard / hard (public subset)"><span class="todo" data-fill="jev-small">TODO: wire from models.json</span></td>
+      </tr>
+      <tr>
+        <td data-label="Model"><code>typical-medium</code></td>
+        <td data-label="Backbone">Qwen3.5-4B-Base</td>
+        <td data-label="JevBench standard / hard (public subset)"><span class="todo" data-fill="jev-medium">TODO: wire from models.json</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="note mt-18" style="max-width:72ch"><code>typical-medium</code> reaches <span class="todo" data-fill="jev-medium-std">standard</span> on JevBench's standard tier. The hard tier remains open: <span class="todo" data-fill="jev-medium-hard">hard</span> against Jev's .730. These are runs on the benchmark's 231 public items, not ranked leaderboard entries. The standard tier covers 36 scenarios, each written two ways, so differences of a few points are within noise. We recommend <code>typical-medium</code> when capability matters more than footprint.</p>
+</section>
+
+<section class="page chapter" id="tryit">
+  <div class="claim">
+    <h2>Try it</h2>
+  </div>
+  <div class="code"><pre>pip install -r inference/requirements.txt</pre></div>
+  <div class="code"><pre>from typical import Typical
+
+m = Typical.from_pretrained("OzLabs/typical-medium", device="auto")
+
+m.choice(state, "What does the customer want?", ["refund", "replacement", "repair"])
+m.noul(state, "Is the order still under warranty?")
+m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
+  <p class="note mt-18" style="max-width:72ch"><code>state</code> is a string or any JSON-serialisable dict. The inference package needs only torch, transformers, safetensors, huggingface_hub and numpy.</p>
+  <p class="note mt-18" style="max-width:72ch">Training code will follow. <span class="todo">License line.</span></p>
+</section>
+
+<section class="page chapter" id="next">
+  <div class="claim">
+    <h2>What's next</h2>
+    <p>Typical makes bounded decisions in one pass. Some decisions need more: dates to compare, quantities to combine, trade-offs to weigh. Every model we've trained still struggles with them. So the next question isn't only how to make a decision model more accurate. It's this:</p>
+    <p><strong>When should a decision model decide, and when should it think?</strong></p>
+  </div>
+</section>
+
+<section class="page chapter" id="faq">
+  <div class="claim">
+    <h2>FAQ</h2>
+  </div>
+  <div style="max-width:72ch">
+    <div><h3 class="t-feature">How is this different from Jev?</h3><p class="mt-18">The interface category is similar. Typical is open-weight and self-hostable. Jev's internal architecture isn't public, so we don't claim architectural equivalence. Jev currently scores higher, especially on the hardest decisions.</p></div>
+    <div class="mt-30"><h3 class="t-feature">Is this just a classifier?</h3><p class="mt-18">No. A classifier has a fixed output head. Typical's options arrive as text at call time, can change on every request, and take part in the decision pass itself.</p></div>
+    <div class="mt-30"><h3 class="t-feature">Why not use an LLM's token probabilities?</h3><p class="mt-18">You can. Typical is trained around the decision interface itself: typed probability semantics, explicit abstention, one state encoding shared across questions, and a direct readout instead of sampled tokens.</p></div>
+    <div class="mt-30"><h3 class="t-feature">Does it reason?</h3><p class="mt-18">For bounded decisions it can apply evidence from the state and rules given at runtime. Hard multi-step composition is still weak. For genuinely serial reasoning, use a generative reasoning model.</p></div>
+    <div class="mt-30"><h3 class="t-feature">Does it see the game in Doom?</h3><p class="mt-18">No. The demo supplies a text description of the game state.</p></div>
+    <div class="mt-30"><h3 class="t-feature">Why Qwen?</h3><p class="mt-18">Good open base models at the sizes we wanted, in one family we could test consistently. <code>typical-medium</code> uses Qwen3.5-4B.</p></div>
+    <div class="mt-30"><h3 class="t-feature">What was it trained on, and under what license?</h3><p class="mt-18"><span class="todo">Link to the model cards.</span></p></div>
+  </div>
+</section>
+
+<footer class="footer"><div class="page">
+  <div class="cols">
+    <div><p class="t-card" style="max-width:20ch">Models that decide, not generate.</p><p class="t-eyebrow mt-30" style="color:var(--color-mid)">Weights and inference code on Hugging Face. Training code to follow.</p></div>
+    <div class="t-mono"><p class="t-eyebrow mb-18">Models</p><p><a href="https://huggingface.co/OzLabs/typical-small">typical-small</a></p><p><a href="https://huggingface.co/OzLabs/typical-medium">typical-medium</a></p><p><a href="https://huggingface.co/OzLabs/typical-small-preview">typical-small-preview</a></p></div>
+    <div class="t-mono"><p class="t-eyebrow mb-18">Site</p><p><a href="#results">Results</a></p><p><a href="#demos">Demos</a></p><p><a href="research.html">Research</a></p><p><a href="research.html#limitations">Limitations</a></p></div>
+  </div>
+  <div class="rule t-eyebrow" style="color:var(--color-mid)">Every number on this page traces to a file under site/data</div>
+</div></footer>
+
+<script src="js/vendor/gsap.min.js" defer></script>
+<script src="js/vendor/ScrollTrigger.min.js" defer></script>
+<script type="module" src="js/shell.js"></script>
+<script type="module" src="js/release.js"></script>
+</body>
+</html>
