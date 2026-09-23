@@ -198,6 +198,17 @@
   <p class="note mt-18" style="max-width:72ch"><code>typical-medium</code> reaches <span class="todo" data-fill="jev-medium-std">standard</span> on JevBench's standard tier. The hard tier remains open: <span class="todo" data-fill="jev-medium-hard">hard</span> against Jev's .730. These are runs on the benchmark's 231 public items, not ranked leaderboard entries. The standard tier covers 36 scenarios, each written two ways, so differences of a few points are within noise. We recommend <code>typical-medium</code> when capability matters more than footprint.</p>
 </section>
 
+<section class="page chapter" id="field">
+  <div class="claim">
+    <h2>The whole field, on the same items</h2>
+    <p>Every row below answered the same 231 public JevBench ids. That makes the table comparable, and it does not flatter us: two open decision models and one closed one are ahead of <code>typical&#8209;medium</code> on the standard tier, and a 400M classifier is ahead of <code>typical&#8209;small</code>. We would rather print the field we sit in than the one we win.</p>
+  </div>
+  <figure class="fig">
+    <div id="jev-field"></div>
+    <figcaption>JevBench standard and hard, same 231 public ids. Ours are marked. Easy is 1.00 for every entry and is left out.</figcaption>
+  </figure>
+</section>
+
 <section class="page chapter" id="separating">
   <div class="claim">
     <h2>What actually separates the two models</h2>

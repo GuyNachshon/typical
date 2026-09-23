@@ -1,0 +1,176 @@
+{
+ "what": "JevBench, the same 231 public ids for every row (72 standard / 48 easy / 111 hard). Easy is 1.00 for every entry and is omitted.",
+ "chance": {
+  "std": 0.311,
+  "hard": 0.336
+ },
+ "caveats": [
+  "Not ranked leaderboard entries: the leaderboard needs at least 95% coverage including 146 non-public judge items.",
+  "The hard tier is 111 items, so a 95% interval is about plus or minus 9 points. Adjacent rows are not separable.",
+  "Rows other than ours and the frozen controls are REPORT section 3q's comparison and predate our workflow training."
+ ],
+ "sources": {
+  "ours": "site/data/models.json",
+  "frozen": "site/data/frozen.json",
+  "others": "REPORT section 3q, same 231 public ids"
+ },
+ "rows": [
+  {
+   "name": "Jev 1.13.0",
+   "kind": "decision model",
+   "std": 0.986,
+   "hard": 0.73,
+   "ours": false,
+   "note": "closed"
+  },
+  {
+   "name": "djev",
+   "kind": "decision model",
+   "std": 0.986,
+   "hard": 0.676,
+   "ours": false
+  },
+  {
+   "name": "SemIf",
+   "kind": "decision model",
+   "size": "4B",
+   "std": 0.986,
+   "hard": 0.613,
+   "ours": false
+  },
+  {
+   "name": "OpenJev",
+   "kind": "decision model",
+   "size": "26B-A4B",
+   "std": 0.972,
+   "hard": 0.64,
+   "ours": false
+  },
+  {
+   "name": "system-one-open",
+   "kind": "decision model",
+   "size": "2B",
+   "std": 0.931,
+   "hard": 0.486,
+   "ours": false
+  },
+  {
+   "name": "14B ladder point",
+   "kind": "decision model",
+   "size": "14B",
+   "std": 0.875,
+   "hard": 0.468,
+   "ours": true,
+   "note": "not released: missed its own pass rule"
+  },
+  {
+   "name": "typical-medium",
+   "kind": "decision model",
+   "size": "4B",
+   "std": 0.8611111111111112,
+   "hard": 0.4954954954954955,
+   "ours": true
+  },
+  {
+   "name": "open-alternative-jev",
+   "kind": "decision model",
+   "size": "4B",
+   "std": 0.833,
+   "hard": 0.568,
+   "ours": false
+  },
+  {
+   "name": "Qwen3-14B-Base",
+   "kind": "prompted, 3 exemplars",
+   "std": 0.819,
+   "hard": 0.559,
+   "ours": false
+  },
+  {
+   "name": "Qwen3.5-9B-Base",
+   "kind": "prompted, 3 exemplars",
+   "std": 0.806,
+   "hard": 0.541,
+   "ours": false
+  },
+  {
+   "name": "Qwen3-4B-Base",
+   "kind": "prompted, 3 exemplars",
+   "std": 0.778,
+   "hard": 0.441,
+   "ours": false
+  },
+  {
+   "name": "Qwen3-4B (instruct)",
+   "kind": "prompted, 3 exemplars",
+   "std": 0.778,
+   "hard": 0.423,
+   "ours": false
+  },
+  {
+   "name": "Qwen3.5-4B-Base",
+   "kind": "prompted, 3 exemplars",
+   "std": 0.764,
+   "hard": 0.495,
+   "ours": false
+  },
+  {
+   "name": "jeff (GLiFormer)",
+   "kind": "classifier",
+   "size": "400M",
+   "std": 0.75,
+   "hard": 0.387,
+   "ours": false
+  },
+  {
+   "name": "typical-small",
+   "kind": "decision model",
+   "size": "1.7B",
+   "std": 0.7083333333333334,
+   "hard": 0.43243243243243246,
+   "ours": true
+  },
+  {
+   "name": "Laya (ModernBERT)",
+   "kind": "classifier",
+   "std": 0.694,
+   "hard": 0.351,
+   "ours": false
+  },
+  {
+   "name": "GLiNER2",
+   "kind": "classifier",
+   "std": 0.639,
+   "hard": 0.369,
+   "ours": false
+  },
+  {
+   "name": "Qwen3.5-2B-Base",
+   "kind": "prompted, 3 exemplars",
+   "std": 0.583,
+   "hard": 0.387,
+   "ours": false
+  },
+  {
+   "name": "Qwen3-8B-Base",
+   "kind": "prompted, 3 exemplars",
+   "std": 0.556,
+   "hard": 0.369,
+   "ours": false
+  },
+  {
+   "name": "Qwen3-1.7B-Base",
+   "kind": "prompted, 3 exemplars",
+   "std": 0.528,
+   "hard": 0.369,
+   "ours": false
+  },
+  {
+   "name": "open-jev-deberta-v3-large",
+   "kind": "classifier",
+   "std": 0.431,
+   "hard": 0.378,
+   "ours": false
+  }
+ ]
+}

@@ -554,5 +554,11 @@
   .post .claim { max-width: 680px; }
   @media (max-width: 64rem) { .post .fig, .post .figband, .post .gamepair { max-width: none; } }
 
+  /* ours marked in a table where we are mid-field: weight, not colour, and the chance row set
+     apart because it is the one row nobody may sit below */
+  .field tr.is-ours td { font-weight: 700; color: var(--color-off); }
+  .field tr.is-ours td:first-child::before { content: '\2192\00a0'; color: var(--color-mid); }
+  .field tr.is-chance td { color: var(--color-mid); border-top: 1px solid var(--color-off); }
+
   .todo { background: var(--color-lgray); color: var(--color-off); padding: 1px 6px; border-radius: 2px; font-family: var(--font-mono); font-size: 12px; }
 }
