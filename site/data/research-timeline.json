@@ -32,13 +32,13 @@
     },
     {
       "date": "2026-09-21",
-      "label": "typical-small",
+      "label": "ts1b (typical-small v1)",
       "std": 0.694,
       "source": "REPORT.md \u00a73ae (ts1b, +DecisionMix v2 +typed heads)"
     },
     {
       "date": "2026-09-21",
-      "label": "typical-medium",
+      "label": "tm1b (typical-medium v1)",
       "std": 0.806,
       "source": "REPORT.md \u00a73af (tm1b, 4B)"
     },
@@ -47,6 +47,12 @@
       "label": "14B ladder (unreleased)",
       "std": 0.875,
       "source": "REPORT.md \u00a73ab"
+    },
+    {
+      "date": "2026-09-23",
+      "label": "tm2 (typical-medium v2, Qwen3.5-4B)",
+      "std": 0.8611111111111112,
+      "source": "buffalo:RESULTS.md#5 / runs/jev_native_tm2/summary.json .original.accuracy"
     }
   ],
   "bugs": [
@@ -139,5 +145,6 @@
     }
   ],
   "run_count": 92,
-  "run_count_source": "git ls-tree --name-only gpu-runpod-full-experiment:runs | grep -v -E '^(probe_|jev_|bench_|zs_|smoke|dump_|leak_|kb_)' | grep -v '\\.json$' | wc -l -- this worktree only checks out a subset of runs/, so the count is read from the source branch's tree, not the local directory"
+  "run_count_source": "git ls-tree --name-only gpu-runpod-full-experiment:runs | grep -v -E '^(probe_|jev_|bench_|zs_|smoke|dump_|leak_|kb_)' | grep -v '\\.json$' | wc -l -- this worktree only checks out a subset of runs/, so the count is read from the source branch's tree, not the local directory",
+  "lineage_note": "ts1c (typical-small v2, shipped 2026-09-23) has no JevBench point: runs/jev_native_ts1c/ does not exist. The .708 quoted for it elsewhere is ts1c_tap17's standard accuracy."
 }

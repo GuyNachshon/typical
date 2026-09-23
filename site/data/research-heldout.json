@@ -3,8 +3,8 @@
     {
       "key": "wf_heldout_noul",
       "label": "held-out noul (W)",
-      "small": 0.7147,
-      "medium": 0.8107,
+      "small": null,
+      "medium": null,
       "floor": 0.5833,
       "n_small": 1500,
       "n_medium": 1500
@@ -12,8 +12,8 @@
     {
       "key": "wf_heldout_score",
       "label": "held-out score (W)",
-      "small": 0.52,
-      "medium": 0.528,
+      "small": null,
+      "medium": null,
       "floor": 0.3549,
       "n_small": 1502,
       "n_medium": 1502
@@ -21,8 +21,8 @@
     {
       "key": "wf_heldout_style",
       "label": "held-out style (W)",
-      "small": 0.8586,
-      "medium": 0.8586,
+      "small": null,
+      "medium": null,
       "floor": 0.3645,
       "n_small": 1627,
       "n_medium": 1627
@@ -30,8 +30,8 @@
     {
       "key": "wh_heldout_family",
       "label": "held-out family (DecisionMix v2)",
-      "small": 0.8365,
-      "medium": 0.8744,
+      "small": null,
+      "medium": null,
       "floor": 0.3839,
       "n_small": 422,
       "n_medium": 422
@@ -39,8 +39,8 @@
     {
       "key": "wh_heldout_grammar",
       "label": "held-out grammar (DecisionMix v2)",
-      "small": 0.8983,
-      "medium": 0.8934,
+      "small": null,
+      "medium": null,
       "floor": 0.3848,
       "n_small": 816,
       "n_medium": 816
@@ -48,8 +48,8 @@
     {
       "key": "wh_heldout_style",
       "label": "held-out style (DecisionMix v2)",
-      "small": 0.8958,
-      "medium": 0.8908,
+      "small": null,
+      "medium": null,
       "floor": 0.4268,
       "n_small": 403,
       "n_medium": 403
@@ -57,8 +57,8 @@
     {
       "key": "wh_rubric_flip",
       "label": "rubric-flip, both correct",
-      "small": 0.718,
-      "medium": 0.743,
+      "small": null,
+      "medium": null,
       "floor": 0.3998,
       "n_small": 2206,
       "n_medium": 2206
@@ -66,8 +66,8 @@
     {
       "key": "wh_level7",
       "label": "level 7 -- untrained composition (chance)",
-      "small": 0.4955,
-      "medium": 0.5443,
+      "small": null,
+      "medium": null,
       "floor": 0.4602,
       "n_small": 880,
       "n_medium": 880
@@ -77,8 +77,8 @@
     {
       "key": "pagerduty_trigger",
       "label": "PagerDuty (never trained)",
-      "small": 0.8172,
-      "medium": 0.838,
+      "small": null,
+      "medium": null,
       "floor": 0.7917,
       "n_small": 6000,
       "n_medium": 6000
@@ -86,8 +86,8 @@
     {
       "key": "mind2web_choice",
       "label": "Mind2Web (never trained)",
-      "small": 0.3575,
-      "medium": 0.5444,
+      "small": null,
+      "medium": null,
       "floor": 0.4269,
       "n_small": 1600,
       "n_medium": 1600
@@ -95,8 +95,8 @@
     {
       "key": "jevlogs_triage",
       "label": "jevlogs (research-licensed, block-level labels)",
-      "small": 0.7104,
-      "medium": 0.6734,
+      "small": null,
+      "medium": null,
       "floor": 0.6969,
       "n_small": 5080,
       "n_medium": 5080
@@ -104,8 +104,8 @@
     {
       "key": "tree_choice_cap",
       "label": "tree-choice K=320 (never trained)",
-      "small": 0.4736,
-      "medium": 0.6903,
+      "small": null,
+      "medium": null,
       "floor": 0.1139,
       "n_small": 720,
       "n_medium": 720
@@ -113,13 +113,13 @@
     {
       "key": "typed_decisions_test",
       "label": "typed-decisions (held-out)",
-      "small": 0.5105,
-      "medium": 0.5325,
+      "small": null,
+      "medium": null,
       "floor": 0.2905,
       "n_small": 2000,
       "n_medium": 2000
     }
   ],
-  "source": "runs/ts1b/eval_wf_full.json + runs/tm1b/eval_wf.json (eval.<set>.raw.acc, .baselines.majority_acc)",
-  "note": "curriculum = REPORT.md G6 (in-grammar held-out, level 7 kept in as an untrained-composition control); external = G7 (sets never trained on)"
+  "source": "MISSING -- no full-file eval_wf pass (max_state 4096, limit 0) exists for ts1c or tm2; runs/{ts1c,tm2}/eval_wf.json are absent. The capped pass in runs/<ckpt>/results.json (eval_cap 1500, max_state = training max_state) is NOT the same protocol: on ts1b it reads pagerduty .560 against eval_wf_full's .8172, and across ts1c_tap15/17/18 the two protocols disagree by -15 to +34 points and flip sign, so it cannot be substituted.",
+  "note": "curriculum = REPORT.md G6 (in-grammar held-out, level 7 kept in as an untrained-composition control); external = G7 (sets never trained on). Floors and n are properties of the eval files and are unchanged; the per-model values are absent because the shipping checkpoints (ts1c, tm2) have no full-file eval_wf pass. The previous values were ts1b (runs/ts1b/eval_wf_full.json) and tm1b (runs/tm1b/eval_wf.json), both superseded on 2026-09-23."
 }

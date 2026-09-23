@@ -1,304 +1,297 @@
 [
-  {
-    "id": "typical-small-preview",
-    "backbone": "Qwen3-1.7B-Base",
-    "params": "1.7B",
-    "tap": "20/28",
-    "released": true,
-    "hf_url": "https://huggingface.co/OzLabs/typical-small-preview",
-    "jevbench": {
-      "std": {
-        "acc": 0.75,
-        "brier": 0.40276924379203316,
-        "ece": 0.150803044024441,
-        "n": 72
-      },
-      "easy": {
-        "acc": 1.0,
-        "brier": 0.000741052543754835,
-        "ece": 0.006602810074885651,
-        "n": 48
-      },
-      "hard": {
-        "acc": 0.38738738738738737,
-        "brier": 0.8756417814236204,
-        "ece": 0.37200241878226,
-        "n": 111
-      }
-    },
-    "latency": {
-      "single_ms": {
-        "k2": 45,
-        "k32": 46,
-        "k256": 106
-      },
-      "marginal_ms_m32": {
-        "k2": 2.7,
-        "k32": 3.7,
-        "k256": 28.0
-      },
-      "peak_gb": {
-        "k2": 6.4,
-        "k256": 9.3
-      },
-      "note": "borrows typical-small's ladder -- same 1.7B recipe shape"
-    },
-    "mmlu_pro_among_k": 0.33,
-    "nlu": {
-      "snli": 0.894,
-      "mnli": 0.849,
-      "boolq": 0.831,
-      "anli": 0.481
-    },
-    "topic_intent": {
-      "clinc": 0.734,
-      "trec": 0.372,
-      "hwu": 0.735,
-      "ng20": 0.522
-    },
-    "external": {
-      "pagerduty": 0.779,
-      "jevlogs": 0.522,
-      "mind2web": 0.427
-    },
-    "held_out": {
-      "noul": 0.699,
-      "score": 0.498,
-      "flip_both_correct": 0.565
-    },
-    "sources": {
-      "jevbench": "runs/jev_native_v3t20_wf/summary.json",
-      "latency": "releases/typical-small.md#latency",
-      "mmlu_pro_among_k": "releases/typical-small.md#\u00a73ae-table",
-      "nlu": "releases/typical-small.md#\u00a73ae-table",
-      "topic_intent": "releases/typical-small.md#\u00a73ae-table",
-      "external": "releases/typical-small.md#\u00a73ae-table",
-      "held_out": "releases/typical-small.md#\u00a73ae-table"
-    }
+ {
+  "id": "typical-small-preview",
+  "backbone": "Qwen3-1.7B-Base",
+  "params": "1.7B",
+  "tap": "20/28",
+  "released": true,
+  "hf_url": "https://huggingface.co/OzLabs/typical-small-preview",
+  "jevbench": {
+   "std": {
+    "acc": 0.75,
+    "brier": 0.40276924379203316,
+    "ece": 0.150803044024441,
+    "n": 72
+   },
+   "easy": {
+    "acc": 1.0,
+    "brier": 0.000741052543754835,
+    "ece": 0.006602810074885651,
+    "n": 48
+   },
+   "hard": {
+    "acc": 0.38738738738738737,
+    "brier": 0.8756417814236204,
+    "ece": 0.37200241878226,
+    "n": 111
+   }
   },
-  {
-    "id": "typical-small",
-    "backbone": "Qwen3-1.7B-Base",
-    "params": "1.7B",
-    "tap": "20/28",
-    "released": true,
-    "hf_url": "https://huggingface.co/OzLabs/typical-small",
-    "jevbench": {
-      "std": {
-        "acc": 0.6944444444444444,
-        "brier": 0.39750463081241993,
-        "ece": 0.11412504853473769,
-        "n": 72
-      },
-      "easy": {
-        "acc": 1.0,
-        "brier": 0.0047407252593300855,
-        "ece": 0.016207356005907027,
-        "n": 48
-      },
-      "hard": {
-        "acc": 0.43243243243243246,
-        "brier": 0.7909445007358973,
-        "ece": 0.25632501856700796,
-        "n": 111
-      }
-    },
-    "latency": {
-      "single_ms": {
-        "k2": 45,
-        "k32": 46,
-        "k256": 106
-      },
-      "marginal_ms_m32": {
-        "k2": 2.7,
-        "k32": 3.7,
-        "k256": 28.0
-      },
-      "peak_gb": {
-        "k2": 6.4,
-        "k256": 9.3
-      }
-    },
-    "mmlu_pro_among_k": 0.343,
-    "nlu": {
-      "snli": 0.894,
-      "mnli": 0.859,
-      "boolq": 0.824,
-      "anli": 0.497
-    },
-    "topic_intent": {
-      "clinc": 0.804,
-      "trec": 0.508,
-      "hwu": 0.761,
-      "ng20": 0.54
-    },
-    "external": {
-      "pagerduty": 0.817,
-      "jevlogs": 0.71,
-      "mind2web": 0.357
-    },
-    "held_out": {
-      "noul": 0.715,
-      "score": 0.52,
-      "flip_both_correct": 0.581
-    },
-    "sources": {
-      "jevbench": "runs/jev_native_ts1b/summary.json",
-      "latency": "releases/typical-small.md#latency",
-      "mmlu_pro_among_k": "releases/typical-small.md#\u00a73ae-table",
-      "nlu": "releases/typical-small.md#\u00a73ae-table",
-      "topic_intent": "releases/typical-small.md#\u00a73ae-table",
-      "external": "releases/typical-small.md#\u00a73ae-table",
-      "held_out": "releases/typical-small.md#\u00a73ae-table"
-    }
+  "latency": {
+   "single_ms": {
+    "k2": 45,
+    "k32": 46,
+    "k256": 106
+   },
+   "marginal_ms_m32": {
+    "k2": 2.7,
+    "k32": 3.7,
+    "k256": 28.0
+   },
+   "peak_gb": {
+    "k2": 6.4,
+    "k256": 9.3
+   },
+   "note": "borrows typical-small's ladder -- same 1.7B recipe shape"
   },
-  {
-    "id": "typical-medium",
-    "backbone": "Qwen3-4B-Base",
-    "params": "4B",
-    "tap": "26/36",
-    "released": true,
-    "hf_url": "https://huggingface.co/OzLabs/typical-medium",
-    "jevbench": {
-      "std": {
-        "acc": 0.8055555555555556,
-        "brier": 0.29652247410236326,
-        "ece": 0.08584584999415612,
-        "n": 72
-      },
-      "easy": {
-        "acc": 1.0,
-        "brier": 0.011964783954900882,
-        "ece": 0.020954714467128106,
-        "n": 48
-      },
-      "hard": {
-        "acc": 0.42342342342342343,
-        "brier": 0.7731682475813886,
-        "ece": 0.2818109610596219,
-        "n": 111
-      }
-    },
-    "latency": {
-      "single_ms": {
-        "k2": 56,
-        "k32": 56,
-        "k256": 118
-      },
-      "marginal_ms_m32": {
-        "k2": 3.3,
-        "k32": 6.1,
-        "k256": 50.6
-      },
-      "peak_gb": {
-        "k2": 14.6,
-        "k256": 18.6
-      },
-      "bench": "runs/bench_tm1b/bench.json"
-    },
-    "mmlu_pro_among_k": 0.458,
-    "nlu": {
-      "snli": 0.909,
-      "mnli": 0.861,
-      "boolq": 0.843,
-      "anli": 0.544
-    },
-    "topic_intent": {
-      "clinc": 0.847,
-      "trec": 0.414,
-      "hwu": 0.769,
-      "ng20": 0.588
-    },
-    "external": {
-      "pagerduty": 0.838,
-      "jevlogs": 0.673,
-      "mind2web": 0.544
-    },
-    "held_out": {
-      "noul": 0.811,
-      "score": 0.528,
-      "flip_both_correct": 0.786
-    },
-    "sources": {
-      "jevbench": "runs/jev_native_tm1b/summary.json",
-      "latency": "releases/typical-medium.md#latency",
-      "mmlu_pro_among_k": "releases/typical-medium.md#\u00a73af-table",
-      "nlu": "releases/typical-medium.md#\u00a73af-table",
-      "topic_intent": "releases/typical-medium.md#\u00a73af-table",
-      "external": "releases/typical-medium.md#\u00a73af-table",
-      "held_out": "releases/typical-medium.md#\u00a73af-table"
-    }
+  "mmlu_pro_among_k": 0.33,
+  "nlu": {
+   "snli": 0.894,
+   "mnli": 0.849,
+   "boolq": 0.831,
+   "anli": 0.481
   },
-  {
-    "id": "typical-14b-ladder",
-    "backbone": "Qwen3-14B-Base",
-    "params": "14B",
-    "tap": "28/40",
-    "released": false,
-    "hf_url": null,
-    "jevbench": {
-      "std": {
-        "acc": 0.875,
-        "brier": 0.17328450018092195,
-        "ece": 0.06269621062609886,
-        "n": 72
-      },
-      "easy": {
-        "acc": 1.0,
-        "brier": 3.45922132774932e-07,
-        "ece": 0.00012271727124846254,
-        "n": 48
-      },
-      "hard": {
-        "acc": 0.46846846846846846,
-        "brier": 0.8489469919457218,
-        "ece": 0.3777795289013837,
-        "n": 111
-      }
-    },
-    "latency": {
-      "single_ms": {
-        "k2": 60,
-        "k32": 62,
-        "k256": 157
-      },
-      "marginal_ms_m32": {
-        "k2": 3.9,
-        "k32": 11.7,
-        "k256": 109.7
-      },
-      "peak_gb": {
-        "k2": 51.6,
-        "k256": 57.5
-      }
-    },
-    "mmlu_pro_among_k": 0.514,
-    "nlu": {
-      "snli": 0.91,
-      "mnli": 0.864,
-      "boolq": 0.894,
-      "anli": 0.588
-    },
-    "topic_intent": {
-      "clinc": 0.834,
-      "trec": 0.472,
-      "hwu": 0.792,
-      "ng20": 0.668
-    },
-    "external": null,
-    "held_out": {
-      "noul": 0.887,
-      "score": 0.558,
-      "flip_both_correct": null
-    },
-    "sources": {
-      "jevbench": "runs/jev_native_ladder_14b/summary.json",
-      "latency": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-apples-to-apples-table",
-      "mmlu_pro_among_k": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table",
-      "nlu": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table",
-      "topic_intent": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table",
-      "held_out": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table"
-    },
-    "note": "scaling-ladder point (PLAN7 Track A), not a public release -- no HF repo, no PagerDuty/jevlogs/Mind2Web/flip numbers in the source table"
+  "topic_intent": {
+   "clinc": 0.734,
+   "trec": 0.372,
+   "hwu": 0.735,
+   "ng20": 0.522
+  },
+  "external": {
+   "pagerduty": 0.779,
+   "jevlogs": 0.522,
+   "mind2web": 0.427
+  },
+  "held_out": {
+   "noul": 0.699,
+   "score": 0.498,
+   "flip_both_correct": 0.565
+  },
+  "sources": {
+   "jevbench": "runs/jev_native_v3t20_wf/summary.json",
+   "latency": "releases/typical-small.md#latency",
+   "mmlu_pro_among_k": "releases/typical-small.md#\u00a73ae-table",
+   "nlu": "releases/typical-small.md#\u00a73ae-table",
+   "topic_intent": "releases/typical-small.md#\u00a73ae-table",
+   "external": "releases/typical-small.md#\u00a73ae-table",
+   "held_out": "releases/typical-small.md#\u00a73ae-table"
   }
+ },
+ {
+  "id": "typical-small",
+  "backbone": "Qwen3-1.7B-Base",
+  "params": "1.7B",
+  "tap": "20/28",
+  "released": true,
+  "hf_url": "https://huggingface.co/OzLabs/typical-small",
+  "jevbench": {
+   "std": {
+    "acc": 0.7083333333333334,
+    "brier": 0.4231324308004447,
+    "ece": 0.15155392636855441,
+    "n": 72
+   },
+   "easy": {
+    "acc": 1.0,
+    "brier": 0.002105722190339487,
+    "ece": 0.015349641442298894,
+    "n": 48
+   },
+   "hard": {
+    "acc": 0.43243243243243246,
+    "brier": 0.7220186972065705,
+    "ece": 0.24054944300436756,
+    "n": 111
+   }
+  },
+  "latency": {
+   "single_ms": {
+    "k2": 45,
+    "k32": 46,
+    "k256": 106
+   },
+   "marginal_ms_m32": {
+    "k2": 2.7,
+    "k32": 3.7,
+    "k256": 28.0
+   },
+   "peak_gb": {
+    "k2": 6.4,
+    "k256": 9.3
+   }
+  },
+  "mmlu_pro_among_k": 0.3383333333333333,
+  "nlu": {
+   "snli": 0.8885548206053318,
+   "mnli": 0.8530612244897959,
+   "boolq": 0.7758409785932722,
+   "anli": 0.491875
+  },
+  "topic_intent": {
+   "clinc": 0.7954136690647482,
+   "trec": 0.496,
+   "hwu": 0.7472118959107806,
+   "ng20": 0.5516062884483938
+  },
+  "external": {
+   "pagerduty": null,
+   "jevlogs": null,
+   "mind2web": null
+  },
+  "held_out": {
+   "noul": null,
+   "score": null,
+   "flip_both_correct": null
+  },
+  "sources": {
+   "jevbench": "hf://guychuk/pcdm-runs/jev_native_ts1c/summary.json \u2014 not mirrored into the local runs/ directory, which is partial. Its accuracies coincide with ts1c_tap17's standard and ts1b's hard to seven digits, but its Brier and ECE differ from both (hard Brier .7220 vs ts1b's .7909), so it is an independent run that ties, not a copy. The run-to-checkpoint mapping is inferred from the jev_native_<name> convention, not recorded in the summary.",
+   "latency": "buffalo:RESULTS.md#6-single-decision-latency (Qwen3-1.7B row, labelled \"ts1b-shape recipe\") = REPORT.md#3ab apples-to-apples. 1.7B apples-to-apples ladder row (REPORT #3ab, one pod, one torch build). It is a recipe-shape row, not a checkpoint row: ts1c is the same Qwen3-1.7B-Base backbone, same tap 20, same 512x2x8 tower as ts1b, so the shape row still describes it. ts1c's own bench (runs/bench_ts1c/bench.json) reads 60.6 ms at K=2 on a different pod/harness and is not comparable to the other rows in this file.",
+   "mmlu_pro_among_k": "runs/ts1c/results.json .eval.mmlu_pro.raw.acc_k",
+   "nlu": "runs/ts1c/results.json .eval.{snli_test,mnli_val,boolq_val,anli_test}.scaled.acc (the accessor buffalo:RESULTS.md#1 uses)",
+   "topic_intent": "runs/ts1c/results.json .eval.{clinc_test,trec_fine,hwu64_test,ng20_test}.scaled.acc (the accessor buffalo:RESULTS.md#1 uses)",
+   "external": "MISSING -- no full-file eval_wf pass (max_state 4096, limit 0) exists for ts1c. runs/ts1c/eval_wf.json absent. runs/ts1c/results.json has these sets but at the capped training-pass protocol (eval_cap 1500, max_state 2048), which on ts1b/tm1b disagrees with the full pass by up to 34 points on pagerduty_trigger and flips sign across taps -- not the protocol the published .817/.838 figures use.",
+   "held_out": "MISSING -- no full-file eval_wf pass (max_state 4096, limit 0) exists for ts1c. runs/ts1c/eval_wf.json absent. runs/ts1c/results.json has these sets but at the capped training-pass protocol (eval_cap 1500, max_state 2048), which on ts1b/tm1b disagrees with the full pass by up to 34 points on pagerduty_trigger and flips sign across taps -- not the protocol the published .817/.838 figures use."
+  },
+  "checkpoint": "ts1c",
+  "note": "ships as OzLabs/typical-small v2, in-place supersede of ts1b on 2026-09-23 (releases/MANIFEST.json, best.pt sha256 c830931e...). Long-state facts-first .947 vs ts1b's .598 (+34.9, n=605, buffalo:RESULTS.md#5b). Backbone, tap and tower unchanged from ts1b."
+ },
+ {
+  "id": "typical-medium",
+  "backbone": "Qwen3.5-4B-Base",
+  "params": "4B",
+  "tap": "23/32",
+  "released": true,
+  "hf_url": "https://huggingface.co/OzLabs/typical-medium",
+  "jevbench": {
+   "std": {
+    "acc": 0.8611111111111112,
+    "brier": 0.22418323168605847,
+    "ece": 0.07142386792434585,
+    "n": 72
+   },
+   "easy": {
+    "acc": 1.0,
+    "brier": 0.018742329400688627,
+    "ece": 0.032462828482190745,
+    "n": 48
+   },
+   "hard": {
+    "acc": 0.4954954954954955,
+    "brier": 0.7208977550548654,
+    "ece": 0.25216041357667596,
+    "n": 111
+   }
+  },
+  "latency": {
+   "single_ms": null,
+   "marginal_ms_m32": null,
+   "peak_gb": null,
+   "note": "MISSING -- tm2's in-process latency was never benchmarked (buffalo:RESULTS.md#6, Qwen3.5-4B row is all dashes; no runs/bench_tm2/). The 56/56/118 ms previously here is the Qwen3-4B apples-to-apples row and does not describe a Qwen3.5 hybrid Gated-DeltaNet stack (REPORT.md#3ag measures Qwen3.5-4B at 42-53 -> 34-46 ms on the serving path vs 26-27 -> 19-21 ms for Qwen3-4B). tm2's serving-path warm p50 is 33.7 ms at K=2 / 44.4 ms at K=32, L_s=256 (runs/serve_bench2/results.json, model \"tm2\") -- a different harness from the in-process ladder the other rows use, so it is not substituted here."
+  },
+  "mmlu_pro_among_k": 0.42916666666666664,
+  "nlu": {
+   "snli": 0.899579073962718,
+   "mnli": 0.8547619047619047,
+   "boolq": 0.8397553516819571,
+   "anli": 0.55375
+  },
+  "topic_intent": {
+   "clinc": 0.7945143884892086,
+   "trec": 0.48,
+   "hwu": 0.716542750929368,
+   "ng20": 0.578673957621326
+  },
+  "external": {
+   "pagerduty": null,
+   "jevlogs": null,
+   "mind2web": null
+  },
+  "held_out": {
+   "noul": null,
+   "score": null,
+   "flip_both_correct": null
+  },
+  "sources": {
+   "jevbench": "runs/jev_native_tm2/summary.json (.original/.easy/.hard -> accuracy, brier_mean, ece.ece, n_scorable) = buffalo:RESULTS.md#5 and #5a",
+   "latency": "MISSING -- see latency.note",
+   "mmlu_pro_among_k": "runs/tm2/results.json .eval.mmlu_pro.raw.acc_k = buffalo:RESULTS.md#2 (.429)",
+   "nlu": "runs/tm2/results.json .eval.{snli_test,mnli_val,boolq_val,anli_test}.scaled.acc = buffalo:RESULTS.md#1 (.900/.855/.840/.554)",
+   "topic_intent": "runs/tm2/results.json .eval.{clinc_test,trec_fine,hwu64_test,ng20_test}.scaled.acc = buffalo:RESULTS.md#1 (.795/.480/.717/.579)",
+   "external": "MISSING -- no full-file eval_wf pass (max_state 4096, limit 0) exists for tm2. runs/tm2/eval_wf.json absent. runs/tm2/results.json has these sets but at the capped training-pass protocol (eval_cap 1500, max_state 2048), which on ts1b/tm1b disagrees with the full pass by up to 34 points on pagerduty_trigger and flips sign across taps -- not the protocol the published .817/.838 figures use.",
+   "held_out": "MISSING -- no full-file eval_wf pass (max_state 4096, limit 0) exists for tm2. runs/tm2/eval_wf.json absent. runs/tm2/results.json has these sets but at the capped training-pass protocol (eval_cap 1500, max_state 2048), which on ts1b/tm1b disagrees with the full pass by up to 34 points on pagerduty_trigger and flips sign across taps -- not the protocol the published .817/.838 figures use."
+  },
+  "checkpoint": "tm2",
+  "note": "ships as OzLabs/typical-medium v2, in-place supersede of tm1b on 2026-09-23 (releases/MANIFEST.json, best.pt sha256 4564b3b1...). Backbone CHANGED: Qwen3.5-4B-Base, 32 layers, tap 23 (runs/tm2/results.json .args). Requires the 2026-09-23 inference/typical/backbone.py -- a Qwen3.5 checkpoint will not load on the earlier package. Long-state facts-first .950 vs tm1b's .612 (+33.8, n=605, buffalo:RESULTS.md#5b)."
+ },
+ {
+  "id": "typical-14b-ladder",
+  "backbone": "Qwen3-14B-Base",
+  "params": "14B",
+  "tap": "28/40",
+  "released": false,
+  "hf_url": null,
+  "jevbench": {
+   "std": {
+    "acc": 0.875,
+    "brier": 0.17328450018092195,
+    "ece": 0.06269621062609886,
+    "n": 72
+   },
+   "easy": {
+    "acc": 1.0,
+    "brier": 3.45922132774932e-07,
+    "ece": 0.00012271727124846254,
+    "n": 48
+   },
+   "hard": {
+    "acc": 0.46846846846846846,
+    "brier": 0.8489469919457218,
+    "ece": 0.3777795289013837,
+    "n": 111
+   }
+  },
+  "latency": {
+   "single_ms": {
+    "k2": 60,
+    "k32": 62,
+    "k256": 157
+   },
+   "marginal_ms_m32": {
+    "k2": 3.9,
+    "k32": 11.7,
+    "k256": 109.7
+   },
+   "peak_gb": {
+    "k2": 51.6,
+    "k256": 57.5
+   }
+  },
+  "mmlu_pro_among_k": 0.514,
+  "nlu": {
+   "snli": 0.91,
+   "mnli": 0.864,
+   "boolq": 0.894,
+   "anli": 0.588
+  },
+  "topic_intent": {
+   "clinc": 0.834,
+   "trec": 0.472,
+   "hwu": 0.792,
+   "ng20": 0.668
+  },
+  "external": null,
+  "held_out": {
+   "noul": 0.887,
+   "score": 0.558,
+   "flip_both_correct": null
+  },
+  "sources": {
+   "jevbench": "runs/jev_native_ladder_14b/summary.json",
+   "latency": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-apples-to-apples-table",
+   "mmlu_pro_among_k": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table",
+   "nlu": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table",
+   "topic_intent": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table",
+   "held_out": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table"
+  },
+  "note": "scaling-ladder point (PLAN7 Track A), not a public release -- no HF repo, no PagerDuty/jevlogs/Mind2Web/flip numbers in the source table"
+ }
 ]

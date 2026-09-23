@@ -33,25 +33,14 @@
         "k2": 6.4,
         "k256": 9.3
       },
-      "source": "releases/typical-small.md#latency"
+      "source": "buffalo:RESULTS.md#6-single-decision-latency (Qwen3-1.7B row, labelled \"ts1b-shape recipe\") = REPORT.md#3ab apples-to-apples. Recipe-shape row, not a checkpoint row: ts1c is the same backbone, tap 20 and tower as ts1b. runs/bench_ts1c/bench.json (ts1c's own bench) reads 60.6 ms at K=2 on a different pod/harness and is not comparable to the other rows."
     },
     "typical-medium": {
-      "single_ms": {
-        "k2": 56,
-        "k32": 56,
-        "k256": 118
-      },
-      "marginal_ms_m32": {
-        "k2": 3.3,
-        "k32": 6.1,
-        "k256": 50.6
-      },
-      "peak_gb": {
-        "k2": 14.6,
-        "k256": 18.6
-      },
-      "bench": "runs/bench_tm1b/bench.json",
-      "source": "releases/typical-medium.md#latency"
+      "single_ms": null,
+      "marginal_ms_m32": null,
+      "peak_gb": null,
+      "note": "MISSING -- tm2 (Qwen3.5-4B-Base) was never benchmarked in-process; buffalo:RESULTS.md#6 Qwen3.5-4B row is all dashes. The 56/56/118 ms previously here is the Qwen3-4B row and does not describe a Qwen3.5 hybrid Gated-DeltaNet stack. Serving-path warm p50 (different harness): 33.7 ms K=2 / 44.4 ms K=32 at L_s=256, runs/serve_bench2/results.json model \"tm2\".",
+      "source": "MISSING"
     },
     "typical-14b-ladder": {
       "single_ms": {
