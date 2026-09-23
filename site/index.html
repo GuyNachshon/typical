@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Typical — models that decide, not generate</title>
+<title>Introducing Typical — open decision models</title>
 <meta name="description" content="Typical: open 1.7B and 4B decision models. One pass over the text, a probability for every option, and an explicit abstain. Results with controls, real demos.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Geist+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="exhibits.css">
 </head>
-<body>
-<nav class="nav"><a class="brand" href="#top">Typical</a><span class="links"><a href="#results">Results</a><a href="#demos">Demos</a><a href="research.html">Research</a><a href="https://huggingface.co/OzLabs/typical-small">Weights</a></span><a class="cta" href="#tryit">Try it live</a></nav>
+<body class="post">
+<nav class="nav"><a class="brand" href="#top">Typical</a><span class="links"><a href="#field">Results</a><a href="#watch">Demos</a><a href="research.html">Research</a><a href="https://huggingface.co/OzLabs/typical-small">Weights</a></span><a class="cta" href="#tryit">Try it live</a></nav>
 
 <div class="stage-track"><header class="stage" id="top">
   <iframe class="stage-film" id="film" src="games/doom/index.html?film=1" title="DOOM, played by the model" loading="eager"></iframe>
@@ -25,7 +25,7 @@
     <h1 class="t-hero">Models that decide, not generate.</h1>
     <p class="sub">Give Typical some state, a question, and the options your software can take. Get a probability for each one back, including none of the above.</p>
     <p class="watching">On screen: Typical playing DOOM, reading one sentence a tick and picking one of five moves.</p>
-    <div class="btns"><a class="btn" href="#results">See the results</a><a class="btn outline" href="research.html">Read the research</a></div>
+    <div class="btns"><a class="btn" href="#field">See the results</a><a class="btn outline" href="research.html">Read the research</a></div>
   </div>
   <div class="stage-hud" id="hud">
     <div class="rec"><i></i><span id="hud-rec">REC · typical-small · E1M1</span></div>
@@ -35,44 +35,101 @@
   </div>
 </header></div>
 
-<div class="page" style="padding-top:34px"><div class="strip">
-  <span><b>Typical</b> — open decision models, 1.7B and 4B</span>
-  <a href="https://huggingface.co/OzLabs/typical-small">Weights</a>
-  <a href="https://github.com/GuyNachshon/typical">Source</a>
-  <a href="research.html">Research</a>
-  <a href="#results">Results</a>
-</div></div>
+<header class="page masthead">
+  <h1>Introducing Typical</h1>
+  <p class="masthead-sub">Open decision models. Generate an answer, or read a decision.</p>
+  <div class="masthead-meta t-mono">
+    <span>Oz Labs</span>
+    <span>23 September 2026</span>
+    <a href="https://huggingface.co/OzLabs/typical-small">Weights</a>
+    <a href="https://github.com/GuyNachshon/typical">Source</a>
+    <a href="research.html">Research</a>
+  </div>
+</header>
 
-<section class="page chapter" id="what">
+<section class="page chapter" id="why">
   <div class="claim">
-    <h2>Generation is the wrong interface for a decision.</h2>
-    <p>A language model can tell you what it thinks. Typical hands your program a distribution over the actions it can actually take, and the odds that none of them are right. No token is ever decoded. The answer is a head on the hidden state, so there is nothing to parse, constrain or retry.</p>
+    <h2>Why decision models</h2>
+    <p>A week ago TypeSafe launched Jev and made a strong case for a different interface between models and software. Instead of generating a string that code then has to parse, the model returns typed probabilities over outcomes the program already knows. TypeSafe calls this a System One model. We think <em>decision model</em> is the more useful name for the category.</p>
+    <p>The reaction was quick and concrete. Within a week Cloudflare was serving it on Workers AI as <a class="ul" href="https://developers.cloudflare.com/ai/models/typesafe/jev/"><code>typesafe/jev</code></a>, Vercel had wired it into <a class="ul" href="https://vercel.com/i/what-is-jev">AI Gateway</a> behind the AI SDK’s evaluation API, and an independent write-up had <a class="ul" href="https://archerhume.com/posts/jevs-architecture-unmasked">reconstructed the architecture</a> from the published interface alone. A month ago the category had no name. It now has two clouds serving it and people reverse-engineering it in public.</p>
+    <p>The idea deserves an open implementation: weights you can inspect, run on your own hardware, adapt to your domain, and keep next to your own data. Today we're releasing <strong>Typical</strong>, two open-weight decision models: <code>typical-small</code> (1.7B) and <code>typical-medium</code> (4B).</p>
+    <p>You give Typical a state once. That can be a support ticket, a policy document, an agent trace, or a game frame rendered as text. You can then ask it as many questions as you like, each with options you define at call time. Every answer is a probability distribution over those options, plus an explicit "none of the above." Nothing is generated and nothing needs parsing. A decision takes tens of milliseconds on a single GPU, and each further question about the same state costs a few more.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="shape">
+  <div class="claim">
+    <h2>The shape of a decision</h2>
+    <p>Look at where language models sit inside production code and the same loop appears. A prompt asks a question, the model writes an answer, and a parser tries to turn that answer back into something the program can branch on.</p>
+    <p>That loop is a poor fit for what the program wants. The program already knows the possible outcomes: route to one of four queues, approve or don't, assign urgency 0 to 3. What it lacks is a calibrated sense of which outcome is right. The program should own the outputs, and the model should own the probabilities.</p>
+    <p>A generated string gets both halves wrong:</p>
+  </div>
+  <ul class="fit">
+    <li><strong>The output space is open.</strong> A string can be malformed, off-list, or a refusal.</li>
+    <li><strong>The probability arrives as prose,</strong> if it arrives at all, and it is rarely calibrated.</li>
+    <li><strong>The state is re-read for every question.</strong> You pay for it again each time you ask.</li>
+  </ul>
+</section>
+
+<section class="page chapter" id="parallel">
+  <div class="claim">
+    <h2>Forty answers, two ways</h2>
+    <p>A generative model produces answers in an order, because each one is conditioned on the last. A decision model does not have an order to produce them in. The state is read once into a cache and every question is a short suffix scored against it in the same forward pass, so the fortieth answer does not wait behind the thirty-ninth. It is computed alongside it.</p>
   </div>
   <figure class="fig">
-    <div class="media dark">
-      <div id="hero-decision"></div>
-    </div>
-    <figcaption><b>Fig. 1.</b> The instrument reads a state and a question, then plots a live probability for every option.</figcaption>
+    <div class="chart" id="chart-parallel"></div>
+    <figcaption>Schematic. Cell shade is arrival order. The measured version is <a class="figref" href="#head-to-head">the figure below</a>.</figcaption>
   </figure>
 </section>
 
-
-
-<section class="page chapter" id="runtime">
+<section class="page chapter" id="head-to-head">
   <div class="claim">
-    <h2>Your program keeps its logic. It gets a new kind of condition.</h2>
-    <p>The questions, the options and the scale all arrive with the call — none of it is trained in. Take the winning option out of the answer space and its weight lands on the ∅ the model keeps for &ldquo;none of these&rdquo; — far enough that a different line of the program runs.</p>
+    <h2>Same twenty questions. Same order.</h2>
+    <p>One support ticket: a broken integration and a double charge, from a customer with a renewal coming up. Twenty typed questions about it, asked in one request of us and of a hosted model, both pinned by the same JSON schema to the same options. Started together.</p>
   </div>
-  <figure class="fig">
-    <div class="media"><div id="primitives"></div></div>
-    <figcaption><b>Fig. 2.</b> The same call against a shrinking answer space, with the excluded option's weight moving to ∅.</figcaption>
+  <figure class="fig figfull">
+    <div id="showdown"></div>
+    <figcaption>A replay of a recording, at the speed it was recorded. A <code>noul</code> line prints P(yes), so under .5 is a no.</figcaption>
   </figure>
 </section>
 
-<section class="page chapter" id="latency">
+  <section class="page chapter" id="onestate">
   <div class="claim">
-    <h2>The second question is nearly free.</h2>
-    <p>Reading the state is the work, and it happens once. A decision on a fresh state takes 45&nbsp;ms; every further question against that same state adds 2.7. Thirty&#8209;two questions on one ticket come to 129&nbsp;ms — four milliseconds a decision.</p>
+    <h2>One state, many decisions</h2>
+    <p>Typical starts from a pretrained base model and changes what happens at the end.</p>
+  </div>
+  <ol class="steps mt-18 mb-18">
+    <li>The state is encoded once into the model's key-value cache.</li>
+    <li>Each question, together with its options, becomes a short suffix read against that cache.</li>
+    <li>At the end of the suffix, a small head reads the model's final hidden state and scores it against each option's own representation.</li>
+  </ol>
+  <div class="mt-18 mb-18">
+    <p>The probabilities come from those scores directly. No token is ever sampled. The answer is always one of the options you passed or an explicit abstention, by construction rather than by validation.</p>
+    <p class="mt-18">The same model handles both kinds of question software asks. Some are grounded in the state ("does this contract include a termination clause?"). Others lean on what the model already knows ("which of these libraries is for plotting?").</p>
+  </div>
+  <figure class="fig">
+    <div class="chart" id="chart-arch"></div>
+    <figcaption>The read path. Nothing is decoded.</figcaption>
+  </figure>
+</section>
+
+<section class="page chapter" id="types">
+  <div class="claim">
+    <h2>Types are contracts</h2>
+    <p>Different decisions deserve different probability spaces.</p>
+  </div>
+  <div class="typegrid fig">
+    <div class="typecard"><div class="chart" data-type="choice"></div><h3 class="t-feature">Choice</h3><p>Picks one of K options defined at call time, as a categorical distribution.</p></div>
+    <div class="typecard"><div class="chart" data-type="noul"></div><h3 class="t-feature">Noul</h3><p>Answers yes or no with a single Bernoulli probability, from a head that never sees the labels. That makes it exactly invariant to which label you call "yes." When we treated yes/no as a two-way Choice instead, reversing the label order moved P(yes) by as much as .55. In a matched comparison, the dedicated head also generalized better: on PagerDuty incidents, a dataset never used in training, accuracy rose from .60 to .89.</p></div>
+    <div class="typecard"><div class="chart" data-type="score"></div><h3 class="t-feature">Score</h3><p>Returns a distribution over ordered levels, trained so that probability concentrates near the true level instead of spreading over every wrong one. In a matched comparison this halved negative log-likelihood on held-out Score tasks (2.07 to 1.23) without changing any top answer.</p></div>
+    <div class="typecard"><div class="chart" data-type="abstain"></div><h3 class="t-feature">Abstain</h3><p>Attaches a probability to every Choice and Score answer that none of the options fit. It is a judgment about the set as a whole, not an extra label you have to remember to add.</p></div>
+  </div>
+</section>
+
+<section class="page chapter" id="cost">
+  <div class="claim">
+    <h2>Cheap enough to sit inside the loop</h2>
+    <p>Most software doesn't make one decision about a piece of state; it makes many. Is this a refund? Is it still under warranty? How severe is it? Which team owns it?</p>
   </div>
   <div class="figband">
     <div class="page figband-row">
@@ -81,129 +138,182 @@
       <p><span class="t-figure">129</span><i>ms</i><em>thirty&#8209;two on one ticket</em></p>
     </div>
   </div>
-  <div class="page">
-    <figure class="fig">
-      <div class="media mt-30"><div class="chart" id="chart-g2"></div></div>
-      <figcaption><b>Fig. 3.</b> A breakdown of where a single decision call spends its time.</figcaption>
-    </figure>
-    
+  <div class="mb-18">
+    <p>Asking a generative model each of those means re-reading the ticket each time. With Typical, the state is paid for once. On <code>typical-small</code>, with the state cached and 32 questions batched against it, each question costs about 3 ms for up to 32 options. A single cold decision, including reading the state, is in the tens of milliseconds. Cost grows with the total length of the option text, so for hundreds of options, narrow the set first.</p>
   </div>
+  <div class="mt-18 mb-18">
+    <p>That per-question cost lets a decision model live inside a loop rather than at the end of a pipeline.</p>
+  </div>
+  <figure class="fig">
+    <div class="media mt-30"><div class="chart" id="chart-g2"></div></div>
+    <figcaption>Where one decision call spends its time.</figcaption>
+  </figure>
 </section>
 
-<section class="page chapter" id="results">
+<section class="page chapter" id="watch">
   <div class="claim">
-    <h2>Small models make useful decision engines.</h2>
-    <p>Three tasks, each with the number you would get by guessing beside the number the model gets &mdash; and then the same benchmark run against general&#8209;purpose models of every size, prompted the ordinary way.</p>
+    <h2>Watch it decide</h2>
+    <p>Games are a good stress test for a decision model. The state changes every tick, the questions repeat, and a slow answer is a wrong answer.</p>
   </div>
   <figure class="fig">
-    <div class="media"><div id="results-table"></div></div>
-    <figcaption><b>Fig. 4.</b> Typical against chance, on each of the three tasks.</figcaption>
-  </figure>
-  <figure class="fig">
-    <div class="media mt-30">
-      <p class="t-eyebrow muted" style="margin-bottom:22px">Against general models, prompted</p>
-      <div id="results-compare"></div>
+    <div class="media dark">
+      <p class="media-label t-eyebrow">The road · Three.js</p>
+      <div class="media-split"><div class="media-scene"><div class="game-mount" data-game="drive"></div></div></div>
     </div>
-    <figcaption><b>Fig. 5.</b> The same benchmarks run against general&#8209;purpose models across sizes, prompted the ordinary way.</figcaption>
+    <figcaption><b>Drive.</b> One sentence per tick giving lane, speed, limit and what is ahead; one Choice over five to seven manoeuvres. typical‑small on Apple silicon, end to end from the browser over a socket, not the in‑process H100 figure above: median 192 ms a tick over 108 decisions. Several decision types run against the same state on every tick.</figcaption>
   </figure>
-  <p class="note mt-30" style="max-width:72ch">Purpose&#8209;built decision models from other groups score higher than this on JevBench &mdash; up to .986 standard, some of them on typical&#8209;medium&rsquo;s own base checkpoint. Our report attributes that to their rendering and method and is replicating it as a probe; until that probe lands, the gap stands as measured. JevBench figures here are a public&#8209;subset run (72&nbsp;standard / 48&nbsp;easy / 111&nbsp;hard public ids), not a ranked leaderboard entry, and chance is 31.1% standard. <a class="ul" href="research.html#jevbench-context-report-3q-same-231-public-ids">The whole field, on the same 231 ids &rarr;</a> <a class="ul" href="research.html#jevbench-per-family-typical-small">The disclosure in full &rarr;</a></p>
-  <p class="note mt-18"><a class="ul" href="research.html#eval-suite">Every table, every source and the calibration curves &rarr;</a></p>
-
-  <div class="claim mt-55">
-    <h2>Where it works, and where it does not.</h2>
-    <p>Bounded decisions over text you already have. Anything that needs several steps of reasoning, or a document longer than the state window, is outside what these two models do today.</p>
-  </div>
-  <div class="grid gap-18 lg:grid-cols-2 mt-30">
-    <div><h3 class="t-card">Good fit</h3><ul class="fit"><li>Routing and triage</li><li>Classification over labels you define</li><li>Policy and eligibility checks</li><li>Extraction with a closed answer set</li><li>Scoring on a scale you define</li><li>Tool choice and next action</li></ul></div>
-    <div><h3 class="t-card">Not yet</h3><ul class="fit"><li>Documents past the state window</li><li>Serial arithmetic</li><li>Temporal composition</li><li>Multi-step planning</li><li>Vision, or any raw perception</li></ul></div>
-  </div>
-  <p class="note mt-18">Each of these has a measured failure behind it, including the ones that surprised us: object-location phrasing, rules with an &ldquo;or&rdquo; in them, a compaction threshold that never crosses .5, and a truncation bug that taught confident answers without evidence.</p>
-  <p class="note mt-18"><a class="ul" href="research.html#limitations">Every known failure, with its numbers &rarr;</a></p>
-</section>
-
-<section class="page chapter" id="demos">
-  <div class="claim">
-    <h2>Watch it decide.</h2>
-    <p>Every tick, the state is a sentence and the options are the legal moves. The board, the road and the corridor are all text by the time the model sees them. <span class="tag" data-mode-pill></span></p>
-  </div>
-  <figure class="fig">
-      <div class="media dark">
-        <p class="media-label t-eyebrow">The road · Three.js</p>
-        <div class="media-split"><div class="media-scene"><div class="game-mount" data-game="drive"></div></div></div>
-      </div>
-      <figcaption><b>Fig. 6.</b> The model picks each manoeuvre · 123 of 127 matched the rule list.</figcaption>
-    </figure>
   <div class="gamepair">
     <figure class="fig">
-    <div class="media dark">
-      <p class="media-label t-eyebrow">Snake · canvas</p>
-      <div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="snake"></div></div>
-    </div>
-    <figcaption><b>Fig. 7.</b> One sentence per tick, the candidate set is the safe moves, and the recorded run matched 98.4% of moves on 62 boards (chance 48%).</figcaption>
-  </figure>
+      <div class="media dark">
+        <p class="media-label t-eyebrow">Snake · canvas</p>
+        <div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="snake"></div></div>
+      </div>
+      <figcaption><b>Snake.</b> One sentence per tick describing the gaps and what each move hits; one Choice over the two or three legal moves. typical‑small on Apple silicon, end to end from the browser over a socket, not the in‑process H100 figure above: median 128 ms a tick over 201 decisions. This is the simplest loop: one state, one bounded action, repeated.</figcaption>
+    </figure>
     <figure class="fig">
-    <div class="media dark">
-      <p class="media-label t-eyebrow">DOOM · E1M1 · live</p>
-      <div class="media-scene" style="min-height:520px"><iframe class="card-film" id="film-card" src="games/doom/index.html?film=1" title="DOOM played by typical-small" loading="lazy"></iframe></div>
-      <div class="card-hud t-mono"><p class="rec"><i></i><span id="card-rec">REC · typical-small · E1M1</span></p><p class="rec-sub" id="card-rec2">booting</p><div id="card-rows"></div><p class="sentence" id="card-sentence"></p></div>
-    </div>
-    <figcaption><b>Fig. 8.</b> Two facts per tick, badly hurt or not and an enemy in sight or not, decide retreat, engage or explore, straight from the text state, never a pixel.</figcaption>
-  </figure>
-  </div>
-<div id="tryit">
-    <div class="exrow" data-exhibit-card>
-      <div class="exrow-head">
-        <span class="tag">Recorded</span>
-        <h3 class="t-feature">Rules are the program</h3>
-        <p>Five fixed facts about a loan applicant and four rules with a stated precedence. Reorder the rules and the model re-decides live on the same facts; a second panel runs six applicants under both orders and flags each flip.</p>
-        <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
+      <div class="media dark">
+        <p class="media-label t-eyebrow">DOOM · E1M1 · live</p>
+        <div class="media-scene" style="min-height:520px"><iframe class="card-film" id="film-card" src="games/doom/index.html?film=1" title="DOOM played by typical-small" loading="lazy"></iframe></div>
+        <div class="card-hud t-mono"><p class="rec"><i></i><span id="card-rec">REC · typical-small · E1M1</span></p><p class="rec-sub" id="card-rec2">booting</p><div id="card-rows"></div><p class="sentence" id="card-sentence"></p></div>
       </div>
-      <div class="exrow-body" data-exhibit-body hidden><div data-demo="rules"></div></div>
-    </div>
-    <div class="exrow" data-exhibit-card>
-      <div class="exrow-head">
-        <span class="tag">Recorded</span>
-        <h3 class="t-feature">Try it</h3>
-        <p>Your own state, question and options, decided in one forward pass, or the prefilled example if the local model server isn't running.</p>
-        <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
-      </div>
-      <div class="exrow-body" data-exhibit-body hidden><div data-demo="tryit"></div></div>
-    </div>
-    <div class="exrow" data-exhibit-card>
-      <div class="exrow-head">
-        <span class="tag">Recorded</span>
-        <h3 class="t-feature">SQL over judgment</h3>
-        <p><code>SELECT * FROM tickets WHERE typical(body, 'the customer mentions a duplicate charge')</code>, 129 rows, one forward pass each, no embeddings, checked against hand labels on four conditions.</p>
-        <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
-      </div>
-      <div class="exrow-body" data-exhibit-body hidden><div data-demo="sql"></div></div>
-    </div>
-    <div class="exrow" data-exhibit-card>
-      <div class="exrow-head">
-        <span class="tag">Recorded</span>
-        <h3 class="t-feature">One document, twenty questions</h3>
-        <p>A short handbook is read once into the KV cache, then twenty typed questions (12 yes/no, 5 choice, 3 score) are answered from that cached state in one call, timed against twenty one-at-a-time calls and marked against a hand label.</p>
-        <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
-      </div>
-      <div class="exrow-body" data-exhibit-body hidden><div data-demo="doc-20"></div></div>
-    </div>
+      <figcaption><b>Doom.</b> Two facts a tick, whether the player is badly hurt and whether an enemy is in sight; one Choice over four or five actions. typical‑small on Apple silicon, end to end from the browser over a socket, not the in‑process H100 figure above: median 129 ms a tick over 43 decisions. TypeSafe used Doom to make the Jev interface visible. We liked the idea enough to build our own with Typical: one text state per tick, one bounded action distribution back.</figcaption>
+    </figure>
   </div>
 </section>
 
-<section class="page chapter" id="start">
+
+<section class="page chapter" id="field">
   <div class="claim">
-    <h2>Three commands and you are running it locally.</h2>
-    <p>Open weights and inference code today. The full training recipe is documented; training code comes next. Download the <code>inference/</code> folder from the model repo, install its requirements, and call it. <code>state</code> is a string or a dict; the options are whatever you pass, per call, with no retraining.</p>
+    <h2>The whole field, on the same items</h2>
+    <p>Every row below answered the same 231 public JevBench ids. That makes the table comparable, and it does not flatter us: four open decision models and one closed one are ahead of <code>typical&#8209;medium</code> on the standard tier, and a 400M classifier is ahead of <code>typical&#8209;small</code>. We would rather print the field we sit in than the one we win.</p>
   </div>
-  <div class="code"><pre >pip install typical-ai</pre></div>
-  <p class="note mt-18">The three calls themselves are the six lines shown above under <a href="#runtime">Your program keeps its logic</a>: <code>choice</code>, <code>noul</code>, <code>score</code>, each taking the same state.</p>
+  <figure class="fig">
+    <div id="jev-field"></div>
+    <figcaption>JevBench standard, same 231 public ids. Click a column to re-sort.</figcaption>
+  </figure>
+  <p class="mt-30">Plotted against the parameters you have to host, neither of our models sits on the frontier. A 400M classifier scores above <code>typical&#8209;small</code>, and <code>SemIf</code> scores above <code>typical&#8209;medium</code> on the same 4B base — a gap our report puts down to their rendering and method, and one we are still probing. Our models do lead every prompted backbone we ran, at every size, including a 14B.</p>
+  <figure class="fig">
+    <div class="chart" id="size-score"></div>
+    <figcaption>JevBench standard against parameters. The dashed step is the frontier. <span data-count="unplotted">Four</span> entries publish no size.</figcaption>
+  </figure>
+  <figure class="fig">
+    <div class="chart" id="chart-runreq"></div>
+    <figcaption>What it takes to run each. Sources per row in <code>site/data/run-requirements.json</code>.</figcaption>
+  </figure>
+</section>
+
+<section class="page chapter" id="separating">
+  <div class="claim">
+    <h2>What actually separates the two models</h2>
+    <p>The JevBench columns above look like a ranking. They are not one. The standard tier is 72 items drawn from only 36 independent states, each written twice, and the hard tier is 111 items. Cluster-bootstrapped over the paraphrase group, that is a 95% interval of roughly ±6 to 13 points on any standard-tier number and ±9 on any hard-tier one. <code>typical-medium</code>'s standard-tier interval is [.778, .944] and its hard-tier interval is [.405, .595]. Put the same &plusmn;6 to 13 around <code>typical-small</code>'s .708, and the same &plusmn;9 around its .432, and the two models' intervals overlap on both tiers.</p>
+    <p><strong>JevBench cannot separate these two models.</strong> Nor can it separate any adjacent pair in our seven-checkpoint ladder, which spans 1.7B to 14B and four backbone generations. Two of those checkpoints score exactly 55 of 111 on the hard tier while disagreeing on 26 items outright. That is not a tie, it is a measurement that has run out of resolution. Do not read the standard-tier gap between Small and Medium as a result. We do not.</p>
+    <p>What does separate them is everything measured at a sample size that can answer the question.</p>
+  </div>
+  <table class="register">
+    <thead>
+      <tr><th>Evaluation set</th><th><code>typical-small</code></th><th><code>typical-medium</code></th></tr>
+    </thead>
+    <tbody>
+      <tr><td data-label="Set">MMLU-Pro among-K</td><td data-label="small">.338</td><td data-label="medium">.429</td></tr>
+      <tr><td data-label="Set">ANLI</td><td data-label="small">.492</td><td data-label="medium">.554</td></tr>
+      <tr><td data-label="Set">BoolQ</td><td data-label="small">.776</td><td data-label="medium">.840</td></tr>
+      <tr><td data-label="Set">20 Newsgroups</td><td data-label="small">.552</td><td data-label="medium">.579</td></tr>
+      <tr><td data-label="Set">SNLI</td><td data-label="small">.889</td><td data-label="medium">.900</td></tr>
+      <tr><td data-label="Set">MNLI</td><td data-label="small">.853</td><td data-label="medium">.855</td></tr>
+      <tr><td data-label="Set">JevBench standard Brier</td><td data-label="small">.423</td><td data-label="medium">.224</td></tr>
+    </tbody>
+  </table>
+  <div class="mt-18 mb-18">
+    <p>Medium leads by 9 points on MMLU-Pro among-K, 6 on ANLI, 6 on BoolQ and 3 on 20 Newsgroups, and its standard-tier Brier is nearly half Small's, which is what matters if you intend to threshold on the probability rather than take the argmax.</p>
+    <p class="mt-18">It is not a clean sweep, and three sets are held off the table above for space rather than for comfort. The two tie on CLINC-150 to within a tenth of a point, and CLINC is in the training mix anyway, so read that row as capacity and not as evidence about unseen labels. Medium is 3 points worse than Small on HWU64 and 2 points worse on TREC-fine, the 50-way fine-grained topic set. All three are on the <a href="research.html">research page</a>. One matched full-file pass covers both shipping checkpoints. On held-out DecisionMix-v2 families, against a .384 floor, Small reads .853 and Medium .889. On level-7 composition, the families our generator never produces, they read .524 and .539 against a .460 floor &mdash; six and eight points, where every in-distribution family is forty above its own. And on held-out yes/no, against a .583 floor, Medium reads .858 and Small reads <strong>.643</strong>. That is seven points below what the superseded 1.7B scored on the same file, and it is the one number in this release that went backwards. Small gained elsewhere in the same pass &mdash; PagerDuty .857 against a .792 floor, JevBench standard .708 &mdash; but if your decisions are mostly yes/no at 1.7B, take Medium.</p>
+    <p class="mt-18"><strong>Take Medium for accuracy, Small for cost, and do not use the benchmark column to decide.</strong> If you are choosing between these two for real work, the number you want is a paired test on your own decisions, not a leaderboard row.</p>
+    <p class="mt-18">One warning about the hard tier, and it is a warning rather than a caveat. The probabilities there are not usable. A uniform predictor over that tier's candidate sets scores a Brier of .66. <code>typical-small</code> scores .722 and <code>typical-medium</code> .721, which is worse than guessing evenly. On the standard tier the same comparison runs the other way and by a distance, .423 and .224 against .69, which is where an abstention threshold is worth having. If your decisions look like the hard tier, take the argmax if you like it, and do not threshold on the confidence.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="rules">
+  <div class="claim">
+    <h2>Rules are part of the input</h2>
+    <p>A decision model that memorises "this kind of ticket gets that label" is useless the moment your policy changes. So a large share of the workflow training is counterfactual: the same state and the same option list appear under different rubrics with different correct answers, which forces the model to read the rule instead of pattern-matching the state.</p>
+    <p>It is the largest training-distribution effect we measured, and it is larger than anything we changed in the architecture. Adding the rule-engine corpus took held-out rubric-flip accuracy, where the rule is inverted and the state left alone, from .477 to .710. Held-out families went .481 to .827, held-out grammars .507 to .881, held-out styles .491 to .888. Same head, same steps, same backbone. Only the mixture changed.</p>
+    <p>Write the rule into the state. A changed policy does not need a retrain, it needs a different paragraph.</p>
+    <p>It works inside the rule grammar we generate and it stops at the edge of it. On level-7 composition, which mixes temporal, unit, expected-value and trade-off reasoning and which our generator never produces, the same change moved accuracy from .477 to .498 against a .441 uniform-guess rate. The curriculum that moved every in-distribution family by thirty points moved that one by two. What the generator produces is learned. What it does not produce is not.</p>
+    <p class="mt-18">Those four figures are from the mixture ablation, which is what isolates the effect. The shipping checkpoints carry it through: held-out rubric-flip reads .730 on <code>typical-small</code> and .740 on <code>typical-medium</code>, against a .400 floor. Shuffle the rubric and leave the state alone and they fall to .394 and .392. That is under the floor, which is what reading a rule you were not given looks like.</p>
+  </div>
+</section>
+
+
+
+<section class="page chapter" id="surprised">
+  <div class="claim">
+    <h2>Four things that surprised us</h2>
+    <p>Each of these started as a bug or a failed run, and each one cost more time than the thing it taught us.</p>
+  </div>
+  <div>
+    <div>
+      <h3 class="t-feature">The last layer was the wrong layer to decide from</h3>
+      <p class="mt-18">The first full-scale version read the backbone's last hidden state, which is what you do without thinking about it. The control that caught it was blanking the premise and re-scoring: a model that has learned entailment should collapse, and this one did not. At SNLI .701 it scored .648 with the premise removed, so the evidence was worth five points and the model was reading the hypothesis for well-known annotation artefacts. Moving the tap to layer 20 of 28, so that the state and the query interact inside the pretrained layers rather than above them, took the same probe to .910 with the premise and .440 without, a gap of forty-seven. Going from a 0.6B backbone to a 1.7B one had bought nothing until the tap moved.</p>
+    </div>
+    <div class="mt-30">
+      <h3 class="t-feature">Candidates had to participate in the computation</h3>
+      <p class="mt-18">The candidate-blind architecture scored above chance, and the shuffled-question control killed it. Replace the real question with an unrelated one, hold the candidate set fixed, and the listwise teacher loses .102 of accuracy while the students lose between −.026 and +.023, in both directions, at 1,200 items. Their entire above-chance score was candidate-set priors: which option strings look plausible together. Eight probes instead of one decision vector, cross-attention over the candidate tokens and multi-set supervision all failed to move that number, and multi-set training produced exactly .000. Rendering the options into the suffix, so the candidate text passes through the same pretrained layers as the question, produces .127 at 1.7B and .193 at 4B from the same backbone.</p>
+    </div>
+    <div class="mt-30">
+      <h3 class="t-feature">Abstention had to be architecture, not vocabulary</h3>
+      <p class="mt-18">Rendering "none of the above" as an extra option makes the abstention rate a pure function of K. On CLINC with the gold label removed, the model abstained correctly .02 of the time at K=5 and 1.00 of the time at K=150. Not more often: always, on every item, which is a model that has stopped answering. AUROC read .97, .91 and 1.00 across that sweep and hid the pathology, because a model that abstains on everything ranks every positive above every negative. Moving abstention into its own head took MMLU-Pro false abstention from .692 to .003 and Banking77 at all 77 labels from .063 to .579, and it cost 2 to 7 points on intent and topic label spaces. A null score that means something different at every candidate count cannot be thresholded, and a threshold is the entire point.</p>
+    </div>
+    <div class="mt-30">
+      <h3 class="t-feature">One KV-cache deep copy cost a quarter to a third of serving latency</h3>
+      <p class="mt-18">The serving path encoded the state once and then deep-copied the entire prefix cache on every single decision, because mutating a shared cache is the kind of bug you only find in production and the copy made it impossible. Replacing the copy with a stride-0 view is bit-identical and allocates nothing, and with cached attention masks and position tensors it took warm p50 on the 1.7B from 21–25 ms to 15.5–17 ms; the Qwen3.5-4B stack <code>typical-medium</code> runs on went from 42–53 ms to 34–46 ms. A quarter to a third of serving latency, for a change that removes code. We tried <code>torch.compile</code> and CUDA graphs on top of it and rejected both: 8 ms on a single shape, but probabilities moved by up to .1 across shape buckets.</p>
+    </div>
+  </div>
+  <p class="note mt-18">The controls behind all four, along with the ones that came back null, are in the <a class="ul" href="research.html#eight-results-each-with-a-control">research notes</a>.</p>
+</section>
+
+<section class="page chapter" id="tryit">
+  <div class="claim">
+    <h2>Try it</h2>
+  </div>
+  <div class="code"><pre>pip install typical-ai</pre></div>
+  <div class="code"><pre>from typical_ai import Typical
+
+m = Typical.from_pretrained("OzLabs/typical-medium", device="auto")
+
+m.choice(state, "What does the customer want?", ["refund", "replacement", "repair"])
+m.noul(state, "Is the order still under warranty?")
+m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
+  <p class="note mt-18"><code>state</code> is a string or any JSON-serialisable dict. The package is <code>typical‑ai</code> on PyPI, Apache‑2.0, Python 3.11 or newer. The import is <code>typical_ai</code>: PyPI’s bare <code>typical</code> is an established typing toolkit and is not us.</p>
+  <p class="note mt-18">The source is on <a class="ul" href="https://github.com/GuyNachshon/typical">GitHub</a>. Both checkpoints are Apache‑2.0 over Apache‑2.0 Qwen3 base models. The training mix is not uniformly permissive and we are not going to imply it is: ANLI is CC BY‑NC 4.0, SciQ is CC BY‑NC 3.0, and two portions of the uncertainty corpus declare no licence at all. Whether non‑commercially‑licensed training data constrains the use of the resulting weights is unsettled, and a launch post is not the place it gets resolved. The whole per‑source table is in each model card so your own counsel has something to read.</p>
+</section>
+
+<section class="page chapter" id="next">
+  <div class="claim">
+    <h2>What's next</h2>
+    <p>Typical makes bounded decisions in one pass. Some decisions need more: dates to compare, quantities to combine, trade-offs to weigh. Every model we've trained still struggles with them. So the next question isn't only how to make a decision model more accurate.</p>
+    <p><strong>When should a decision model decide, and when should it think?</strong></p>
+  </div>
+</section>
+
+<section class="page chapter" id="faq">
+  <div class="claim">
+    <h2>FAQ</h2>
+  </div>
+  <div>
+    <details class="faq-item"><summary>How is this different from Jev?</summary><p>The interface category is similar. Typical is open-weight and self-hostable. Jev's internal architecture isn't public, so we don't claim architectural equivalence. Jev currently scores higher, especially on the hardest decisions.</p></details>
+    <details class="faq-item"><summary>Is this just a classifier?</summary><p>No. A classifier has a fixed output head. Typical's options arrive as text at call time, can change on every request, and take part in the decision pass itself.</p></details>
+    <details class="faq-item"><summary>Why not use an LLM's token probabilities?</summary><p>You can. Typical is trained around the decision interface itself: typed probability semantics, explicit abstention, one state encoding shared across questions, and a direct readout instead of sampled tokens.</p></details>
+    <details class="faq-item"><summary>Does it reason?</summary><p>For bounded decisions it can apply evidence from the state and rules given at runtime. Hard multi-step composition is still weak. For genuinely serial reasoning, use a generative reasoning model.</p></details>
+    <details class="faq-item"><summary>Does it see the game in Doom?</summary><p>No. The demo supplies a text description of the game state.</p></details>
+    <details class="faq-item"><summary>Why Qwen?</summary><p>Good open base models at the sizes we wanted, in one family we could test consistently. <code>typical-medium</code> uses Qwen3.5-4B.</p></details>
+    <details class="faq-item"><summary>What was it trained on, and under what license?</summary><p>The per‑source training table and the exact flags are on each model card: <a class="ul" href="https://huggingface.co/OzLabs/typical-small">typical‑small</a> and <a class="ul" href="https://huggingface.co/OzLabs/typical-medium">typical‑medium</a>.</p></details>
+  </div>
 </section>
 
 <footer class="footer"><div class="page">
   <div class="cols">
     <div><p class="t-card" style="max-width:20ch">Models that decide, not generate.</p><p class="t-eyebrow mt-30" style="color:var(--color-mid)">Weights on Hugging Face, package on PyPI, source on GitHub.</p></div>
     <div class="t-mono"><p class="t-eyebrow mb-18">Models</p><p><a href="https://huggingface.co/OzLabs/typical-small">typical-small</a></p><p><a href="https://huggingface.co/OzLabs/typical-medium">typical-medium</a></p><p><a href="https://huggingface.co/OzLabs/typical-small-preview">typical-small-preview</a></p></div>
-    <div class="t-mono"><p class="t-eyebrow mb-18">Site</p><p><a href="#results">Results</a></p><p><a href="#demos">Demos</a></p><p><a href="research.html">Research</a></p><p><a href="research.html#limitations">Limitations</a></p></div>
+    <div class="t-mono"><p class="t-eyebrow mb-18">Site</p><p><a href="#field">Results</a></p><p><a href="#watch">Demos</a></p><p><a href="research.html">Research</a></p><p><a href="research.html#limitations">Limitations</a></p></div>
   </div>
   <div class="rule t-eyebrow" style="color:var(--color-mid)">Every number on this page traces to a file under site/data</div>
 </div></footer>
@@ -211,5 +321,6 @@
 <script src="js/vendor/gsap.min.js" defer></script>
 <script src="js/vendor/ScrollTrigger.min.js" defer></script>
 <script type="module" src="js/shell.js"></script>
+<script type="module" src="js/release.js"></script>
 </body>
 </html>

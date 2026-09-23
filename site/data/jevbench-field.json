@@ -103,26 +103,6 @@
    "params_active": 9.0
   },
   {
-   "name": "Qwen3-4B-Base",
-   "kind": "prompted, 3 exemplars",
-   "std": 0.778,
-   "hard": 0.441,
-   "ours": false,
-   "size": "4B",
-   "params_total": 4.0,
-   "params_active": 4.0
-  },
-  {
-   "name": "Qwen3-4B (instruct)",
-   "kind": "prompted, 3 exemplars",
-   "std": 0.778,
-   "hard": 0.423,
-   "ours": false,
-   "size": "4B",
-   "params_total": 4.0,
-   "params_active": 4.0
-  },
-  {
    "name": "Qwen3.5-4B-Base",
    "kind": "prompted, 3 exemplars",
    "std": 0.764,

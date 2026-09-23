@@ -71,6 +71,31 @@ function scrollReveals() {
     const items = head.querySelectorAll('.t-eyebrow, .t-section, .lede, .t-hero');
     g.from(items, { opacity: 0, y: 14, duration: 0.6, ease: 'expo.out', stagger: 0.07, scrollTrigger: { trigger: head, ...once } });
   });
+  // The post has its own structure -- .chapter > .claim, not .chapter-head -- so none of the above
+  // ever matched it and the long-form page had no choreography at all. One reveal per chapter:
+  // the rule draws (CSS, above), then the heading and its standfirst rise behind it. The figures
+  // are deliberately left alone. A chart a reader is meant to trust should be printed, not
+  // performed, and the same argument that keeps the count-up off the numbers keeps the fade off
+  // the figures.
+  document.querySelectorAll('.post .chapter').forEach((chapter) => {
+    if (!pending(chapter)) return;
+    const items = chapter.querySelectorAll(':scope > .claim > h2, :scope > .claim > p');
+    if (!items.length) return;
+    chapter.classList.add('will-reveal');
+    g.from(items, {
+      opacity: 0,
+      y: 12,
+      duration: 0.55,
+      ease: 'expo.out',
+      stagger: 0.06,
+      scrollTrigger: {
+        trigger: chapter,
+        ...once,
+        onEnter: () => chapter.classList.add('is-revealed'),
+      },
+    });
+  });
+
   // Only the chapter heads move. The earlier pass faded up every media panel, card, demo row and
   // destination link and counted every figure from zero — the stock scroll-reveal kit, and the
   // count-up turned .804 into a slot machine. A figure a visitor is meant to trust should be

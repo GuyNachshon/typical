@@ -29,6 +29,16 @@
   --text-hero: 62px;      /* hero heading, 400, -1.86px, lh .93 */
   --text-figure: 120px;   /* big figures, 400, -4.8px */
 
+  /* One vertical scale for the post. Before this the gaps in play were 0, 10, 18, 22, 30, 104,
+     122, 126 and 134 -- nine values, none of them chosen against the others. */
+  --v-1: 8px;
+  --v-2: 14px;
+  --v-3: 22px;    /* paragraph to paragraph */
+  --v-4: 36px;    /* heading block to body */
+  --v-5: 56px;    /* prose to figure, figure to prose */
+  --v-6: 88px;
+  --v-7: 128px;   /* chapter to chapter */
+
   --spacing: 1px;         /* raw px spacing utilities: p-18, gap-30, py-55, py-88, py-143 */
 
   --radius-card: 12px;
@@ -96,6 +106,22 @@
      nothing; the page gets shorter and heavier at the same time. */
   .chapter { padding-block: 104px 0; }
   @media (max-width: 64rem) { .chapter { padding-block: 96px 0; } }
+
+  /* ---- the post's vertical rhythm ---- */
+  /* A chapter had 104-134px of air above it and nothing to say a chapter had started, so the
+     break read as a long paragraph gap. One distance, and a rule on the measure to mark it. */
+  .post .chapter { padding-block: var(--v-6) 0; }
+  .post .chapter::before { content: ''; display: block; max-width: 680px; margin: 0 auto var(--v-5); height: 1px; background: var(--color-steel); transform-origin: left center; }
+  /* The rule draws itself before the chapter's title rises: the mark that says a section started
+     is the thing that should arrive first. CSS rather than JS because it is predetermined, so it
+     runs off the main thread and survives the page still loading charts underneath it.
+     .will-reveal is only ever applied to a chapter that is still below the fold, so a section the
+     reader has already reached is never hidden in order to be shown again. */
+  .post .chapter.will-reveal::before { transform: scaleX(0); }
+  .post .chapter.is-revealed::before { transform: scaleX(1); transition: transform var(--duration-reveal) var(--ease-out-expo); }
+  .post .chapter:first-of-type { padding-top: var(--v-6); }
+  .post .chapter:first-of-type::before { display: none; }
+  @media (max-width: 64rem) { .post .chapter { padding-block: var(--v-6) 0; } .post .chapter::before { margin-bottom: var(--v-5); } }
   #results { padding-block: 120px 0; }
   /* The side rail is gone. It put every h2 at x=330 while every panel below it started at x=80, so
      the two dominant objects in a section never shared an edge, and it left a 250px column empty in
@@ -119,15 +145,15 @@
      then a full-width piece of evidence, repeated. Those pages are 40-70% media by height; this
      one was a stack of 58px pronouncements over 640px charts. So the heading stops shouting, the
      rule and the eyebrow go, and the evidence gets the room they were taking. */
-  .claim { max-width: 64ch; margin-bottom: 30px; }
-  .claim h2 { font-size: clamp(25px, 2.3vw, 33px); line-height: 1.12; letter-spacing: -0.7px; margin-bottom: 12px; }
-  .claim p { font-size: 17px; line-height: 1.55; color: var(--color-slate); }
-  .claim p + p { margin-top: 10px; }
+  .claim { max-width: 64ch; margin-bottom: var(--v-4); }
+  .claim h2 { font-size: clamp(27px, 2.6vw, 38px); line-height: 1.06; letter-spacing: -1.3px; font-weight: 700; margin-bottom: var(--v-2); }
+  .claim p { font-size: 17px; line-height: 1.45; color: var(--color-slate); }
+  .claim p + p { margin-top: var(--v-3); }
   .claim .tag { vertical-align: 2px; margin-left: 6px; }
 
   /* a figure: full width, on paper, numbered, captioned under a hairline. No frame on the page's
      own live panels — a dark game screen is already a bounded object. */
-  .fig { margin: 0 0 22px; }
+  .fig { margin: 0 0 var(--v-5); }
   .fig > figcaption { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-steel); font-family: var(--font-mono); font-size: 12px; line-height: 1.6; color: var(--color-slate); max-width: 88ch; }
   .fig > figcaption b { font-weight: 700; color: var(--color-off); }
 
@@ -585,7 +611,11 @@
   .post .chapter > *, .post .masthead > * { max-width: 680px; margin-inline: auto; }
   .post .fig, .post .figband, .post .chapter > table, .post .gamepair { max-width: 1080px; margin-inline: auto; }
   .post .figband-row { max-width: 1080px; padding-inline: 0; }
-  .post .claim { max-width: 680px; }
+  .post .claim { max-width: 680px; margin-bottom: 0; }
+  /* one distance between a chapter's blocks, whatever they happen to be, instead of a rule for
+     every pair of element types that could sit next to each other */
+  .post .chapter > * + * { margin-top: var(--v-5); }
+  .post .fig { margin-bottom: 0; }
   /* one figure on the page is a pair of terminals printing real response objects; it gets the
      page, because the thing being shown is exactly the part that a narrower column cuts off */
   .post .fig.figfull { max-width: none; }
