@@ -47,8 +47,11 @@ states — identical items, only the position of the case block differs, no trun
 | `typical-small` | .798 | .598 | −20 pts |
 | `typical-medium` | .866 | .612 | −25 pts |
 
-Short states are unaffected. Retrained checkpoints without the bias already exist and will supersede this line
-(`ts1c` at 1.7B: .947 facts-first, +34.9; `tm2` at Qwen3.5-4B: .950, +33.8), giving up nothing on facts-last.
+Short states are unaffected. **Both models were re-released on 2026-09-23 with checkpoints that do not have this
+bias** (`ts1c` at 1.7B: .947 facts-first; `tm2` at Qwen3.5-4B: .950), so the table above describes the *previous*
+weights. Pull again if you downloaded before that date. Both replacements are trades — Small loses 6.5 points of
+held-out Noul and 4.8 of BoolQ, Medium loses 5.5 of CLINC-150 and 5.3 of HWU64 — and each card states its own.
+Medium's backbone changed to Qwen3.5-4B, so re-pull `inference/` from the model repo before loading it.
 
 This also illustrates why JevBench alone is not a sufficient gate here: `ts1c` reads .708 / .432 against
 `typical-small`'s .694 / .432 — statistically indistinguishable — while being 35 points better on the axis the
