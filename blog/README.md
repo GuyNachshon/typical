@@ -5,10 +5,13 @@ Two public posts, meant to publish together.
 - `typical-launch.md` — **"Typical: Models That Decide, Not Generate."** The launch. Leads with the
   decision primitive, shows the API, the two released models, where they break, and what is open.
   ~1,950 words.
-- `technical-deep-dive.md` — **"We Removed Generation from an LLM. Here's What Broke."** The
-  archaeology: the candidate-blind architecture that failed, the wrong tap layer, the "none of the
-  above" pathology, the long-state data defect, the calibration results, the KV-cache deep copy.
-  ~3,650 words. The launch links to it twice.
+- `technical-deep-dive.md` — **"How Typical Works, and What Broke Building It."** The system
+  piece: the interface, the architecture in depth (tap depth, candidate-aware readout, factored
+  null, typed heads, cached prefix), the training recipe (E/K/W/U mixture, counterfactual rubric
+  groups, null augmentation, ordinal smoothing, calibration-based checkpoint selection), results
+  with confidence intervals and paired tests, the truncation 2x2, rendering as a factor, the
+  metric lesson, the serving bugs, releases and open work. Each architecture choice is told
+  together with the negative result that forced it. ~5,700 words. The launch links to it twice.
 
 Every number in both traces to `REPORT.md`, `RESULTS.md`, `COMPARE.md`, or a `releases/*.md` card.
 Check the cited section before changing a number, not just the number.
@@ -33,15 +36,17 @@ This is the part that goes stale first, so read it before editing.
   (`metaeval/ambient`, `metaeval/chaos-mnli-ambiguity`) declare no license on their HF cards. The
   launch post flags that rather than asserting commercial-use safety. Don't upgrade that wording
   without a licensing review.
-- **The truncation story is a null result, not a cause.** Deep dive §5 states the data defect
-  (98.8% of long rows lost their facts at a 1,024-token window, verified and countable, and
-  truncation keeps the start and drops the end) and explicitly does *not* claim it caused the
-  long-policy metric movement. The matched render-order ablation came back underpowered:
-  long_policy .316 (6/19) facts-first vs .105 (2/19) facts-last, Fisher exact two-sided p = 0.232,
-  bootstrap CI on the difference [−0.053, +0.474] containing zero, and the hard aggregate going
-  the other way (.378 vs .396). The well-powered effect is train/test render mismatch: on 605
-  held-out long-state items with no truncation at eval, moving the case from the end of the state
-  to the start costs the facts-last arm 23 points (.842 → .615, onto its .612 majority floor).
+- **The truncation story is now established, and the way it got established is the point**
+  (REPORT §3ak-a/-c/-e, superseding the earlier null reading). Sequence the deep dive tells: a
+  verified data defect (98.8% of long rows lost their facts at a 1,024-token window; truncation
+  keeps the start and drops the end); then a matched render-order ablation that was underpowered
+  on the pre-registered metric (long_policy .316 = 6/19 vs .105 = 2/19, Fisher p = 0.232, CI
+  [−0.053, +0.474], hard aggregate going the other way); then a purpose-built 605-item eval and a
+  2x2 that separates truncation from train/test render mismatch. Matched-condition gap
+  **+.112 [+.077, +.147], p = 5e-10 at 1.7B**, **+.078 [+.055, +.100], p = 7e-12 at 14B**, and
+  **+.111 at a second seed**. Render mismatch is a *separate* real effect (23 points, .842 → .615
+  onto the .612 floor) and does not explain the truncation effect away. Do not reintroduce the
+  "null result" framing.
 - **Do not say KD contributed nothing.** The matched `--distill_beta 0` control (`tl1b_nokd`) came
   out slightly ahead on hard (.477 vs .450), long-policy (.211 vs .158), standard Brier (.127 vs
   .175) and val NLL (0.410 vs 0.438), but the cluster-bootstrapped hard-tier intervals overlap
@@ -49,9 +54,15 @@ This is the part that goes stale first, so read it before editing.
   direction is consistent and the effect is undetectable at this sample size. Never re-credit KD
   for the calibration gains either.
 - **Sample size.** JevBench public subset: 72 standard items over only 36 independent states (two
-  paraphrases per state, so it must be clustered) and 111 hard items, roughly ±9 points on hard.
-  Point estimates are fine; comparative claims built on a few points are not. The deep dive
-  carries this caveat in its opening and re-states it wherever a claim leans on a small gap.
+  paraphrases per state, so it must be clustered) and 111 hard items, roughly ±9 points on hard
+  and ±6–13 on standard. Every adjacent pair of our own checkpoints is statistically
+  indistinguishable there (RESULTS §5a). Only three paired per-item results in the whole record
+  survive: frozen-14B-beats-trained on hard (+.108 [+.027, +.189], p = .015), the rendering effect
+  (p < .001) and the long-state result. The deep dive carries this in its opening, gives the full
+  interval table in §4, and re-states it wherever a claim leans on a small gap.
+- **The `long_policy` family is n = 19 and contradicts itself across seeds** (6/19 vs 2/19 at seed
+  0, 5/19 vs 5/19 at seed 1). Never quote it as a verdict on anything. Deep dive §7 is about
+  exactly this.
 - **The 14B is not a product.** It stays out of the release table in the launch post and appears
   only as a candidate that missed its own pre-registered bar.
 
@@ -69,7 +80,12 @@ Launch post:
 
 Deep dive:
 
+- `fig_architecture` — also used by the launch post; reused here to open the architecture section.
+- `fig_deltaq` — raw among-K accuracy vs question-dependence for every readout probed; the
+  candidate-blind negative in one chart.
 - `fig_truncation` — state token length vs truncation cutoffs; long-policy accuracy by checkpoint.
+  Its right-hand panel is the n=19 JevBench family, so the caption says outright that this is the
+  measurement the post argues against steering by.
 - `fig_calibration` — held-out score NLL and typed-decisions NLL across checkpoints.
 - `fig_serving` — cold/warm p50 latency before/after removing the per-decision KV-cache deep copy.
 - `fig_ladder` — JevBench standard/hard accuracy across backbone size, trained and frozen.
@@ -108,5 +124,15 @@ blocked, but it needs deciding before any packaged install ships.
 
 If a number changes (a new release, a fixed bug, a benchmark rerun), edit the post directly and
 re-check the specific `REPORT.md`/`RESULTS.md`/`COMPARE.md` section cited next to the claim, rather
-than just bumping the number. One edit is already queued: the launch post's 14B paragraph and the release
-table, if `typical-large` ever clears its pass rule.
+than just bumping the number.
+
+Queued edits:
+
+1. **The launch post is stale on the v2 releases.** It still quotes `typical-small` .694/.798 and
+   `typical-medium` .806/.612, and its "one thing to know before you call it" section says the
+   fixed checkpoints "will supersede these". `ts1c` and `tm2` shipped as v2 on 2026-09-23
+   (REPORT §6.5, RESULTS §7), and the deep dive says so, so the two posts currently disagree.
+   Update the launch post's release table, the facts-first/facts-last table and that paragraph
+   before publishing the pair.
+2. The launch post's 14B paragraph and release table, if `typical-large` ever clears a pass rule —
+   and note that the rule itself is being restated on the n=605 set and paired tests (REPORT §6.3).
