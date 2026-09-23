@@ -8,40 +8,41 @@ hundreds are served through a shortlisting front end (\Cref{sec:results:cost}).
 
 \paragraph{Multi-step composition.} Decisions that require carrying an intermediate value through
 several steps are the open frontier. On DecisionMix level 7 (temporal, numeric, expected-value and
-trade-off composition, never trained) the v1 1.7B and 4B models score .493 and .544 against a .441 guess rate,
-and the 14B model .620. On the JevBench hard tier a frozen 14B backbone read with three in-context
-exemplars scores above our trained 14B checkpoint (paired difference $+.108$ $[+.027, +.189]$,
-$p = .015$), while the trained model leads on the standard tier. \Cref{app:hard-tier} gives the
-per-family breakdown. \Cref{sec:discussion} describes the extension this points to.
+trade-off composition, never trained) the v1 1.7B and 4B models score .493 and .544 against a .441
+guess rate, and the 14B model .620. On the JevBench hard tier a frozen 14B backbone read with three
+in-context exemplars scores above our trained 14B checkpoint (paired difference $+.108$
+$[+.027, +.189]$, $p = .015$), while the trained model leads on the standard tier.
+\Cref{app:hard-tier} gives the per-family breakdown, and \Cref{sec:discussion} the extension this
+points to.
 
 \paragraph{Statistics.} The readout comparison in \Cref{sec:analysis:readout} and the evidence-first
 result in \Cref{sec:results:long} are replicated across seeds; other rows are single training runs.
 JevBench numbers use the 231 public items and are not a ranked leaderboard entry. Its intervals are
 $\pm6$--13 points on the standard tier (36 independent states) and $\pm9$ points on the hard tier
-(111 items), so we base comparisons between our own checkpoints on paired tests and on larger
+(111 items), so comparisons between our own checkpoints rest on paired tests and on larger
 purpose-built sets.
 
 \paragraph{Generalization and invariance.} ``Runtime-defined labels'' refers to the axes of
 \Cref{tab:generalization}. The rubric-generalization results share one rule engine between training and
-held-out families. Choice is order-robust rather than order-invariant: the contextual readout reduces
-order sensitivity relative to the letter interface, per-step option shuffling during training
-contributes to that robustness, and only Noul is exactly invariant. The pairwise-odds property of
-\Cref{eq:factored-null} holds among non-null candidates; the abstention gate is set-dependent by design.
+held-out families. Choice is order-robust rather than order-invariant: per-step option shuffling during
+training contributes to its robustness, and only Noul is invariant by construction. The pairwise-odds
+property of \Cref{eq:factored-null} holds among non-null candidates; the abstention gate is
+set-dependent by design.
 
-\paragraph{Ladder and release.} The size ladder is one recipe on one backbone family (Qwen3) with a
-Qwen3.5-4B checkpoint as a second-generation point; the Qwen3-8B rung underperforms its neighbours in
-both frozen and trained form. Inference code, weights and evaluation outputs are public; the training
-code is not yet released.
+\paragraph{Ladder and release.} The size ladder spans Qwen3 1.7B--14B plus Qwen3.5-4B, and its rows
+come from the recipe current when each was trained (\Cref{tab:headline}); the Qwen3-8B checkpoint sits
+below its neighbours in both frozen and trained form. Inference code, weights and evaluation outputs are
+public; the training code is not yet released.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
 Typical reads decisions directly out of a pretrained causal language model. A state is encoded once, a
 question and its runtime candidates are read in a short suffix, and a head at mid-depth returns a typed
-distribution with a factored abstention event, at 45\,ms per decision at 1.7B and 59\,ms at 14B. The design rests on measured answers to where the decision lives: inside the forward pass
-over the candidates, in their contextual states, below the layers that specialize for generation. The
-training recipe shows that decision types, counterfactual rubrics, abstention targets and selection
-criteria shape a decision model as strongly as its architecture, and the render-crossed evaluation
-shows how to measure such effects cleanly. The models and the inference package are public, and the
-same interface is the natural terminal layer for decision systems that add intermediate computation
-before the typed readout.
+distribution with a factored abstention event, at 45\,ms per decision at 1.7B and 60\,ms at 14B. The
+design rests on measured answers to where the decision lives: inside the forward pass over the
+candidates, in their contextual states, below the layers that specialize for generation. The training
+recipe shows that decision types, counterfactual rubrics and abstention targets shape a decision model
+as strongly as its architecture, and render-crossed evaluation shows how to measure such effects
+cleanly. The models and the inference package are public, and the same interface is a natural terminal
+layer for decision systems that add intermediate computation before the typed readout.

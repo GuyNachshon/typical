@@ -1,13 +1,78 @@
 \section{Appendix}
 
-\subsection{Additional ablation tables and figures}
+\subsection{Additional tables and figures}
 \label{app:extra-figures}
 
-\Cref{tab:app-blind-closure,tab:app-null-fix} give the full numbers for the candidate-blind closure
-(\Cref{sec:analysis:deltaq}) and the rendered-null-line ablation (\Cref{sec:analysis:null}).
+\Cref{tab:generalization} lists the held-out axes of \Cref{sec:setup:heldout}.
+\Cref{tab:blind,tab:app-blind-closure} give the per-variant numbers for the candidate-blind states of
+\Cref{sec:analysis:deltaq}, and \Cref{tab:app-null-fix} the rendered-null-line ablation of
+\Cref{sec:analysis:null}. \Cref{fig:ladder} plots \Cref{tab:headline} against backbone size, and \Cref{tab:rendering} gives the
+rendering-only comparison of \Cref{sec:results:rendering}.
 \Cref{fig:truncation} gives the long-state truncation histogram behind \Cref{sec:train:long}. The
 serving-path engineering behind \Cref{sec:results:cost}, with \Cref{fig:serving}, is in
 \Cref{app:serving}.
+
+\begin{table}[h]
+  \centering
+  \caption{Generalization axes, each with its own held-out split, and the scope a positive result
+  licenses.}
+  \label{tab:generalization}
+  \small
+  \begin{tabular}{p{2.5cm}p{4.9cm}p{5.2cm}}
+    \toprule
+    Axis & Evaluated on & A positive result licenses \\
+    \midrule
+    Unseen examples & Held-out rows of every trained corpus & In-distribution competence \\
+    Unseen label wording & Label paraphrases; re-worded CLINC-150 labels & Robustness to label surface form \\
+    Unseen label space & Banking77-77, HWU64, tree-choice ($\numcands \le 320$), TruthfulQA-MC1 & Scoring labels never trained on, within trained domains \\
+    Unseen family & 3 of 15 workflow families; 3 DecisionMix domains & Transfer across families of one generator \\
+    Unseen rubric style & 2 withheld DecisionMix writing styles & Rubric conditioning beyond style memorization \\
+    Unseen grammar & 1 withheld domain$\times$level grammar & Rule execution inside the generator's grammar \\
+    Unseen composition & DecisionMix level 7 (temporal, numeric, expected value, trade-off) & Composition outside the trained grammar \\
+    External & PagerDuty, jevlogs, Mind2Web, typed-decisions, JevBench & Transfer outside our generators \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+  \centering
+  \caption{Candidate-blind variants: six factorizations and objectives, two tap depths. ``Shuffled''
+  replaces the real question with an unrelated one, candidate set fixed; $\dqsh$ is the difference.
+  $n{=}1{,}200$ MMLU-Pro items. Referenced from \Cref{sec:analysis:deltaq}.}
+  \label{tab:blind}
+  \small
+  \begin{tabular}{llrrr}
+    \toprule
+    Variant & Factorization / objective & among-$\numcands$ & shuffled & $\dqsh$ \\
+    \midrule
+    \texttt{z1} & single decision vector, bilinear scorer & .171 & .147 & $+.023$ \\
+    \texttt{zr} & 8 probes, token-level max-similarity & .157 & .182 & $-.026$ \\
+    \texttt{zr\_set} & + $O(\numcands)$ cross-attention over candidate tokens & .147 & .151 & $-.003$ \\
+    \texttt{ms\_ctrl} & single-set distillation, steps-matched control & .124 & .147 & $-.023$ \\
+    \texttt{ms\_zr\_set} & same-$Z$ multi-set, $\Delta$log-odds targets & .130 & .130 & $+.000$ \\
+    \texttt{zr} (full depth) & 8 probes, tap at layer 28 of 28 & .147 & .156 & $-.008$ \\
+    \midrule
+    Teacher & listwise decoder, options in context & .310 & .208 & $\mathbf{+.102}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The multi-set variant (\texttt{ms\_zr\_set}, $\dqsh$ exactly zero) is compared against its steps-matched
+single-set control (\texttt{ms\_ctrl}, $-.023$). Reading the full 28 layers lowers among-$\numcands$
+accuracy to .147 and regresses SNLI/MNLI/ANLI/BoolQ to .881/.807/.462/.712 from .905/.873/.541/.826 at
+layer 20 (\Cref{tab:app-blind-closure}). The candidate-blind variants are exactly set-stable (reorder
+$\Delta p$ and pairwise $\Delta$log-odds both zero).
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.9\linewidth]{figures/fig_ladder.pdf}
+  \caption{JevBench (public subset) standard and hard accuracy against backbone size. Qwen3 trained
+  (solid; each point uses the recipe named for its row in \Cref{tab:headline}) and frozen with three
+  exemplars (dashed); Qwen3.5 frozen controls at 2B/4B/9B and the trained Qwen3.5-4B (star). Dotted
+  lines mark other public entries on the same ids, whose rendering and protocols differ
+  (\Cref{app:leaderboard}). Intervals are in \Cref{tab:headline}.}
+  \label{fig:ladder}
+\end{figure}
 
 \begin{table}[h]
   \centering
@@ -45,6 +110,29 @@ serving-path engineering behind \Cref{sec:results:cost}, with \Cref{fig:serving}
   \end{tabular}
 \end{table}
 
+\begin{table}[h]
+  \centering
+  \caption{Rendering alone, frozen weights. Identical Qwen3.5 base checkpoints and items, JevBench (public
+  subset), letter-logit readout in both columns; only the state and option rendering differs. $\Delta$:
+  paired cluster bootstrap over the per-item difference, 20{,}000 resamples. Referenced from \Cref{sec:results:rendering}.}
+  \label{tab:rendering}
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{llccc}
+    \toprule
+    Tier & Backbone & our rendering & replicated rendering & paired $\Delta$ [95\% CI], $p$ \\
+    \midrule
+    \multirow{3}{*}{standard} & Qwen3.5-2B & .583 & .597 & $+.014$ $[-.194, +.208]$, $p{=}.95$ \\
+     & Qwen3.5-4B & .764 & .847 & $+.083$ $[+.014, +.167]$, $p{=}.048$ \\
+     & Qwen3.5-9B & .806 & \textbf{.931} & $\mathbf{+.125}$ $[+.056, +.208]$, $p{<}.001$ \\
+    \midrule
+    \multirow{3}{*}{hard} & Qwen3.5-2B & .387 & .441 & $+.054$ $[-.045, +.153]$, $p{=}.33$ \\
+     & Qwen3.5-4B & .495 & .468 & $-.027$ $[-.117, +.063]$, $p{=}.64$ \\
+     & Qwen3.5-9B & .541 & .595 & $+.054$ $[-.027, +.135]$, $p{=}.22$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
 \begin{figure}[h]
   \centering
   \includegraphics[width=\linewidth]{figures/fig_truncation.pdf}
@@ -60,7 +148,7 @@ serving-path engineering behind \Cref{sec:results:cost}, with \Cref{fig:serving}
 \begin{figure}[h]
   \centering
   \includegraphics[width=\linewidth]{figures/fig_latency_quality.pdf}
-  \caption{\textbf{Public subset, unranked.} JevBench standard accuracy vs.\ \emph{warm} per-decision
+  \caption{JevBench (public subset) standard accuracy vs.\ \emph{warm} per-decision
   p50 latency (ms, log scale) for the v1 release checkpoints (\texttt{ts1b}, \texttt{tm1b}), with
   generative-LLM decode-latency comparison bands. Latency is the served path with the state prefix
   already cached (\texttt{runs/serve\_bench2}, $\numcands{=}2$, 256-token state, one stream, in
@@ -70,13 +158,17 @@ serving-path engineering behind \Cref{sec:results:cost}, with \Cref{fig:serving}
   \label{fig:latency_quality}
 \end{figure}
 
-At $M{=}256$ queries against one cached 256-token state, native choice's per-query marginal cost is
-1.07, 1.55, 3.38, and 43.8\,ms at $K{=}2, 10, 32, 256$; a candidate-blind energy-scoring path is flat
-at $\approx$1\,ms across the same range; and a baseline that re-runs the backbone once per candidate
-costs 2.1, 4.6, 12.2, and 101.7\,ms. These values are transcribed from the run's log, because the
-run's \texttt{bench.json} was lost to an out-of-memory crash. Batched marginal cost at $M{=}256$
-scales more steeply with both size and $K$ than single-decision cost, from 2.7\,ms at 1.7B/$K{=}2$ to
-110\,ms at 14B/$K{=}256$, so an energy-scoring front end gains value as the backbone grows.
+\textbf{Throughput mode on an earlier full-depth prototype.} These numbers come from a different
+architecture and harness than \Cref{sec:results:cost}: the full-depth (28-layer) contextual-readout
+prototype of \Cref{sec:analysis:readout}, timed before the one-pod comparison. At $M{=}256$ queries
+against one cached 256-token state, its per-query marginal cost is 1.07, 1.55, 3.38 and 43.8\,ms at
+$K{=}2, 10, 32, 256$; a candidate-blind energy-scoring path costs 0.97--1.06\,ms across the same range
+(the contextual readout is $1.1\times$, $1.6\times$, $3.4\times$ and $41\times$ its cost); and a baseline
+that re-runs the backbone once per candidate costs 2.1, 4.6, 12.2 and 101.7\,ms. These values are
+transcribed from the run's log, because the run's \texttt{bench.json} was lost to an out-of-memory crash.
+We measured timing only; a shortlist-then-decide pipeline was not evaluated for accuracy. On the one-pod
+harness, batched marginal cost at $M{=}32$ scales more steeply with both size and $K$ than
+single-decision cost, from 2.7\,ms at 1.7B/$K{=}2$ to 109.7\,ms at 14B/$K{=}256$.
 
 \subsection{Serving-path engineering}
 \label{app:serving}
@@ -99,6 +191,30 @@ path toward $\sim$10\,ms decisions.
   \texttt{typical-small} v1 (1.7B), \texttt{typical-medium} v1 (Qwen3-4B), and \texttt{tm2}
   (Qwen3.5-4B, \texttt{typical-medium} v2), at $K{=}2$, 256-token state.}
   \label{fig:serving}
+\end{figure}
+
+\subsection{Probability quality: global fit and NLL by checkpoint}
+\label{app:calibration-fit}
+
+\Cref{fig:calibration} gives held-out Score and typed-decisions NLL by checkpoint for
+\Cref{sec:results:calibration}.
+
+One global temperature and null-logit offset, fit jointly on held-out soft-target rows, wants opposite
+corrections for two checkpoints (\Cref{sec:results:calibration}). For an evidence-and-knowledge
+checkpoint the fitted offset is $-1.75$, which cuts CLINC-150 false abstention from .053 to .022. For a
+workflow-trained checkpoint it is $+3.0$, which repairs typed-decisions NLL (1.95 $\to$ 1.19) and held-out
+Score NLL (2.03 $\to$ 1.09) and collapses intent and topic coverage to 5--9\%. Null augmentation and
+per-type targets supply the correction in data and objective instead
+(\Cref{sec:results:mixture,sec:results:typed}).
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.55\linewidth]{figures/fig_calibration.pdf}
+  \caption{Held-out Score and typed-decisions NLL (held-out sets, not JevBench). \texttt{ladder\_14b}:
+  the 14B under the earlier workflow recipe; \texttt{tl1b}: the same backbone under the recipe bundle of
+  \Cref{sec:results:calibration}; \texttt{tl1b\_nokd}: the bundle without distillation. \texttt{ts1b},
+  \texttt{tm1b}, \texttt{tm2}: 1.7B and 4B checkpoints with typed heads and DecisionMix.}
+  \label{fig:calibration}
 \end{figure}
 
 \subsection{Mixture sweep, full table}
@@ -124,9 +240,11 @@ path toward $\sim$10\,ms decisions.
   \end{tabular}
 \end{table}
 
-Before the facts-first fix (\Cref{sec:train:long}), the long-state row (long$_{e45}$, 1{,}024 tokens,
+In this sweep, which ran without the uncertainty corpus or null augmentation, $E \ge .45$ brings NLI and
+BoolQ back within 1 point of the evidence-only base and intent and topic sets within 3--4, with workflow
+metrics within 1--4 (\Cref{sec:results:mixture}). Before the facts-first fix (\Cref{sec:train:long}), the long-state row (long$_{e45}$, 1{,}024 tokens,
 25\% long-policy rows) alone raised \texttt{long\_policy} from .16 to .37 and \texttt{multi\_hop} from .17
-to .28 relative to 6A, and gave the best soft-target NLLs of the sweep.
+to .28 relative to 6A, and gave the best held-out Score NLL of the sweep (1.26).
 
 \subsection{Typed primitives: parameterization, routing, and full results}
 \label{app:typed-primitives}
@@ -148,9 +266,10 @@ with no candidate text,
   \label{eq:bernoulli-noul}
   P(\text{yes}) = \sigma(w_n \cdot \hD),
 \end{equation}
-which is exactly order-invariant by construction and verified as an exact-zero reversed-label control.
-The remaining mass $1{-}P(\text{yes})$ spreads over the other candidate(s), and the factored-null gate
-still applies.
+which is exactly order-invariant by construction for rows routed to it and verified as an exact-zero
+reversed-label control. The remaining mass $1{-}P(\text{yes})$ goes to the other candidate. The log of
+these two probabilities takes the place of the candidate scores in \Cref{eq:factored-null}, and a
+separate gate reading $\hD$ supplies $\pnull$, so the output keeps the factored abstention form.
 
 \textbf{Per-row routing.} A row is Noul-eligible iff its candidate set is exactly
 $\{\text{yes},\text{no}\}$; every other row scores as ordinary Choice, bit-identical to a run with Noul
@@ -176,7 +295,7 @@ input, and breaking that contract collapses accuracy to chance.
     Noul & 2-way Choice & Bernoulli \\
     \midrule
     PagerDuty (floor .792): acc / NLL & .602 / 1.04 & \textbf{.886} / \textbf{.28} \\
-    Reversed-label max $|\Delta P(\mathrm{yes})|$ & .55 & \textbf{0} (exact, all sets) \\
+    Reversed-label max $|\Delta P(\mathrm{yes})|$ & .55 & \textbf{0} (exact, all 9 sets) \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -184,10 +303,12 @@ input, and breaking that contract collapses accuracy to chance.
 \subsection{DecisionMix v2, full numbers}
 \label{app:decisionmix}
 
-Held-out family/grammar/style accuracy moves from .48/.51/.49 (matched control, never trained on
-\texttt{data\_wh}) to .83/.88/.89 (DecisionMix v2), and rubric-flip accuracy moves from .48 to .71,
+Held-out family/grammar/style accuracy moves from .48/.51/.49 (control, never trained on
+\texttt{data\_wh} or \texttt{data\_u}) to .83/.88/.89 (DecisionMix v2 together with the uncertainty
+corpus; the treatment also changed the sampler), and rubric-flip accuracy moves from .48 to .71,
 measured within the generator's own rule engine (\Cref{sec:train:rubric}). The uncertainty corpus moves
-typed-decisions NLL from 2.06 to 1.71 (\Cref{sec:train:uncertainty}). Level-7 composition is in
+typed-decisions NLL from 2.06 to 1.71 and ChaosNLI NLL from 1.27 to 1.00 while ChaosNLI accuracy falls
+from .584 to .537 (\Cref{sec:train:uncertainty}). Level-7 composition is in
 \Cref{app:hard-tier}.
 
 \subsection{Full hyperparameters}
@@ -228,8 +349,10 @@ and null augmentation are described in \Cref{sec:train:mixture,sec:train:nullaug
 3-shot letter distribution on 63k labelled rows), and checkpoint selection on held-out
 uncertainty-plus-curriculum validation NLL (\texttt{--best\_on}) in place of in-distribution loss. Final
 fitted temperature and null offset for \texttt{ts1b}: $T{=}1.124$, offset $0$ (post-hoc, applied at eval).
-\texttt{ts1c} (\texttt{typical-small} v2) is the 1.7B model trained on the facts-first long-state corpus;
-its long-state and JevBench numbers are in \Cref{tab:app-long-release}.
+\texttt{ts1c} (\texttt{typical-small} v2) is the 1.7B model trained on the facts-first long-state corpus
+with a 2{,}048-token window, \texttt{--drop\_truncated} and the same \texttt{--best\_on} selection for
+8{,}000 steps; its long-state and JevBench numbers are in \Cref{tab:app-long-release}. \texttt{tm2} also
+uses \texttt{--best\_on}; \texttt{ts1b} and \texttt{tm1b} have no likelihood-based selection.
 
 \subsection{Corpus construction detail}
 \label{app:corpora}
@@ -359,12 +482,12 @@ uniform-guess rate is .441 (598 items at $\numcands{=}2$, 224 at 3, 58 at 4; the
 .250), and the checkpoints score .493 (\texttt{ts1b}), .544 (\texttt{tm1b}) and .620 (\texttt{tl1b}).
 The 14B checkpoint is the one clearly above the guess rate, and all three sit 25--40 points below their
 own in-distribution held-out scores: the curriculum that moves every in-distribution family by more than
-30 points moves level 7 by 5. The JevBench hard tier's temporal, probability and trade-off families
+30 points moves level 7 by 2 (.477 to .498). The JevBench hard tier's temporal, probability and trade-off families
 show the same pattern.
 
 \begin{table}[h]
   \centering
-  \caption{14B comparisons. \textbf{JevBench: public 231-id subset, unranked}; 95\% cluster-bootstrap
+  \caption{14B comparisons. JevBench (public subset); 95\% cluster-bootstrap
   intervals over the paraphrase \texttt{group} field ($n_{\mathrm{eff}}{=}36$ standard states,
   $n{=}111$ hard items). \texttt{tl1b\_nokd} is identical to \texttt{tl1b} in every flag except
   \texttt{--distill\_beta 0}. Paired per-item tests are in the text; the marginal intervals overlap and
@@ -390,7 +513,7 @@ show the same pattern.
 \textbf{The frozen 14B backbone with three exemplars leads the trained 14B on the hard tier.}
 \Cref{tab:tl1b} compares the previous-recipe 14B checkpoint (\texttt{ladder\_14b}); the bundle that
 fixed the long-state rendering, dropped over-length rows, and added DecisionMix v2, the typed heads and
-calibration-shaped checkpoint selection (\texttt{tl1b}); the same bundle without frozen-teacher
+likelihood-based checkpoint selection (\texttt{tl1b}); the same bundle without frozen-teacher
 distillation (\texttt{tl1b\_nokd}); and the frozen backbone with three exemplars. A paired cluster
 bootstrap on the per-item difference over the same 111 hard items gives frozen-minus-trained $+.108$
 $[+.027, +.189]$, $p{=}.015$ against \texttt{tl1b}, and $+.081$ $[-.009, +.171]$, $p{=}.082$ against
@@ -429,27 +552,38 @@ facts-last question was asked on JevBench (\Cref{tab:trunc}). The two 1.7B arms 
 flag except whether \texttt{data\_wf\_long} renders its facts at 0\% or 97.6\% of the state text (same
 rows, same labels, matched state length, $p50 = 8{,}702$ characters in both arms), trained at
 \texttt{--max\_state 1024} with \texttt{--drop\_truncated} off so that truncation bites exactly as it did
-before the fix. On 19 \texttt{long\_policy} items in one fixed benchmark render the arms read .316 (6/19)
-vs.\ .105 (2/19), Fisher exact $p{=}.232$, with the hard-tier aggregate moving the other way. On 605
-items under the $2\times2$, which separates the training effect from render compatibility, the same
-arms give $+.112$ $[+.077, +.147]$, $p = 5\times10^{-10}$, and the 14B pair gives $+.078$
-$[+.055, +.100]$, $p = 7\times10^{-12}$ (\Cref{tab:twobytwo}).
+before the fix. On 19 \texttt{long\_policy} items in one fixed benchmark render the seed-0 arms read
+.316 (6/19) vs.\ .105 (2/19), Fisher exact $p{=}.232$, with the hard-tier aggregate moving the other way.
+A second seed of the whole pair, byte-identical flags apart from the seed, reads 5/19 vs.\ 5/19: the
+19-item family gives a four-item gap at one seed and none at the other. On the 605 held-out long states
+the same pairs give matched-configuration gaps of $+.112$ $[+.077, +.147]$, $p = 5\times10^{-10}$ (seed 0)
+and $+.111$ (seed 1, .937 vs.\ .826), and the 14B pair gives $+.078$ $[+.055, +.100]$,
+$p = 7\times10^{-12}$ (\Cref{tab:twobytwo}).
 
 \begin{table}[h]
   \centering
-  \caption{Matched facts-first vs.\ facts-last training arms, 1.7B, single variable, scored on JevBench:
-  the question of \Cref{tab:twobytwo} asked on 19 \texttt{long\_policy} items in a single fixed render.
-  \textbf{Public 231-id subset, unranked}, 95\% cluster-bootstrap intervals.}
+  \caption{Matched facts-first vs.\ facts-last training arms, 1.7B, single variable, two seeds, scored on
+  JevBench: the question of \Cref{tab:twobytwo} asked on 19 \texttt{long\_policy} items in a single fixed
+  render. The last row gives the same pairs on the 605 held-out long states.
+  JevBench (public subset), 95\% cluster-bootstrap intervals.}
   \label{tab:trunc}
   \small
   \setlength{\tabcolsep}{4pt}
-  \begin{tabular}{lccp{6.1cm}}
+  \begin{tabular}{lccp{5.0cm}}
     \toprule
     & Arm A (facts-first) & Arm B (facts-last) & Test \\
     \midrule
-    \texttt{long\_policy} & .316 (6/19) & .105 (2/19) & Fisher exact $p{=}.232$; bootstrap $\Delta$ $[-.053, +.474]$ \\
+    \multicolumn{4}{l}{\emph{seed 0}} \\
+    \texttt{long\_policy} & .316 (6/19) & .105 (2/19) & Fisher $p{=}.232$; bootstrap $\Delta$ $[-.053, +.474]$ \\
     JevBench hard & .378 [.288, .468] & .396 [.306, .486] & opposite direction \\
     JevBench std & .750 [.625, .861] & .736 [.597, .861] & indistinguishable \\
+    \midrule
+    \multicolumn{4}{l}{\emph{seed 1}} \\
+    \texttt{long\_policy} & .263 (5/19) & .263 (5/19) & tie \\
+    JevBench hard & .405 & .387 & -- \\
+    JevBench std & .792 & .708 & -- \\
+    \midrule
+    605 states, matched & .942 / .937 & .830 / .826 & gap $+.112$ (s0), $+.111$ (s1) \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -457,7 +591,7 @@ $[+.055, +.100]$, $p = 7\times10^{-12}$ (\Cref{tab:twobytwo}).
 \begin{figure}[h]
   \centering
   \includegraphics[width=\linewidth]{figures/fig_hard_families.pdf}
-  \caption{\textbf{Public subset, unranked.} Per-family JevBench-hard accuracy for the v1 release
+  \caption{Per-family JevBench (public subset) hard-tier accuracy for the v1 release
   checkpoints (\texttt{ts1b}, \texttt{tm1b}), the 14B checkpoint \texttt{tl1b}, and the frozen-14B
   3-shot control, chance line at .336. Per-family $n$ ranges from 4 to 19 items; no single family
   separates, and the direction across the serial families is uniform. Values are read directly from each
@@ -475,7 +609,7 @@ in the JSON vs.\ .20/.40 in the report); the table gives the report values, mark
 
 \begin{table}[h]
   \centering
-  \caption{JevBench hard-tier sub-family accuracy, 14B. \textbf{Public subset, unranked};
+  \caption{JevBench (public subset) hard-tier sub-family accuracy, 14B;
   per-family cells are 3--19 items each and carry no useful interval.}
   \label{tab:app-hard}
   \small
@@ -519,7 +653,7 @@ plain question. Accuracy is agreement with the literal rule list applied over th
   \label{tab:app-closed-loop}
   \small
   \setlength{\tabcolsep}{3pt}
-  \begin{tabular}{lp{3.1cm}rrrp{4.2cm}}
+  \begin{tabular}{lp{3.1cm}rrrp{3.6cm}}
     \toprule
     Game & Candidates (legal actions) & Probe & Chance & No rules & Recorded run \\
     \midrule
@@ -584,7 +718,7 @@ last-layer tap and rendered abstain-line diagnoses, which merged a planned two-r
 architecture into a single model; (4) the workflow and uncertainty corpora, the mixture sweep, and null
 augmentation; (5) the Qwen3 size ladder at 1.7B/4B/8B/14B with frozen controls; (6) the 14B bundle
 (facts-first long-state rendering, \texttt{--drop\_truncated}, DecisionMix v2, typed heads,
-calibration-shaped checkpoint selection, frozen-teacher KD) and its matched no-KD control; (7) the
+likelihood-based checkpoint selection, frozen-teacher KD) and its matched no-KD control; (7) the
 Qwen3.5 port; (8) cluster bootstraps, the matched truncation ablation, and the purpose-built held-out
 long-state set, which produced the paired tests of \Cref{app:hard-tier} and the $2\times2$ of
 \Cref{sec:results:long}; and (9) the v2 releases, \texttt{ts1c} (\texttt{typical-small}) and
@@ -597,7 +731,9 @@ question-dependent. Selection on accuracy would have kept that branch.
 \subsection{JevBench leaderboard context}
 \label{app:leaderboard}
 
-\Cref{tab:app-leaderboard} places our numbers among other entries scored on the same 231 public ids.
+On JevBench, $\pnull$ is dropped and the remaining probabilities renormalized; option order follows the
+harness (reversing it moves one checkpoint's standard accuracy by $\pm4$ points); majority baselines are
+.311 standard, .284 easy and .336 hard. \Cref{tab:app-leaderboard} places our numbers among other entries scored on the same 231 public ids.
 Entries differ in protocol and rendering, several have no method paper, and the 146 private judge items
 are not included. The public standard tier has $n_{\mathrm{eff}}{=}36$ independent states, and rendering
 alone moves a frozen model by 12.5 points (\Cref{sec:results:rendering}), which exceeds most of the
@@ -606,7 +742,7 @@ spread in this table (\Cref{sec:setup:jevbench}).
 \begin{table}[h]
   \centering
   \caption{Other entries scored on the same public 231 ids, from the harness's own per-item files.
-  \textbf{Public subset, unranked}, for all rows including ours. Majority/chance baselines: .311
+  JevBench (public subset) for all rows including ours. Majority/chance baselines: .311
   standard, .284 easy, .336 hard. 95\% cluster-bootstrap intervals for our own rows are in
   \Cref{tab:headline,tab:tl1b}; differences smaller than $\pm6$--13 points (standard) or $\pm9$ points
   (hard) are not rankings.}
@@ -648,7 +784,7 @@ $p50 = 1{,}965$ and $\max = 2{,}843$ tokens, so no item is truncated at evaluati
 cells. The two renderings differ only in whether the evidence block precedes or follows the request
 text; the items, labels, and candidate sets are identical. The set shares a generator family with the
 training data, and it measures the training defect of \Cref{sec:results:long}. Significance for the
-matched-vs-matched comparison is a two-proportion test over the 605 paired items ($z = 6.2$,
+matched-configuration gap is a two-proportion test over the 605 paired items ($z = 6.2$,
 $p = 5\times10^{-10}$ at 1.7B; $p = 7\times10^{-12}$ at 14B).
 
 \textbf{Released checkpoints.} The v1 releases were trained before the facts-first fix, and the v2
@@ -661,7 +797,7 @@ change: \texttt{ts1c} reads .708/.432 against \texttt{ts1b}'s .694/.432.
   \centering
   \caption{Release checkpoints on the 605 held-out long states (4{,}096-token window, no truncation),
   identical items in both render columns. Majority-class floors: .334 overall, .612 on
-  \texttt{policy\_permit}. JevBench is the public 231-id subset, unranked.}
+  \texttt{policy\_permit}. JevBench (public subset).}
   \label{tab:app-long-release}
   \small
   \setlength{\tabcolsep}{4pt}
@@ -767,8 +903,8 @@ and \texttt{tm1b} are the v1 releases; \texttt{tm2} is \texttt{typical-medium} v
 
 \begin{table}[h]
   \centering
-  \caption{JevBench accuracy (Brier). \textbf{Public subset, unranked} (72 standard over 36
-  paraphrase-clustered states / 48 easy / 111 hard); see \Cref{tab:headline,tab:tl1b} for intervals.}
+  \caption{JevBench (public subset) accuracy (Brier): 72 standard over 36
+  paraphrase-clustered states / 48 easy / 111 hard; see \Cref{tab:headline,tab:tl1b} for intervals.}
   \label{tab:app-jevbench}
   \small
   \begin{tabular}{lrrr}
@@ -789,17 +925,18 @@ and \texttt{tm1b} are the v1 releases; \texttt{tm2} is \texttt{typical-medium} v
 
 \begin{table}[h]
   \centering
-  \caption{Single-decision latency (same-pod, same-torch-build; ms), $L_s{=}256$.}
+  \caption{Single-decision research-harness latency (ms), $L_s{=}256$. The 1.7B, 4B and 14B rows are one
+  pod and one PyTorch build; the 8B row (marked $\ast$) was timed on a separate pod.}
   \label{tab:app-latency}
   \small
   \begin{tabular}{lrrrr}
     \toprule
     Model (checkpoint) & $K{=}2$ & $K{=}32$ & $K{=}256$ & Peak memory $K{=}2{\to}256$ (GB) \\
     \midrule
-    Qwen3-1.7B (\texttt{ts1b}-shape) & 45 & 46 & 106 & 6.4 $\to$ 9.3 \\
-    Qwen3-4B (\texttt{tm1b}) & 57 & 58 & 96 & 14.6 $\to$ 18.6 \\
-    Qwen3-8B (\texttt{ladder\_8b}) & 70 & 71 & 126 & 29.3 $\to$ 34.1 \\
-    Qwen3-14B (\texttt{tl1b}) & 59 & 62 & 156 & 51.6 $\to$ 57.5 \\
+    Qwen3-1.7B & 45 & 46 & 106 & 6.4 $\to$ 9.3 \\
+    Qwen3-4B & 56 & 56 & 118 & 14.6 $\to$ 18.6 \\
+    Qwen3-8B$^\ast$ & 70 & 71 & 126 & 29.3 $\to$ 34.1 \\
+    Qwen3-14B & 60 & 62 & 157 & 51.6 $\to$ 57.5 \\
     \bottomrule
   \end{tabular}
 \end{table}

@@ -1,0 +1,48 @@
+\subsection{Training corpora}
+\label{app:training-corpora}
+
+\Cref{tab:corpora} lists the seven training corpora of \Cref{sec:train}; \Cref{app:corpora} gives their
+construction.
+
+\begin{table}[h]
+  \centering
+  \caption{Training corpora. ``Held out'' counts whole families, domains, styles or parameter ranges
+  excluded from training entirely, distinct from a random validation split; \Cref{sec:setup:heldout} maps
+  these onto generalization axes. No corpus contains any of the 231 public JevBench ids.}
+  \label{tab:corpora}
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{llrp{3.0cm}p{4.2cm}}
+    \toprule
+    Corpus & Family & Train rows & Held out & Role \\
+    \midrule
+    \texttt{data\_v5} & $E$ & 633{,}213 & label wordings & Evidence (NLI, BoolQ) and wide-vocabulary classification \\
+    \texttt{data\_kb} & $K$ & 147{,}447 & TruthfulQA-MC1, GPQA & Closed-book multiple-choice knowledge \\
+    \texttt{data\_wf} & $W$ & 72{,}006 & 3 of 15 families & Rubric-conditioned workflow (Noul, Choice, Score) \\
+    \texttt{data\_wf\_hf} & $W$ & 86{,}600 & 3 external test/demo splits & External workflow sets (forms, rules, distillation) \\
+    \texttt{data\_wf\_long} & $W$ & 23{,}318 & -- & Long-state (multi-paragraph policy) workflow rows \\
+    \texttt{data\_wh} & $W$ & 60{,}605 & 3 domains, 2 styles, 1 grammar per level, level 7 & DecisionMix v2 counterfactual rubric groups \\
+    \texttt{data\_u} & $U$ & 31{,}029 & 4 synthetic parameter ranges & Soft-target uncertainty \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+DecisionMix v2 spreads its 60{,}605 training rows evenly over levels 1--6 and is leak-checked against the
+public JevBench ids with 0 of 231 hits.
+
+\subsection{Cached-state equivalence}
+\label{app:cache-equivalence}
+
+An equivalence test on the real model checks that the cached-state pass of \Cref{sec:method:pass} computes
+the same decision as a forward pass on $\mathrm{concat}(\state, \query, \cands)$. Cached-state decisions
+match the full-concatenation path to within $10^{-3}$ across suffix chunk sizes 1, 2, 3, 5 and 64, are
+consistent under permutation of the queries in a batch, and repeat exactly.
+
+\subsection{Long-state corpus statistics}
+\label{app:long-state-stats}
+
+States in \texttt{data\_wf\_long} have p10/p50/p90 lengths of 1{,}190, 1{,}845 and 2{,}490 tokens. In the
+original render, with the case facts after the policy body, right-truncation at a 1{,}024-token window
+removed the facts from 98.8\% of rows, and at 256 tokens from all of them. The facts-first render places
+the case inside the first 8\% of the text, and \texttt{--drop\_truncated} removes any row longer than the
+training window.

@@ -4,110 +4,71 @@
 \subsection{Evaluation sets}
 \label{sec:setup:data}
 
-Training corpora are listed in \Cref{tab:corpora}. We evaluate on evidence and label-space sets (SNLI
-\citep{bowman2015snli}, MNLI \citep{williams2018mnli}, ANLI \citep{nie2020anli}, BoolQ
-\citep{clark2019boolq}, CLINC-150 \citep{larson2019clinc}, TREC-fine, HWU64, 20 Newsgroups, and Banking77
-\citep{casanueva2020banking77} against all 77 labels); a fixed 1{,}200-item MMLU-Pro probe
-\citep{wang2024mmlupro} scored among the rendered options, with two items matched by a leakage audit
-excluded, and TruthfulQA-MC1 \citep{lin2022truthfulqa}; held-out splits of our generators, including the
-never-trained DecisionMix level~7 (880 items, uniform-guess rate .441) and ChaosNLI
-\citep{nie2020chaosnli}; and 605 held-out long states built for \Cref{sec:results:long}
-(\texttt{policy\_permit}, $\numcands{=}2$, majority floor .612; \texttt{action\_select}, $\numcands{=}4$,
-floor .233). Six external sets are evaluation-only: \textbf{PagerDuty} (alert triage, yes/no, majority
-floor .792), \textbf{jevlogs} (log triage, yes/no, floor .697), \textbf{Mind2Web} (web-agent action
-choice, floor .427), \textbf{tree-choice} (taxonomy routing up to $\numcands{=}320$),
-\textbf{typed-decisions} (400 cases across all three output types with probabilistic gold) and
-\textbf{JevBench} (\Cref{sec:setup:jevbench}). Several are class-imbalanced, so each is reported against
-its own majority floor. No training corpus contains any of the 231 public JevBench ids.
+Training corpora are in \Cref{tab:corpora}. We evaluate on SNLI \citep{bowman2015snli}, MNLI
+\citep{williams2018mnli}, ANLI \citep{nie2020anli}, BoolQ \citep{clark2019boolq}, CLINC-150
+\citep{larson2019clinc}, TREC-fine, HWU64, 20 Newsgroups and Banking77 \citep{casanueva2020banking77}
+against all 77 labels; a fixed 1{,}200-item MMLU-Pro probe \citep{wang2024mmlupro} scored among the
+rendered options (two leakage-matched items excluded) and TruthfulQA-MC1 \citep{lin2022truthfulqa};
+held-out generator splits, including the never-trained DecisionMix level~7 (880 items, guess rate .441),
+and ChaosNLI \citep{nie2020chaosnli}; and 605 held-out long states (\texttt{policy\_permit},
+$\numcands{=}2$, floor .612; \texttt{action\_select}, $\numcands{=}4$, floor .233). Evaluation-only
+external sets are PagerDuty (alert triage, yes/no, majority floor .792), jevlogs (log
+triage, floor .697), Mind2Web (web-agent actions, floor .427), tree-choice (taxonomy
+routing, $\numcands \le 320$), typed-decisions (400 cases of all three types, probabilistic
+gold) and JevBench.
 
 \subsection{What ``held out'' means}
 \label{sec:setup:heldout}
 
-Each held-out split excludes a whole family, domain, style, grammar or parameter range from training;
-none is a random validation split. \Cref{tab:generalization} lists the axes and the scope a positive
-result on each licenses.
-
-\begin{table}[t]
-  \centering
-  \caption{Generalization axes, each with its own held-out split, and the scope a positive result
-  licenses.}
-  \label{tab:generalization}
-  \small
-  \begin{tabular}{p{2.5cm}p{4.9cm}p{5.2cm}}
-    \toprule
-    Axis & Evaluated on & A positive result licenses \\
-    \midrule
-    Unseen examples & Held-out rows of every trained corpus & In-distribution competence \\
-    Unseen label wording & Label paraphrases; re-worded CLINC-150 labels & Robustness to label surface form \\
-    Unseen label space & Banking77-77, HWU64, tree-choice ($\numcands \le 320$), TruthfulQA-MC1 & Scoring labels never trained on, within trained domains \\
-    Unseen family & 3 of 15 workflow families; 3 DecisionMix domains & Transfer across families of one generator \\
-    Unseen rubric style & 2 withheld DecisionMix writing styles & Rubric conditioning beyond style memorization \\
-    Unseen grammar & 1 withheld domain$\times$level grammar & Rule execution inside the generator's grammar \\
-    Unseen composition & DecisionMix level 7 (temporal, numeric, expected value, trade-off) & Composition outside the trained grammar \\
-    External & PagerDuty, jevlogs, Mind2Web, typed-decisions, JevBench & Transfer outside our generators \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+Each held-out split excludes a whole family, domain, rubric style, grammar or parameter range from
+training; none is a random validation split (axes in \Cref{tab:generalization}).
 
 \subsection{\texorpdfstring{$\dq$}{Delta-q}: question dependence separated from candidate priors}
 \label{sec:setup:deltaq}
 
-A model can clear chance on a multiple-choice set by learning which option strings tend to be correct
-together, and accuracy and calibration do not distinguish this from answering the question.
-
 \begin{definition}[Question-dependence gap]
 \label{def:deltaq}
-For a model $f$ and a set of decisions,
-\[
-  \dq = \mathrm{Acc}\big(f(\state, \query, \cands)\big) \;-\; \mathrm{Acc}\big(f(\state, \tilde{\query}, \cands)\big),
-\]
-where $\tilde{\query}$ replaces the real question while the state and the candidate set $\cands$ are held
-fixed. In the \emph{choices-only} variant $\tilde{\query}$ is an empty placeholder; in the
-\emph{shuffled-question} variant $\dqsh$, primary throughout, it is a real, unrelated question from the
-same corpus.
+$\dq = \mathrm{Acc}\big(f(\state, \query, \cands)\big) - \mathrm{Acc}\big(f(\state, \tilde{\query},
+\cands)\big)$, where $\tilde{\query}$ replaces the real question with the state and candidate set held
+fixed: an empty placeholder in the \emph{choices-only} variant, a real unrelated question from the same
+corpus in the \emph{shuffled-question} variant $\dqsh$, primary throughout.
 \end{definition}
 
 $\dq$ extends the choices-only control of \citet{balepur2024artifacts} to a shuffled real question, which
-is stricter: a degenerate placeholder can leak candidate priors through the rendering, and on one
-candidate-blind model the choices-only variant reads $+.017$ where $\dqsh$ reads $.000$. High accuracy
-with $\dqsh \approx 0$ means the model answers from the candidate set. The reference is the listwise
-teacher, a fine-tuned decoder reading the options in context, with $\dqsh = .102$ on the 1{,}200 MMLU-Pro
-items. We treat $|\dqsh| < .02$ as indistinguishable from zero, since .02 is about 1.4 standard errors of
-an unpaired difference of proportions at $n{=}1{,}200$ and $p \approx .15$.
+is stricter: a placeholder can leak candidate priors through the rendering (on one candidate-blind model
+choices-only reads $+.017$ where $\dqsh$ reads $.000$). High accuracy with $\dqsh \approx 0$ means the
+score is explained by candidate-set priors. The reference is the listwise teacher, a fine-tuned decoder
+reading the options in context, at $\dqsh = .102$ on the MMLU-Pro probe. $|\dqsh| < .02$ (about 1.4 standard
+errors at $n{=}1{,}200$, $p \approx .15$) counts as zero.
 
 \subsection{Metrics}
 \label{sec:setup:metrics}
 
-We report accuracy, Brier score, expected calibration error (ECE) and negative log-likelihood (NLL)
-against hard or soft gold; on soft-gold sets NLL and Brier are primary. \emph{Among-$\numcands$ accuracy}
-takes the argmax over candidates and ignores $\pnull$, and the \emph{false-abstain rate} is the fraction of
-gold-present items on which $\nullsym$ wins, so abstention and discrimination errors are reported
-separately. \emph{Rubric-flip} sets pair rows that share a state and candidate set under two rubrics with
-different gold. On MMLU-Pro counterfactual variants, \emph{reorder $\Delta p$} is the largest change in any
-candidate's probability when the options are reordered, and \emph{pairwise $\Delta$log-odds} the
-absolute shift in log-odds between the two top original candidates when three unrelated options are
-added; both are averaged over questions and are zero for a set-invariant scorer.
+We report accuracy, Brier score, expected calibration error (ECE) and negative log-likelihood (NLL),
+with NLL and Brier primary on soft-gold sets. \emph{Among-$\numcands$ accuracy} takes the argmax over
+candidates and ignores $\pnull$; the \emph{false-abstain rate} is the fraction of gold-present items on
+which $\nullsym$ wins. \emph{Rubric-flip} pairs share a state and candidate set under two rubrics with
+different gold. On MMLU-Pro, \emph{reorder $\Delta p$} is the largest change in any candidate's
+probability under reordering, and \emph{pairwise $\Delta$log-odds} the shift in log-odds between the two
+top candidates when three unrelated options are added; both are zero for a set-invariant scorer.
 
 \subsection{JevBench protocol}
 \label{sec:setup:jevbench}
 
 JevBench (\texttt{fstandhartinger/jevbench} v1.2.1) is a third-party benchmark of yes/no, choice
-($\numcands{=}2$--6) and ordinal decisions, each item with a state, a rubric and an exact label set. Its
-public release has 231 items (72 standard, 48 easy, 111 hard); 146 judge-scored items are private, and
-the harness ranks only submissions covering at least 95\% of all items, so every JevBench number here is
-on the public ids and unranked. The 72 standard items are 36 states, each in two paraphrases sharing a
-\texttt{group} field, so intervals are cluster bootstraps over \texttt{group} (20{,}000 resamples): $\pm6$--13
-points on the standard tier and $\pm9$ on the hard tier. Comparisons between our own models use paired
-per-item bootstraps. Probabilities are conditioned on non-$\nullsym$: $\pnull$ is dropped and the rest
-renormalized. Across all models, option order follows the harness (reversing it moved one checkpoint's
-standard accuracy by $\pm4$ points), and majority baselines are .311 standard, .284 easy and .336 hard.
-Leaderboard context is in \Cref{app:leaderboard}.
+($\numcands{=}2$--6) and ordinal decisions, each with a state, a rubric and an exact label set, in three
+tiers: \emph{standard} (72 items), \emph{easy} (48) and \emph{hard} (111, eight families including long
+policies, multi-hop, temporal, probability and trade-off). Its 146 judge-scored items are private and the
+harness ranks only submissions covering 95\% of all items, so every JevBench number here is on the 231
+public ids and unranked; no training corpus contains a public id. The 72 standard items are 36 states in
+two paraphrases sharing a \texttt{group}, so intervals are cluster bootstraps over \texttt{group}
+(20{,}000 resamples): $\pm6$--13 points on standard, $\pm9$ on hard. Comparisons between our models use
+paired per-item bootstraps; scoring details and leaderboard context are in \Cref{app:leaderboard}.
 
 \subsection{Hardware and latency}
 \label{sec:setup:hardware}
 
-Models train on single H100 GPUs in bf16 with AdamW, effective batch 64, for 8{,}000--12{,}000 steps.
-Latency has two protocols. The \emph{research harness} times one decision in process, one stream, 256-token
-state, state encode included and model loading excluded, for $\numcands$ from 2 to 256, with all sizes on
-one pod and one PyTorch/CUDA build. The \emph{optimized serving path} is the released inference package,
-timed as warm p50 per decision against an already-cached 256-token state at $\numcands{=}2$.
+Models train on single H100 GPUs (\Cref{app:hyperparams}). The \emph{research harness} times one in-process decision on a 256-token state, state encode included, for
+$\numcands$ from 2 to 256, all sizes on one pod and PyTorch/CUDA build. The \emph{serving path} is the
+released inference package, timed as warm p50 against an already-cached 256-token state at
+$\numcands{=}2$.

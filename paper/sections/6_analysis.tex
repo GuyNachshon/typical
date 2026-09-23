@@ -1,30 +1,26 @@
 \section{Where the decision lives}
 \label{sec:analysis}
 
-This section locates the decision inside the backbone. It compares readouts of one decision pass
-(\Cref{sec:analysis:readout}), tests decision states computed before the candidates are known
-(\Cref{sec:analysis:deltaq}), varies the layer the head reads (\Cref{sec:analysis:depth}), and isolates
-how abstention enters the computation (\Cref{sec:analysis:null}). Unless stated otherwise, the models are
-1.7B, trained for 12k steps on the evidence and knowledge mixture, and $\dqsh$ is measured on the
-1{,}200-item MMLU-Pro probe against the teacher's .102.
+Unless stated otherwise, models here are 1.7B, trained for 12k steps on the evidence and knowledge
+mixture, and $\dqsh$ is measured on the MMLU-Pro probe against the teacher's .102.
 
 \subsection{The contextual-candidate readout}
 \label{sec:analysis:readout}
 
-\textbf{Scoring the decision state against each candidate's contextual state keeps the letter-logit
+Scoring the decision state against each candidate's contextual state keeps the letter-logit
 readout's question-conditioned signal within seed noise, with a quarter of its pairwise log-odds shift
-and 2--7 more points on natural language inference.} \Cref{tab:n1n3} compares the three readouts of
-\Cref{sec:method:readout} on the same pass: N1 reads the next-token logits of the option letters, N2
-scores $\hD$ against an independently computed embedding of each option's text, and N3 scores $\hD$
-against each option's contextual state $\hctx{j}$. All arms render the candidates in the suffix, train
-on identical data with per-step option shuffling, and read the full 28-layer backbone; N1 and N3 each
-have two seeds.
+and 2--7 more points on natural language inference. \Cref{tab:n1n3} compares the readouts of
+\Cref{sec:method:readout} on one pass: letter logits (N1), $\hD$ against an independent embedding of each
+option's text (N2), and $\hD$ against each option's contextual state $\hctx{j}$ (N3). All arms render the
+candidates in the suffix, train on identical data with per-step option shuffling, and read all 28 layers.
+N1 and N3 differ in readout and in the null form native to each; N2 and N3 differ only in what $\hD$ is
+scored against.
 
 \begin{table}[t]
   \centering
   \caption{Three readouts of one decision pass, full-depth 1.7B backbone, identical data and steps; N1
-  and N3 at two seeds (\texttt{seed=0}/\texttt{seed=1}), N2 at one. Teacher: a fine-tuned decoder
-  reading the options in context. Order measures are zero for a set-invariant scorer.}
+  and N3 at two seeds (\texttt{s0}/\texttt{s1}), N2 at one. Teacher: a fine-tuned decoder reading the
+  options in context. Order measures are zero for a set-invariant scorer.}
   \label{tab:n1n3}
   \small
   \setlength{\tabcolsep}{4pt}
@@ -45,137 +41,91 @@ have two seeds.
   \end{tabular}
 \end{table}
 
-\textbf{The candidate's contextual state carries the decision.} N2 runs the candidates through the
-language model and scores the same $\hD$ with the same scorer; it differs from N3 only in scoring
-against an independent embedding of the option text. It loses 13 points of among-$\numcands$ accuracy
-against N1 (.198 vs.\ .325), half of the question-conditioned signal ($\dqsh$ .058 vs.\ .114), and
-collapses on Banking77 at $\numcands{=}77$ (.012 against .531 and .497 for N1 and N3). The pattern fits
-a decision state that encodes which rendered slot holds the answer: the letter embedding and the
-contextual state both carry slot identity, and an independently embedded label carries only its meaning.
+The candidate's contextual state carries the decision. N2 loses 10--12 points of among-$\numcands$ accuracy against
+N3 (.198 vs.\ .314/.301) and 13 against N1, half of the question-conditioned signal ($\dqsh$ .058 vs.\
+.106 for N3 across seeds), and collapses on Banking77 at $\numcands{=}77$ (.012 against .497 for N3 and
+.531 for N1). The pattern fits a decision state that encodes which rendered slot holds the answer: the
+letter embedding and the contextual state both carry slot identity, and an independently embedded label
+carries only its meaning.
 
-\textbf{N3 matches N1 on question dependence and is far less sensitive to the candidate set.} Across
-seeds N1 averages $\dqsh = .109$ and N3 .106, against the teacher's .102; the seed-to-seed spread is
-.01--.02 for both readouts, so the two are within seed noise of each other and of the teacher.
-Among-$\numcands$ accuracy is 1--2 points lower for N3 (.314/.301 vs.\ .325/.318). Adding three unrelated
-options shifts N3's pairwise log-odds by .09--.13 against .44--.46 for N1, a quarter of the shift, and
-reordering moves N3's probabilities by .10--.11 against .165. On evidence tasks N3 leads in both seeds
-by 2 points on SNLI, 6--7 on MNLI and 4--5 on ANLI, and trails by 2--3 on BoolQ. Per-step option
-shuffling is shared by both arms, so the difference in order sensitivity is the readout's. N3 is the
-readout Typical deploys; its Choice output is order-robust, and exact order invariance is the Bernoulli
-head's contract (\Cref{sec:results:typed}).
+N3 matches N1 on question dependence and is far less sensitive to the candidate set. Across
+seeds N1 averages $\dqsh = .109$ and N3 .106 (teacher .102), within the .01--.02 seed spread of both;
+among-$\numcands$ accuracy is 1--2 points lower for N3. Adding three unrelated options shifts N3's pairwise log-odds by
+.09--.13 against .44--.46 for N1, a quarter of the shift, and reordering moves N3's probabilities by
+.10--.11 against .165. On evidence tasks N3 leads in both seeds by 2 points on SNLI, 5.5--7 on MNLI and
+4--5 on ANLI, and trails by 2--3 on BoolQ. Option shuffling is shared, so the order-sensitivity
+difference comes from the readout together with its null form. N3 is the readout Typical deploys; exact
+order invariance is the Bernoulli head's contract (\Cref{sec:results:typed}).
 
 \subsection{Candidate-blind decision states}
 \label{sec:analysis:deltaq}
 
-\textbf{In every configuration we tested, question-conditioned capability appeared only when the
-candidates were processed inside the forward pass.} Six candidate-blind variants, spanning three head
-factorizations, two distillation objectives and two tap depths, all have $\dqsh$ within .03 of zero,
-while the letter-logit and contextual readouts and the teacher, which compute over the candidates in
-context, sit at .09--.12 and even the semantic readout N2 keeps .058 (\Cref{fig:deltaq}). A candidate-blind variant computes a decision state $Z(\state, \query)$ before the
-candidates are seen and scores each candidate against it with a learned head; each is distilled from the
-listwise teacher.
+In every configuration we tested, question-conditioned capability appeared only when the
+candidates were processed inside the forward pass. A candidate-blind variant computes a decision state
+$Z(\state, \query)$ before the candidates are seen, scores each candidate against it with a learned head,
+and is distilled from the listwise teacher. Six such variants, spanning three head factorizations, two
+distillation objectives and two tap depths, all have $\dqsh$ within .03 of zero, while N1, N3 and the
+teacher sit at .09--.12 and even N2 keeps .058 (\Cref{fig:deltaq}; per-variant numbers in
+\Cref{tab:blind}, \Cref{app:extra-figures}).
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{figures/fig_deltaq.pdf}
-  \caption{Raw MMLU-Pro among-$\numcands$ accuracy against $\dqsh$, the accuracy lost when the real
-  question is replaced by a shuffled one with the state and candidate set fixed ($n{=}1{,}200$; shaded:
-  the $\pm.02$ band of \Cref{sec:setup:deltaq}). The six candidate-blind variants cluster at zero at
-  every head capacity, objective and depth. The letter-logit (N1) and contextual (N3) readouts and the
-  listwise teacher carry .09--.12; the semantic readout N2 sits between. Accuracy alone does not
-  separate the groups.}
+  \includegraphics[width=0.62\linewidth]{figures/fig_deltaq.pdf}
+  \caption{Raw MMLU-Pro among-$\numcands$ accuracy against $\dqsh$ ($n{=}1{,}200$; shaded: the
+  $\pm.02$ band of \Cref{sec:setup:deltaq}). The six candidate-blind variants cluster at zero at every
+  head capacity, objective and depth; the letter-logit (N1) and contextual (N3) readouts and the listwise
+  teacher carry .09--.12, and the semantic readout N2 sits between. Accuracy alone does not separate the
+  groups.}
   \label{fig:deltaq}
 \end{figure}
 
-\begin{table}[t]
-  \centering
-  \caption{Candidate-blind variants: six factorizations and objectives, two tap depths. ``Shuffled''
-  replaces the real question with an unrelated one, candidate set fixed; $\dqsh$ is the difference.
-  $n{=}1{,}200$ MMLU-Pro items.}
-  \label{tab:blind}
-  \small
-  \begin{tabular}{llrrr}
-    \toprule
-    Variant & Factorization / objective & among-$\numcands$ & shuffled & $\dqsh$ \\
-    \midrule
-    \texttt{z1} & single decision vector, bilinear scorer & .171 & .147 & $+.023$ \\
-    \texttt{zr} & 8 probes, token-level max-similarity & .157 & .182 & $-.026$ \\
-    \texttt{zr\_set} & + $O(\numcands)$ cross-attention over candidate tokens & .147 & .151 & $-.003$ \\
-    \texttt{ms\_ctrl} & single-set distillation, steps-matched control & .124 & .147 & $-.023$ \\
-    \texttt{ms\_zr\_set} & same-$Z$ multi-set, $\Delta$log-odds targets & .130 & .130 & $+.000$ \\
-    \texttt{zr} (full depth) & 8 probes, tap at layer 28 of 28 & .147 & .156 & $-.008$ \\
-    \midrule
-    Teacher & listwise decoder, options in context & .310 & .208 & $\mathbf{+.102}$ \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+No lever we varied moves $\dqsh$. Cross-attention from the probes over all candidate tokens leaves it at
+$-.003$ while improving null quality (CLINC out-of-scope .568 $\to$ .727); supervising the change in the
+teacher's log-odds across seven candidate sets gives exactly zero; reading all 28 layers gives $-.008$.
+Two variants fall just outside the $\pm.02$ band in opposite directions ($+.023$, $-.026$), the spread
+1{,}200 items allow. One alternative we cannot exclude is optimization: the zero-initialized
+set-conditioning cross-attention stayed inert through 4k steps of direct supervision.
 
-The result holds across every lever we varied (\Cref{tab:blind}). A single decision vector retains as
-much as eight probes. Cross-attention from the probes over all candidate tokens leaves $\dqsh$ at
-$-.003$ while improving null quality (CLINC out-of-scope accuracy .568 $\to$ .727). Supervising the
-change in the teacher's log-odds across seven candidate sets for the same question gives $\dqsh$ of
-exactly zero, against $-.023$ for its steps-matched single-set control. Reading the full 28 layers
-instead of layer 20 leaves $\dqsh$ at $-.008$, lowers among-$\numcands$ accuracy to .147, and regresses
-the evidence tasks (SNLI/MNLI/ANLI/BoolQ .881/.807/.462/.712 against .905/.873/.541/.826 at layer 20;
-\Cref{tab:app-blind-closure}). Two variants fall just outside the $\pm.02$ band, in opposite directions
-(\texttt{z1} $+.023$, \texttt{zr} $-.026$), which is the spread 1{,}200 items allow; every variant is
-separated from the teacher's .102. The one mechanistic alternative the data leave open is an optimization
-failure in the set-conditioning path, whose zero-initialized cross-attention stayed inert through 4k
-steps of direct supervision.
-
-\textbf{What a candidate-blind state does learn explains why accuracy hides the gap.} The variants
-inherit the teacher's candidate priors and its calibration. Their accuracy of .12--.17 sits above the
-.10 chance rate of ten-option questions and comes from which option strings tend to be correct together;
-ECE on the knowledge probe falls from .39 for an earlier baseline to .04; and they are exactly set-stable
-(reorder $\Delta p$ and pairwise $\Delta$log-odds both zero) where the teacher is not. On accuracy and
-calibration alone the factorization looks sound. $\dqsh$ shows that the question-dependent component
-lives in candidate-contextual computation, which sets the design principle for Typical: render the
-candidates inside the backbone's forward pass. The candidate-blind state keeps one role, shortlisting
-large candidate sets, a task that runs on priors (\Cref{sec:results:cost}).
+Accuracy hides the gap because candidate-blind states learn priors and calibration. Their
+accuracy of .12--.17 sits above the .10 chance rate and comes from which option strings tend to be
+correct together; ECE on the knowledge probe falls from .39 for an earlier baseline to .04. The
+question-dependent component lives in candidate-contextual computation, which sets the design principle
+for Typical: render the candidates inside the backbone's forward pass.
 
 \subsection{Mid-depth readout}
 \label{sec:analysis:depth}
 
-\textbf{Reading at 71\% of depth gives one model that carries both evidence reasoning and
-question-conditioned knowledge.} The first full-scale model in this project read the backbone's last
-layer and scored 58.6 on SNLI, the hypothesis-only baseline: it predicted entailment without using the
-premise. Moving the tap to layer 20 of 28 lifted it to 65.3 frozen and 68.2 with LoRA. The same effect
-appears in the contextual readout under a controlled comparison. With head, data and steps fixed,
-reading N3 at layer 20 instead of 28 raises SNLI/MNLI/ANLI/BoolQ from .863/.752/.431/.737 to
-.906/.865/.519/.834, CLINC-150 from .740 to .862, and lowers validation NLL from .430 to .341, while
-$\dqsh$ stays at .118 against .117 at full depth. Evidence accuracy lands within 1--3 points of a
-candidate-blind energy-scoring baseline on every evidence set, and 8 points above it on CLINC-150, so
-the evidence and knowledge regimes that had needed separate models are served by one. For a
-candidate-blind state the same change in depth moves nothing (\Cref{sec:analysis:deltaq}).
-
-The final layers of a causal language model specialize for next-token prediction, and that the most
-useful features for a downstream decision sit below them agrees with work on layer pruning and probing
-\citep{gromov2024deeperlayers,men2024shortgpt,tenney2019pipeline,belrose2023tunedlens}. For a deployed
-decision interface the choice is decisive and interacts with the readout: depth recovers evidence for
-the candidate-aware readout and leaves a candidate-blind state unchanged. Every checkpoint we report
-uses the 71\% tap, ported across sizes as layer 20 of 28, 26 of 36 and 28 of 40.
+Reading at 71\% of depth gives one model that carries both evidence reasoning and
+question-conditioned knowledge. The first full-scale model in this project read the last layer and
+scored 58.6 on SNLI, the hypothesis-only baseline (65.3 frozen and 68.2 with LoRA at layer 20). Under a
+controlled
+comparison (head, data and steps fixed), reading N3 at layer 20 instead of 28 raises SNLI/MNLI/ANLI/BoolQ
+from .863/.752/.431/.737 to .906/.865/.519/.834, CLINC-150 from .740 to .862, and lowers validation NLL
+from .430 to .341, while $\dqsh$ stays at .118 against .117. Evidence accuracy lands within 1--4 points of
+a candidate-blind energy-scoring baseline on every evidence set (ANLI trails by 3.6) and 8 points above it
+on CLINC-150, so the evidence and knowledge regimes that had needed separate models are served by one.
+For a candidate-blind state the same change moves nothing. Decision features sitting below the final,
+next-token-specialized layers agrees with work on layer pruning and probing
+\citep{gromov2024deeperlayers,men2024shortgpt,tenney2019pipeline,belrose2023tunedlens}. Every checkpoint
+we report uses the 71\% tap: layer 20 of 28, 26 of 36 and 28 of 40.
 
 \subsection{Abstention as a gate}
 \label{sec:analysis:null}
 
-\textbf{Abstention must be a gate and never a rendered candidate.} A rendered ``none of the above'' line
-competes for softmax mass with the real candidates, so its share depends on how many there are. We
-isolate this with a matched pair: the same model (N3 at layer 20, with the factored gate of
-\Cref{eq:factored-null}) with and without a rendered $\nullsym$ line in the suffix. With the line, the
-abstention behavior is a function of $\numcands$: on CLINC-150 with the gold label absent the model
-abstains with probability .02 at $\numcands{=}5$ and 1.00 at $\numcands{=}150$, where it abstains on
-every item, and on Banking77 at $\numcands{=}77$ null AUROC is .00 by the same mechanism.
-
-Removing the line removes both degenerate endpoints and makes the $\numcands$-sweep smooth: null AUROC on CLINC-150 is
-.98/.95/.92/.95 at $\numcands = 5/20/50/150$ and on Banking77 .90/.83/.69 at $\numcands = 5/20/77$.
-Downstream, MMLU-Pro false abstention falls from .692 to .003 and accuracy rises from .133 to .353, the
-KL divergence to the teacher's distribution on MMLU-Pro falls from 2.43 to .27, Banking77 with
-all 77 labels rises from .063 to .579, and CLINC out-of-scope accuracy from .639 to .798, with $\dqsh$
-unchanged (.118 vs.\ .122) and evidence tasks at the same level (\Cref{tab:app-null-fix}). The
-false-abstain change is far outside its seed-to-seed variation of .05--.10. The price is 2--7 points on
-intent and topic label spaces (HWU64 .801 $\to$ .757, 20NG .589 $\to$ .515) and a rise in reorder
-$\Delta p$ from .077 to .123. The gate's algebraic properties hold by construction
-(\Cref{sec:method:null}); this pair shows their empirical consequence, and null augmentation supplies the
-training signal that teaches the gate when to fire (\Cref{sec:results:mixture}). This configuration, contextual
-readout at 71\% depth with a gate and no rendered $\nullsym$ line, is the architecture of every checkpoint
-in \Cref{sec:results}.
+Abstention belongs in the gate alone. A rendered ``none of the above'' line
+competes for softmax mass with the real candidates, so its share depends on how many there are. In a
+matched pair, both arms N3 at layer 20 with the factored gate of \Cref{eq:factored-null}, the treatment
+removes the rendered $\nullsym$ line. With the line, abstention has degenerate endpoints: on CLINC-150
+with the gold label absent the model almost never abstains at $\numcands{=}5$
+($P(\nullsym \mid \text{absent}) = .02$) and always abstains at $\numcands{=}150$ (1.00) and on Banking77
+at $\numcands{=}77$, while its null AUROC is .97/.94/.91 at $\numcands = 5/20/50$. Removing the line
+removes both endpoints: null AUROC is .98/.95/.92/.95 on CLINC-150 at
+$\numcands = 5/20/50/150$ and .90/.83/.69 on Banking77 at $\numcands = 5/20/77$. MMLU-Pro false
+abstention falls from .692 to .003 (far outside its seed-to-seed variation of .05--.10) and accuracy
+rises from .133 to .353, the KL divergence to the teacher on MMLU-Pro falls from 2.43 to .27, Banking77
+with all 77 labels rises from .063 to .579, and CLINC out-of-scope accuracy from .639 to .798, with
+$\dqsh$ unchanged (.118 vs.\ .122) and evidence tasks level (\Cref{tab:app-null-fix}). The price is 2--7
+points on intent and topic label spaces (HWU64 .801 $\to$ .757, 20NG .589 $\to$ .515) and a rise in
+reorder $\Delta p$ from .077 to .123. This configuration, contextual readout at 71\% depth with a gate and no
+rendered $\nullsym$ line, is the architecture of every checkpoint in \Cref{sec:results}; null
+augmentation teaches the gate when to fire (\Cref{sec:results:mixture}).

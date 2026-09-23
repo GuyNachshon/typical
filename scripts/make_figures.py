@@ -371,7 +371,7 @@ def fig_calibration():
         i0, i1 = labels.index("ladder_14b"), labels.index("tl1b")
         y0, y1 = score_nll[i0], score_nll[i1]
         ax.annotate(
-            f"long-state fix + frozen-teacher KD\nscore NLL {y0:.2f} \u2192 {y1:.2f}",
+            f"14B recipe bundle\nscore NLL {y0:.2f} \u2192 {y1:.2f}",
             xy=(i1 - w / 2, y1), xytext=((i0 + i1) / 2, max(score_nll) * 0.75),
             arrowprops=dict(arrowstyle="->", color="#333333", lw=1.0),
             fontsize=8, ha="center",

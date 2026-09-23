@@ -1,12 +1,8 @@
 \section{Typical: the decision pass}
 \label{sec:method}
 
-Typical turns a pretrained causal language model into a decision function. A call supplies a state, a
-typed question and a candidate set, and receives a probability for every candidate plus a probability of
-abstention, read from hidden states in one pass over a short suffix. This section defines the task
-(\Cref{sec:method:task}), the pass (\Cref{sec:method:pass}), the readout (\Cref{sec:method:readout}) and
-the layer it reads (\Cref{sec:method:depth}), the typed heads (\Cref{sec:method:typed}), the abstention
-gate (\Cref{sec:method:null}), and the cost model (\Cref{sec:method:cost}).
+Typical turns a pretrained causal language model into a decision function whose output is read from hidden
+states in one pass over a short suffix.
 
 \subsection{Typed decisions}
 \label{sec:method:task}
@@ -27,117 +23,91 @@ $\dtype \in \{\textsc{Choice}, \textsc{Score}, \textsc{Noul}\}$. The model retur
 and emits no token.
 \end{definition}
 
-The type is a contract on the returned distribution, and each contract is enforced by the head and the
-training target. \textbf{Choice} is categorical over $\cands$. \textbf{Score} is categorical over an
-ordered $\cands$ (severity levels, priorities), trained so that mass on a level adjacent to the gold level
-costs less than mass on a distant one. \textbf{Noul} is a Bernoulli probability for a single proposition
-with $\cands = \{\text{yes}, \text{no}\}$, invariant to the order in which the caller lists the two
-labels. The abstention event $\nullsym$ is available under every type and is never one of the
-candidates. Because $\cands$ is text supplied per call, the model has no output index for any label and
-must read the candidates to score them.
+The type is a contract on the returned distribution, enforced by the head and the training target.
+\emph{Choice} is categorical over $\cands$. \emph{Score} is categorical over ordered levels, where near
+misses cost less than distant ones. \emph{Noul} is a yes/no decision: a Bernoulli probability for one proposition, with
+$\cands = \{\text{yes}, \text{no}\}$, invariant to the order in which the caller lists the two labels. The
+abstention event $\nullsym$ is available under every type and is never one of the candidates. Because
+$\cands$ is text supplied per call, the model has no output index for any label and must read the
+candidates to score them.
 
 \subsection{Cached state and causal suffix}
 \label{sec:method:pass}
 
 The state is encoded once as an ordinary causal prefix and its key-value cache is retained. Each question
 against it is a short causal suffix: the question text, the candidates rendered as lettered lines, an
-answer cue, and a terminal decision token. The suffix runs through the backbone attending to the cached
-state, and a batch of suffixes against one state runs in chunks without attending to one another. A
-decision is therefore exactly a forward pass on $\mathrm{concat}(\state, \query, \cands)$ with the state
-half read from cache. We verify this with an equivalence test on the real model: cached-state decisions
-match the full-concatenation path to within $10^{-3}$ across suffix chunk sizes 1, 2, 3, 5 and 64, are
-consistent under permutation of the queries in a batch, and repeat exactly. No question recomputes the
-state, and no question sees another.
+answer cue, and a terminal decision token. The suffix attends to the cached state, and a batch of
+suffixes against one state runs in chunks without attending to one another. A decision is therefore a
+forward pass on $\mathrm{concat}(\state, \query, \cands)$ with the state half read from cache, which an
+equivalence test on the real model confirms (\Cref{app:cache-equivalence}).
 
 \subsection{The contextual-candidate readout}
 \label{sec:method:readout}
 
-One forward pass over the suffix yields two things at the tap layer: the terminal decision state $\hD$,
-the hidden state at the decision token, and for each candidate a contextual state $\hctx{j}$, the mean of
-the hidden states over the tokens of candidate $j$'s rendered span. Candidate $j$ receives the score
+At the tap layer the suffix pass yields the terminal decision state $\hD$, the hidden state at the
+decision token, and for each candidate a contextual state $\hctx{j}$, the mean hidden state over the
+tokens of candidate $j$'s rendered span. Candidate $j$ receives the score
 \begin{equation}
   u = W_h \hD, \qquad v_j = W_c\, \hctx{j}, \qquad
   s_j = \frac{u^{\top} v_j}{\sqrt{d_v}} + w^{\top}(u \odot v_j) + g(u \odot v_j),
   \label{eq:readout}
 \end{equation}
 where $W_h$ and $W_c$ are layer-normalized linear projections to width $d_v$, $w$ is a vector and $g$ a
-two-layer MLP. The score is a bilinear form in $\hD$ and $\hctx{j}$ with a small learned correction on
-their elementwise product. The option letters stay in the rendered text and are never read out.
+two-layer MLP: a bilinear form with a small learned correction on the elementwise product. The option
+letters stay in the rendered text and are never read out. Because the candidates are tokens in the same
+causal computation as the state and the question, $\hctx{j}$ carries the candidate's meaning together
+with its slot and its set, and $\hD$ has attended to all of them.
 
-Because the candidates are tokens in the same causal computation as the state and the question,
-$\hctx{j}$ carries the candidate's meaning together with its slot and the set it appears in, and $\hD$
-has attended to all of them. We compare three readouts that differ only in what $\hD$ is scored against
-(\Cref{sec:analysis:readout}):
-\begin{itemize}
-  \item \textbf{N1, letter-logit readout.} $\hD$ is scored against the output embedding of each option
-  letter, i.e.\ the next-token logits of the letters. Nothing is generated. This is the standard
-  multiple-choice interface read at the decision token.
-  \item \textbf{N2, candidate-blind semantic readout.} $\hD$ is scored with \Cref{eq:readout} against an
-  embedding of the candidate text computed independently by a frozen text-embedding model, which carries
-  the label's meaning and no slot identity.
-  \item \textbf{N3, contextual-candidate readout.} $\hD$ is scored with \Cref{eq:readout} against the
-  span-pooled contextual state $\hctx{j}$. This is the readout Typical deploys.
-\end{itemize}
-N3 keeps N1's question-conditioned signal within seed noise, cuts its pairwise log-odds shift under
-candidate-set edits to about a quarter, and gains on evidence tasks. N2, with the same scorer, keeps
-$\dqsh$ of .058 against the teacher's .102 and scores .012 on Banking77 at $\numcands = 77$
-(\Cref{sec:analysis:readout}).
+\Cref{sec:analysis:readout} compares three readouts. \emph{N1}, the letter-logit readout, scores $\hD$
+against the output embeddings of the option letters (their next-token logits, with a softmax null),
+the standard multiple-choice interface read without generating. \emph{N2}, the candidate-blind semantic readout, applies \Cref{eq:readout} to an embedding of
+the candidate text from a frozen text-embedding model, which carries meaning and no slot identity.
+\emph{N3}, the contextual-candidate readout Typical deploys, applies \Cref{eq:readout} to $\hctx{j}$.
+N2 and N3 share the scorer, the factored null and the feature normalization and differ only in the
+candidate vector. N1 and N3 differ in the readout and in the null form native to each; option shuffling
+during training is shared by all three.
 
 \subsection{Mid-depth tap}
 \label{sec:method:depth}
 
 The backbone is truncated at about 71\% of its depth: the readout taps layer 20 of 28 at 1.7B, 26 of 36 at
-4B and 8B, and 28 of 40 at 14B. The layers above the tap are removed from the model, so the top 8 layers at
-1.7B, 10 at 4B and 8B, and 12 at 14B are never computed for any token, state or suffix. LoRA \citep{hu2022lora}
-at rank 16 adapts the top eight kept layers (layers 13--20 at 1.7B), and everything below is frozen.
-
-The tap is chosen for what the representation holds. Our first full-scale model read the final layer
-and scored 58.6 on SNLI, the hypothesis-only baseline: it ignored the premise. For the contextual
-readout, moving the tap from layer 28 to layer 20 with everything else fixed raises SNLI, MNLI, ANLI and
-BoolQ from .863, .752, .431 and .737 to .906, .865, .519 and .834, and keeps the question-conditioned
-signal ($\dqsh$ .118 against .117), so one model carries both evidence and knowledge
-(\Cref{sec:analysis:depth}). All released and ladder models use this tap.
+4B and 8B, and 28 of 40 at 14B, and the layers above the tap are never computed. LoRA \citep{hu2022lora}
+at rank 16 adapts the top eight kept layers, and everything below is frozen. The tap is chosen for what
+the representation holds: our first full-scale model read the final layer and scored 58.6 on SNLI, the
+hypothesis-only baseline, because it ignored the premise. The mid-depth tap carries evidence and
+question-conditioned knowledge in one model (\Cref{sec:analysis:depth}), and every released and ladder
+model uses it.
 
 \subsection{Typed heads}
 \label{sec:method:typed}
 
-Choice, Score and Noul share the backbone, the tap and the readout of \Cref{eq:readout}. They differ in
-the training target and, for Noul, the terminal head, and every row is routed by its own type.
+The three types share the backbone and the tap and differ in the training target and, for Noul, the
+terminal head. \emph{Choice} is the $\numcands$-way readout of \Cref{eq:readout}, trained with
+cross-entropy against the gold distribution over $\cands \cup \{\nullsym\}$ through the gate of
+\Cref{sec:method:null}. \emph{Score} uses the Choice readout over the rendered levels with an
+ordinal-smoothed target $\tilde{t}_j \propto \exp(-|j - y|/\tauord)$ for gold level $y$, normalized over
+the valid levels, with $\tauord = 0.7$; $\tauord \to 0$ recovers the one-hot Choice target, and the change
+adds no parameters. \emph{Noul} uses a dedicated Bernoulli head, $P(\text{yes}) = \sigma(w_n^{\top}
+\hD)$, on a query-only suffix that renders no candidate text, with the complement assigned to ``no''.
+Abstention on this path uses a gate of the form of \Cref{eq:factored-null} with its own parameters, whose
+score statistics come from $\log P(\text{yes})$ and $\log P(\text{no})$ and whose state input is $\hD$,
+since no candidate span is rendered. Every gate input is symmetric in the two labels, so for rows routed
+to the Bernoulli head the returned yes, no and $\nullsym$ probabilities are exactly invariant to label
+order.
 
-\textbf{Choice} is the $\numcands$-way readout trained with cross-entropy against the gold distribution
-over $\cands \cup \{\nullsym\}$, composed through the gate of \Cref{sec:method:null}.
-
-\textbf{Score} uses the Choice readout over the rendered levels with an ordinal-smoothed target. For gold
-level $y$,
-\[
-  \tilde{t}_j \propto \exp\!\left(-\frac{|j - y|}{\tauord}\right), \qquad \tauord = 0.7,
-\]
-normalized over the valid levels; $\tauord \to 0$ recovers the one-hot Choice target. This is a change
-of target with no new parameters. On held-out urgency it takes NLL from 2.07 to 1.23 at flat accuracy
-(.505 to .508), and on JevBench's 12 ordinal items it changes no decision (\Cref{sec:results:typed}).
-
-\textbf{Noul} uses a dedicated Bernoulli head on a query-only suffix that renders no candidate text:
-\[
-  P(\text{yes}) = \sigma(w_n^{\top} \hD),
-\]
-with the complement assigned to ``no''. Since no candidate enters the computation, reversing the label
-order cannot change $P(\text{yes})$; a two-way Choice over the same labels moves it by up to .55 under
-reversal (\Cref{sec:results:typed}). The abstention gate applies to Noul unchanged.
-
-\textbf{Per-row routing.} A row takes the Bernoulli path if and only if its candidate set is exactly
-$\{\text{yes}, \text{no}\}$, and Score rows take the ordinal target; every other row is scored by the
-Choice path, bit-identical to a model with the typed heads disabled. Routing is a property of the row
-because a batch mixes types: an early build that applied the Bernoulli head to every row scored Choice
-and Score rows with no candidate text and fell to chance on them (\Cref{app:typed-primitives}).
+Routing is per row, because a batch mixes types. A row takes the Bernoulli path if and only if its
+candidate set is exactly $\{\text{yes}, \text{no}\}$, Score rows take the ordinal target, and every other
+row is scored by the Choice path, bit-identical to a model with the typed heads disabled
+(\Cref{app:typed-primitives}).
 
 \subsection{Factored abstention gate}
 \label{sec:method:null}
 
-Abstention is a separate gate with its own inputs, outside the candidate softmax. Given scores
-$s_1,\dots,s_\numcands$ from \Cref{eq:readout}, the gate reads a vector $z$ of permutation-invariant
-statistics over the valid candidates (maximum score, top-2 margin, mean score, log-mean-exp of the
-scores), the projected decision state, and the mean and variance of the projected candidate states
-$v_j$, and computes $r = \sigma(g_\nullsym(z))$. The returned distribution is
+Abstention is a separate gate outside the candidate softmax. Given the scores $s_j$ of
+\Cref{eq:readout}, the gate reads a vector $z$ of permutation-invariant statistics over the valid
+candidates (maximum score, top-2 margin, mean score, log-mean-exp of the scores), the projected decision
+state, and the mean and variance of the projected candidate states $v_j$, and computes
+$r = \sigma(g_\nullsym(z))$. The returned distribution is
 \begin{equation}
   \label{eq:factored-null}
   P(\cand{j} \mid \state, \query, \cands) = (1-r)\,\frac{\exp(s_j/T)}{\sum_{k=1}^{\numcands}\exp(s_k/T)},
@@ -145,43 +115,24 @@ $v_j$, and computes $r = \sigma(g_\nullsym(z))$. The returned distribution is
   \pnull = r,
 \end{equation}
 implemented as logits $\ell_j = \log \mathrm{softmax}(s/T)_j + \log(1-r)$ and $\ell_\nullsym = \log r$,
-so a standard cross-entropy over $\numcands + 1$ outcomes trains both parts. Two properties follow
-exactly from the construction.
-\begin{enumerate}
-  \item \emph{Pairwise non-null odds are invariant to abstention.} For fixed scores,
-  $P(\cand{j})/P(\cand{k}) = \exp((s_j - s_k)/T)$, independent of $r$: the multiplier $(1-r)$ is common to
-  every non-null candidate, so abstention never reorders or reweights the candidates among themselves.
-  The contextual scores $s_j$ are themselves computed in the context of the whole set and remain
-  set-dependent.
-  \item \emph{The gate is temperature-invariant.} $T$ enters only the candidate softmax and $r$ is computed
-  from untempered statistics, so recalibrating $T$ sharpens or flattens the candidate distribution
-  without moving $\pnull$.
-\end{enumerate}
-Together with the exact order invariance of the Bernoulli head (\Cref{sec:method:typed}), these are the
-structural guarantees of the output layer. The gate is also a symmetric function of the candidate set:
-every input to $z$ is invariant to permuting the pairs $(s_j, v_j)$, so it adds no dependence on
-candidate order beyond what the contextual scores carry. Whether to abstain depends on what was offered,
-so $r$ is set-dependent by design. The null is never
-rendered as a candidate line. The matched experiment in \Cref{sec:analysis:null} removes the rendered
-``none of the above'' line from a model that already has this gate and shows why: a rendered null
-competes for softmax mass that dilutes as $\numcands$ grows, and removing it takes MMLU-Pro false
-abstention from .692 to .003.
+so one cross-entropy over $\numcands + 1$ outcomes trains both parts. Two properties follow exactly.
+(i)~\emph{Pairwise non-null odds are invariant to abstention}: for fixed scores
+$P(\cand{j})/P(\cand{k}) = \exp((s_j - s_k)/T)$, independent of $r$, because $(1-r)$ multiplies every
+non-null candidate; the contextual scores themselves remain set-dependent. (ii)~\emph{The gate is
+temperature-invariant}: $T$ enters only the candidate softmax and $r$ reads untempered statistics, so
+recalibrating $T$ never moves $\pnull$. The gate is symmetric in the pairs $(s_j, v_j)$, so it adds
+no order dependence, while $r$ depends on what was offered by design. The null is never rendered as a candidate line, because a rendered line competes
+for softmax mass that dilutes as $\numcands$ grows; \Cref{sec:analysis:null} removes that line from a model
+that already has the gate and measures the difference.
 
 \subsection{Cost model}
 \label{sec:method:cost}
 
-$M$ decisions against one state cost one prefix pass and $M$ suffix passes,
-\[
-  O(|\state|) \;+\; M \cdot O(|\query| + |\cands|)
-\]
-token positions, where $|\cands|$ counts the rendered candidate tokens. Each suffix position attends to
-the cached state, and every position, in the prefix and in the suffix, runs through only the kept
-71\% of the layers. The state term is paid once and amortized over every question asked of it; the
-per-decision term grows with the length of the question and the candidate text, and is independent of
-the other questions. On one H100 in our single-stream research harness, a decision at $\numcands = 2$
-costs 45, 57 and 59\,ms at 1.7B, 4B and 14B, so an $8\times$ larger backbone is $1.3\times$ slower.
-At $\numcands = 256$ the candidate term dominates and grows with the backbone: the marginal per-query cost
-in a batch of 32 is 28.0\,ms at 1.7B and 109.7\,ms at 14B, against 2.7 and 3.9\,ms at $\numcands = 2$.
-For large candidate sets a candidate-blind scorer, whose cost does not depend on rendering candidates
-through the backbone, shortlists to a bounded set for the contextual readout; \Cref{sec:results:cost}
-gives the full sweep and the crossover.
+$M$ decisions against one state cost $O(|\state|) + M \cdot O(|\query| + |\cands|)$ token positions, where
+$|\cands|$ counts the rendered candidate tokens, and every position runs through only the kept 71\% of the
+layers. The state term is paid once and amortized over every question asked of it; the per-decision term
+grows with the question and the candidate text and is independent of the other questions. In our research harness on one H100
+at $\numcands = 2$, a decision takes 45, 56 and 60\,ms at 1.7B, 4B and 14B, so an $8\times$ larger backbone
+is $1.3\times$ slower. At large $\numcands$ the rendered candidates dominate the per-decision term, and in
+throughput mode a candidate-blind scorer, whose cost does not grow with the rendered set, is cheaper per
+query by a margin that grows with $\numcands$ (\Cref{sec:results:cost}).

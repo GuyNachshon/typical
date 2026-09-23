@@ -1,54 +1,50 @@
 \section{Discussion}
 \label{sec:discussion}
 
-\paragraph{Decisions live in candidate-contextual states at mid-depth.} Three measurements point at the
-same place. Question-conditioned capability appears only when the candidates are processed inside the
-language model's own forward pass (\Cref{sec:analysis:deltaq}); among readouts that do process them,
-the candidate's contextual state carries the decision and an independently embedded copy of the same
-text does not (\Cref{sec:analysis:readout}); and the layer that holds it sits before the top of the
-stack specializes for next-token prediction (\Cref{sec:analysis:depth}). This refines the cross-encoder
-versus dual-encoder picture. In every configuration we tested, a candidate-independent state reproduced the teacher's candidate
-priors and calibration, and the question-dependent component appeared only with the candidates in
-context. The reusable-state formulation remains valuable for shortlisting large
-candidate sets, a sub-task that runs on priors (\Cref{sec:results:cost}), and $\dq$ is the measurement
+\paragraph{Where the decision lives.} Question-conditioned capability appeared only when the candidates
+were processed inside the language model's forward pass (\Cref{sec:analysis:deltaq}); among readouts
+that process them, the candidate's contextual state carries the decision and an independently embedded
+copy of the same text carries much less of it (\Cref{sec:analysis:readout}); and the layer that holds it
+sits below the top of the stack (\Cref{sec:analysis:depth}). This refines the familiar cross-encoder
+versus dual-encoder trade-off. In every configuration we tested, a candidate-independent state
+reproduced the teacher's candidate priors and calibration, and the question-dependent component
+appeared only with the candidates in context. Candidate-independent scoring keeps a clear role as a
+shortlisting front end for large candidate sets (\Cref{sec:results:cost}), and $\dq$ is the measurement
 that tells the two roles apart. We recommend reporting it for any architecture that scores candidates
 against a precomputed representation.
 
-\paragraph{An output type is a contract, and structure enforces it.} Each typed primitive fixes a
-property that post-hoc calibration cannot reach. The Bernoulli head is order-invariant because there is
-no candidate order to be sensitive to; the ordinal target moves probability mass toward adjacent levels
-without changing a decision; the gate keeps null AUROC between .92 and .98 from
-$\numcands = 5$ to $\numcands = 150$, where a rendered abstain option collapsed at both ends. The same lesson appears in reverse at the output layer: one global
-temperature and null offset, fit on held-out soft targets, wants opposite corrections for an
-evidence-trained and a workflow-trained checkpoint (\Cref{sec:results:calibration}). Probability
-quality for a decision model is indexed by decision type, and the productive place to shape it is the
-head, the target and the training data.
+\paragraph{Types are enforced by structure.} Each typed primitive fixes a property that post-hoc
+calibration cannot reach. The Bernoulli head has no candidate order to be sensitive to; the ordinal
+target moves probability mass toward adjacent levels without changing accuracy; keeping abstention out
+of the rendered candidates removes its dependence on how many candidates were offered. The same point
+shows up at the output layer from the other side: one global temperature and null offset, fit on
+held-out soft targets, wants opposite corrections for an evidence-trained and a workflow-trained
+checkpoint (\Cref{sec:results:calibration}). Probability quality for a decision model is indexed by
+decision type, and the head, the target and the training data are where it is shaped.
 
-\paragraph{The distribution of decision types is a first-order lever.} Several of the largest effects in
-this paper come from data and selection with the architecture held fixed: counterfactual rubric groups
-(35--40 points on held-out families, grammars and styles), null augmentation (2.6--6.0 points on
-label-space accuracy, from teaching the model when to abstain), family-balanced sampling (bringing
-evidence and intent accuracy back to within 1 and 3--4 points of the evidence-only base after an
-unbalanced mix cost 10--11), evidence-first rendering of long states (11.2 points), and a 14B recipe built around calibration-based
-checkpoint selection (a threefold reduction in held-out ordinal NLL). Decision models are trained on a mixture of decision \emph{shapes}, and each shape the
-mixture contains is one the model learns.
+\paragraph{Data and selection as levers.} Several of the largest effects in this paper hold the
+architecture fixed: the DecisionMix v2 curriculum (35--40 points on held-out families, grammars and
+styles), null augmentation (2.6--6.0 points of label-space accuracy), family-balanced sampling (evidence
+and intent accuracy back to within 1 and 3--4 points of the evidence-only base after an unbalanced mix
+cost 10--11), evidence-first long states (11.2 points), and the 14B recipe as a whole (a threefold
+reduction in held-out ordinal NLL). A decision model is trained on a mixture of decision shapes, and the
+composition of that mixture deserves the same experimental care as the architecture.
 
-\paragraph{A benchmark score measures capability together with interface compatibility.} Changing only
-the rendering moves a frozen 9B model 12.5 points on the same items (\Cref{sec:results:rendering}), more
-than the gap between many systems a benchmark is used to rank. Two practices made our own measurements
-decisive. The first is to cross training render with evaluation render, so that data effects and
-compatibility effects separate. The second is to build an evaluation set with the power to resolve the
-effect in question: 605 generated, leak-checked long states settled at $p < 10^{-9}$ a question that a
-19-item benchmark cell returned as $p = .232$. Pre-registration protects a decision rule only when the
-metric it names can resolve the effect it gates.
+\paragraph{Measuring interfaces.} Changing only the rendering moves a frozen 9B model 12.5 points on the
+same items (\Cref{sec:results:rendering}), more than the gap between many systems a benchmark is used to
+rank. Two practices made our own measurements decisive: crossing training render with evaluation
+render, so that data effects and compatibility effects separate, and building evaluation sets with the
+power to resolve the effect in question. Our 605 generated, leak-checked long states settled at
+$p < 10^{-9}$ a question that a 19-item benchmark cell returned at $p = .232$. A pre-registered decision
+rule is only as strong as the power of the metric it names.
 
 \paragraph{What a single pass computes.} Typical decides in one forward pass of fixed depth, with no
 intermediate tokens. Fixed-depth transformers correspond to constant-depth threshold circuits
-\citep{merrill2023parallelism}, while conditioning on self-generated intermediate tokens extends what
-they can compute \citep{merrill2024expressive,feng2023chain}. The decisions that remain hard for every
-model we trained, temporal arithmetic, unit conversion, expected value and multi-attribute trade-offs
-(\Cref{app:hard-tier}), have the serial shape that picture singles out. That makes a concrete next step:
-keep the typed readout and the cached state, and add a bounded amount of intermediate computation
-before the decision token, in the form of extra passes or a short scratchpad. The interface in this
-paper is the natural terminal layer for such a system, since a decision still has to end in a typed,
-thresholdable distribution over the options the caller supplied.
+\citep{merrill2023parallelism}, and conditioning on self-generated intermediate tokens extends what they
+can compute \citep{merrill2024expressive,feng2023chain}. The decisions that remain hardest for the models
+we trained (temporal arithmetic, unit conversion, expected value, multi-attribute trade-offs;
+\Cref{app:hard-tier}) have the serial shape that this theory singles out, which suggests a concrete
+next step: keep the typed readout and the cached state, and add a bounded amount of intermediate
+computation before the decision token. The interface in this paper is a natural terminal layer for
+such a system, since the result still has to be a typed, thresholdable distribution over the options
+the caller supplied.
