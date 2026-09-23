@@ -51,8 +51,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       btn.textContent = open ? 'Accuracy only' : 'Add the control';
     };
     btn?.addEventListener('click', flip);
+    let timer = 0;
+    btn?.addEventListener('click', () => clearTimeout(timer), { once: true });
     const io = new IntersectionObserver((es) => {
-      if (es.some((e) => e.isIntersecting) && !open) { io.disconnect(); setTimeout(flip, 900); }
+      if (es.some((e) => e.isIntersecting) && !open) {
+        io.disconnect();
+        timer = setTimeout(() => { if (!open) flip(); }, 900);
+      }
     }, { threshold: 0.45 });
     io.observe(host);
   }

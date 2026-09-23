@@ -68,7 +68,7 @@
     <p>A decision model can score well above chance on a benchmark without reading the question at all, by learning which option strings tend to be correct together. Accuracy will not tell you. Calibration will not tell you either: one of the variants below has an expected calibration error of .04.</p>
     <p>So we measure &Delta;q: accuracy with the real question, minus accuracy with the question replaced by an unrelated one. A model that scores the same either way has not used the question. Below is every variant we tested, ranked by accuracy. That is the view a leaderboard gives you.</p>
   </div>
-  <figure class="fig figfull">
+  <figure class="fig">
     <div class="show-head"><p class="show-eyebrow t-mono">12 variants &middot; MMLU-Pro, n = 1,200</p><button class="btn dark" type="button" id="dq-reveal">Add the control</button></div>
     <div class="chart" id="chart-deltaq"></div>
     <figcaption>Accuracy against &Delta;q. The band is the &plusmn;.02 spread 1,200 items allow. Hover a point for its configuration.</figcaption>

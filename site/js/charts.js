@@ -733,8 +733,8 @@ const COST_W = 1040;
 export function costBar(container, opts) {
   const { rows, m = 32, title = '' } = opts;
   const w = fitWidth(container, COST_W);
-  const labelW = Math.min(196, w * 0.22);
-  const pad = { t: 16, r: 92, b: 78 }; // b leaves room for the axis, its ticks and the key under it
+  const labelW = Math.max(104, Math.min(196, w * 0.22));
+  const pad = { t: 16, r: 92, b: 96 }; // b leaves room for the axis, its ticks and a key that may wrap
   const barH = 24;
   const rowGap = 12;
   const groupGap = 34;
@@ -780,11 +780,16 @@ export function costBar(container, opts) {
   g.appendChild(svgText(iw, axisY + 20, 'ms', { fill: MID, 'font-size': 11, 'text-anchor': 'end' }));
   // the two segments need naming once: without it the split reads as decoration
   const key = [{ fill: INK, op: 1, text: 'the state, read once' }, { fill: MID, op: 0.34, text: `the other ${m - 1} questions` }];
+  // the key ran off the right edge on a phone -- "the other 31 questions" ended 45px past the
+  // frame. It wraps to a second line when the next entry would not fit.
   let kx = 0;
+  let ky = axisY + 34;
   key.forEach((k) => {
-    g.appendChild(svgEl('rect', { x: kx, y: axisY + 34, width: 11, height: 11, rx: 2, fill: k.fill, 'fill-opacity': k.op }));
-    g.appendChild(svgText(kx + 17, axisY + 44, k.text, { fill: MID, 'font-size': 11 }));
-    kx += 28 + k.text.length * 6.6;
+    const wpx = 28 + k.text.length * 6.6;
+    if (kx && kx + wpx > iw) { kx = 0; ky += 18; }
+    g.appendChild(svgEl('rect', { x: kx, y: ky, width: 11, height: 11, rx: 2, fill: k.fill, 'fill-opacity': k.op }));
+    g.appendChild(svgText(kx + 17, ky + 10, k.text, { fill: MID, 'font-size': 11 }));
+    kx += wpx;
   });
   registerChart(container, () => costBar(container, opts));
   return svg;

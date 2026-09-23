@@ -110,10 +110,17 @@ export function mountReadouts(host, doc) {
   if (!host || !doc?.rows?.length) return;
   const table = document.createElement('table');
   table.className = 'register readouts';
+  if (doc.note) {
+    const cap = document.createElement('caption');
+    cap.className = 'sr-only';
+    cap.textContent = doc.note;
+    table.appendChild(cap);
+  }
   const thead = document.createElement('thead');
   const hr = document.createElement('tr');
   ['', ...doc.cols].forEach((c) => {
     const th = document.createElement('th');
+    th.scope = 'col';
     th.textContent = c;
     if (/^N3/.test(c)) th.className = 'is-ours';
     hr.appendChild(th);
@@ -122,12 +129,16 @@ export function mountReadouts(host, doc) {
   const tbody = document.createElement('tbody');
   doc.rows.forEach((r) => {
     const tr = document.createElement('tr');
-    const th = document.createElement('td');
-    th.textContent = r.k;
-    tr.appendChild(th);
+    const rowHead = document.createElement('th');
+    rowHead.scope = 'row';
+    rowHead.textContent = r.k;
+    tr.appendChild(rowHead);
     const vals = r.v.filter((v) => v != null);
     const hi = Math.max(...vals);
-    const best = r.better === 'low' ? Math.min(...vals) : hi;
+    const lo = Math.min(...vals);
+    const best = r.better === 'low' ? lo : hi;
+    // bar length always means better, whichever direction the row is scored in
+    const frac = (v) => (r.better === 'low' ? (v ? lo / v : 0) : v / hi);
     r.v.forEach((v, i) => {
       const td = document.createElement('td');
       td.dataset.label = doc.cols[i];
@@ -136,7 +147,7 @@ export function mountReadouts(host, doc) {
       if (/^N3/.test(doc.cols[i])) td.classList.add('is-ours');
       if (v != null) {
         const bar = document.createElement('i');
-        bar.style.width = `${(v / hi) * 100}%`;
+        bar.style.width = `${Math.max(2, frac(v) * 100)}%`;
         td.appendChild(bar);
       }
       const s = document.createElement('span');

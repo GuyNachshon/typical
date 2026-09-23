@@ -14,8 +14,8 @@
   --color-mid: #938f89;       /* secondary copy, numerals, hairlines */
   --color-steel: #c2bfba;     /* borders, outlines */
   --color-slate: #595855;     /* secondary copy: #938f89 on canvas is 2.78:1, under AA-large */
-  --color-ours: #2f5d50;      /* figures only: our side of a comparison (7.0:1 on canvas) */
-  --color-other: #9a5b3d;     /* figures only: the other side (5.2:1 on canvas) */
+  --color-ours: #2f5d50;      /* figures only: our side of a comparison (6.47:1 on canvas) */
+  --color-other: #9a5b3d;     /* figures only: the other side (4.61:1 on canvas) */
 
   --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -683,6 +683,8 @@
      slower than a UI animation would be and staggered left to right along the ranking. */
   .dq .dq-pt { transform: translateY(var(--dy)); transition: transform 820ms var(--ease-out-expo); transition-delay: calc(var(--i) * 34ms); }
   .dq.is-open .dq-pt { transform: translateY(0); }
+  .dq .dq-pt text, .dq .dq-pt polyline { transition: opacity 260ms var(--ease-out) 260ms; }
+  .dq:not(.is-open) .dq-pt text, .dq:not(.is-open) .dq-pt polyline { opacity: 0; transition-delay: 0ms; }
   .dq .dq-band { opacity: 0; transition: opacity 420ms var(--ease-out) 300ms; }
   .dq.is-open .dq-band { opacity: 1; }
   /* Reduced motion drops the animation, not the control. Pinning the points to their open state
@@ -695,12 +697,13 @@
 
   /* ---- the readout table: a bar behind each number, so a row has a shape ---- */
   .readouts td { position: relative; }
-  .readout-cell { text-align: right; font-family: var(--font-mono); font-size: 12.5px; }
-  .readout-cell i { position: absolute; left: 0; bottom: 6px; height: 3px; background: var(--color-steel); }
+  .readout-cell { text-align: right; font-family: var(--font-mono); font-size: var(--text-nav); padding-right: 14px; }
+  .readout-cell i { position: absolute; left: 0; right: 14px; bottom: 6px; height: 3px; background: var(--color-steel); max-width: calc(100% - 14px); }
   .readout-cell.is-ours i { background: var(--color-ours); opacity: 0.45; }
   .readout-cell.is-best span { font-weight: 700; color: var(--color-off); }
   .readouts th.is-ours { color: var(--color-ours); }
-  .readouts td:first-child { font-weight: 400; font-size: 13px; white-space: nowrap; }
+  @media (max-width: 48rem) { .readout-cell i { display: none; } .readout-cell { padding-right: 0; } }
+  .readouts tbody th { text-align: left; text-transform: none; letter-spacing: 0; font-weight: 400; font-family: var(--font-mono); font-size: var(--text-nav); white-space: nowrap; padding: 12px 12px 12px 0; border-bottom: 1px solid var(--color-steel); vertical-align: top; }
 
   /* ---- the showdown: two terminals, started together, each printing what it actually returned ---- */
   .show { display: grid; grid-template-columns: minmax(0, 1fr); }
@@ -709,7 +712,7 @@
   .pane-cost { padding: 0 22px; margin-top: 14px; font-family: var(--font-mono); font-size: 11.5px; color: var(--color-mid); }
   .pane.is-ours .pane-cost { color: var(--color-slate); }
   .pane-foot { margin-top: 2px; }
-  .show-eyebrow { flex: 1 1 100%; font-size: 11px; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); }
+  .show-eyebrow { flex: 1 1 100%; font-size: var(--text-eyebrow); letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-slate); }
   .show-pick { display: flex; gap: 1px; margin-left: auto; background: var(--color-steel); border: 1px solid var(--color-steel); }
   .show-pick-btn { appearance: none; border: 0; background: var(--color-warm); padding: 8px 12px; cursor: pointer; font-size: 11px; letter-spacing: 0.36px; color: var(--color-slate); transition: background var(--duration-tap) var(--ease-out), color var(--duration-tap) var(--ease-out); }
   .show-pick-btn:hover { color: var(--color-off); }
@@ -748,5 +751,6 @@
     .pane-line.is-in { display: block; }
   }
 
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
   .todo { background: var(--color-lgray); color: var(--color-off); padding: 1px 6px; border-radius: 2px; font-family: var(--font-mono); font-size: 12px; }
 }
