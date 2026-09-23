@@ -111,8 +111,6 @@
     <div class="mt-30"><h3 class="t-feature">Score</h3><p class="mt-18">Returns a distribution over ordered levels, trained so that probability concentrates near the true level instead of spreading over every wrong one. In a matched comparison this halved negative log-likelihood on held-out Score tasks (2.07 to 1.23) without changing any top answer.</p></div>
     <div class="mt-30"><h3 class="t-feature">Abstain</h3><p class="mt-18">Attaches a probability to every Choice and Score answer that none of the options fit. It is a judgment about the set as a whole, not an extra label you have to remember to add.</p></div>
   </div>
-</section>
-
   <figure class="fig">
     <div class="media dark"><div id="hero-decision"></div></div>
     <figcaption>One ticket, four typed questions asked of it. The state is read once; each question is a short suffix against the same cache.</figcaption>
@@ -198,6 +196,132 @@
     </tbody>
   </table>
   <p class="note mt-18" style="max-width:72ch"><code>typical-medium</code> reaches <span class="todo" data-fill="jev-medium-std">standard</span> on JevBench's standard tier. The hard tier remains open: <span class="todo" data-fill="jev-medium-hard">hard</span> against Jev's .730. These are runs on the benchmark's 231 public items, not ranked leaderboard entries. The standard tier covers 36 scenarios, each written two ways, so differences of a few points are within noise. We recommend <code>typical-medium</code> when capability matters more than footprint.</p>
+</section>
+
+<section class="page chapter" id="separating">
+  <div class="claim">
+    <h2>What actually separates the two models</h2>
+    <p>The JevBench columns above look like a ranking. They are not one. The standard tier is 72 items drawn from only 36 independent states, each written twice, and the hard tier is 111 items. Cluster-bootstrapped over the paraphrase group, that is a 95% interval of roughly ±6 to 13 points on any standard-tier number and ±9 on any hard-tier one. <code>typical-medium</code>'s standard-tier interval is [.778, .944] and its hard-tier interval is [.405, .595]. <code>typical-small</code>'s <span class="todo">cluster-bootstrap intervals for the shipping <code>typical-small</code> checkpoint are not in our data yet</span>, and at .708 and .432 they overlap Medium's along most of their length.</p>
+    <p><strong>JevBench cannot separate these two models.</strong> Nor can it separate any adjacent pair in our seven-checkpoint ladder, which spans 1.7B to 14B and four backbone generations. Two of those checkpoints score exactly 55 of 111 on the hard tier while disagreeing on 26 items outright. That is not a tie, it is a measurement that has run out of resolution. Do not read the standard-tier gap between Small and Medium as a result. We do not.</p>
+    <p>What does separate them is everything measured at a sample size that can answer the question.</p>
+  </div>
+  <table class="register">
+    <thead>
+      <tr><th>Evaluation set</th><th><code>typical-small</code></th><th><code>typical-medium</code></th></tr>
+    </thead>
+    <tbody>
+      <tr><td data-label="Set">MMLU-Pro among-K</td><td data-label="small">.338</td><td data-label="medium">.429</td></tr>
+      <tr><td data-label="Set">ANLI</td><td data-label="small">.492</td><td data-label="medium">.554</td></tr>
+      <tr><td data-label="Set">BoolQ</td><td data-label="small">.776</td><td data-label="medium">.840</td></tr>
+      <tr><td data-label="Set">20 Newsgroups</td><td data-label="small">.552</td><td data-label="medium">.579</td></tr>
+      <tr><td data-label="Set">SNLI</td><td data-label="small">.889</td><td data-label="medium">.900</td></tr>
+      <tr><td data-label="Set">MNLI</td><td data-label="small">.853</td><td data-label="medium">.855</td></tr>
+      <tr><td data-label="Set">CLINC-150 (151 intents)</td><td data-label="small">.795</td><td data-label="medium">.795</td></tr>
+      <tr><td data-label="Set">HWU64</td><td data-label="small">.747</td><td data-label="medium">.717</td></tr>
+      <tr><td data-label="Set">TREC-fine (50 topics)</td><td data-label="small">.496</td><td data-label="medium">.480</td></tr>
+      <tr><td data-label="Set">JevBench standard Brier</td><td data-label="small">.423</td><td data-label="medium">.224</td></tr>
+    </tbody>
+  </table>
+  <div class="mt-18 mb-18" style="max-width:72ch">
+    <p>Medium leads by 9 points on MMLU-Pro among-K, 6 on ANLI, 6 on BoolQ and 3 on 20 Newsgroups, and its standard-tier Brier is nearly half Small's, which is what matters if you intend to threshold on the probability rather than take the argmax.</p>
+    <p class="mt-18">It is not a clean sweep. The two tie on CLINC-150 to within a tenth of a point, and CLINC is in the training mix anyway, so read that row as capacity and not as evidence about unseen labels. Medium is 3 points worse than Small on HWU64 and 2 points worse on TREC-fine, the 50-way fine-grained topic set. <span class="todo">Held-out yes/no, held-out workflow families and composition-curriculum figures for the shipping checkpoints: no full-file evaluation pass exists for either checkpoint yet, so the per-model numbers in our earlier drafts do not apply to what we are releasing.</span></p>
+    <p class="mt-18"><strong>Take Medium for accuracy, Small for cost, and do not use the benchmark column to decide.</strong> If you are choosing between these two for real work, the number you want is a paired test on your own decisions, not a leaderboard row.</p>
+    <p class="mt-18">One warning about the hard tier, and it is a warning rather than a caveat. The probabilities there are not usable. A uniform predictor over that tier's candidate sets scores a Brier of .66. <code>typical-small</code> scores .722 and <code>typical-medium</code> .721, which is worse than guessing evenly. On the standard tier the same comparison runs the other way and by a distance, .423 and .224 against .69, which is where an abstention threshold is worth having. If your decisions look like the hard tier, take the argmax if you like it, and do not threshold on the confidence.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="rules">
+  <div class="claim">
+    <h2>Rules are part of the input</h2>
+    <p>A decision model that memorises "this kind of ticket gets that label" is useless the moment your policy changes. So a large share of the workflow training is counterfactual: the same state and the same option list appear under different rubrics with different correct answers, which forces the model to read the rule instead of pattern-matching the state.</p>
+    <p>It is the largest training-distribution effect we measured, and it is larger than anything we changed in the architecture. Adding the rule-engine corpus took held-out rubric-flip accuracy, where the rule is inverted and the state left alone, from .477 to .710. Held-out families went .481 to .827, held-out grammars .507 to .881, held-out styles .491 to .888. Same head, same steps, same backbone. Only the mixture changed.</p>
+    <p>The practical form of that is short. Write the rule into the state. A changed policy does not need a retrain, it needs a different paragraph.</p>
+    <p>It works inside the rule grammar we generate and it stops at the edge of it. On level-7 composition, which mixes temporal, unit, expected-value and trade-off reasoning and which our generator never produces, the same change moved accuracy from .477 to .498 against a .441 uniform-guess rate. The curriculum that moved every in-distribution family by thirty points moved that one by two. What the generator produces is learned. What it does not produce is not.</p>
+    <p><span class="todo">Per-checkpoint rubric-flip numbers for the shipping <code>typical-small</code> and <code>typical-medium</code>: the figures above are from the matched mixture ablation, not from the released checkpoints.</span></p>
+  </div>
+</section>
+
+<section class="page chapter" id="breaks">
+  <div class="claim">
+    <h2>Where direct decisions still break</h2>
+    <p>Every model we have trained, at every size, does worse on JevBench's hard tier than on its standard tier. That is the project's clearest open problem, and the evidence says it is not a capacity problem.</p>
+    <p>A frozen 14B base model, reading letter logits with three examples in its prompt and no decision training at all, scores .559 on that tier. Our trained 14B research candidate scores .450. Both models answered the same 111 items, so the test that applies is a paired one, and it says <strong>frozen minus trained is +.108, 95% CI [+.027, +.189], p = .015</strong>. The untrained backbone wins, and we cannot wave it off as noise. Against the no-distillation control the same test gives +.081, [−.009, +.171], p = .082: the same direction, not separable. On the standard tier the ordering reverses, −.111 [−.250, +.014], which is what our training was for.</p>
+  </div>
+  <table class="register">
+    <thead>
+      <tr><th>Hard-tier family</th><th>Frozen 14B, 3-shot</th><th>Trained 14B</th></tr>
+    </thead>
+    <tbody>
+      <tr><td data-label="Family">Trap, routing</td><td data-label="Frozen">1.00</td><td data-label="Trained">1.00</td></tr>
+      <tr><td data-label="Family">Adversarial (n=6)</td><td data-label="Frozen">.833</td><td data-label="Trained">.667</td></tr>
+      <tr><td data-label="Family">Ambiguous (n=7)</td><td data-label="Frozen">.714</td><td data-label="Trained">.429</td></tr>
+      <tr><td data-label="Family">Judge-hard (n=17)</td><td data-label="Frozen">.588</td><td data-label="Trained">.529</td></tr>
+      <tr><td data-label="Family">Multi-hop (n=18)</td><td data-label="Frozen">.444</td><td data-label="Trained">.611</td></tr>
+      <tr><td data-label="Family">Probability</td><td data-label="Frozen">.500</td><td data-label="Trained">.300</td></tr>
+      <tr><td data-label="Family">Long-policy (n=19)</td><td data-label="Frozen">.421</td><td data-label="Trained">.158</td></tr>
+      <tr><td data-label="Family">Temporal / numeric</td><td data-label="Frozen">.333</td><td data-label="Trained">.200</td></tr>
+      <tr><td data-label="Family">Trade-off</td><td data-label="Frozen">.500</td><td data-label="Trained">.167</td></tr>
+    </tbody>
+  </table>
+  <div class="mt-18 mb-18" style="max-width:72ch">
+    <p>We had been explaining the hard tier as missing coverage: our generators never produce temporal arithmetic, unit conversion or expected-value trade-offs, so the model never learned them. That story predicts the frozen backbone fails those families too, and it does not. It leads on every serial family in the table and trails only on multi-hop. Individual cells are single digits and none of them separates alone, but the direction is uniform.</p>
+    <p class="mt-18">Missing coverage still explains why training did not add the behaviour. It does not explain why training appears to have removed it. So the question we can actually ask is narrower and more awkward: <strong>what is our fine-tuning removing?</strong></p>
+    <p class="mt-18">A third result points the same way. Rerunning the same candidate at batch 16 instead of 64, which is simply four times fewer examples seen, raised hard-tier accuracy from .369 to .450 and dropped hard-tier Brier from .90 to .76, while losing ground on everything in distribution. Under-fit beats fit, and untrained beats under-fit. That ordering points at our training distribution rather than at the model's confidence, and two controls decide it: the same frozen backbone with a scratchpad on the same 111 items, and a backbone trained only on the families it already handles. Both are queued. Until they land, nothing here distinguishes "this task needs intermediate computation" from "our fine-tuning damaged a backbone that already had some of it". We think it is the second. The <a class="ul" href="research.html#c-frozen-controls">frozen controls</a> are written up in full.</p>
+    <p class="mt-18">Two other places Typical is the wrong tool today. Candidate sets in the hundreds or thousands want a retrieval front end feeding a shortlist to the decision head, because cost grows with the total length of the option text. And <code>Choice</code> keeps some sensitivity to the order you list options in. <code>noul()</code> does not, because it renders no candidates at all, but it only routes to the Bernoulli head when the candidate set is exactly yes and no. Pass <code>{true, false}</code> or <code>{approve, reject}</code> and the call is scored as an ordinary Choice and keeps Choice's order sensitivity. Call <code>noul()</code> with the proposition and let it render the labels.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="longstates">
+  <div class="claim">
+    <h2>The ordering bug in long states, and the retrain that fixed it</h2>
+    <p>Until this release, both public checkpoints had a positional defect in long documents, and it was worth twenty to twenty-five points.</p>
+    <p>They were trained with a 1,024-token state window on a long-policy corpus that rendered its supporting facts at the end of every row. Training truncates from the right, so 98.8% of those rows lost their facts before the model ever saw them, and the model was optimised to answer long policies from states that no longer contained the evidence for the answer. It learned to expect the case block at the end, and it learned not to look anywhere else.</p>
+    <p>We measured that on 605 held-out long policy states with no overlap with either training corpus: identical items differing only in where the case block sits, scored in a 4,096-token window so nothing is truncated at evaluation time.</p>
+  </div>
+  <table class="register">
+    <thead>
+      <tr><th>Checkpoint</th><th>Facts last</th><th>Facts first</th></tr>
+    </thead>
+    <tbody>
+      <tr><td data-label="Checkpoint"><code>typical-small-preview</code></td><td data-label="Facts last">.744</td><td data-label="Facts first">.534</td></tr>
+      <tr><td data-label="Checkpoint"><code>typical-small</code>, superseded</td><td data-label="Facts last">.798</td><td data-label="Facts first">.598</td></tr>
+      <tr><td data-label="Checkpoint"><code>typical-medium</code>, superseded</td><td data-label="Facts last">.866</td><td data-label="Facts first">.612</td></tr>
+      <tr><td data-label="Checkpoint"><code>typical-small</code>, shipping</td><td data-label="Facts last"><span class="todo">TODO</span></td><td data-label="Facts first">.947</td></tr>
+      <tr><td data-label="Checkpoint"><code>typical-medium</code>, shipping</td><td data-label="Facts last"><span class="todo">TODO</span></td><td data-label="Facts first">.950</td></tr>
+    </tbody>
+  </table>
+  <div class="mt-18 mb-18" style="max-width:72ch">
+    <p>The two superseded rows are the defect. Twenty to twenty-five points on the same documents for moving one block of text, and rendered facts-first the superseded <code>typical-small</code> sat on the majority-class floor for yes/no. It had stopped reading the evidence altogether.</p>
+    <p class="mt-18"><strong>The checkpoints we are releasing today are the retrain.</strong> <code>typical-small</code> scores .947 on that set with the facts first, against the superseded checkpoint's .598. <code>typical-medium</code> scores .950 against .612. Both gain roughly 34 points, and neither gives up anything in the facts-last column. The rendering convention we were going to have to ship as a caveat is gone: put the case facts wherever they read best.</p>
+    <p class="mt-18">The fix is upstream and not a convention. The corpus is regenerated facts-first, with the case inside the first 8% of the text, and the loader now discards any row that does not fit the window instead of quietly cutting it. A matched 2×2, in which each arm is scored in both renders because scoring each arm only in its own render confounds the variable under test, puts the cost of the original defect at 11.2 points at 1.7B: .942 against .830, 95% CI [+.077, +.147], p = 5e-10. It replicates an order of magnitude up, at 7.8 points at 14B, [+.055, +.100], p = 7e-12, the gap smaller there only because the facts-first 14B reaches .997 and has nowhere left to go.</p>
+    <p class="mt-18">One number from that work is worth more than the fix. JevBench's <code>long_policy</code> subfamily is nineteen items, and on those nineteen the 14B ladder checkpoint scores .053, which is indistinguishable from broken. The same checkpoint scores .919 on long states in its own matched render. Nothing about the model changed between those two numbers. What changed is whether the evaluation put the evidence where that model had been trained to look for it. A benchmark score is a joint measurement of a model and an interface, and you cannot tell which one you are reading without varying both. That subfamily also reported the whole mechanism as a null, p = 0.232, on a difference a better-powered measurement puts below 1e-9 twice. The <a class="ul" href="research.html#the-long-state-bug-and-what-comes-next">long-state write-up</a> has the full 2×2.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="surprised">
+  <div class="claim">
+    <h2>Four things that surprised us</h2>
+    <p>Each of these started as a bug or a failed run, and each one cost more time than the thing it eventually taught us.</p>
+  </div>
+  <div style="max-width:72ch">
+    <div>
+      <h3 class="t-feature">The last layer was the wrong layer to decide from</h3>
+      <p class="mt-18">The first full-scale version read the backbone's last hidden state, which is what you do without thinking about it. The control that caught it was blanking the premise and re-scoring: a model that has learned entailment should collapse, and this one did not. At SNLI .701 it scored .648 with the premise removed, so the evidence was worth five points and the model was reading the hypothesis for well-known annotation artefacts. Moving the tap to layer 20 of 28, so that the state and the query interact inside the pretrained layers rather than above them, took the same probe to .910 with the premise and .440 without, a gap of forty-seven. Going from a 0.6B backbone to a 1.7B one had bought nothing at all until the tap moved.</p>
+    </div>
+    <div class="mt-30">
+      <h3 class="t-feature">Candidates had to participate in the computation</h3>
+      <p class="mt-18">The candidate-blind architecture scored above chance, and the shuffled-question control killed it. Replace the real question with an unrelated one, hold the candidate set fixed, and the listwise teacher loses .102 of accuracy while the students lose between −.026 and +.023, in both directions, at 1,200 items. Their entire above-chance score was candidate-set priors: which option strings look plausible together. Eight probes instead of one decision vector, cross-attention over the candidate tokens and multi-set supervision all failed to move that number, and multi-set training produced exactly .000. Rendering the options into the suffix, so the candidate text passes through the same pretrained layers as the question, produces .127 at 1.7B and .193 at 4B from the same backbone.</p>
+    </div>
+    <div class="mt-30">
+      <h3 class="t-feature">Abstention had to be architecture, not vocabulary</h3>
+      <p class="mt-18">Rendering "none of the above" as an extra option makes the abstention rate a pure function of K. On CLINC with the gold label removed, the model abstained correctly .02 of the time at K=5 and 1.00 of the time at K=150. Not more often: always, on every item, which is a model that has stopped answering. AUROC read .97, .91 and 1.00 across that sweep and hid the pathology completely, because a model that abstains on everything ranks every positive above every negative. Moving abstention into its own head took MMLU-Pro false abstention from .692 to .003 and Banking77 at all 77 labels from .063 to .579, and it cost 2 to 7 points on intent and topic label spaces. A null score that means something different at every candidate count cannot be thresholded, and a threshold is the entire point.</p>
+    </div>
+    <div class="mt-30">
+      <h3 class="t-feature">One KV-cache deep copy cost a quarter to a third of serving latency</h3>
+      <p class="mt-18">The serving path encoded the state once and then deep-copied the entire prefix cache on every single decision, because mutating a shared cache is the kind of bug you only find in production and the copy made it impossible. Replacing the copy with a stride-0 view is bit-identical and allocates nothing, and with cached attention masks and position tensors it took warm p50 on the 1.7B from 21–25 ms to 15.5–17 ms; the Qwen3.5-4B stack <code>typical-medium</code> runs on went from 42–53 ms to 34–46 ms. A quarter to a third of serving latency, for a change that removes code. We tried <code>torch.compile</code> and CUDA graphs on top of it and rejected both: 8 ms on a single shape, but probabilities moved by up to .1 across shape buckets.</p>
+    </div>
+  </div>
+  <p class="note mt-18" style="max-width:72ch">The controls behind all four, along with the ones that came back null, are in the <a class="ul" href="research.html#eight-results-each-with-a-control">research notes</a>.</p>
 </section>
 
 <section class="page chapter" id="tryit">
