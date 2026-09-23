@@ -93,6 +93,7 @@
   /* One gap per boundary. 128 top + 128 bottom + a 64px head margin made every seam 256px of
      nothing; the page gets shorter and heavier at the same time. */
   .chapter { padding-block: 168px 0; }
+  @media (max-width: 64rem) { .chapter { padding-block: 96px 0; } }
   #results { padding-block: 200px 0; }
   /* The side rail is gone. It put every h2 at x=330 while every panel below it started at x=80, so
      the two dominant objects in a section never shared an edge, and it left a 250px column empty in
@@ -115,12 +116,17 @@
      is entered by scrolling. A *box* — radius, clipped, inset in the column — is reserved for a
      live screen: a canvas, an iframe, the instrument. Nothing holding only type gets a box.
      That distinction is what nine identical rounded panels failed to make. */
+  /* The band starts at the section's rule, not at the top of its lead-in gap. Covering the whole
+     168px made the grey begin the instant the previous section's black panel ended — an inset
+     panel edge, the warm margins beside it and a full-bleed band all terminating on one line.
+     Landing the band on the rule gives the panel warm air to end in, and makes the rule the seam. */
   .band { position: relative; }
-  .band::before { content: ''; position: absolute; inset: 0; left: calc(50% - 50vw); width: 100vw; z-index: -1; background: var(--band); }
+  .band::before { content: ''; position: absolute; top: var(--band-top, 168px); right: 0; bottom: 0; left: calc(50% - 50vw); width: 100vw; z-index: -1; background: var(--band); }
   section, .stage-track, .footer, .figband { position: relative; z-index: 1; }
 
   /* the program runs on ground, not on paper: a measured, settled surface */
   #runtime.band { --band: var(--color-lgray); }
+  @media (max-width: 64rem) { .band { --band-top: 96px; } }
   /* lgray is also the default bar-track colour, so the tracks would vanish into their own band */
   #runtime .program-track, #runtime .bar .track { background: var(--color-steel); }
 
