@@ -47,7 +47,7 @@ index: `PROJECT.md`; release cards with full training args: `releases/*.md`.
 | Qwen3.5-4B | `tm2` | .429 | .194 | .414 |
 | Qwen3.5-9B | – | – | – | – |
 
-## 3. Held-out workflow (W), typed-decisions, and external floors — full-row `eval_wf`
+## 3. Held-out workflow (W), typed-decisions, and external floors — capped `results.json` pass
 
 | model | checkpoint | held-out noul | held-out score (NLL) | held-out style | typed-decisions acc (NLL) | PagerDuty (floor .792) | jevlogs (.697) | Mind2Web (.427) | tree-choice |
 |---|---|---|---|---|---|---|---|---|---|
@@ -59,8 +59,12 @@ index: `PROJECT.md`; release cards with full training args: `releases/*.md`.
 | Qwen3.5-4B | `tm2` | .858 | .586 (0.97) | .842 | .515 (1.13) | .757 | .518 | .497 | .585 |
 | Qwen3.5-9B | – | – | – | – | – | – | – | – | – |
 
-PagerDuty/jevlogs/Mind2Web numbers above are this pass's own full-file `eval_wf` extraction and can differ a few
-points from a given release card's train-time-pass number for the same checkpoint (release cards sometimes quote
+**Protocol note (corrected 2026-09-23).** Every number in this table is the capped `results.json`
+evaluation pass, not a full-file `eval_wf` run — the heading previously said otherwise. The two protocols can
+disagree by far more than a few points on the external suites: `ts1b` reads PagerDuty **.560** here, while
+full-file `eval_wf` passes over the same suite (n = 6,000) land between .69 and .79 on comparable checkpoints.
+Compare rows within this table to each other, and do not compare them against a full-file number from §5 or
+from REPORT.md's §3x re-evaluation.
 a shorter pass — see each card's footnotes); treat these as the full-row figures.
 
 ## 4. DecisionMix v2 (`data_wh` hard curriculum, `data_u` uncertainty corpus) — trained checkpoints only
