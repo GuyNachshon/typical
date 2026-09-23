@@ -35,8 +35,11 @@ TAG_RE = re.compile(r"<[^>]+>")
 H2_SPLIT_RE = re.compile(r"(?=<h2)")
 H2_RE = re.compile(r'^<h2 id="([^"]*)">(.*?)</h2>', re.S)
 LI_RE = re.compile(r"<li>\s*(?:<p>)?(.*?)(?:</p>)?\s*</li>", re.S)
-BLOCK_START_RE = re.compile(r'(?=^<(?:h3|p|ul|ol|table|div)\b)', re.M)
-SETPIECE_PREFIXES = ('<table', '<div class="code', '<div class="media', '<div class="ucard')
+BLOCK_START_RE = re.compile(r'(?=^<(?:h3|p|ul|ol|table|div|figure)\b)', re.M)
+# A setpiece breaks the prose column and gets its own full-width row. Match on the opening of the
+# class attribute, not the whole value: '<div class="media"' missed 'class="media dark"' and
+# silently nested a full-width diagram inside the 64ch column, where it drew its stacked layout.
+SETPIECE_PREFIXES = ('<table', '<div class="code', '<div class="media', '<div class="ucard', '<figure class="fig')
 
 # Eyebrow category word per chapter (keyed by the h2's slug id): short and never the title itself
 # (the eyebrow used to fall back to the full title, printing every chapter head twice).

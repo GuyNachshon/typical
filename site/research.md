@@ -15,7 +15,7 @@ top 8 kept layers and a factored ∅ head. The state is read once and cached; ea
 short rendered suffix, and the label, the yes/no, and the level all come out of the same terminal
 decision state, with nothing generated.
 
-<div class="media dark"><div class="chart" id="chart-arch"></div></div>
+<figure class="fig"><div class="chart" id="chart-arch"></div></figure>
 
 *Fig. 1. Typical forward pass, state to probabilities.*
 
