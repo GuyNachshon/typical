@@ -1622,25 +1622,34 @@ worse for callers who do not.
    reference rather than a matched baseline.
 
 
-### 3ak-e. Seed-1 replicate (arm A in; arm B running)
+### 3ak-e. Seed-1 replicate — complete, and it convicts the JevBench metric
 
-A second independent seed of the render-order pair, byte-identical flags apart from `--seed 1`, run to settle
-whether the single-seed result was noise. Arm A is complete; arm B is still training.
+A second independent seed of the whole pair, byte-identical flags apart from `--seed 1`.
 
-| run | JevBench std | hard | `long_policy` | long-605 facts-first | facts-last |
+| run | JevBench std | hard | `long_policy` (n=19) | long-605 facts-first | long-605 facts-last |
 |---|---:|---:|---:|---:|---:|
-| seed-0 arm A (`trunc_first`) | .750 | .378 | 6/19 | **.942** | .797 |
-| seed-0 arm B (`trunc_last`) | .736 | .396 | 2/19 | .640 | .830 |
-| seed-1 arm A (`trunc_first_s1`) | .792 | .405 | 5/19 | **.937** | .777 |
+| seed-0 arm A (facts-first) | .750 | .378 | 6/19 | **.942** | .797 |
+| seed-0 arm B (facts-last) | .736 | .396 | 2/19 | **.640** | .830 |
+| seed-1 arm A (facts-first) | .792 | .405 | 5/19 | **.937** | .777 |
+| seed-1 arm B (facts-last) | .708 | .387 | **5/19** | **.631** | .826 |
 
-**The well-powered measurement replicates almost exactly: .942 → .937 across an independent seed**, a 0.5-point
-difference on the metric the truncation conclusion rests on. That is the reassurance the n=605 set needed.
+**The matched-condition gap is +.112 at seed 0 and +.111 at seed 1.** Every cell of the n=605 measurement
+reproduces to within a point (.942/.937 facts-first, .640/.631 facts-last, .830/.826 and .797/.777 on the
+mismatched renders). For a 1.7B model trained from a different seed on a 23k-row corpus, that is about as stable
+as an empirical result gets, and it is the measurement the truncation conclusion rests on.
 
-**And `long_policy` demonstrates its own inadequacy under replication.** Facts-first gives 6/19 then 5/19; the
-seed-to-seed wobble (1 item) is the same order as the entire effect it is meant to detect (6 vs 2 items). No
-amount of care in analysing a 19-item metric fixes that — the sample size, not the statistics, was the binding
-constraint. This is the empirical version of the argument in §3ak: where a question mattered, the fix was to build
-an eval set large enough to answer it, not to test the small one harder.
+**The pre-registered JevBench metric contradicts itself across seeds on the same comparison.** `long_policy` gives
+facts-first 6/19 against facts-last 2/19 at seed 0 — a 4-item gap in the predicted direction — and 5/19 against
+**5/19** at seed 1, exactly zero. Same two recipes, same protocol, opposite verdicts, while the n=605 set reports
++.112 and +.111. This is the sharpest evidence in the record that the metric, not the mechanism, was the problem:
+a 19-item family cannot distinguish a real 11-point effect from nothing, and one seed of it would have supported
+either conclusion depending which seed was run first. Had seed 1 been the only run, §3ag would have been recorded
+as refuted.
+
+**Methodological consequence.** Pre-registering a decision rule on a metric is not sufficient; the rule has to be
+pre-registered on a metric with the power to resolve the effect size in question. The pass rule for
+`typical-large` (hard ≥ .559, long_policy ≥ .35) fails that test on both terms and should be restated on the
+n=605 set and the paired tests before it gates another release.
 
 
 ## 3ak-b. Cluster-bootstrap confidence intervals on the JevBench public subset
