@@ -1707,47 +1707,127 @@ paraphrases sharing a `group`), so standard is cluster-bootstrapped over `group`
   `zs_mcq_8B`, `bench_fair`, `joint_v2` (data v4 control, no tower), `joint_lw` (listwise), `joint_emb` (embedding-model
   candidates — the $0 probe showed the candidate encoder is the unseen-label bottleneck).
 
-## 6. Where the project stands (2026-09-21) and what is next
+## 6. Where the project stands (2026-09-23) and what is next
 
-**Established (each with a matched control and, where it mattered, a seed or a full-row re-evaluation):**
-1. Candidate-blind decision states carry priors and calibration, not question-conditioned knowledge — at tap 20 and
-   at full depth (§3j, §3s). Candidate-aware suffix computation does; a direct contextual readout keeps all of it with a
-   quarter of the letter interface's order fragility (§3l, §3v).
-2. The evidence-vs-knowledge trade-off was two artifacts: depth (last-layer features) and the rendered "none of the
-   above" line. Removing both gives one model, `nc_v3_tap20` (§3r, §3t): evidence at energy level, Δ_q kept, null
-   monotone in K, JevBench .694 with no workflow training. Two-expert machinery (fusion, support gate, learned gate) is
-   unnecessary (§3n–§3o, §3u).
-3. Rubric-conditioned workflow data teaches the decision shapes it contains — held-out rubric styles +34, held-out
-   families +9–14, rubric-flip both-correct .43 → .57 — and not the general external abstraction (jevlogs / PagerDuty /
-   Mind2Web at floor for K-way Choice; §3w–§3x). It costs probability quality on soft and ordinal gold.
-4. Mixing is a first-class variable: E .45–.50 restores evidence; ∅-augmented W rows fix abstention and MMLU where an
-   eval-time null offset cannot (one global threshold cannot serve E and W; §3y–§3z); the fraction in [.1, .2] does not
-   matter (§3aa). The 1.7B Release-1 mix is fixed.
-5. Small batch = under-fitting = better hard-tier and soft-target numbers at the cost of everything in-distribution: the
-   1.7B hard tier is a probability-quality problem, not a data-volume one (§3aa).
-6. Typed primitives: ordinal-smoothed Score targets fix Score calibration with zero decision changes; a Bernoulli Noul
-   head is exactly order-invariant, cheaper, and the first thing to beat an untouched external floor by a margin
-   (PagerDuty .602 → .886; §3ac).
-7. DecisionMix v2: the hard curriculum transfers within its rule grammar (+34–37, flip .48 → .71, JevBench adversarial
-   .33 → .83) and not beyond it (level-7 composition ~.50 for every model); the U corpus buys likelihood, not top-1
-   (§3ad).
-8. Scale, same recipe: 1.7B → 4B → 14B lifts standard-tier accuracy, knowledge and in-distribution workflow decisions
-   monotonically (JevBench .750 → .833 → .875, MMLU among-K .330 → .457 → .514, held-out noul .70 → .84 → .89) at
-   45 → 56 → 60 ms per decision; 8B (Qwen3-8B-Base) is a checkpoint outlier in both frozen and trained form. Long
-   states and soft calibration do not scale — the frozen 14B with three shots beats our trained 14B on hard (.559 vs
-   .468) — so the hard tier is a data/objective problem at every size (§3ab).
+Rewritten 2026-09-23. The previous version of this section was dated 2026-09-21 and several of its claims did not
+survive the statistical work in §3ak-b; where a reading has been superseded it is marked below rather than deleted,
+because the supersessions are part of the record.
 
-**Release lineage.** `typical-small-preview` (frozen `nc_v3_tap20_wf`, §3t/§3w, errata in the card) → `ts1` / `tm1`
-(1.7B / 4B, r1 mix + DecisionMix v2 + typed heads + 1,024-token states; running) → `typical-small` / `typical-medium`.
+### 6.1 The architecture, frozen since §3r
 
-**Next, in order.** (1) Read `ts1`/`tm1` against `r1_dmv2` and `ladder_4b` with the same pass rule; freeze whichever
-passes as Release 1. (2) Phase 10 calibration objective on the U corpus (log + λ·Brier + ordinal; per-type / per-tier
-reporting; no global T) — the target is the frozen-with-shots hard number at each size. (3) Generator work on level-7
-families (temporal / units / expected value / trade-off), the one axis nothing else in the suite moved. (4) Cumulative-
-link Score head with more steps (open, not rejected). (5) 8B tap/lr sweep only if a product need for that size appears.
-(6) Large-K path benchmarks (energy → top-r → native; memo Phase 12) — the batched marginal cost at K = 256 grows 4×
-from 1.7B to 14B, so this matters more with scale. Closed and not reopened: candidate-blind Z, further readout
-variants, confidence-only routing, null functional forms, depth sweeps.
+Backbone truncated at ~71% depth, LoRA r16 on the kept top layers, the state text KV-cached once as a prefix, the
+question and its runtime-defined candidates rendered into a short causal suffix against that cache, and a contextual
+readout (N3) scoring the terminal decision state against each candidate's own hidden state. No answer token is
+generated. Three typed outputs — Choice (categorical), Score (ordinal-smoothed), Noul (per-row Bernoulli) — plus a
+factored abstention gate.
+
+### 6.2 What is established, and how strongly
+
+1. **Candidate-blind decision states do not preserve question-conditioned capability.** Six factorisations and
+   objectives, every tested depth, with a shuffled-question control (Δ_q) separating genuine question dependence
+   from candidate-set priors: all candidate-blind variants sit in a ±.02 Δ_q band while teacher/N1/N3 sit at
+   .09–.12 (§3j, §3s). Candidate-aware suffix computation recovers it, and the contextual readout keeps it with a
+   quarter of the letter interface's order fragility (§3l, §3v). **This is the project's strongest result** and the
+   one with no close prior art. Scoped, not an impossibility theorem.
+
+2. **The evidence-vs-knowledge trade-off was two artifacts, not a trade-off:** last-layer features, and the rendered
+   "none of the above" line. Removing both gives one model rather than two experts; fusion, support gating and
+   learned routing are all unnecessary (§3n–§3o, §3r, §3t, §3u).
+
+3. **Typed primitives are contracts on the output distribution, and they work.** Ordinal-smoothed Score targets fix
+   Score calibration with zero top-1 decision changes; a Bernoulli Noul head is exactly order-invariant and was the
+   first thing to beat an untouched external floor by a wide margin (PagerDuty .602 → .886) (§3ac).
+
+4. **Rubric-conditioned workflow data teaches the decision shapes it contains, not a general abstraction.** Held-out
+   rubric styles +34, held-out families +9–14; external suites (jevlogs, PagerDuty, Mind2Web) at or below their
+   constant-prediction floors for K-way Choice (§3w–§3x). DecisionMix v2 transfers within its rule grammar and not
+   beyond it; level-7 composition sits near .50 for every model at every size (§3ad).
+
+5. **Training mixture is a first-class variable**, on a par with architecture: E .45–.50 restores evidence, and
+   ∅-augmented W rows fix abstention where an eval-time null offset cannot, because one global threshold cannot
+   serve E and W at once (§3y–§3aa).
+
+6. **The long-state truncation defect was real and its fix is demonstrated.** `data_wf_long` rendered the case facts
+   last; with right-truncation (verified empirically) at a 1,024-token window, 98.8% of long rows lost their facts,
+   and every model since §3z was trained to answer long policies from unreadable states. A matched facts-first vs
+   facts-last ablation, scored in each model's own render so that render compatibility is not confounded with the
+   effect, gives **+.112 [+.077, +.147] at 1.7B (p = 5e-10)** and **+.078 [+.055, +.100] at 14B (p = 7e-12)**,
+   replicated at a second seed (+.111) (§3ak-a, §3ak-c, §3ak-e).
+
+7. **Rendering is a first-class experimental factor, and benchmark score = capability + interface compatibility.**
+   Three independent demonstrations: frozen-model rendering alone moves JevBench standard by 12.5 points at 9B
+   (p < .001); a train/test render mismatch moves a held-out family 23 points and drops the model onto its
+   majority-class floor; and `ladder_14b`, whose JevBench `long_policy` reads .053, scores **.919** on 605 held-out
+   long states in its own matched render (§3ak-a, §3ak-c). This is a methodological finding about comparing
+   architectures, including ours — it is not a reason to discount anyone else's numbers.
+
+8. **The hard tier is unresolved at every size, and fine-tuning can make it worse.** A frozen 14B with three
+   exemplars beats our trained 14B on the hard tier by **+.108 [+.027, +.189], p = .015** on a paired per-item test
+   (§3ab, §3ak-b). Whether that reflects a limit of direct readout or of this training recipe is open; the rendering
+   confound in point 7 weakens any strong causal reading.
+
+### 6.3 What the confidence intervals changed (§3ak-b)
+
+Cluster-bootstrapped over the paraphrase `group`, because JevBench's standard tier is 72 items but only **36
+independent states**: hard is **±9 points at n = 111**, standard **±6–13 at n_eff = 36**.
+
+- **Every adjacent pair of checkpoints in this record is statistically indistinguishable on JevBench.** Only paired
+  per-item tests have the power to say anything, and only three survive: frozen-beats-trained on hard (p = .015),
+  the rendering effect (p < .001), and nothing else.
+- **Superseded:** the previous §6 claimed scale lifts standard-tier accuracy "monotonically" across
+  1.7B → 4B → 14B. Those gaps are inside the interval. The ladder is a ladder, not a scaling law, and the 8B point
+  remains an anomaly.
+- **Superseded:** §3ai's reading that the frozen teacher was "slightly negative" on the hard tier. Paired test gives
+  +.027 [−.027, +.090], p = .45 — no effect detectable in either direction at this sample size.
+- **`tl2` (9B) vs `tm2` (4B) are both exactly 55/111 on hard but are not the same model** — zero of 111 probability
+  vectors match and they disagree on 26 items, 13 each way. McNemar p = 1.000, paired CI [−.090, +.090]. The
+  benchmark cannot resolve 4B vs 9B; that is not a tie.
+- **The pre-registered `typical-large` pass rule (hard ≥ .559, long_policy ≥ .35) is not fit for purpose**: both
+  terms are point thresholds on quantities whose intervals are wider than the effects being gated. It must be
+  restated on a lower confidence bound, or on metrics with enough items, before it gates another release.
+
+### 6.4 The metric lesson, stated plainly
+
+JevBench's hard-tier `long_policy` family has **n = 19**. Across two seeds of the same matched comparison it gave
+6/19 vs 2/19 and then 5/19 vs 5/19 — a four-item gap, then exactly zero — while the purpose-built 605-item set gave
++.112 and +.111 on the same pair. Had the second seed been the one we ran first, §3ag would have been recorded as
+refuted. Separately, that same family gave `tl1b_semif` a .053 that the 605-item set showed to be .974.
+
+Three conclusions this project nearly reached from that one 19-item cell would have been wrong. Pre-registering a
+decision rule is not sufficient; the rule has to be pre-registered on a metric with the power to resolve the effect
+size in question. Where a question mattered, the fix was to build an eval set large enough to answer it
+(`scripts/make_long_eval.py`, n = 605, leak-checked) rather than to analyse the small one harder.
+
+### 6.5 Releases as of 2026-09-23
+
+| release | checkpoint | backbone | status |
+|---|---|---|---|
+| `typical-small-preview` | `nc_v3_tap20_wf` | Qwen3-1.7B-Base | historical reference, kept public |
+| `typical-small` **v2** | `ts1c` | Qwen3-1.7B-Base | shipped 2026-09-23, supersedes `ts1b` |
+| `typical-medium` **v2** | `tm2` | **Qwen3.5-4B-Base** | shipped 2026-09-23, supersedes `tm1b` |
+| `typical-large` | — | — | **withheld**: `tl1b` missed its pass rule, and the rule itself needs restating |
+
+Both v2 releases are trades, and both cards say so. Small gains +34.9 on long states and loses 6.5 on held-out
+Noul, 4.8 on BoolQ, 3.7 on uncertainty, 3.4 on Score, 2.8 on style. Medium gains +33.8 long-state, +7.2 JevBench
+hard and +5.6 standard, and loses 5.5 on CLINC-150 and 5.3 on HWU64. v1 weights remain in each repo's git history.
+The Qwen3.5-capable `inference/typical/backbone.py` was published to all three repos before the medium weights,
+because 60 of `tm2`'s 124 LoRA tensors sit on modules the previous code did not know.
+
+### 6.6 What is open, in priority order
+
+1. **Restate the release gate** on the n=605 set and paired tests before any further release decision.
+2. **Level-7 composition** (temporal, numeric, expected-value, trade-off) — near .50 at every size, and the one axis
+   nothing in the suite has moved. Generator work, not scale.
+3. **The hard tier / frozen-backbone gap** — is direct readout insufficient, or is the recipe? Design an experiment
+   that separates them, controlling rendering.
+4. **Phase 10 calibration objective** on the U corpus (log + λ·Brier + ordinal, per-type reporting, no global T).
+5. **Retrain Small without the regression** — v2's Noul/BoolQ/Score losses are a data-mixture question, not an
+   architectural one.
+6. **Large-K path** (energy → top-r → native): the batched marginal cost at K = 256 grows 4× from 1.7B to 14B.
+7. **Training-code release** — the repo is private; every public card currently promises it.
+
+Closed and not reopened: candidate-blind Z compilation, further readout variants, confidence-only routing, null
+functional forms, depth/tap sweeps (§3aj, a matched negative).
 
 ## 7. Decision log (why things were done)
 
