@@ -16,7 +16,7 @@
       "easy": 1.0,
       "hard": 0.441,
       "brier_hard": 0.67,
-      "trained": "typical-medium"
+      "trained": null
     },
     {
       "backbone": "Qwen3-4B (instruct)",
@@ -57,7 +57,7 @@
       "easy": 1.0,
       "hard": 0.495,
       "brier_hard": 0.6,
-      "trained": null
+      "trained": "typical-medium"
     },
     {
       "backbone": "Qwen3.5-9B-Base",
@@ -69,6 +69,6 @@
       "source": "buffalo:RESULTS.md#5-jevbench (jev_zs3_q35_9b)"
     }
   ],
-  "in_flight": "a 14B release candidate, not yet a release (Qwen3-14B, facts-first long rows, 3,072-token states, frozen-14B distillation) and tm2 (Qwen3.5-4B); pass rule: hard >= .559 or hard Brier <= .65, long_policy >= .35 (REPORT \u00a73ag)",
-  "long_state_bug": "data_wf_long rendered the case facts last and training right-truncated at max_state, so 98.8% of long-policy rows lost their facts at 1,024 tokens; fixed by facts-first regeneration + --drop_truncated (REPORT \u00a73ag, commit 2fad326)"
+  "in_flight": "a 14B release candidate, not yet a release (Qwen3-14B, facts-first long rows, 3,072-token states, frozen-14B distillation), and tl2 (Qwen3.5-9B) trained but not yet evaluated; pass rule: hard >= .559 or hard Brier <= .65, long_policy >= .35 (REPORT #3ag). tm2 (Qwen3.5-4B) is no longer in flight -- it shipped as typical-medium on 2026-09-23, as ts1c did for typical-small (buffalo:RESULTS.md#7, releases/MANIFEST.json).",
+  "long_state_bug": "data_wf_long rendered the case facts last and training right-truncated at max_state, so 98.8% of long-policy rows lost their facts at 1,024 tokens; fixed by facts-first regeneration + --drop_truncated (REPORT \u00a73ag, commit 2fad326). Both shipped checkpoints carry the fix: ts1c and tm2 train at 2,048-token states with --drop_truncated and read .947 / .950 on 605 held-out facts-first long states, against .598 / .612 for the superseded ts1b / tm1b (buffalo:RESULTS.md#5b)."
 }
