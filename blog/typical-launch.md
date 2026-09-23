@@ -85,8 +85,8 @@ We train on four kinds of decision: evidence (NLI-style), knowledge (multiple ch
 
 | model | size | JevBench standard\* | JevBench hard\* | CLINC-150 | warm p50 |
 |---|---|---|---|---|---|
-| `typical-small` | 1.7B | .694 | .432 | .801 | 15.5–17 ms |
-| `typical-medium` | 4B | .806 | .423 | .847 | 19–21 ms |
+| `typical-small` v2 | 1.7B | .708 | .432 | .797 | 15.5–17 ms |
+| `typical-medium` v2 | 4B (Qwen3.5) | .861 | .495 | .795 | 19–21 ms |
 
 \* Public-subset run against JevBench v1.2.1 (72 standard / 111 hard public ids), not a ranked leaderboard entry. Majority baselines on this split are .311 standard and .336 hard, and at n_eff ≈ 36 on standard, small gaps are noise. Latency is warm p50 per decision on one H100 through the public inference package.
 
@@ -111,11 +111,11 @@ The honest version of the question: when is a direct decision enough, and when d
 
 Two other places Typical is the wrong tool today: candidate sets in the hundreds or thousands need a retrieval front end feeding a shortlist to the decision head, and Choice keeps some sensitivity to the order you list options in. Noul does not, by construction.
 
-## One thing to know before you call it
+## The bug we shipped, and the fix
 
-If your state is a long document, put the case facts **after** the policy text, not before.
+Both models were re-released on 2026-09-23 to fix this. If you pulled them before that date, pull again.
 
-All three public checkpoints were trained on a corpus whose long states rendered the case last, and they picked up that ordering. We measured it on 605 held-out long policy states, identical content in both conditions, only the position of the case block different, with no truncation at scoring time:
+The checkpoints we first published were trained on a corpus whose long states rendered the case last, and they picked up that ordering. We measured it on 605 held-out long policy states, identical content in both conditions, only the position of the case block different, with no truncation at scoring time:
 
 | model | facts last | facts first |
 |---|---|---|
@@ -125,7 +125,9 @@ All three public checkpoints were trained on a corpus whose long states rendered
 
 Twenty to twenty-five points, and on the yes/no subset the preview model drops below the majority-class floor, meaning you would do better answering "yes" to everything than calling it that way. Short states are unaffected.
 
-We found this while testing whether a data bug we had already fixed was the cause of a separate problem. Retrained checkpoints without the bias exist and reach .947 and .950 in the same test, giving up nothing in the other column, and they will supersede these. Until they do, the ordering above is the caveat, and it is on each model card.
+We found this while testing whether a data bug we had already fixed was the cause of a separate problem. The current weights, published on 2026-09-23, reach **.947** (Small) and **.950** (Medium) on that same test, so either ordering works now.
+
+Both replacements are trades rather than clean upgrades, and the model cards say so. Small gains 34.9 points on long states and loses 6.5 on held-out yes/no decisions, 4.8 on BoolQ and 3.4 on Score. Medium gains 33.8 on long states, 7.2 on JevBench hard and 5.6 on standard, and loses 5.5 on CLINC-150 and 5.3 on HWU64. Medium also moved to a Qwen3.5-4B backbone, so re-pull the inference package from the model repo before loading it. The previous weights remain in each repository's git history if the older behaviour suited your workload better.
 
 ## Four things that surprised us
 
