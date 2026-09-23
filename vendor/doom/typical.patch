@@ -1,0 +1,199 @@
+diff --git a/configure.ac b/configure.ac
+index ae1320b..87a935a 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -115,7 +115,7 @@ AS_IF([test "x$with_libpng" != xno], [
+ 
+ # TODO: We currently link everything against libraries that don't need it.
+ # Use the specific library CFLAGS/LIBS variables instead of setting them here.
+-EMFLAGS="-gsource-map -s INVOKE_RUN=1 -s USE_SDL=2 -s USE_SDL_MIXER=2 -s LEGACY_GL_EMULATION=0 -s USE_SDL_NET=2 -s ASSERTIONS=0 -s WASM=1 -s ALLOW_MEMORY_GROWTH=0 -s FORCE_FILESYSTEM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS=[['FS','ccall']] -s SAFE_HEAP=1 -s EXIT_RUNTIME=1 -s STACK_OVERFLOW_CHECK=1 -s PROXY_POSIX_SOCKETS=0 -s USE_PTHREADS=0 -s PROXY_TO_PTHREAD=0 -s TOTAL_MEMORY=64MB -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASYNCIFY -O3 --source-map-base /"
++EMFLAGS="-s INVOKE_RUN=1 -s USE_SDL=2 -s USE_SDL_MIXER=2 -s LEGACY_GL_EMULATION=0 -s USE_SDL_NET=2 -s ASSERTIONS=0 -s WASM=1 -s ALLOW_MEMORY_GROWTH=0 -s FORCE_FILESYSTEM=1 -s EXPORTED_RUNTIME_METHODS=[['FS','ccall','cwrap','UTF8ToString']] -s EXPORTED_FUNCTIONS=[['_main','_typical_state_json','_typical_input','_typical_new_game']] -Wno-error=undefined -s EXIT_RUNTIME=1 -s STACK_OVERFLOW_CHECK=1 -s PROXY_POSIX_SOCKETS=0 -s USE_PTHREADS=0 -s PROXY_TO_PTHREAD=0 -s TOTAL_MEMORY=64MB -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASYNCIFY -O3 -g0 --profiling-funcs -s STACK_SIZE=5MB"
+ 
+ CFLAGS="$CFLAGS $SDL_CFLAGS ${SAMPLERATE_CFLAGS:-} ${PNG_CFLAGS:-} $EMFLAGS"
+ LDFLAGS="$LDFLAGS $SDL_LIBS ${SAMPLERATE_LIBS:-} ${PNG_LIBS:-} $EMFLAGS -lwebsocket.js"
+diff --git a/src/doom/Makefile.am b/src/doom/Makefile.am
+index 89ca2b4..d221a45 100644
+--- a/src/doom/Makefile.am
++++ b/src/doom/Makefile.am
+@@ -71,5 +71,6 @@ sounds.c           sounds.h     \
+ statdump.c         statdump.h   \
+ st_lib.c           st_lib.h     \
+ st_stuff.c         st_stuff.h   \
++typical_api.c                   \
+ wi_stuff.c         wi_stuff.h
+ 
+diff --git a/src/doomtype.h b/src/doomtype.h
+index 9947a07..c547778 100644
+--- a/src/doomtype.h
++++ b/src/doomtype.h
+@@ -100,7 +100,7 @@
+ 
+ #include <inttypes.h>
+ 
+-#if defined(__cplusplus) || defined(__bool_true_false_are_defined)
++#if defined(__cplusplus)
+ 
+ // Use builtin bool type with C++.
+ 
+@@ -108,11 +108,12 @@ typedef bool boolean;
+ 
+ #else
+ 
+-typedef enum 
+-{
+-    false, 
+-    true
+-} boolean;
++// typical: one fixed size in every TU. With newer emscripten, some headers
++// (SDL, emscripten.h) pull in <stdbool.h> so the old __bool_true_false_are_defined
++// switch gave 1-byte bools in some files and 4-byte enums in others, corrupting
++// playeringame[] and player_t across translation units.
++#include <stdbool.h>
++typedef int boolean;
+ 
+ #endif
+ 
+diff --git a/src/doom/typical_api.c b/src/doom/typical_api.c
+new file mode 100644
+index 0000000..157b2fd
+--- /dev/null
++++ b/src/doom/typical_api.c
+@@ -0,0 +1,138 @@
++// typical_api.c — JS-facing state export + input injection for the Typical site.
++// GPL-2, same as the rest of Chocolate Doom.
++#include <emscripten.h>
++#include <math.h>
++#include <stdio.h>
++#include <string.h>
++
++#include "doomstat.h"
++#include "d_event.h"
++#include "d_player.h"
++#include "d_items.h"
++#include "g_game.h"
++#include "m_menu.h"
++#include "p_local.h"
++#include "r_main.h"
++
++#define ANG_TO_DEG(a) ((double)(int32_t)(a) * (360.0 / 4294967296.0))
++#define NEAREST 8
++
++static const char *weapon_names[NUMWEAPONS] = {
++    "fist", "pistol", "shotgun", "chaingun", "rocket", "plasma", "bfg", "chainsaw", "supershotgun"};
++
++static const char *MonsterName(mobjtype_t t)
++{
++    switch (t)
++    {
++        case MT_POSSESSED: return "zombieman";
++        case MT_SHOTGUY:   return "shotgun_guy";
++        case MT_TROOP:     return "imp";
++        case MT_SERGEANT:  return "demon";
++        case MT_SHADOWS:   return "spectre";
++        case MT_HEAD:      return "cacodemon";
++        case MT_BRUISER:   return "baron";
++        case MT_SKULL:     return "lost_soul";
++        case MT_SPIDER:    return "spider_mastermind";
++        case MT_CYBORG:    return "cyberdemon";
++        default:           return "monster";
++    }
++}
++
++// Same test as P_TryMove but without moving, and with pickups disabled so the
++// probe can't grab items. P_CheckPosition only looks at the bbox at the target,
++// so probe every 16 units out to dist rather than just the far point.
++static int BlockedAhead(mobj_t *mo, int dist)
++{
++    int flags = mo->flags, d, ok = 1;
++    mo->flags &= ~MF_PICKUP;
++    for (d = 16; d <= dist && ok; d += 16)
++    {
++        fixed_t nx = mo->x + FixedMul(d * FRACUNIT, finecosine[mo->angle >> ANGLETOFINESHIFT]);
++        fixed_t ny = mo->y + FixedMul(d * FRACUNIT, finesine[mo->angle >> ANGLETOFINESHIFT]);
++        ok = P_CheckPosition(mo, nx, ny)
++            && tmceilingz - tmfloorz >= mo->height
++            && tmceilingz - mo->z >= mo->height
++            && tmfloorz - mo->z <= 24 * FRACUNIT;
++    }
++    mo->flags = flags;
++    return !ok;
++}
++
++EMSCRIPTEN_KEEPALIVE
++const char *typical_state_json(void)
++{
++    static char buf[4096];
++    char *p = buf, *end = buf + sizeof(buf);
++    player_t *pl = &players[consoleplayer];
++    mobj_t *mo = pl->mo;
++    int ammotype;
++
++    if (gamestate != GS_LEVEL || !mo)
++    {
++        snprintf(buf, sizeof(buf), "{\"in_level\":false,\"gamestate\":%d,\"menu\":%d}",
++                 (int)gamestate, menuactive ? 1 : 0);
++        return buf;
++    }
++
++    ammotype = weaponinfo[pl->readyweapon].ammo;
++    p += snprintf(p, end - p,
++        "{\"in_level\":true,\"demo\":%s,\"menu\":%d,\"episode\":%d,\"map\":%d,\"tic\":%d,"
++        "\"x\":%.1f,\"y\":%.1f,\"angle\":%.1f,\"health\":%d,\"armor\":%d,"
++        "\"weapon\":\"%s\",\"ammo\":%d,\"kills\":%d,\"total_kills\":%d,"
++        "\"blocked_ahead\":%s,\"monsters\":[",
++        demoplayback ? "true" : "false", menuactive ? 1 : 0, gameepisode, gamemap, leveltime,
++        mo->x / (double)FRACUNIT, mo->y / (double)FRACUNIT, ANG_TO_DEG(mo->angle),
++        pl->health, pl->armorpoints, weapon_names[pl->readyweapon],
++        ammotype == am_noammo ? -1 : pl->ammo[ammotype],
++        pl->killcount, totalkills, BlockedAhead(mo, 64) ? "true" : "false");
++
++    // ponytail: O(n*8) insertion into a small sorted array; fine for Doom's thinker counts.
++    mobj_t *near[NEAREST];
++    double near_d[NEAREST];
++    int n = 0;
++    for (thinker_t *th = thinkercap.next; th != &thinkercap; th = th->next)
++    {
++        if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
++        mobj_t *m = (mobj_t *)th;
++        if (!(m->flags & MF_COUNTKILL) || m->health <= 0) continue;
++        double d = P_AproxDistance(m->x - mo->x, m->y - mo->y) / (double)FRACUNIT;
++        if (n == NEAREST && d >= near_d[NEAREST - 1]) continue;
++        int i = n < NEAREST ? n++ : NEAREST - 1;
++        while (i > 0 && near_d[i - 1] > d) { near[i] = near[i - 1]; near_d[i] = near_d[i - 1]; i--; }
++        near[i] = m; near_d[i] = d;
++    }
++    for (int i = 0; i < n; i++)
++    {
++        mobj_t *m = near[i];
++        // Doom angles grow counter-clockwise; flip so positive = right of crosshair.
++        double bearing = -ANG_TO_DEG(R_PointToAngle2(mo->x, mo->y, m->x, m->y) - mo->angle);
++        // visible = line of sight (P_CheckSight, the same test monsters use to see the player), so
++        // the text state can say "in sight" honestly instead of listing monsters behind walls.
++        p += snprintf(p, end - p,
++            "%s{\"type\":\"%s\",\"dist\":%.0f,\"bearing\":%.1f,\"in_crosshair\":%s,\"visible\":%s}",
++            i ? "," : "", MonsterName(m->type), near_d[i], bearing,
++            fabs(bearing) <= 8.0 ? "true" : "false", P_CheckSight(mo, m) ? "true" : "false");
++    }
++    snprintf(p, end - p, "]}");
++    return buf;
++}
++
++// Same path I_HandleKeyboardEvent takes for SDL key events (key codes from doomkeys.h).
++EMSCRIPTEN_KEEPALIVE
++void typical_input(int key, int down)
++{
++    event_t ev;
++    memset(&ev, 0, sizeof(ev));
++    ev.type = down ? ev_keydown : ev_keyup;
++    ev.data1 = key;
++    ev.data2 = ev.data3 = (down && key < 128) ? key : 0;
++    D_PostEvent(&ev);
++}
++
++// Start E1M1 the same way the menu does (deferred to the next tic inside the main loop);
++// -warp autostart runs the first tic inline in main() and trips over asyncify.
++EMSCRIPTEN_KEEPALIVE
++void typical_new_game(int skill)
++{
++    G_DeferedInitNew(skill, 1, 1);
++}

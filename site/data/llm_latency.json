@@ -1,0 +1,117 @@
+{
+  "method": "Wall clock from a client process: request sent to answer parsed, both arms, same ticket and same four options, the hosted model constrained to the same label set by JSON schema. Each hosted model is run twice, at its lowest and its highest reasoning effort. Medians over the stated trial count, warmups discarded. Typical runs locally on mps, not the H100 the 45 ms ladder was measured on.",
+  "runs": {
+    "openrouter/google/gemini-2.5-flash-lite (high reasoning)": {
+      "trials": 8,
+      "reasoning": "high",
+      "measured_utc": "2026-09-22T20:44:50Z",
+      "arms": {
+        "typical_1": {
+          "n": 8,
+          "median_ms": 64.1,
+          "p10_ms": 61.7,
+          "p90_ms": 64.3
+        },
+        "typical_8": {
+          "n": 8,
+          "median_ms": 161.4,
+          "p10_ms": 160.5,
+          "p90_ms": 162.8
+        },
+        "llm_1": {
+          "n": 8,
+          "median_ms": 3910.9,
+          "p10_ms": 2068.6,
+          "p90_ms": 5323.9
+        },
+        "llm_8_batched": {
+          "n": 8,
+          "median_ms": 7554.1,
+          "p10_ms": 5874.6,
+          "p90_ms": 9922.3
+        },
+        "llm_8_serial": {
+          "n": 4,
+          "median_ms": 34954.2,
+          "p10_ms": 30415.4,
+          "p90_ms": 37087.6
+        }
+      }
+    },
+    "openrouter/openai/gpt-5.4-nano (low reasoning)": {
+      "trials": 12,
+      "reasoning": "low",
+      "measured_utc": "2026-09-22T20:49:44Z",
+      "arms": {
+        "typical_1": {
+          "n": 12,
+          "median_ms": 69.8,
+          "p10_ms": 67.1,
+          "p90_ms": 183.7
+        },
+        "typical_8": {
+          "n": 12,
+          "median_ms": 280.5,
+          "p10_ms": 166.0,
+          "p90_ms": 283.8
+        },
+        "llm_1": {
+          "n": 12,
+          "median_ms": 2336.9,
+          "p10_ms": 1957.2,
+          "p90_ms": 2677.2
+        },
+        "llm_8_batched": {
+          "n": 12,
+          "median_ms": 2755.2,
+          "p10_ms": 1682.1,
+          "p90_ms": 3269.2
+        },
+        "llm_8_serial": {
+          "n": 4,
+          "median_ms": 15754.0,
+          "p10_ms": 14871.3,
+          "p90_ms": 15964.3
+        }
+      }
+    },
+    "openrouter/openai/gpt-5.4-nano (high reasoning)": {
+      "trials": 8,
+      "reasoning": "high",
+      "measured_utc": "2026-09-22T20:52:19Z",
+      "arms": {
+        "typical_1": {
+          "n": 8,
+          "median_ms": 64.7,
+          "p10_ms": 62.5,
+          "p90_ms": 65.6
+        },
+        "typical_8": {
+          "n": 8,
+          "median_ms": 164.2,
+          "p10_ms": 163.2,
+          "p90_ms": 167.8
+        },
+        "llm_1": {
+          "n": 8,
+          "median_ms": 2841.3,
+          "p10_ms": 2311.7,
+          "p90_ms": 5017.4
+        },
+        "llm_8_batched": {
+          "n": 8,
+          "median_ms": 4668.1,
+          "p10_ms": 2892.9,
+          "p90_ms": 5457.9
+        },
+        "llm_8_serial": {
+          "n": 4,
+          "median_ms": 19469.9,
+          "p10_ms": 19156.5,
+          "p90_ms": 19559.0
+        }
+      }
+    }
+  },
+  "typical_device": "mps"
+}

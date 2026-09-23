@@ -1,0 +1,13 @@
+{
+  "source": "gpu-runpod-full-experiment:REPORT.md#6 (eight established results, each with a matched control)",
+  "items": [
+    {"tag": "Readout", "title": "The decision is in the model before it emits a letter; read it there.", "meta": "Contextual readout keeps knowledge with a quarter of the letter interface's order fragility · §3l, §3v"},
+    {"tag": "Null", "title": "Two artifacts caused the evidence-vs-knowledge trade-off: last-layer taps and a rendered “none of the above” line.", "meta": "Removing both: JevBench .694 with no workflow training · §3r, §3t"},
+    {"tag": "Data", "title": "Rubric-conditioned workflow data teaches the decision shapes it contains, not the general abstraction.", "meta": "Held-out styles +34, families +9–14, rubric-flip .43 → .57 · §3w–§3x"},
+    {"tag": "Mixing", "title": "The training mix is a first-class variable; one global null threshold cannot serve evidence and workflow sets.", "meta": "E .45–.50 restores evidence; ∅-augmented rows fix abstention · §3y–§3aa"},
+    {"tag": "Batch", "title": "Small batches under-fit: better hard-tier numbers at the cost of everything in-distribution.", "meta": "The 1.7B hard tier is a probability-quality problem · §3aa"},
+    {"tag": "Typed heads", "title": "Ordinal-smoothed Score fixes calibration with zero decision changes; a Bernoulli Noul head is exactly order-invariant.", "meta": "PagerDuty .602 → .886 (intermediate checkpoint) · §3ac"},
+    {"tag": "Curriculum", "title": "DecisionMix v2 transfers within its rule grammar and not beyond it.", "meta": "Families +34–37, flip .48 → .71; level-7 composition at chance for every model · §3ad"},
+    {"tag": "Scale", "title": "1.7B → 4B → 14B lifts standard accuracy and knowledge; long states and soft calibration do not scale.", "meta": "JevBench .750 → .833 → .875 at 45 → 56 → 60 ms; frozen 14B 3-shot beats trained on hard · §3ab"}
+  ]
+}

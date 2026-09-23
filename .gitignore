@@ -4,6 +4,8 @@ __pycache__/
 .context/
 wandb/
 data/
+!site/data/
+!site/data/**
 data_*/
 runs_*.log
 run_grid*.sh
@@ -28,3 +30,9 @@ runs/jev_*/*/*
 !runs/jev_*/*/summary.json
 !runs/jev_*/*/manifest.json
 !runs/jev_*/*/results.jsonl
+
+# vendored upstream clone (GPL-2 Chocolate Doom); rebuild with vendor/doom/build.sh
+vendor/doom/doom-wasm/
+vendor/doom/doom1.wad
+vendor/doom/build.log
+node_modules/

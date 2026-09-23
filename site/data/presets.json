@@ -1,0 +1,358 @@
+{
+  "_note": "Single source of truth for every demo on the site. scripts/record_replays.py records data/replays.json from these exact strings; js/main.js mounts demos from them. Do not edit a state/query here without re-recording. Strings for playground/flip/policy/abstain come from .context/content-spec.md (R1, R2, R5, R6); inbox/triage rows are filled by the replay recorder from the source datasets.",
+  "playground": {
+    "title": "One state, many questions, one pass",
+    "state": "Ticket #7734: A customer writes: 'I was charged twice for my last order and the tracking number you sent doesn't work. I need this fixed today.'",
+    "queries": [
+      {
+        "type": "choice",
+        "question": "Which team should own this ticket?",
+        "labels": [
+          "billing",
+          "shipping",
+          "support",
+          "retention"
+        ]
+      },
+      {
+        "type": "score",
+        "question": "How urgent is this ticket, 0=low..3=critical?",
+        "labels": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ]
+      },
+      {
+        "type": "noul",
+        "question": "Should this be escalated to a manager? Answer yes if the customer was charged twice or asks for same-day resolution; otherwise answer no.",
+        "labels": [
+          "no",
+          "yes"
+        ]
+      },
+      {
+        "type": "choice",
+        "question": "What is the customer asking for?",
+        "labels": [
+          "a refund of the duplicate charge",
+          "a replacement item",
+          "an apology",
+          "a working tracking number"
+        ]
+      }
+    ]
+  },
+  "flip": {
+    "title": "Same facts, different rule",
+    "state": "The applicant's credit score is 590. The applicant's income was verified with pay stubs. No collateral was pledged. The applicant has no prior defaults. The applicant's debt-to-income ratio is 28%.",
+    "rules": {
+      "deny": "applies when the applicant's credit score is below 650",
+      "approve": "applies when the applicant's income was independently verified",
+      "approve_with_conditions": "applies when collateral was pledged",
+      "refer_to_underwriter": "applies when none of the above rules fire"
+    },
+    "question_prefix": "Which outcome applies for approve the loan? Apply the rules in the stated precedence order; the first matching rule wins.",
+    "orders": [
+      [
+        "deny",
+        "approve",
+        "approve_with_conditions",
+        "refer_to_underwriter"
+      ],
+      [
+        "approve",
+        "deny",
+        "approve_with_conditions",
+        "refer_to_underwriter"
+      ]
+    ]
+  },
+  "policy": {
+    "title": "Policy check (yes / no)",
+    "state": "The item was purchased 45 days ago. The item is unused. The customer is asking for a cash refund.",
+    "queries": [
+      {
+        "type": "noul",
+        "question": "Should you issue a cash refund? Answer yes if the purchase was within the last 30 days; otherwise answer no.",
+        "labels": [
+          "no",
+          "yes"
+        ]
+      },
+      {
+        "type": "noul",
+        "question": "Should you issue store credit? Answer yes if the purchase was more than 30 days ago and the item is unused; otherwise answer no.",
+        "labels": [
+          "no",
+          "yes"
+        ]
+      }
+    ]
+  },
+  "abstain": {
+    "title": "When the answer is not in the list: ∅",
+    "state": "Premise: the company's Q3 revenue grew 4% year-over-year, driven mainly by its cloud division.",
+    "variants": [
+      {
+        "label": "gold absent",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "What was the primary driver of the decline in Q3 profit?",
+            "labels": [
+              "layoffs",
+              "currency headwinds",
+              "litigation costs"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "gold present",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "What was the primary driver of Q3 revenue growth?",
+            "labels": [
+              "layoffs",
+              "cloud division",
+              "litigation costs"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "inbox": {
+    "title": "Route to one of 150 intents",
+    "question": "What does the user want?",
+    "labels": [
+      "accept_reservations",
+      "account_blocked",
+      "alarm",
+      "application_status",
+      "apr",
+      "are_you_a_bot",
+      "balance",
+      "bill_balance",
+      "bill_due",
+      "book_flight",
+      "book_hotel",
+      "calculator",
+      "calendar",
+      "calendar_update",
+      "calories",
+      "cancel",
+      "cancel_reservation",
+      "car_rental",
+      "card_declined",
+      "carry_on",
+      "change_accent",
+      "change_ai_name",
+      "change_language",
+      "change_speed",
+      "change_user_name",
+      "change_volume",
+      "confirm_reservation",
+      "cook_time",
+      "credit_limit",
+      "credit_limit_change",
+      "credit_score",
+      "current_location",
+      "damaged_card",
+      "date",
+      "definition",
+      "direct_deposit",
+      "directions",
+      "distance",
+      "do_you_have_pets",
+      "exchange_rate",
+      "expiration_date",
+      "find_phone",
+      "flight_status",
+      "flip_coin",
+      "food_last",
+      "freeze_account",
+      "fun_fact",
+      "gas",
+      "gas_type",
+      "goodbye",
+      "greeting",
+      "how_busy",
+      "how_old_are_you",
+      "improve_credit_score",
+      "income",
+      "ingredient_substitution",
+      "ingredients_list",
+      "insurance",
+      "insurance_change",
+      "interest_rate",
+      "international_fees",
+      "international_visa",
+      "jump_start",
+      "last_maintenance",
+      "lost_luggage",
+      "make_call",
+      "maybe",
+      "meal_suggestion",
+      "meaning_of_life",
+      "measurement_conversion",
+      "meeting_schedule",
+      "min_payment",
+      "mpg",
+      "new_card",
+      "next_holiday",
+      "next_song",
+      "no",
+      "nutrition_info",
+      "oil_change_how",
+      "oil_change_when",
+      "order",
+      "order_checks",
+      "order_status",
+      "pay_bill",
+      "payday",
+      "pin_change",
+      "play_music",
+      "plug_type",
+      "pto_balance",
+      "pto_request",
+      "pto_request_status",
+      "pto_used",
+      "recipe",
+      "redeem_rewards",
+      "reminder",
+      "reminder_update",
+      "repeat",
+      "replacement_card_duration",
+      "report_fraud",
+      "report_lost_card",
+      "reset_settings",
+      "restaurant_reservation",
+      "restaurant_reviews",
+      "restaurant_suggestion",
+      "rewards_balance",
+      "roll_dice",
+      "rollover_401k",
+      "routing",
+      "schedule_maintenance",
+      "schedule_meeting",
+      "share_location",
+      "shopping_list",
+      "shopping_list_update",
+      "smart_home",
+      "spelling",
+      "spending_history",
+      "sync_device",
+      "taxes",
+      "tell_joke",
+      "text",
+      "thank_you",
+      "time",
+      "timer",
+      "timezone",
+      "tire_change",
+      "tire_pressure",
+      "todo_list",
+      "todo_list_update",
+      "traffic",
+      "transactions",
+      "transfer",
+      "translate",
+      "travel_alert",
+      "travel_notification",
+      "travel_suggestion",
+      "uber",
+      "update_playlist",
+      "user_name",
+      "vaccines",
+      "w2",
+      "weather",
+      "what_are_your_hobbies",
+      "what_can_i_ask_you",
+      "what_is_your_name",
+      "what_song",
+      "where_are_you_from",
+      "whisper_mode",
+      "who_do_you_work_for",
+      "who_made_you",
+      "yes"
+    ],
+    "examples": [
+      "I want to move 200 dollars from my savings to my checking account.",
+      "what's the weather going to be like in Denver tomorrow",
+      "write me a sonnet about my cat"
+    ]
+  },
+  "triage": {
+    "title": "Ops triage: page, ticket, or ignore",
+    "question": {
+      "type": "choice",
+      "instructions": "Under PagerDuty alerting principles, what should the on-call system do with this log line?",
+      "criteria": {
+        "ignore": "No human action needed; keep it in the log stream.",
+        "ticket": "A human should look during business hours; open a ticket, do not page.",
+        "page": "A human must act now; page the on-call engineer."
+      }
+    },
+    "labels": [
+      "ignore",
+      "ticket",
+      "page"
+    ],
+    "examples": [
+      {
+        "label": "disk_full_writes_failing",
+        "state": "[postgres] ERROR: postgres PANIC: could not write to file pg_wal/00000001000004E2: No space left on device. disk=/var/lib/postgresql 100% inodes=100% host=authz-2b1. INSERT into orders failing. replica cannot catch up.",
+        "gold": "page"
+      },
+      {
+        "label": "checkout_slo_burn",
+        "state": "[checkout-api] WARN: slo.burn service=checkout-api window=5m burn_rate=14.2x error_budget_remaining=8% availability=0.812 (SLO 0.995). 5xx=1840/2400 requests. primary journey POST /v1/checkout failing. runbook=https://runbooks.internal/checkout-slo",
+        "gold": "page"
+      },
+      {
+        "label": "tls_hours_left_serving",
+        "state": "[edge] WARN: tls.certificate notAfter=2026-09-17T14:10:00Z hours_remaining=6.2 host=api.checkout.example.com serving_prod=true clients=current. auto-renew job last failed: rateLimited. browsers will fail TLS this afternoon.",
+        "gold": "page"
+      },
+      {
+        "label": "deploy_success",
+        "state": "[checkout-api] INFO: deployment succeeded rev=2026.09.17.8 replicas=6/6. PagerDuty example of a suppressed notification.",
+        "gold": "ignore"
+      },
+      {
+        "label": "http_404",
+        "state": "[checkout-api] INFO: GET /favicon.ico 404 req=req_9ba0d11c client=bot. no user journey affected.",
+        "gold": "ignore"
+      },
+      {
+        "label": "disk_80pct_48h",
+        "state": "[postgres] WARN: disk /var/lib/postgresql in_use=0.81 host=ip-10-2-7-9. fill_rate predicts full in 46 hours. log rotation running. writes still succeeding. follow runbook disk-capacity.",
+        "gold": "ticket"
+      }
+    ]
+  },
+  "snake": {
+    "board": {
+      "w": 10,
+      "h": 10
+    },
+    "question": "Which move brings the snake closer to the food without dying?",
+    "order": [
+      "up",
+      "down",
+      "left",
+      "right"
+    ],
+    "state_template": "[The snake must move {A} to close the {larger gap|gap} to the food.] [The snake can also move {B} to close the smaller gap.] [Moving {d} hits the wall. | Moving {d} hits the snake's body. - one per unsafe direction, canonical order] (only the situations that apply; A = the move along the axis with the larger distance to the food, B = the other axis)",
+    "variant": "situations-v4",
+    "rules": {
+      "close the larger gap": "move along the axis with the larger distance to the food when that move is safe",
+      "close the smaller gap": "else move along the other axis when that move is safe",
+      "any safe move": "else the first safe move in up, down, left, right order"
+    }
+  }
+}

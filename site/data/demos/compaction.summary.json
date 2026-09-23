@@ -1,0 +1,14 @@
+{
+  "n_calls": 24,
+  "keep": {
+    "accuracy": 0.583,
+    "majority": 0.542,
+    "auroc": 0.741,
+    "max_p_keep": 0.63
+  },
+  "verbatim": {
+    "accuracy": 0.75,
+    "majority": 0.75
+  },
+  "mean_ms": 114.9
+}

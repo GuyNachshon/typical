@@ -1,0 +1,362 @@
+// Real canvas Snake renderer over js/snake.js's pure engine. 10x10 board drawn as a green
+// phosphor terminal: a monospace glyph grid inside a box-drawn frame, scanlines + a cheap
+// glyph bloom (crt.js), ~2-tick phosphor persistence on cells that just went dark, and a
+// terminal status line baked into the same canvas so the panel reads as one machine.
+import { Snake, greedyPolicy } from '../snake.js';
+import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, modelPolicy, replayFrame, loadJSON } from './loop.js';
+import { drawScanlines, drawGlyphBloom, phosphorDecay, prefersReducedMotion, drawBezel, drawGlass, drawFringe } from './crt.js';
+
+const TICK_MS = 200;
+const FADE_MS = TICK_MS * 2; // phosphor persistence window
+// No key map: Snake is a demonstration of the model deciding, not a game to play. The other
+// panels keep their human override; this one deliberately has none.
+
+// Green P1 phosphor (VT100/Apple II/IBM 5151 terminals) rather than amber: it's the more
+// common "terminal" association, and a single hue read against near-black lets brightness
+// alone carry head/body/food/wall hierarchy - the monochrome-CRT way, no extra hues to manage.
+const P = [77, 255, 136];
+const phos = (a) => `rgba(${P[0]},${P[1]},${P[2]},${a})`;
+const HEAD_GLYPH = { up: '^', down: 'v', left: '<', right: '>' };
+const BODY_GLYPH = 'o';
+const FOOD_GLYPH = '*';
+const DOT_GLYPH = '·';
+const BORDER = { tl: '┌', tr: '┐', bl: '└', br: '┘', h: '─', v: '│' };
+const pad = (n, digits) => String(n).padStart(digits, '0');
+
+export async function mount(el, { decide, mode, ctx } = {}) {
+  const refs = mountChrome(el, { label: 'Snake · 10×10 board', takeover: false });
+  const canvas = refs.canvas;
+  const dctx = canvas.getContext('2d');
+
+  const presets = (await loadJSON('data/presets.json').catch(() => null)) ?? null;
+  const question = presets?.snake?.question ?? 'Which move brings the snake closer to the food without dying?';
+  // data/replays/snake.json is {frames, summary} (scripts/record_games.mjs) - replayFrame()
+  // wants the bare frames array.
+  const replay = ((await loadJSON('data/replays/snake.json').catch(() => null)) ?? {}).frames ?? [];
+
+  let engine = new Snake({ w: 10, h: 10 });
+  let policyName = mode() === 'live' ? 'model' : 'model'; // MODEL button always present; static plays the replay
+  let prevState = engine.state();
+  let currState = engine.state();
+  let lastTickAt = performance.now();
+  let replayIndex = 0;
+  let dying = false;
+  let deathFlashAt = 0;
+  let visible = true;
+  let lastDecision = { candidates: engine.safeMoves(), probs: {}, p_null: null, sentence: engine.describe() };
+
+  const scriptedMove = greedyPolicy; // the rule list applied literally (snake.js RULES)
+
+  // Phosphor persistence: `lastLit` is what was on as of the most recently *committed* tick;
+  // `fading` holds cells that just went dark, keyed "x,y", so draw() can afterglow them for
+  // FADE_MS without re-deriving a diff every frame. Both mutated in place - no per-frame
+  // allocation in the draw loop itself (commit only runs once per tick, gated below).
+  let lastLit = new Map();
+  const fading = new Map();
+  let lastPhosphorTick = -1;
+  const reducedMotion = prefersReducedMotion();
+
+  function litCellsOf(state) {
+    const m = new Map();
+    state.body.forEach((seg, i) => {
+      m.set(`${seg.x},${seg.y}`, { ch: i === 0 ? HEAD_GLYPH[state.dir] : BODY_GLYPH, hot: i === 0 });
+    });
+    m.set(`${state.food.x},${state.food.y}`, { ch: FOOD_GLYPH, hot: true });
+    return m;
+  }
+
+  function commitPhosphorTick(state, now) {
+    const lit = litCellsOf(state);
+    for (const [key, info] of lastLit) {
+      if (!lit.has(key)) fading.set(key, { ...info, offAt: now });
+    }
+    for (const key of lit.keys()) fading.delete(key);
+    lastLit = lit;
+  }
+
+  async function tick() {
+    if (policyName === 'model' && mode() !== 'live') {
+      const f = replayFrame(replay, replayIndex);
+      if (!f) return;
+      replayIndex = f.nextIndex;
+      prevState = currState;
+      currState = f.state;
+      lastTickAt = performance.now();
+      lastDecision = { candidates: f.candidates, probs: f.probs, p_null: f.p_null, sentence: f.desc };
+      if (currState.dead) flashDeath();
+      return;
+    }
+
+    if (engine.dead) return;
+    const safe = engine.safeMoves();
+    if (safe.length === 0) {
+      engine.dead = true;
+      currState = engine.state();
+      flashDeath();
+      return;
+    }
+
+    let move;
+    let decision;
+    if (policyName === 'scripted') {
+      move = scriptedMove(engine);
+      decision = { candidates: safe, probs: { [move]: 1 }, p_null: 0, sentence: engine.describe() };
+    } else {
+      const r = await modelPolicy({ decide, engine, question: safe.length > 1 ? question : question });
+      move = r?.move ?? scriptedMove(engine);
+      decision = { candidates: safe, probs: r?.probs ?? {}, p_null: r?.p_null ?? null, sentence: engine.describe() };
+    }
+
+    prevState = engine.state();
+    engine.step(move);
+    currState = engine.state();
+    lastTickAt = performance.now();
+    lastDecision = decision;
+    if (engine.dead) flashDeath();
+  }
+
+  function flashDeath() {
+    dying = true;
+    deathFlashAt = performance.now();
+    setTimeout(restart, 650);
+  }
+
+  function restart() {
+    dying = false;
+    engine = new Snake({ w: 10, h: 10 });
+    prevState = engine.state();
+    currState = engine.state();
+    replayIndex = 0;
+    lastTickAt = performance.now();
+    lastDecision = { candidates: engine.safeMoves(), probs: {}, p_null: null, sentence: engine.describe() };
+    fading.clear();
+    lastLit = new Map();
+    lastPhosphorTick = -1;
+  }
+
+  function resize() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const rect = refs.stage.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    canvas.dataset.dpr = dpr;
+  }
+  const ro = new ResizeObserver(resize);
+  ro.observe(refs.stage);
+  resize();
+
+  // Font strings are rebuilt only when the cell size actually changes (resize), not every
+  // frame - the draw loop below just swaps between these cached strings.
+  let cachedCell = 0;
+  let font = '';
+  let haloFont = '';
+  let statusFont = '';
+
+  function draw() {
+    const dpr = Number(canvas.dataset.dpr || 1);
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
+    dctx.save();
+    dctx.scale(dpr, dpr);
+    dctx.clearRect(0, 0, w, h);
+
+    const state = currState;
+    const now = performance.now();
+
+    // Layout: a 1-cell box-drawn frame around the w×h play field - the whole box, border
+    // included, sits clear of the HUD (top-right) and decision/controls (bottom) chrome that
+    // loop.js overlays on top, since those dock to the edges and this block is centered.
+    const outerCols = state.w + 2;
+    const outerRows = state.h + 2;
+    // .media-label (top-left, left/top:18px) and .gc-hud (top-right, top:18px or 46px under
+    // 48rem) are fixed-px DOM chrome outside our control - reserve real px clearance so the
+    // frame's own top border (and the status line embedded in it) never sits under that text,
+    // the way it did with a flat margin on wide/short panels where height was the binding
+    // constraint.
+    const topClear = 58;
+    // .gc-foot (exhibits.css) docks the decision bars and the read sentence to the bottom-left,
+    // min(520px, 58%) wide and ~150px tall over a scrim. A centred board puts the play field
+    // under them — the food glyph was disappearing behind a probability bar. Sit the board in
+    // the room that is actually free: to the right of the readout when the panel is wide enough
+    // for that, otherwise above it.
+    const sideMargin = 14;
+    const footW = Math.min(520, w * 0.58);
+    const footH = 158; // .gc-foot: four bars + the two-line sentence, measured — the tube must clear it
+    const rightRoom = w - footW - sideMargin * 2;
+    const beside = rightRoom > (h - topClear - sideMargin) * 0.62; // wide enough to stand beside
+    const availW = (beside ? rightRoom : w - sideMargin * 2);
+    const availH = (beside ? h - topClear - sideMargin : h - topClear - footH - sideMargin);
+    const cell = Math.max(6, Math.min(availW / outerCols, availH / outerRows));
+    const boardW = cell * outerCols;
+    const boardH = cell * outerRows;
+    const ox = beside ? footW + sideMargin + (rightRoom - boardW) / 2 : (w - boardW) / 2;
+    const oy = topClear + Math.max(0, availH - boardH) / 2;
+    const gx = ox + cell; // interior (play field) origin, inside the frame
+    const gy = oy + cell;
+
+    if (cell !== cachedCell) {
+      cachedCell = cell;
+      const family = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+      font = `${Math.round(cell * 0.82)}px ${family}`;
+      haloFont = `${Math.round(cell * 1.18)}px ${family}`;
+      statusFont = `${Math.round(cell * 0.46)}px ${family}`;
+    }
+
+    // the tube: bezel around the glass, then the near-black screen itself
+    drawBezel(dctx, ox, oy, boardW, boardH, { radius: 14, bezel: Math.max(6, cell * 0.45) });
+    dctx.fillStyle = '#060807';
+    dctx.fillRect(ox, oy, boardW, boardH);
+    dctx.save();
+    dctx.font = `${Math.max(8, Math.round(cell * 0.32))}px ui-monospace, monospace`;
+    dctx.fillStyle = 'rgba(240,238,235,0.22)';
+    dctx.textAlign = 'right';
+    dctx.textBaseline = 'top';
+    dctx.fillText('TYPICAL-1', ox + boardW, oy + boardH + Math.max(3, cell * 0.12));
+    dctx.restore();
+    dctx.textAlign = 'center';
+    dctx.textBaseline = 'middle';
+
+    dctx.textAlign = 'center';
+    dctx.textBaseline = 'middle';
+    dctx.font = font;
+
+    // border ring - the "wall" glyph, box-drawing characters at mid brightness so the living
+    // snake still reads as the brightest thing on screen
+    dctx.fillStyle = phos(0.55);
+    for (let x = 0; x < outerCols; x++) {
+      const cx = ox + (x + 0.5) * cell;
+      const top = x === 0 ? BORDER.tl : x === outerCols - 1 ? BORDER.tr : BORDER.h;
+      const bot = x === 0 ? BORDER.bl : x === outerCols - 1 ? BORDER.br : BORDER.h;
+      dctx.fillText(top, cx, oy + 0.5 * cell);
+      dctx.fillText(bot, cx, oy + (outerRows - 0.5) * cell);
+    }
+    for (let y = 1; y < outerRows - 1; y++) {
+      const cy = oy + (y + 0.5) * cell;
+      dctx.fillText(BORDER.v, ox + 0.5 * cell, cy);
+      dctx.fillText(BORDER.v, ox + (outerCols - 0.5) * cell, cy);
+    }
+
+    // terminal status line, set into the top border like a boxed terminal window's title bar -
+    // this is the one spot on the canvas neither the HUD (top-right) nor the decision/controls
+    // (bottom) chrome ever covers. Falls back to a shorter form, then drops entirely, on
+    // boards too narrow to fit it rather than spilling past the frame.
+    dctx.font = statusFont;
+    dctx.textAlign = 'left';
+    const titleAvail = boardW - 3 * cell;
+    // score/steps are already in the HUD (loop.js, top-right); the title bar carries what the
+    // HUD doesn't: how long the snake is now and which tick it is on
+    let title = `LEN ${pad(state.body.length, 2)}  TICK ${pad(state.steps, 4)}`;
+    if (dctx.measureText(title).width > titleAvail) title = `L${pad(state.body.length, 2)} T${pad(state.steps, 4)}`;
+    if (dctx.measureText(title).width > titleAvail) title = '';
+    if (title) {
+      const titleX = ox + 1.5 * cell;
+      const titleW = dctx.measureText(title).width;
+      dctx.fillStyle = TOKENS.putty; // cut the title out of the border dashes, like a real boxed title bar
+      dctx.fillRect(titleX - cell * 0.25, oy + cell * 0.12, titleW + cell * 0.5, cell * 0.76);
+      dctx.fillStyle = phos(0.75);
+      dctx.textBaseline = 'middle';
+      dctx.fillText(title, titleX, oy + 0.5 * cell);
+    }
+    dctx.textAlign = 'center';
+    dctx.font = font;
+
+    // commit the tick→tick diff once per tick (not per frame) so a cell that just went dark
+    // starts fading here rather than being recomputed every rAF
+    if (lastTickAt !== lastPhosphorTick) {
+      commitPhosphorTick(state, lastTickAt);
+      lastPhosphorTick = lastTickAt;
+    }
+    for (const [key, info] of fading) {
+      if (reducedMotion || now - info.offAt > FADE_MS) fading.delete(key);
+    }
+
+    // play field: lit (head/body/food) > fading (phosphor afterglow) > dim dot-matrix rest
+    for (let x = 0; x < state.w; x++) {
+      for (let y = 0; y < state.h; y++) {
+        const key = `${x},${y}`;
+        const cx = gx + (x + 0.5) * cell;
+        const cy = gy + (y + 0.5) * cell;
+        const lit = lastLit.get(key);
+        if (lit) {
+          const color = phos(lit.hot ? 1 : 0.85);
+          if (lit.hot) {
+            drawGlyphBloom(dctx, lit.ch, cx, cy, { font, haloFont, color, haloColor: phos(0.28) });
+            if (!reducedMotion) drawFringe(dctx, lit.ch, cx, cy, { spread: Math.max(0.6, cell * 0.035) });
+          } else {
+            dctx.font = font;
+            dctx.fillStyle = color;
+            dctx.fillText(lit.ch, cx, cy);
+          }
+          continue;
+        }
+        const fade = fading.get(key);
+        if (fade) {
+          const a = phosphorDecay(now - fade.offAt, FADE_MS);
+          dctx.font = font;
+          dctx.fillStyle = phos((fade.hot ? 0.9 : 0.6) * a);
+          dctx.fillText(fade.ch, cx, cy);
+          continue;
+        }
+        dctx.font = font;
+        dctx.fillStyle = phos(0.12);
+        dctx.fillText(DOT_GLYPH, cx, cy);
+      }
+    }
+
+    if (dying) {
+      const dt = Math.min(1, (now - deathFlashAt) / 300);
+      dctx.fillStyle = TOKENS.paper;
+      dctx.globalAlpha = dt < 0.5 ? dt * 2 : (1 - dt) * 2;
+      dctx.fillRect(ox, oy, boardW, boardH);
+      dctx.globalAlpha = 1;
+    }
+
+    drawScanlines(dctx, ox, oy, boardW, boardH);
+    drawGlass(dctx, ox, oy, boardW, boardH, { t: now, roll: !reducedMotion });
+    dctx.restore();
+  }
+
+  function frame() {
+    draw();
+    refs.hud.innerHTML = '';
+    const l1 = document.createElement('div');
+    l1.textContent = `Snake · 10×10 board`;
+    const l2 = document.createElement('div');
+    l2.textContent = `score ${currState.score} · steps ${currState.steps}`;
+    refs.hud.append(l1, l2);
+    paintDecision(refs, lastDecision);
+    rafId = requestAnimationFrame(frame);
+  }
+  let rafId = requestAnimationFrame(frame);
+
+  const ticker = createTicker(TICK_MS, tick);
+  ticker.start();
+  const stopWatch = watchVisibility(el, (v) => {
+    visible = v;
+    if (v) ticker.resume();
+    else ticker.pause();
+  });
+
+  refs.policyBtn.textContent = 'Model';
+  refs.policyBtn.classList.add('gc-on');
+  refs.policyBtn.addEventListener('click', () => {
+    policyName = policyName === 'model' ? 'scripted' : 'model';
+    refs.policyBtn.textContent = policyName === 'model' ? 'Model' : 'Scripted';
+    refs.policyBtn.classList.toggle('gc-on', policyName === 'model');
+  });
+  refs.restartBtn.addEventListener('click', restart);
+
+  return {
+    stop() {
+      cancelAnimationFrame(rafId);
+      ticker.stop();
+      stopWatch();
+    },
+    restart,
+    setPolicy(name) {
+      policyName = name === 'scripted' ? 'scripted' : 'model';
+      refs.policyBtn.textContent = policyName === 'model' ? 'Model' : 'Scripted';
+      refs.policyBtn.classList.toggle('gc-on', policyName === 'model');
+    },
+  };
+}

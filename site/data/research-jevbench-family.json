@@ -1,0 +1,29 @@
+{
+  "typical-small": {
+    "adequacy": {
+      "acc": 0.5833,
+      "n": 12
+    },
+    "extraction": {
+      "acc": 0.75,
+      "n": 12
+    },
+    "intent": {
+      "acc": 0.75,
+      "n": 12
+    },
+    "ordinal": {
+      "acc": 0.5833,
+      "n": 12
+    },
+    "policy": {
+      "acc": 0.6667,
+      "n": 12
+    },
+    "routing": {
+      "acc": 0.8333,
+      "n": 12
+    }
+  },
+  "source": "runs/jev_native_ts1b/summary.json (original.per_family.<family>.accuracy)"
+}

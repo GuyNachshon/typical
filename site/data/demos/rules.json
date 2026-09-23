@@ -1,0 +1,78 @@
+{
+  "title": "Same facts, different rule - 6 applicants",
+  "caption": "Held-out DecisionMix v2 rule families and grammars: .836 / .898 accuracy (typical-small). Rubric flip (same facts, a different rule listed first) both-correct .718 / .743. The model answers each order correctly more often than it answers both orders correctly, because the orders sometimes disagree.",
+  "applicants": [
+    {
+      "id": "a1-low-credit-verified",
+      "label": "Low credit, income verified",
+      "facts": [
+        "The applicant's credit score is 590.",
+        "The applicant's income was verified with pay stubs.",
+        "No collateral was pledged.",
+        "The applicant has no prior defaults.",
+        "The applicant's debt-to-income ratio is 28%."
+      ],
+      "state": "The applicant's credit score is 590. The applicant's income was verified with pay stubs. No collateral was pledged. The applicant has no prior defaults. The applicant's debt-to-income ratio is 28%."
+    },
+    {
+      "id": "a2-low-credit-verified-collateral",
+      "label": "Low credit, verified, collateral, one default",
+      "facts": [
+        "The applicant's credit score is 610.",
+        "The applicant's income was verified with pay stubs.",
+        "Collateral of $5,000 was pledged.",
+        "The applicant has 1 prior default.",
+        "The applicant's debt-to-income ratio is 41%."
+      ],
+      "state": "The applicant's credit score is 610. The applicant's income was verified with pay stubs. Collateral of $5,000 was pledged. The applicant has 1 prior default. The applicant's debt-to-income ratio is 41%."
+    },
+    {
+      "id": "a3-good-credit-verified",
+      "label": "Good credit, income verified",
+      "facts": [
+        "The applicant's credit score is 705.",
+        "The applicant's income was verified with pay stubs.",
+        "No collateral was pledged.",
+        "The applicant has no prior defaults.",
+        "The applicant's debt-to-income ratio is 19%."
+      ],
+      "state": "The applicant's credit score is 705. The applicant's income was verified with pay stubs. No collateral was pledged. The applicant has no prior defaults. The applicant's debt-to-income ratio is 19%."
+    },
+    {
+      "id": "a4-midcredit-unverified",
+      "label": "Sub-650 credit, income not verified",
+      "facts": [
+        "The applicant's credit score is 640.",
+        "The applicant's income was not independently verified.",
+        "No collateral was pledged.",
+        "The applicant has no prior defaults.",
+        "The applicant's debt-to-income ratio is 30%."
+      ],
+      "state": "The applicant's credit score is 640. The applicant's income was not independently verified. No collateral was pledged. The applicant has no prior defaults. The applicant's debt-to-income ratio is 30%."
+    },
+    {
+      "id": "a5-okcredit-unverified-collateral",
+      "label": "Ok credit, unverified, collateral pledged",
+      "facts": [
+        "The applicant's credit score is 680.",
+        "The applicant's income was not independently verified.",
+        "Collateral of $15,000 was pledged.",
+        "The applicant has no prior defaults.",
+        "The applicant's debt-to-income ratio is 33%."
+      ],
+      "state": "The applicant's credit score is 680. The applicant's income was not independently verified. Collateral of $15,000 was pledged. The applicant has no prior defaults. The applicant's debt-to-income ratio is 33%."
+    },
+    {
+      "id": "a6-okcredit-unverified-defaults",
+      "label": "Ok credit, unverified, two defaults",
+      "facts": [
+        "The applicant's credit score is 660.",
+        "The applicant's income was not independently verified.",
+        "No collateral was pledged.",
+        "The applicant has 2 prior defaults.",
+        "The applicant's debt-to-income ratio is 52%."
+      ],
+      "state": "The applicant's credit score is 660. The applicant's income was not independently verified. No collateral was pledged. The applicant has 2 prior defaults. The applicant's debt-to-income ratio is 52%."
+    }
+  ]
+}

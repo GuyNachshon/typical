@@ -1,0 +1,5 @@
+{
+  "type": "module",
+  "private": true,
+  "description": "No build step - this only exists so `node js/*.js` self-tests run as ES modules without warnings."
+}

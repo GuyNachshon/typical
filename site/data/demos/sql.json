@@ -1,0 +1,542 @@
+{
+  "conditions": [
+    {
+      "id": "D",
+      "condition": "the customer mentions a duplicate charge",
+      "criterion": "the customer says they were charged twice or billed more than once for the same thing"
+    },
+    {
+      "id": "C",
+      "condition": "the request is about cancelling",
+      "criterion": "the customer asks to cancel an order, subscription, booking, plan, or account"
+    },
+    {
+      "id": "B",
+      "condition": "the item arrived damaged",
+      "criterion": "the customer says a delivered item was broken, cracked, dented, or otherwise damaged on arrival"
+    },
+    {
+      "id": "L",
+      "condition": "the customer cannot log in or needs a password reset",
+      "criterion": "the customer reports being unable to sign in, locked out, or asks for a password reset"
+    }
+  ],
+  "rows": [
+    {
+      "text": "I was charged twice for order #4471. My card statement shows two identical $59.99 charges on the same day.",
+      "gold": "D"
+    },
+    {
+      "text": "There are two charges from you on my bank statement for the same subscription renewal. Please refund one.",
+      "gold": "D"
+    },
+    {
+      "text": "Why did you bill me twice this month? I only have one account and one plan.",
+      "gold": "D"
+    },
+    {
+      "text": "Duplicate charge: invoice 8812 was taken from my card two times. I need the second one reversed.",
+      "gold": "D"
+    },
+    {
+      "text": "My statement shows $120 charged twice on March 3rd for the same order. This is a double charge.",
+      "gold": "D"
+    },
+    {
+      "text": "I got two receipts for the same purchase and my card was debited both times.",
+      "gold": "D"
+    },
+    {
+      "text": "You charged my PayPal twice for a single pair of shoes. Order number is 22910.",
+      "gold": "D"
+    },
+    {
+      "text": "Being billed twice for one month of Premium. Second charge appeared 4 minutes after the first.",
+      "gold": "D"
+    },
+    {
+      "text": "I see a duplicate transaction on my Visa ending 4401, both for $34.50 from your store.",
+      "gold": "D"
+    },
+    {
+      "text": "Two identical charges hit my account this morning for the annual plan. I only signed up once.",
+      "gold": "D"
+    },
+    {
+      "text": "Refund request: I was double charged when the checkout page timed out and I resubmitted.",
+      "gold": "D"
+    },
+    {
+      "text": "My husband's card shows the same $89 charge twice from your company. We placed one order.",
+      "gold": "D"
+    },
+    {
+      "text": "Hello, the renewal was charged two times. Please remove the extra charge and confirm.",
+      "gold": "D"
+    },
+    {
+      "text": "Double billing on account 77120: the September invoice was paid twice by auto-pay.",
+      "gold": "D"
+    },
+    {
+      "text": "I have been charged twice for the same booking reference. Please fix.",
+      "gold": "D"
+    },
+    {
+      "text": "The app says one payment but my bank shows two debits of $15 to you on the same date.",
+      "gold": "D"
+    },
+    {
+      "text": "I want to cancel my subscription effective immediately. Please confirm by email.",
+      "gold": "C"
+    },
+    {
+      "text": "How do I cancel my order? I placed it ten minutes ago by mistake.",
+      "gold": "C"
+    },
+    {
+      "text": "Please cancel my Premium plan before the next renewal date.",
+      "gold": "C"
+    },
+    {
+      "text": "Cancel order 55210. I found the item cheaper elsewhere.",
+      "gold": "C"
+    },
+    {
+      "text": "I no longer need the service. Please close my account and cancel any future billing.",
+      "gold": "C"
+    },
+    {
+      "text": "Can you cancel the second item in my order but keep the first one?",
+      "gold": "C"
+    },
+    {
+      "text": "I'd like to cancel my membership. What is the process?",
+      "gold": "C"
+    },
+    {
+      "text": "Please cancel my reservation for the 14th; my flight was moved.",
+      "gold": "C"
+    },
+    {
+      "text": "Cancel my auto-renewal. I do not want to be charged again next year.",
+      "gold": "C"
+    },
+    {
+      "text": "I want to stop the subscription and cancel it for good. Nothing personal, just not using it.",
+      "gold": "C"
+    },
+    {
+      "text": "Requesting cancellation of order #9031 which has not shipped yet.",
+      "gold": "C"
+    },
+    {
+      "text": "Please cancel the trial before it converts to a paid plan tomorrow.",
+      "gold": "C"
+    },
+    {
+      "text": "I need to cancel my appointment booked through your app for Thursday.",
+      "gold": "C"
+    },
+    {
+      "text": "Cancel everything on my account. I am moving abroad and cannot use the service.",
+      "gold": "C"
+    },
+    {
+      "text": "Is it possible to cancel the pre-order for the console? I changed my mind.",
+      "gold": "C"
+    },
+    {
+      "text": "Please cancel my monthly box. I have too many products already.",
+      "gold": "C"
+    },
+    {
+      "text": "I am writing to cancel my contract under the 14-day cooling-off period.",
+      "gold": "C"
+    },
+    {
+      "text": "Cancel my ticket for Saturday's show and refund it to the original card.",
+      "gold": "C"
+    },
+    {
+      "text": "The package arrived with the box crushed and the lamp inside is shattered.",
+      "gold": "B"
+    },
+    {
+      "text": "My order arrived damaged: the screen of the tablet has a crack across the corner.",
+      "gold": "B"
+    },
+    {
+      "text": "Received the chair today and one leg is snapped off. It was broken in transit.",
+      "gold": "B"
+    },
+    {
+      "text": "The mug came in pieces. The box had no padding at all.",
+      "gold": "B"
+    },
+    {
+      "text": "Item arrived broken. The blender jar is cracked and leaks water.",
+      "gold": "B"
+    },
+    {
+      "text": "The book arrived with a torn cover and bent pages, looks like it got wet in shipping.",
+      "gold": "B"
+    },
+    {
+      "text": "Opened the delivery and the frame glass is smashed. Photos attached.",
+      "gold": "B"
+    },
+    {
+      "text": "My headphones arrived with the left cup dented and the hinge broken.",
+      "gold": "B"
+    },
+    {
+      "text": "The parcel was delivered soaked and the electronics inside no longer power on.",
+      "gold": "B"
+    },
+    {
+      "text": "Vase arrived in a hundred pieces. Courier must have dropped it.",
+      "gold": "B"
+    },
+    {
+      "text": "The monitor I ordered came with a shattered panel out of the box.",
+      "gold": "B"
+    },
+    {
+      "text": "Damaged on delivery: the bike frame has a deep dent and the wheel is bent.",
+      "gold": "B"
+    },
+    {
+      "text": "The sofa arrived with a ripped seam and a broken castor.",
+      "gold": "B"
+    },
+    {
+      "text": "Two of the six wine glasses were broken when the box arrived.",
+      "gold": "B"
+    },
+    {
+      "text": "The keyboard arrived with several keys snapped off. The packaging was crushed.",
+      "gold": "B"
+    },
+    {
+      "text": "I cannot log in. The password reset email never arrives.",
+      "gold": "L"
+    },
+    {
+      "text": "Locked out of my account after too many attempts. Please reset my password.",
+      "gold": "L"
+    },
+    {
+      "text": "I forgot my password and the reset link says it has expired.",
+      "gold": "L"
+    },
+    {
+      "text": "Login fails with 'invalid credentials' even though I just changed the password.",
+      "gold": "L"
+    },
+    {
+      "text": "Can you help me reset my password? I no longer have access to the old phone number for 2FA.",
+      "gold": "L"
+    },
+    {
+      "text": "I can't sign in on the mobile app but the website works with the same password.",
+      "gold": "L"
+    },
+    {
+      "text": "Please send me a password reset link; the button on the login page does nothing.",
+      "gold": "L"
+    },
+    {
+      "text": "My account says it is locked. I need to get back in to download invoices.",
+      "gold": "L"
+    },
+    {
+      "text": "The two-factor code never comes through so I cannot log into my account.",
+      "gold": "L"
+    },
+    {
+      "text": "I am unable to log in since the update. It keeps sending me back to the login screen.",
+      "gold": "L"
+    },
+    {
+      "text": "Need a password reset for user jsmith@example.com. Recovery email is out of date.",
+      "gold": "L"
+    },
+    {
+      "text": "Every time I try to log in it says my email is not recognised, but I've had this account for years.",
+      "gold": "L"
+    },
+    {
+      "text": "I changed my password yesterday and now nothing works. Please reset it.",
+      "gold": "L"
+    },
+    {
+      "text": "Login loop: enter credentials, spinner, back to login. Tried three browsers.",
+      "gold": "L"
+    },
+    {
+      "text": "Can't access my account. The password I saved in my browser is rejected.",
+      "gold": "L"
+    },
+    {
+      "text": "Please unlock my account and send a new temporary password.",
+      "gold": "L"
+    },
+    {
+      "text": "Where is my order? The tracking page has said 'in transit' for six days.",
+      "gold": ""
+    },
+    {
+      "text": "Do you ship to Canada, and what are the customs fees?",
+      "gold": ""
+    },
+    {
+      "text": "I'd like to change the delivery address on order 31877 before it ships.",
+      "gold": ""
+    },
+    {
+      "text": "What is the difference between the Pro and the Business plan?",
+      "gold": ""
+    },
+    {
+      "text": "Can I get an invoice with my company VAT number on it?",
+      "gold": ""
+    },
+    {
+      "text": "The color of the jacket I received is navy, but I ordered black.",
+      "gold": ""
+    },
+    {
+      "text": "Do you have this dress in a size 12? The website only shows 8 and 10.",
+      "gold": ""
+    },
+    {
+      "text": "I want to upgrade my plan to the annual option. How do I do that?",
+      "gold": ""
+    },
+    {
+      "text": "Great service, just wanted to say thanks to Marcus who helped me on chat yesterday.",
+      "gold": ""
+    },
+    {
+      "text": "Is the warranty transferable if I sell the laptop to a friend?",
+      "gold": ""
+    },
+    {
+      "text": "I was charged once for my order but I never received a confirmation email.",
+      "gold": ""
+    },
+    {
+      "text": "How do I add a second user to my team account?",
+      "gold": ""
+    },
+    {
+      "text": "The discount code SPRING20 is not being applied at checkout.",
+      "gold": ""
+    },
+    {
+      "text": "Can you tell me the ingredients in the vanilla protein powder?",
+      "gold": ""
+    },
+    {
+      "text": "My order shipped to my old address. Can you redirect it?",
+      "gold": ""
+    },
+    {
+      "text": "I received one item from my order of three. Where are the other two?",
+      "gold": ""
+    },
+    {
+      "text": "Is there a student discount available for the software?",
+      "gold": ""
+    },
+    {
+      "text": "Please update the email address on my account to my new work address.",
+      "gold": ""
+    },
+    {
+      "text": "The app crashes when I open the settings page on Android 14.",
+      "gold": ""
+    },
+    {
+      "text": "I'd like to return a sweater that doesn't fit. It is unworn with tags.",
+      "gold": ""
+    },
+    {
+      "text": "What are your opening hours for the downtown store?",
+      "gold": ""
+    },
+    {
+      "text": "Can I pause my subscription for two months while I travel?",
+      "gold": ""
+    },
+    {
+      "text": "How long does a refund take to appear on my card after a return?",
+      "gold": ""
+    },
+    {
+      "text": "The tracking number you sent me doesn't work on the courier's site.",
+      "gold": ""
+    },
+    {
+      "text": "I want to exchange the blue kettle for the red one, same model.",
+      "gold": ""
+    },
+    {
+      "text": "Do you offer gift wrapping for orders placed this week?",
+      "gold": ""
+    },
+    {
+      "text": "My promotional credit of $10 has disappeared from my account balance.",
+      "gold": ""
+    },
+    {
+      "text": "The size chart on the product page seems wrong; a medium fits like a small.",
+      "gold": ""
+    },
+    {
+      "text": "Can I change my payment method from PayPal to a credit card?",
+      "gold": ""
+    },
+    {
+      "text": "What does 'backordered' mean for my item, and when will it ship?",
+      "gold": ""
+    },
+    {
+      "text": "I'd like to request a copy of all the data you hold about me.",
+      "gold": ""
+    },
+    {
+      "text": "Your website keeps showing prices in euros even though I am in the UK.",
+      "gold": ""
+    },
+    {
+      "text": "Is it possible to schedule delivery for a specific day?",
+      "gold": ""
+    },
+    {
+      "text": "The manual for the espresso machine is only in German. Is there an English version?",
+      "gold": ""
+    },
+    {
+      "text": "I received a marketing email after unsubscribing. Please remove me from the list.",
+      "gold": ""
+    },
+    {
+      "text": "Can you confirm my order 60412 was placed successfully? The page went blank.",
+      "gold": ""
+    },
+    {
+      "text": "I'd like to add a gift message to an order I placed an hour ago.",
+      "gold": ""
+    },
+    {
+      "text": "How do I export my invoices for the last tax year?",
+      "gold": ""
+    },
+    {
+      "text": "The product photos show a carrying case but none was included in the box.",
+      "gold": ""
+    },
+    {
+      "text": "Are the toys in the baby range free of BPA?",
+      "gold": ""
+    },
+    {
+      "text": "I have a question about the loyalty points: do they expire?",
+      "gold": ""
+    },
+    {
+      "text": "Can you send a replacement charger? Mine was lost while travelling.",
+      "gold": ""
+    },
+    {
+      "text": "The delivery driver left my parcel with a neighbour who is away for a week.",
+      "gold": ""
+    },
+    {
+      "text": "Please apply my recent purchase to the loyalty account I created afterwards.",
+      "gold": ""
+    },
+    {
+      "text": "What is the maximum file size for uploads on the free tier?",
+      "gold": ""
+    },
+    {
+      "text": "I noticed a typo in your terms of service, section 4.2.",
+      "gold": ""
+    },
+    {
+      "text": "Do you accept Apple Pay in the physical stores?",
+      "gold": ""
+    },
+    {
+      "text": "The API is returning 500 errors for the /reports endpoint since this morning.",
+      "gold": ""
+    },
+    {
+      "text": "Can I merge my two accounts into one? I signed up twice with different emails.",
+      "gold": ""
+    },
+    {
+      "text": "The chair I bought squeaks when I lean back. Is this normal?",
+      "gold": ""
+    },
+    {
+      "text": "I'd like to know if the winter coat is machine washable.",
+      "gold": ""
+    },
+    {
+      "text": "My monthly invoice is higher than last month. Can you explain the line items?",
+      "gold": ""
+    },
+    {
+      "text": "Please send me a receipt for my purchase yesterday at the airport store.",
+      "gold": ""
+    },
+    {
+      "text": "How do I redeem the gift card I received for my birthday?",
+      "gold": ""
+    },
+    {
+      "text": "The download link for my e-book has expired. Can you resend it?",
+      "gold": ""
+    },
+    {
+      "text": "Does the fitness tracker work with iPhone 12?",
+      "gold": ""
+    },
+    {
+      "text": "I placed an order with express shipping but the estimated delivery is next week.",
+      "gold": ""
+    },
+    {
+      "text": "Can I get the product in bulk? I need 200 units for an event.",
+      "gold": ""
+    },
+    {
+      "text": "The receipt shows tax charged but my organisation is tax exempt.",
+      "gold": ""
+    },
+    {
+      "text": "I was overcharged for shipping: the site said free shipping over $50 and my order was $62.",
+      "gold": ""
+    },
+    {
+      "text": "Can you recommend a lens for portrait photography that works with my camera?",
+      "gold": ""
+    },
+    {
+      "text": "My package says delivered but nothing has arrived. Nobody was home.",
+      "gold": ""
+    },
+    {
+      "text": "I'd like to leave a review for the headphones but the button is greyed out.",
+      "gold": ""
+    },
+    {
+      "text": "The dashboard is showing last week's numbers instead of today's.",
+      "gold": ""
+    }
+  ]
+}

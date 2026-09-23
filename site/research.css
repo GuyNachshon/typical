@@ -1,0 +1,143 @@
+/* research.html only. Nav, .page, .chapter, .chapter-head, .t-*, .media, .ucard, .code,
+   .register, .note, .dest, .footer all come from style.css (site/src.css, the v11 Agility
+   lane) — this file adds only what src.css has no component for: the 64ch prose column
+   offset in the chapter-head's 220px+1fr grid, this page's h1 mobile size, and the chart
+   legend/source hooks js/charts.js renders into. */
+
+/* ---- chapter body: 64ch prose column, offset right in the chapter-head's grid ---- */
+
+.chapter-body { display: grid; grid-template-columns: 220px 1fr; gap: 30px; }
+/* .body's own single implicit column defaults to "auto" sizing, which grows to the max-content
+   width of its widest child (the .code ASCII plate) regardless of min-width:0 on that child —
+   min-width:0 only stops a track from refusing to shrink, it doesn't stop one from growing past
+   the container. minmax(0, 1fr) pins the column to the available width instead. */
+.chapter-body .body { grid-column: 2; display: grid; grid-template-columns: minmax(0, 1fr); gap: 30px; min-width: 0; }
+@media (max-width: 64rem) {
+  .chapter-body { grid-template-columns: 1fr; }
+  .chapter-body .body { grid-column: 1; }
+}
+.chapter-body .prose { overflow-wrap: break-word; /* non-breaking hyphens keep identifiers whole; one too long for the column must still break rather than push the page sideways */ max-width: 64ch; min-width: 0; display: grid; gap: 16px; font-size: 15px; line-height: 1.5; }
+.chapter-body .prose ul, .chapter-body .prose ol { margin: 0; padding-left: 20px; display: grid; gap: 10px; }
+.chapter-body .prose a { border-bottom: 1px solid var(--color-steel); }
+.chapter-body .prose a:hover { border-color: var(--color-off); }
+.chapter-body .prose code { background: var(--color-lgray); padding: 1px 4px; border-radius: var(--radius-icon); }
+/* Fig. N / Specimen: captions - a lone *italic* paragraph right after a code or chart panel */
+.chapter-body .prose p:has(> em:only-child) { font-size: 12px; color: var(--color-mid); }
+
+/* the opening chapter-head's title sits inside a 1fr column narrower than the full-bleed
+   hero .stage - drop to .t-section's mobile size rather than .t-hero's */
+@media (max-width: 48rem) {
+  header.chapter .chapter-head h1.t-hero { font-size: 28px; line-height: 1; letter-spacing: -0.7px; }
+}
+
+/* ---- charts: js/research.js mounts js/charts.js SVGs into .chart, inside a white .media
+   panel (charts.js already draws the v11 ink-on-white palette; only the surrounding HTML
+   legend/source hooks need CSS, src.css has no component for them). */
+.chart-source { font-family: var(--font-mono); font-size: 11px; color: var(--color-mid); margin-top: 8px; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 14px; font-size: 12px; color: var(--color-mid); }
+.legend-key { display: inline-flex; align-items: center; gap: 6px; }
+.legend-swatch { flex: none; }
+.donut-legend { justify-content: center; }
+.donut-key { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-mid); }
+.donut-key i { width: 11px; height: 11px; display: inline-block; border-radius: 1px; background: var(--color-off); }
+.timeline-legend { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 32px; margin: 16px 0 0; padding: 0; font-size: 12px; color: var(--color-mid); }
+.timeline-legend b { font-weight: 700; color: var(--color-off); }
+.timeline-legend .dim { color: var(--color-mid); }
+.timeline-legend-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.72px; text-transform: uppercase; margin-top: 20px; color: var(--color-mid); }
+
+/* ASCII plates never shrink below 11px; instead of a hand-maintained narrow twin, the pre just
+   scrolls horizontally under its own min-content width rather than widening the page. */
+.code pre { white-space: pre; line-height: 1.3; overflow-x: auto; }
+
+/* ---- explorables (P1-P4, js/explorables.js): segmented steppers, tiles, scrub rail, dot
+   charts — everything else (.bars/.bar, .media, .note, .btn.ghost) is src.css as-is. ---- */
+/* same auto-track blowout as .chapter-body .body above, one level deeper: an explorable is
+   itself a single-column grid inside the prose column, and flex rows default to min-width:auto
+   too, so both need the same pin-to-available-width treatment. */
+.explorable { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-width: 0; }
+.explorable-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; min-width: 0; }
+.explorable-controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
+.explorable-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
+.explorable-label { min-width: 96px; }
+.explorable-skeleton { font-family: var(--font-mono); }
+
+.seg { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.seg .btn[aria-pressed="true"] { background: var(--color-off); color: var(--color-warm); border-color: var(--color-off); }
+
+.explorable-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.explorable-tile { background: var(--color-lgray); border-radius: var(--radius-icon); padding: 12px 14px; display: grid; gap: 4px; }
+.explorable-note { font-size: 12px; }
+
+.calib-arith { position: relative; display: grid; gap: 10px; }
+.calib-list { margin: 0; padding: 0 0 0 18px; display: grid; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--color-off); }
+.calib-list li.dim { color: var(--color-mid); }
+.calib-sum { margin: 0; }
+.chart-hover-label { position: absolute; top: -8px; right: 0; font-family: var(--font-mono); font-size: 11px; background: var(--color-off); color: var(--color-warm); padding: 4px 8px; border-radius: var(--radius-icon); }
+.chart-hover-label[hidden] { display: none; }
+
+/* scrub rail: 6px steel track, 14px off-black thumb, on every browser's range input */
+.scrub-rail { display: grid; gap: 10px; }
+.scrub-ticks { display: flex; justify-content: space-between; gap: 8px; }
+.scrub-tick { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.36px; text-transform: uppercase; color: var(--color-mid); text-align: center; flex: 1; }
+.scrub-tick.is-on { color: var(--color-off); font-weight: 700; }
+.scrub { -webkit-appearance: none; appearance: none; width: 100%; height: 20px; background: transparent; }
+.scrub::-webkit-slider-runnable-track { height: 6px; background: var(--color-steel); border-radius: 3px; }
+.scrub::-moz-range-track { height: 6px; background: var(--color-steel); border-radius: 3px; }
+.scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -4px; border-radius: 50%; background: var(--color-off); cursor: pointer; }
+.scrub::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--color-off); cursor: pointer; }
+.scrub-nav { display: flex; gap: 8px; }
+.trace-text { overflow-wrap: break-word; }
+
+/* P3 trace figure: six drawn stages, always visible, the scrub only shifts which one is
+   emphasized. Opacity + a small scale via transform - never width/height - so scrubbing is
+   one composited property change, not a relayout. */
+.trace-figure { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-width: 0; }
+.trace-stage { background: var(--color-lgray); border-radius: var(--radius-card); padding: 18px 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; transform-origin: left center; transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out), background 220ms var(--ease-out); opacity: 0.4; transform: scale(0.99); }
+.trace-stage.is-active { opacity: 1; transform: scale(1); background: var(--color-white); }
+.trace-stage-label { margin: 0; }
+.trace-stage svg rect, .trace-stage svg circle, .trace-stage svg line { transition: fill 220ms var(--ease-out), stroke 220ms var(--ease-out); }
+@media (prefers-reduced-motion: reduce) { .trace-stage { transition: none; } }
+
+/* P5 training-curve explorer: pinned-run chips (click = unpin) + unpinned browse list
+   (click = pin) — same .btn.ghost, distinguished only by aria-pressed like every other seg. */
+.curve-legend, .curve-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.curve-chip[aria-pressed="true"] { background: var(--color-off); color: var(--color-warm); border-color: var(--color-off); }
+.curve-list .btn { font-weight: 400; }
+
+@media (max-width: 48rem) {
+  .explorable-row { flex-direction: column; align-items: stretch; }
+  .seg { width: 100%; }
+  .seg .btn { flex: 1; text-align: center; justify-content: center; }
+  /* six stage names stacked as a list read as a menu, not a rail: show only where the scrub is */
+  .scrub-ticks { gap: 0; }
+  .scrub-tick { display: none; }
+  .scrub-tick.is-on { display: block; text-align: left; font-weight: 700; color: var(--color-off); }
+}
+
+/* ---- figures, after archerhume.com/posts/jevs-architecture-unmasked -------------------------
+   A figure breaks the prose column and runs full width, but it stays on paper: light surface,
+   one hairline frame, number and caption beneath. The diagram was briefly mounted on a black
+   panel and drawn in the ink/mid/steel palette meant for warm canvas — near-black on near-black,
+   half of it invisible. Dark is for things you operate; a printed figure is not one. */
+.fig { margin: 40px 0 0; padding: 30px 32px 26px; border: 1px solid var(--color-steel); background: var(--color-warm); }
+.fig > .chart { margin-inline: auto; }
+.fig figcaption, .figure-src { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--color-steel); font-family: var(--font-mono); font-size: 12px; line-height: 1.6; color: var(--color-slate); }
+.fig figcaption b, .figure-src b { font-weight: 700; color: var(--color-off); }
+@media (max-width: 64rem) { .fig { padding: 18px 16px 16px; } }
+
+/* .ucard moved here from src.css when index.html stopped using it. research.html still has nine,
+   and they were styled by a rule the home page's cut pass deleted. The 88px top padding is not
+   reproduced: it existed to push three home-page card titles down and left a hole here. */
+.ucard { background: var(--color-lgray); border-radius: var(--radius-card); padding: 40px 18px 18px; min-height: 300px; display: flex; flex-direction: column; justify-content: flex-start; gap: 30px; }
+.ucard .t-card { margin-bottom: 10px; }
+.ucard p { max-width: 32ch; }
+.ucard .figure-src { max-width: none; } /* .ucard p caps prose at 32ch = 211px, narrower than the paths this line carries */
+.ucard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+@media (max-width: 64rem) { .ucard-grid { grid-template-columns: 1fr; } .ucard { min-height: 0; } }
+
+/* findings cards: equal grid row heights left 120px holes below a short title and its body.
+   #findings doesn't exist on the page (build_research.py ids the section from its h2 slug) — the
+   real id is #eight-results-each-with-a-control, which also covers the D1 disclosure card in the
+   same section. These cards are prose, not figures — tighten the gap on top of the site-wide
+   flex-start fix above. */
+#eight-results-each-with-a-control .ucard { gap: 12px; min-height: 0; }
