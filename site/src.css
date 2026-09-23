@@ -675,6 +675,29 @@
   .typecard > p { margin-top: 8px; font-size: 15px; line-height: 1.55; color: var(--color-slate); }
   @media (max-width: 48rem) { .typegrid { grid-template-columns: minmax(0, 1fr); gap: 34px; } }
 
+  /* ---- the research page's control figure ---- */
+  /* It opens flat, every model on one line ranked by accuracy, because that is the view a
+     leaderboard gives you. Pressing the button drops in the axis a leaderboard does not have, and
+     six variants that looked like a gradient land on zero. The movement is the argument, so it is
+     slower than a UI animation would be and staggered left to right along the ranking. */
+  .dq .dq-pt { transform: translateY(var(--dy)); transition: transform 820ms var(--ease-out-expo); transition-delay: calc(var(--i) * 34ms); }
+  .dq.is-open .dq-pt { transform: translateY(0); }
+  .dq .dq-band { opacity: 0; transition: opacity 420ms var(--ease-out) 300ms; }
+  .dq.is-open .dq-band { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .dq .dq-pt { transform: translateY(0); transition: none; }
+    .dq .dq-band { opacity: 1; transition: none; }
+  }
+
+  /* ---- the readout table: a bar behind each number, so a row has a shape ---- */
+  .readouts td { position: relative; }
+  .readout-cell { text-align: right; font-family: var(--font-mono); font-size: 12.5px; }
+  .readout-cell i { position: absolute; left: 0; bottom: 6px; height: 3px; background: var(--color-steel); }
+  .readout-cell.is-ours i { background: var(--color-ours); opacity: 0.45; }
+  .readout-cell.is-best span { font-weight: 700; color: var(--color-off); }
+  .readouts th.is-ours { color: var(--color-ours); }
+  .readouts td:first-child { font-weight: 400; font-size: 13px; white-space: nowrap; }
+
   /* ---- the showdown: two terminals, started together, each printing what it actually returned ---- */
   .show { display: grid; grid-template-columns: minmax(0, 1fr); }
   .show-head { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; padding-bottom: 18px; }

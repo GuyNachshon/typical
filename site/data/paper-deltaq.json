@@ -1,0 +1,100 @@
+{
+ "note": "Raw MMLU-Pro among-K accuracy against the shuffled-question control, n=1,200. Every value transcribed from the paper on branch main: readouts from paper/sections/6_analysis.tex (tab:n1n3), candidate-blind variants and teacher from paper/sections/A_appendix.tex (tab:blind). The band is the +/-.02 spread 1,200 items allow.",
+ "band": 0.02,
+ "chance": 0.1,
+ "axes": {
+  "x": "MMLU-Pro among-K accuracy",
+  "y": "\u0394q (shuffled-question control)"
+ },
+ "groups": {
+  "blind": "decision state computed before the candidates are seen",
+  "readout": "readout over the candidates, in the same forward pass",
+  "teacher": "listwise decoder with the options in context"
+ },
+ "points": [
+  {
+   "id": "z1",
+   "group": "blind",
+   "acc": 0.171,
+   "dq": 0.023,
+   "note": "single decision vector, bilinear scorer"
+  },
+  {
+   "id": "zr",
+   "group": "blind",
+   "acc": 0.157,
+   "dq": -0.026,
+   "note": "8 probes, token-level max-similarity"
+  },
+  {
+   "id": "zr_set",
+   "group": "blind",
+   "acc": 0.147,
+   "dq": -0.003,
+   "note": "+ O(K) cross-attention over candidate tokens"
+  },
+  {
+   "id": "ms_ctrl",
+   "group": "blind",
+   "acc": 0.124,
+   "dq": -0.023,
+   "note": "single-set distillation, steps-matched control"
+  },
+  {
+   "id": "ms_zr_set",
+   "group": "blind",
+   "acc": 0.13,
+   "dq": 0.0,
+   "note": "same-Z multi-set, \u0394log-odds targets"
+  },
+  {
+   "id": "zr full depth",
+   "group": "blind",
+   "acc": 0.147,
+   "dq": -0.008,
+   "note": "8 probes, tap at layer 28 of 28"
+  },
+  {
+   "id": "N2",
+   "group": "readout",
+   "acc": 0.198,
+   "dq": 0.058,
+   "note": "candidate-blind semantic readout: frozen text embedding of the label"
+  },
+  {
+   "id": "N3 s1",
+   "group": "readout",
+   "acc": 0.301,
+   "dq": 0.094,
+   "note": "contextual-candidate readout, seed 1 \u2014 what Typical ships"
+  },
+  {
+   "id": "N3 s0",
+   "group": "readout",
+   "acc": 0.314,
+   "dq": 0.117,
+   "note": "contextual-candidate readout, seed 0 \u2014 what Typical ships"
+  },
+  {
+   "id": "N1 s1",
+   "group": "readout",
+   "acc": 0.318,
+   "dq": 0.104,
+   "note": "letter logits, seed 1"
+  },
+  {
+   "id": "N1 s0",
+   "group": "readout",
+   "acc": 0.325,
+   "dq": 0.114,
+   "note": "letter logits, seed 0"
+  },
+  {
+   "id": "teacher",
+   "group": "teacher",
+   "acc": 0.31,
+   "dq": 0.102,
+   "note": "listwise decoder, options in context"
+  }
+ ]
+}

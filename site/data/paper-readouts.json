@@ -1,0 +1,126 @@
+{
+ "note": "Three readouts of one decision pass on a full-depth 1.7B backbone, identical data and steps. N1 and N3 at two seeds, N2 at one. Transcribed from paper/sections/6_analysis.tex (tab:n1n3) on branch main.",
+ "cols": [
+  "N1 s0",
+  "N1 s1",
+  "N2",
+  "N3 s0",
+  "N3 s1",
+  "Teacher"
+ ],
+ "legend": {
+  "N1": "letter logits \u2014 the standard multiple-choice interface, read without generating",
+  "N2": "the decision state against a frozen embedding of each label's text",
+  "N3": "the decision state against each candidate's own contextual state \u2014 what Typical ships"
+ },
+ "rows": [
+  {
+   "k": "\u0394q (primary)",
+   "v": [
+    0.114,
+    0.104,
+    0.058,
+    0.117,
+    0.094,
+    0.102
+   ],
+   "better": "high"
+  },
+  {
+   "k": "MMLU-Pro among-K",
+   "v": [
+    0.325,
+    0.318,
+    0.198,
+    0.314,
+    0.301,
+    0.31
+   ],
+   "better": "high"
+  },
+  {
+   "k": "Banking77 (77 options)",
+   "v": [
+    0.531,
+    null,
+    0.012,
+    0.497,
+    null,
+    null
+   ],
+   "better": "high"
+  },
+  {
+   "k": "SNLI",
+   "v": [
+    0.838,
+    0.831,
+    0.854,
+    0.863,
+    0.851,
+    null
+   ],
+   "better": "high"
+  },
+  {
+   "k": "MNLI",
+   "v": [
+    0.684,
+    0.664,
+    0.742,
+    0.752,
+    0.719,
+    null
+   ],
+   "better": "high"
+  },
+  {
+   "k": "ANLI",
+   "v": [
+    0.377,
+    0.393,
+    0.41,
+    0.431,
+    0.437,
+    null
+   ],
+   "better": "high"
+  },
+  {
+   "k": "BoolQ",
+   "v": [
+    0.769,
+    0.764,
+    0.775,
+    0.737,
+    0.746,
+    null
+   ],
+   "better": "high"
+  },
+  {
+   "k": "Reorder \u0394p",
+   "v": [
+    0.165,
+    0.165,
+    0.059,
+    0.101,
+    0.109,
+    0.097
+   ],
+   "better": "low"
+  },
+  {
+   "k": "Pairwise \u0394log-odds",
+   "v": [
+    0.463,
+    0.443,
+    0.379,
+    0.126,
+    0.094,
+    0.179
+   ],
+   "better": "low"
+  }
+ ]
+}

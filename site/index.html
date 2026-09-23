@@ -267,7 +267,7 @@
       <p class="mt-18">The serving path encoded the state once and then deep-copied the entire prefix cache on every single decision, because mutating a shared cache is the kind of bug you only find in production and the copy made it impossible. Replacing the copy with a stride-0 view is bit-identical and allocates nothing, and with cached attention masks and position tensors it took warm p50 on the 1.7B from 21–25 ms to 15.5–17 ms; the Qwen3.5-4B stack <code>typical-medium</code> runs on went from 42–53 ms to 34–46 ms. A quarter to a third of serving latency, for a change that removes code. We tried <code>torch.compile</code> and CUDA graphs on top of it and rejected both: 8 ms on a single shape, but probabilities moved by up to .1 across shape buckets.</p>
     </div>
   </div>
-  <p class="note mt-18">The controls behind all four, along with the ones that came back null, are in the <a class="ul" href="research.html#eight-results-each-with-a-control">research notes</a>.</p>
+  <p class="note mt-18">The controls behind all four, along with the ones that came back null, are in the <a class="ul" href="research.html#control">research notes</a>.</p>
 </section>
 
 <section class="page chapter" id="tryit">
