@@ -1,4 +1,8 @@
-# typical -- minimal inference package
+# typical-ai
+
+**Typed, direct decisions from a pretrained language model.** State + question + a label set you
+define at call time go in; a probability distribution over exactly those labels, plus an explicit
+abstain, comes out. One forward pass, nothing generated, nothing to parse.
 
 A self-contained decision head for `OzLabs/typical-small-preview`, `OzLabs/typical-small`, and
 `OzLabs/typical-medium`. No training-repo dependencies (no `bench`/`train`/`data`/
@@ -7,8 +11,25 @@ A self-contained decision head for `OzLabs/typical-small-preview`, `OzLabs/typic
 ## Install
 
 ```bash
-pip install -r inference/requirements.txt
+pip install typical-ai
 ```
+
+The import name is `typical_ai`, not `typical`: PyPI's `typical` is an unrelated, established
+package, so taking that import name would break anyone who has both installed.
+
+```python
+from typical_ai import Typical
+
+m = Typical.from_pretrained("OzLabs/typical-small")        # or OzLabs/typical-medium
+
+m.choice(state, "What does the customer want?", ["refund", "replacement", "repair"])
+m.noul(state,   "Is the order still under warranty?")
+m.score(state,  "How urgent is this ticket?", ["0", "1", "2", "3"])
+```
+
+Models and their cards, including the measured trade-offs of each release, are at
+<https://huggingface.co/OzLabs>. Source and the full experimental record:
+<https://github.com/GuyNachshon/typical>.
 
 (Or just copy the `typical/` directory next to your code -- it's a plain Python package,
 no build step.)
@@ -16,7 +37,7 @@ no build step.)
 ## Usage
 
 ```python
-from typical import Typical
+from typical_ai import Typical
 
 m = Typical.from_pretrained("OzLabs/typical-small", device="auto")  # or "typical-small-preview" / "typical-medium"
 

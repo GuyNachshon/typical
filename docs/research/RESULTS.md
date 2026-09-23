@@ -3,8 +3,8 @@
 Regenerated as one set of tables per model-family size, Qwen3 and Qwen3.5 side by side. Every number is pulled
 from `runs/*/results.json` / `runs/probe_*/results.json` / `runs/jev_native_*/summary.json` /
 `runs/bench_*/bench.json` (local, or `guychuk/pcdm-runs` where not pulled locally) — none are copied from prose
-summaries or estimated. Missing cells are `–`, not a guess. Narrative and verdicts: `REPORT.md`; plan: `PLAN7.md`;
-index: `PROJECT.md`; release cards with full training args: `releases/*.md`.
+summaries or estimated. Missing cells are `–`, not a guess. Narrative and verdicts: `REPORT.md`; plan: `docs/plan/PLAN7.md`;
+index: `docs/plan/PROJECT.md`; release cards with full training args: `releases/*.md`.
 
 **How to read this.**
 - **JevBench is a public-subset run, not a ranked leaderboard entry** (72 standard / 48 easy / 111 hard of the
@@ -47,7 +47,7 @@ index: `PROJECT.md`; release cards with full training args: `releases/*.md`.
 | Qwen3.5-4B | `tm2` | .429 | .194 | .414 |
 | Qwen3.5-9B | – | – | – | – |
 
-## 3. Held-out workflow (W), typed-decisions, and external floors — full-row `eval_wf`
+## 3. Held-out workflow (W), typed-decisions, and external floors — capped `results.json` pass
 
 | model | checkpoint | held-out noul | held-out score (NLL) | held-out style | typed-decisions acc (NLL) | PagerDuty (floor .792) | jevlogs (.697) | Mind2Web (.427) | tree-choice |
 |---|---|---|---|---|---|---|---|---|---|
@@ -59,8 +59,12 @@ index: `PROJECT.md`; release cards with full training args: `releases/*.md`.
 | Qwen3.5-4B | `tm2` | .858 | .586 (0.97) | .842 | .515 (1.13) | .757 | .518 | .497 | .585 |
 | Qwen3.5-9B | – | – | – | – | – | – | – | – | – |
 
-PagerDuty/jevlogs/Mind2Web numbers above are this pass's own full-file `eval_wf` extraction and can differ a few
-points from a given release card's train-time-pass number for the same checkpoint (release cards sometimes quote
+**Protocol note (corrected 2026-09-23).** Every number in this table is the capped `results.json`
+evaluation pass, not a full-file `eval_wf` run — the heading previously said otherwise. The two protocols can
+disagree by far more than a few points on the external suites: `ts1b` reads PagerDuty **.560** here, while
+full-file `eval_wf` passes over the same suite (n = 6,000) land between .69 and .79 on comparable checkpoints.
+Compare rows within this table to each other, and do not compare them against a full-file number from §5 or
+from REPORT.md's §3x re-evaluation.
 a shorter pass — see each card's footnotes); treat these as the full-row figures.
 
 ## 4. DecisionMix v2 (`data_wh` hard curriculum, `data_u` uncertainty corpus) — trained checkpoints only
@@ -154,7 +158,7 @@ not as the release gate; see §5a for why its intervals cannot support the compa
 | Qwen3-14B (frozen, 3-shot, reference) | `jev_zs3_14b` | frozen control | .819 (.28) | 1.00 | .559 (.56) |
 
 The Qwen3.5-9B semif-rendered frozen control ties the trained `tl1b` on standard accuracy and beats every trained
-checkpoint in this project on hard accuracy, with zero training — see `PROJECT.md` §1/§5 for the reading.
+checkpoint in this project on hard accuracy, with zero training — see `docs/plan/PROJECT.md` §1/§5 for the reading.
 
 ## 6. Single-decision latency (same-pod, same-torch-build; REPORT §3ab "apples-to-apples")
 

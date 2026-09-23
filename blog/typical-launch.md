@@ -87,31 +87,31 @@ For technical readers: the released models use a truncated Qwen3 base model with
 
 We train on four kinds of decision: evidence (NLI-style), knowledge (multiple choice), workflows, and uncertainty (soft targets). The workflow portion includes counterfactual rubric groups, described below.
 
-**Put your case facts at the end of a long state.** This is the one thing to know before you deploy either of these checkpoints, and it is a defect, not a feature.
+**Put your case facts at the end of a long state — if you are on weights pulled before 2026-09-23.** This was the one thing to know before deploying either of the first checkpoints, and it was a defect, not a feature.
 
 Both were trained with a 1,024-token state window on a long-policy corpus that rendered its supporting facts at the *end* of each row. Training truncates from the right, so 98.8% of those rows lost their facts before the model ever saw them, and the model was optimised to answer long policies from states that no longer contained the evidence for the answer. We found this after the runs that produced Small and Medium.
 
 The consequence is positional, and you control it, because you write the state text. On 605 held-out long states, identical items differing only in where the case block sits:
 
-| released model | facts *before* the policy body | facts *after* it | cost |
+| previous weights | facts *before* the policy body | facts *after* it | cost |
 |---|---|---|---|
-| `typical-small` | .598 | .798 | **−20.0** |
-| `typical-medium` | .612 | .866 | **−25.5** |
+| `typical-small` (v1) | .598 | .798 | **−20.0** |
+| `typical-medium` (v1) | .612 | .866 | **−25.5** |
 
-Twenty to twenty-five points, on the same documents, for moving one block of text. Rendered facts-first, `typical-small` sits on the majority-class floor for yes/no — it has stopped reading the evidence. So: policy or document first, case facts last.
+Twenty to twenty-five points, on the same documents, for moving one block of text. Rendered facts-first, the v1 `typical-small` sits on the majority-class floor for yes/no — it has stopped reading the evidence.
 
-The fix is upstream, not a rendering convention we want to keep. The corpus is regenerated facts-first, and a matched 2×2 puts the cost of the original defect at 11.2 points at 1.7B (p = 5e-10) and 7.8 at 14B (p = 7e-12), with the facts-first 14B reaching .997 on that same set. Retraining both released checkpoints on the fixed corpus is the next thing we're doing, and it is worth more than anything else currently on our table. The [deep dive](./technical-deep-dive.md) has the measurement.
+The fix is upstream, not a rendering convention we wanted to keep. The corpus was regenerated facts-first, and a matched 2×2 puts the cost of the original defect at 11.2 points at 1.7B (p = 5e-10) and 7.8 at 14B (p = 7e-12), with the facts-first 14B reaching .997 on that same set. **Both models were re-released on 2026-09-23 on checkpoints retrained against the fixed corpus** — `ts1c` at 1.7B reads .947 facts-first, `tm2` at Qwen3.5-4B reads .950, and neither gives up anything facts-last. Pull again if you downloaded before that date; Medium's backbone changed to Qwen3.5-4B, so re-pull the inference code from the model repo before loading it. Each replacement is a trade and each card states its own. The [deep dive](./technical-deep-dive.md) has the measurement.
 
 ## The released models
 
 | model | size | JevBench standard\* | JevBench hard\* | CLINC-150 | warm p50 |
 |---|---|---|---|---|---|
-| `typical-small` | 1.7B | .694 [.569, .819] | .432 [.342, .523] | .801 | 15.5–17 ms |
-| `typical-medium` | 4B | .806 [.694, .903] | .423 [.333, .514] | .847 | 19–21 ms |
+| `typical-small` v2 | 1.7B | .708 | .432 | .797 | 15.5–17 ms |
+| `typical-medium` v2 | 4B (Qwen3.5) | .861 | .495 | .795 | 19–21 ms |
 
-\* Public-subset run against JevBench v1.2.1 (72 standard / 111 hard public ids), not a ranked leaderboard entry. Brackets are 95% cluster bootstraps over the paraphrase group; the standard tier's 72 items come from only 36 independent states. Majority baselines are .311 standard and .336 hard. Latency is warm p50 for a single K = 2 decision over a 256-token state, one stream, in process on one H100 through the public inference package, model load excluded — not a hosted-endpoint number and not comparable to one measured over a network.
+\* Public-subset run against JevBench v1.2.1 (72 standard / 111 hard public ids), not a ranked leaderboard entry. The standard tier's 72 items come from only 36 independent states, so a 95% cluster bootstrap over the paraphrase group is ±6–13 points there and ±9 points on hard. Majority baselines are .311 standard and .336 hard. Latency is warm p50 for a single K = 2 decision over a 256-token state, one stream, in process on one H100 through the public inference package, model load excluded — not a hosted-endpoint number and not comparable to one measured over a network.
 
-Those intervals are the point of printing them. **JevBench cannot separate these two models.** Nor can it separate any adjacent pair in our seven-checkpoint ladder, which spans 1.7B to 14B and four backbone generations. Do not read the .694-to-.806 gap as a result; we don't.
+That sampling error is the point of quoting it. **Do not read this column as a ranking.** At ±6–13 points on standard it does not separate any adjacent pair in our seven-checkpoint ladder, which spans 1.7B to 14B and four backbone generations, and we have not run the paired per-item test — the only JevBench comparison worth quoting — on this particular pair. It is also blind to the axis the v2 retrain was for: `ts1c` reads .708 against the v1's .694 — statistically indistinguishable — while being 35 points better on facts-first long states.
 
 What does separate them is everything measured at a usable sample size: Medium leads Small by 5 points on CLINC-150, 11 on MMLU-Pro among-K, 10 on held-out yes/no decisions, 5 on the composition curriculum. It is not a clean sweep — Medium is 9 points worse on TREC-fine (50 fine-grained topics). Take Medium for accuracy, Small for cost, and don't use the benchmark column to decide.
 
@@ -141,11 +141,11 @@ Family by family, the frozen backbone leads our trained one on trade-off (.50 to
 
 Two other places Typical is the wrong tool today: candidate sets in the hundreds or thousands need a retrieval front end feeding a shortlist to the decision head, and Choice keeps some sensitivity to the order you list options in. `noul()` does not, because it renders no candidates at all.
 
-## One thing to know before you call it
+## The bug we shipped, and the fix
 
-If your state is a long document, put the case facts **after** the policy text, not before.
+Both models were re-released on 2026-09-23 to fix this. If you pulled them before that date, pull again.
 
-All three public checkpoints were trained on a corpus whose long states rendered the case last, and they picked up that ordering. We measured it on 605 held-out long policy states, identical content in both conditions, only the position of the case block different, with no truncation at scoring time:
+The checkpoints we first published were trained on a corpus whose long states rendered the case last, and they picked up that ordering. We measured it on 605 held-out long policy states, identical content in both conditions, only the position of the case block different, with no truncation at scoring time:
 
 | model | facts last | facts first |
 |---|---|---|
@@ -155,7 +155,9 @@ All three public checkpoints were trained on a corpus whose long states rendered
 
 Twenty to twenty-five points, and on the yes/no subset the preview model drops below the majority-class floor, meaning you would do better answering "yes" to everything than calling it that way. Short states are unaffected.
 
-We found this while testing whether a data bug we had already fixed was the cause of a separate problem. Retrained checkpoints without the bias exist and reach .947 and .950 in the same test, giving up nothing in the other column, and they will supersede these. Until they do, the ordering above is the caveat, and it is on each model card.
+We found this while testing whether a data bug we had already fixed was the cause of a separate problem. The current weights, published on 2026-09-23, reach **.947** (Small) and **.950** (Medium) on that same test, so either ordering works now.
+
+Both replacements are trades rather than clean upgrades, and the model cards say so. Small gains 34.9 points on long states and loses 6.5 on held-out yes/no decisions, 4.8 on BoolQ and 3.4 on Score. Medium gains 33.8 on long states, 7.2 on JevBench hard and 5.6 on standard, and loses 5.5 on CLINC-150 and 5.3 on HWU64. Medium also moved to a Qwen3.5-4B backbone, so re-pull the inference package from the model repo before loading it. The previous weights remain in each repository's git history if the older behaviour suited your workload better.
 
 ## Four things that surprised us
 
@@ -176,16 +178,12 @@ Both checkpoints are Apache-2.0 over Apache-2.0 Qwen3 base models, and the train
 
 ## Try it
 
-The inference package ships inside each model repo:
-
 ```bash
-huggingface-cli download OzLabs/typical-small --local-dir typical-small
-pip install -r typical-small/inference/requirements.txt
+pip install typical-ai
 ```
 
 ```python
-import sys; sys.path.insert(0, "typical-small/inference")
-from typical import Typical
+from typical_ai import Typical
 
 m = Typical.from_pretrained("OzLabs/typical-small", device="auto")  # or "OzLabs/typical-medium"
 
@@ -194,7 +192,7 @@ m.noul(state,   "Is the order still under warranty?")
 m.score(state,  "How urgent is this ticket?", ["0", "1", "2", "3"])
 ```
 
-It needs `torch`, `transformers`, `safetensors`, `huggingface_hub` and `numpy`, and nothing from our training stack. `example.py` in the same directory runs end to end.
+It needs `torch`, `transformers`, `safetensors`, `huggingface_hub` and `numpy`, and nothing from our training stack. The import is `typical_ai` rather than `typical` because the bare name on PyPI belongs to an unrelated package. Weights download from the Hub on first call, and the package also ships inside each model repo if you would rather vendor it.
 
 Pick one bounded decision your software currently makes by calling an LLM and parsing the answer. Write down the label set as it actually varies at runtime. Swap the generation step for `choice`, `noul` or `score`, and test it on your own labels. If the model abstains a lot, that's telling you something about your label set.
 

@@ -1,76 +1,58 @@
 ---
-title: "We Removed Generation from an LLM. Here's What Broke."
-date: 2026-09-22
+title: "How Typical Works, and What Broke Building It"
+date: 2026-09-23
 ---
 
-# We Removed Generation from an LLM. Here's What Broke.
+# How Typical Works, and What Broke Building It
 
-[Typical](./typical-launch.md) is a family of open decision models. You give one a state and a typed question, and it returns a probability distribution over options you defined at runtime. No tokens are generated and nothing is parsed.
+[Typical](./typical-launch.md) is a family of open decision models. You hand one a state and a typed question, you hand it the options at call time, and it returns a probability distribution over those options plus an abstention. Nothing is generated and nothing is parsed.
 
-That interface sounds like a simplification of a language model. In practice, removing generation removed a lot of scaffolding that was doing load-bearing work, and most of what we learned came from finding out which scaffolding mattered.
+The launch post covers what the models are for. This one covers how they work: the architecture down to the layer the readout reads, the training mixture and why the mixture turned out to matter as much as the architecture, the results at the resolution our evidence actually supports, and the failures that shaped each decision. Most of the design was forced by a negative result, so the two are told together.
 
-This is the archaeology: the architecture that didn't work, the bugs that looked like results, and the results that looked like bugs. Section references (§3j, §3t and so on) point at our internal experiment report, which publishes with the training code.
+Section markers (§3r, §3ak-c and so on) point at our internal experiment report. The repo is private today; the report publishes with the training code. The public artefacts are the three model repos on Hugging Face, which carry the weights, the inference package and the evaluation JSON every number here is read from.
 
-One measurement caveat applies throughout, and it is load-bearing enough to state before anything else. Our JevBench runs are against the public subset, unranked: 72 standard items from only 36 independent states (each appears as two paraphrases), and 111 hard items. Cluster-bootstrapped, that is ±9 points on any hard-tier number and ±6 to 13 on standard. Here is what that does to the whole checkpoint ladder:
+One measurement caveat runs through everything below. Our JevBench numbers are against the public subset, unranked: 72 standard items drawn from only 36 independent states (two paraphrases each) and 111 hard items. Cluster-bootstrapped over those states, that is roughly ±9 points on any hard-tier number and ±6 to ±13 on standard. Where a claim leans on a small gap there, we say so, and in several places we say that the benchmark simply cannot resolve the comparison we wanted it to.
 
-| run | standard | 95% CI | hard | 95% CI |
-|---|---|---|---|---|
-| `ts1b` (typical-small, 1.7B) | .694 | [.569, .819] | .432 | [.342, .523] |
-| `tm1b` (typical-medium, 4B) | .806 | [.694, .903] | .423 | [.333, .514] |
-| `tm2` (Qwen3.5-4B) | .861 | [.778, .944] | .495 | [.405, .595] |
-| `tl2` (Qwen3.5-9B) | .833 | [.722, .931] | .495 | [.405, .586] |
-| `ladder_14b` | .875 | [.792, .944] | .468 | [.378, .559] |
-| `tl1b` (14B) | .931 | [.861, .986] | .450 | [.360, .541] |
-| `tl1b_nokd` (14B, no KD) | .917 | [.833, .986] | .477 | [.387, .568] |
+## 1. The interface, and why it has that shape
 
-**Every adjacent pair in that table is statistically indistinguishable.** A 1.7B model and a 14B model, four backbone generations, our best checkpoint and our worst — the benchmark cannot separate them at this sample size. `tl2` and `tm2` both score exactly 55 of 111 on hard while agreeing on none of their probability vectors and disagreeing on 26 items outright; that is not a tie, it is a measurement that has run out of resolution.
+A decision call looks like this:
 
-So the only JevBench comparisons worth quoting are paired per-item tests, and we quote those where we have them. Everything else in this post that carries weight comes from evaluation sets we built to answer one question at a sample size that could answer it.
+```
+state + typed question + runtime candidate set  ->  distribution over candidates + P(∅)
+```
 
-## 1. The obvious architecture failed
+Three properties of that signature drove the whole design.
 
-The first design was the clean one. Compute a decision state `Z(state, question)` once, without looking at the candidates, then score each candidate against it with a cheap head. Candidates are then free: their cost is a dot product, K scales for nothing, and you can cache label vectors forever.
+**The candidate set arrives at runtime.** There is no output head with `refund` at index 0. Your label list is plain text supplied per call, which means the model has to read the candidates, and that turns out to be a hard architectural constraint rather than a convenience (section 2.2).
 
-We built three versions of it and distilled a listwise teacher into them: a single decision vector, eight probes with token-level MaxSim, and probes plus O(K) cross-attention over the candidate tokens. On MMLU-Pro among-K they scored .171, .157 and .147, against .310 for the teacher. That looked like partial success. About half the teacher's score had transferred.
+**One forward pass, no decode.** The state is encoded once into a KV cache; each question is a short suffix scored against that cache. A second question on the same document costs one short pass, not a second read of the document.
 
-Then we ran the control that killed it (§3j). We re-scored every student with the real question replaced by a shuffled, unrelated one, holding the candidate set fixed. The gap between the two is Δ_sh, and it is the only number in the table that says whether the question is doing any work:
+**Abstention is part of the output, not part of the label list.** "None of these fit" is the answer you route to a human or to a slower model, so it has to be a number you can threshold. That requirement alone rules out the obvious implementation (section 2.4).
 
-| among-K | normal | shuffled question | Δ_sh |
-|---|---|---|---|
-| teacher (options in context) | .310 | .208 | **+.102** |
-| `z1` student | .171 | .147 | +.023 |
-| `zr` student | .157 | .182 | −.026 |
-| `zr_set` student | .147 | .151 | −.003 |
-| multi-set + Δ-log-odds student | .130 | .130 | +.000 |
-| `zr` at full depth (28/28) | .147 | .156 | −.008 |
+## 2. Architecture
 
-The teacher gains a tenth of a point of accuracy from being told what the question is. The students gain between −.026 and +.023, in both directions, at 1,200 items — which is to say nothing we can distinguish from zero, and nothing like the teacher. Their whole above-chance score was candidate-set priors: which option strings look plausible together, learned from the corpus.
+<p align="center"><img src="../figures/fig_architecture.png" alt="Typical architecture: state encoded once into a KV cache, per-question suffixes read out a probability distribution" width="720"></p>
+<p align="center"><em>One state encode, many cheap per-question reads against the cached prefix.</em></p>
 
-That result held against every lever we had. Head capacity is not the bottleneck — a single decision vector retains as much as eight probes. Set conditioning is not — O(K) cross-attention over the candidate tokens changes nothing on this axis. Supervision is not: multi-set training, where the same state appears with seven different option sets and the loss targets the teacher's Δ-log-odds between them, produced Δ_sh of exactly 0.000.
+The current shape has been frozen since §3r:
 
-One note on how we first got this wrong, because it is the kind of mistake that is easy to repeat. Our original control replaced the question with a period rather than with a different question, and by that measure every student scored *better* with the question destroyed. The shuffled control is the right one — it holds the amount of question-shaped text fixed and varies only whether that text is the relevant question — and it moves the individual students around by a couple of points. It does not change the finding, and we report it because the weaker control is what we ran first.
+- A Qwen3 or Qwen3.5 base model **truncated at about 71% of its depth** (layer 20 of 28 at 1.7B, 26 of 36 at 4B and 8B, 28 of 40 at 14B). Layers above the tap are discarded, not just unused.
+- **LoRA r16 on the top eight kept layers.** Everything below is frozen.
+- The **state text KV-cached once** as a causal prefix.
+- The **question and its candidates rendered into a short causal suffix** against that cache, ending in a terminal decision token.
+- An **N3 contextual readout**: the terminal decision state scored against each candidate's own contextual hidden states, inside the same forward pass.
+- A **factored abstention gate** reading set statistics of the option scores, outside the softmax over candidates.
+- Three typed outputs on that one readout: **Choice** (categorical), **Score** (ordinal-smoothed categorical), **Noul** (per-row Bernoulli).
 
-## 2. Candidates have to participate in the computation
+Each of those exists because something else failed first.
 
-The suspicion at that point was depth: every candidate-blind student read the backbone at layer 20 of 28, and maybe the last eight layers were where question-conditioned knowledge lived. So we re-ran the candidate-blind student at full depth (§3s). Among-K *fell*, .157 to .147, and Δ_q(shuffled) stayed at −.008 while the evidence tasks regressed hard (BoolQ −11, ANLI −8, MNLI −7).
+### 2.1 The last layer is the wrong layer
 
-That closed it. What transfers into a state computed before the options are known is priors and calibration, not question-conditioned parametric knowledge, at any tap depth.
+The first full-scale run read the backbone's final hidden layer, which is what you do without thinking about it. It scored 58.6 on SNLI.
 
-The architecture that works renders the options into the suffix, so the candidate text goes through the same pretrained layers as the question. The released models built on it carry Δ_q(shuffled) of .127 at 1.7B and .193 at 4B: real, measurable, question-dependent behaviour, from the same backbone that couldn't produce any when the options arrived after the fact.
+58.6 is the hypothesis-only baseline for SNLI. The model was making entailment predictions without using the premise, the classic dataset-artifact failure. The top of a generative stack has been specialised for predicting the next token, and whatever cross-sentence evidence structure lived in the middle of the network was gone by the time it got there. Tapping at layer 20 of 28 took SNLI to 65.3 frozen and 68.2 with LoRA, and the NLI family loss started descending for the first time. Backbone size had been a red herring: 0.6B to 1.7B bought nothing at all until the tap moved.
 
-There's a much dumber version of the same lesson from earlier in the project. Qwen3 has no BOS token, so when we embedded a single-token candidate on its own, that token landed at position 0 — the attention-sink position, where the residual stream carries activations orders of magnitude larger than anything token identity contributes ([Sun et al., 2024](https://arxiv.org/abs/2402.17762)). The cosine similarity between the position-0 states of `neutral`, `yes` and `transfer` was 0.9998. The state does depend on its token; it is just that the sink swamps the dependence. Every single-token candidate we embedded was, for scoring purposes, the same vector. Prepending `<|endoftext|>` and dropping it fixed it.
-
-## 3. The final layer was the wrong layer
-
-The first full-scale version read the backbone's last hidden layer, which is what you'd do without thinking about it. It scored 58.6 on SNLI, and the number alone told us nothing except that it was bad.
-
-What told us what was wrong was a control we should have been running from the start: blank the premise and re-score. A model that has learned entailment should collapse. This family of models did not. At SNLI .701 it scored **.648 with the premise blanked** — the premise was worth five points. It was reading the hypothesis for the well-known SNLI annotation artefacts and ignoring the evidence, which is the classic dataset-artifact failure ([Gururangan et al., 2018](https://arxiv.org/abs/1803.02324)). Our decision head had been handed a state already specialised for next-token prediction, and whatever cross-sentence evidence structure existed in the middle of the network was gone by the top.
-
-The premise-blanked score is not itself the diagnostic — a hypothesis-only classifier trained on SNLI reaches the high 60s, so .648 in isolation is unremarkable. The **gap** is the diagnostic, and ours was five points. Once the state and the query interacted inside the pretrained layers rather than above them, the same probe read .440 against .910 with the premise: a gap of forty-seven.
-
-Tapping at layer 20 of 28 took SNLI to 65.3 frozen and 68.2 with LoRA, and the NLI family loss started descending for the first time. Backbone size had been a red herring the whole time: going from 0.6B to 1.7B bought nothing at all until the tap moved.
-
-The same effect shows up later in the option-conditioned architecture (§3r). Same head, same data, same steps, only the tap depth changed:
+The effect reappeared later in the option-conditioned architecture, where it had been confounded with the readout for several runs. Same head, same data, same steps, only the tap depth changed (§3r):
 
 | | native readout @ 28 layers | native readout @ tap 20 |
 |---|---|---|
@@ -78,210 +60,319 @@ The same effect shows up later in the option-conditioned architecture (§3r). Sa
 | CLINC-150 | .740 | **.862** |
 | best val NLL | .430 | **.341** |
 
-We later swept tap depth again against the current recipe (tap 15, 17 and 18 of 28) and found nothing that clears the seed-to-seed spread we'd measured, so the parameter stays where it is (§3aj). The finding is narrower than "shallower is better": the top of a generative stack is specialised for generating, and a decision head wants a representation from before that specialisation.
+That run also killed a story we had been telling. Before it, the record said the options-in-suffix formulation cost evidence accuracy. It did not; the depth did. Two separate claims collapsed into one when the confound was removed.
 
-## 4. "None of the above" broke the model
+We swept tap depth once more against the current recipe, at 54%, 61% and 64% of depth (§3aj). Quality rose weakly and non-monotonically toward the deeper end, and every gain sat inside the seed-to-seed spread we had already measured for the same config. The parameter stays at 71%, filed as a closed negative. The general claim is narrower than "shallower is better": a decision head wants a representation from before the top of the stack specialises for generation, and where exactly that is has a wide flat optimum.
 
-Every decision model needs an escape hatch. The obvious implementation is to add "none of the above" to the candidate list and let the softmax handle it.
+### 2.2 The candidates have to be in the forward pass
 
-It produced one of the strangest failure modes in the project. The abstention rate became a pure function of K — of how many options you happened to pass, not of whether the right one was among them.
+The architecture everyone wants is the factored one. Compute a decision state `Z(state, question)` once, without looking at the candidates, then score each candidate against it with a cheap head. Candidates become free, K scales for nothing, label vectors cache forever.
 
-The number that shows it is P(∅ | the gold answer is absent): how often the model correctly abstains when it should. Sweeping K on CLINC with the gold label removed:
+We built three versions of it and distilled a listwise teacher into them: a single decision vector, eight probes with token-level MaxSim, and probes plus O(K) cross-attention over the candidate tokens. On MMLU-Pro among-K they scored .171, .157 and .147 against the teacher's .310, which reads like partial success.
 
-| P(∅ \| gold absent), CLINC | K=5 | K=50 | K=150 |
-|---|---|---|---|
-| rendered ∅ as an option | .02 | .61 | **1.00** |
-| ∅ as a head decision | .89 | .67 | .64 |
+Then we ran the control (§3j). Every student was re-scored with the question replaced by a period, and again with the question shuffled:
 
-The top row is the pathology in one line. At K=5 the model essentially never abstained; at K=150 it always did. Not "abstained more often" — *always*, on every item, which is a model that has stopped answering. On Banking77 at K=77 the same collapse drove null AUROC to .00.
-
-We looked at AUROC first and nearly missed it. On the same sweep it reads .97 / .91 / 1.00 for the broken version against .98 / .92 / .95 for the fixed one — a rounding error at small K, and *better* for the broken one at K=150, because a model that abstains on everything ranks every positive above every negative. AUROC measures whether the score separates. It cannot see that the score's meaning has moved.
-
-Downstream, the effects were not subtle. MMLU-Pro false-abstention was .692, dropping accuracy to .133. Banking77 with all 77 labels scored .063.
-
-Moving abstention out of the candidate list and into a separate head, computed independently of the softmax over the real options, fixed all of it at once (§3t). MMLU-Pro false-abstention went .692 to .003 with accuracy .133 to .353, KL to the listwise teacher went 2.43 to .27, and Banking77-77 went .063 to .579. It cost 2 to 7 points on intent and topic label spaces (HWU64 .801 to .757, 20NG .589 to .515) and raised option-order sensitivity.
-
-The practical version: if you have added a "none of these" option to any classifier, check whether it behaves the same way at K=5 and K=150. A null score that means something different at every candidate count cannot be thresholded, and a threshold is the entire point.
-
-## 5. We trained on long documents after silently deleting the evidence
-
-Our long-policy training corpus, 23k rows, renders the case facts at the end of the text: policy document first, then `Case: <facts> <request>`.
-
-State length in that corpus runs p10/p50/p90 = 1,190 / 1,845 / 2,490 tokens. The training pipeline right-truncated states at `--max_state`. At the 1,024-token window Release 1 used, **98.8% of those rows lost their facts before the model ever saw them**. At the 256-token window the earlier scaling ladder used, all of them did.
-
-So for a stretch of this project we were training models to answer confidently about text that had been cut off. The symptom was visible in the metrics, if you knew to read it: long-document policy accuracy of .05 for the 14B ladder run and .21 for `typical-medium`, with high confidence attached.
-
-The fixes were to regenerate the corpus facts-first (case position inside the first 8% of the text), and to stop truncating. `--drop_truncated` discards any row that doesn't fit the window rather than quietly cutting it, which is the right default for a training loader handling anything with a payload at a known position.
-
-**Then we tried to prove it mattered, and for two days we had it backwards.** The data defect is verified and not in dispute: we can count the rows, 98.8% is a measurement, and we confirmed empirically that the tokenizer path keeps the start of a state and drops the end. What needed establishing is that the defect *caused* the metric movement we saw afterwards. The run that fixed it changed five things at once (facts-first rendering, `--drop_truncated`, a wider window, a Brier term, calibration-based checkpoint selection), so the long-policy recovery had five candidate explanations and we had separated none of them.
-
-The counterfactual corpus was still on disk, so the ablation was clean to set up: two 1.7B arms, byte-identical flags, a 1,024-token window with `--drop_truncated` deliberately off so truncation bites exactly as it did in Release 1, differing only in which render of the same rows is the training file. Same rows, same labels, same state lengths, `Case:` at the start or at the end.
-
-On JevBench it came back a null. Long-policy accuracy was .316 for the facts-first arm against .105 for facts-last — the predicted direction, but 6 of 19 items against 2 of 19. Fisher's exact test gives two-sided p = 0.232, the bootstrap interval on the difference contains zero, and the hard-tier aggregate goes the other way (.378 against .396). We wrote that up as "consistent with the mechanism, underpowered to confirm it."
-
-Then we scored both arms on a purpose-built held-out set: 605 long states, no overlap with either training corpus, a 4,096-token window so nothing is truncated at eval. Our first pass only had the facts-last arm, and it showed something striking — .830 when the case sits at the end of the state where its training put it, .640 when the same 605 items put the case at the start, and on the two-way `policy_permit` subset (n = 330) .842 against .615 against a majority-class floor of .612. Moving the facts to a position the model wasn't trained to look at cost 23 points and landed it exactly on the floor.
-
-That looked like the answer, and we drafted it as the answer: the mechanism is train/test render mismatch, and truncation is a side issue. It was the wrong conclusion, for a reason that is easy to miss. Scoring each arm only in the render its own training used confounds the variable under test with render compatibility. The facts-first arm's cells landed a day later and completed the 2×2:
-
-| trained on | scored on | overall | `policy_permit` (floor .612) | `action_select` (floor .233) |
+| among-K | normal | choices only | shuffled question | question-dependent gain |
 |---|---|---|---|---|
-| facts-first | facts-first *(matched)* | **.942** | **.933** | **.953** |
+| teacher (options in context) | .310 | .222 | .208 | **+.088** |
+| `z1` student | .171 | .181 | .147 | −.010 |
+| `zr` student | .157 | .166 | .182 | −.009 |
+| `zr_set` student | .147 | .162 | .151 | −.014 |
+
+Every student did as well or better with the question destroyed. Their entire above-chance score was candidate-set priors: which option strings look plausible together, learned from the corpus. Nothing question-dependent had compiled into `Z`.
+
+We tried the strongest available fix. Multi-set supervision, where the same state appears with seven different option sets and the loss targets the teacher's Δ-log-odds between them, produced a model with Δ_q(shuffled) of exactly 0.000. The set-conditioning cross-attention path stayed inert through 4k steps of direct supervision.
+
+Then we ran the closure experiment, because every candidate-blind student had been tapped at layer 20 and §3r had just shown depth was decisive for the candidate-aware readout. Same head, full 28 layers (§3s): among-K *fell* to .147, Δ_q(shuffled) stayed at −.008, and the evidence tasks regressed exactly as a last-layer tap predicts (BoolQ −11, ANLI −8, MNLI −7).
+
+That closes it as far as our factorisation goes. A state computed before the options are known transfers the teacher's priors and its calibration, and not its question-conditioned parametric knowledge, at any tap depth we tested. Six factorisations and objectives, every depth: all of them sit in a ±.02 band on Δ_q while the teacher and both candidate-aware readouts sit at .09 to .12. This is the project's strongest result and the one with no close prior art. It is scoped to what we built; it is not an impossibility theorem.
+
+<p align="center"><img src="../figures/fig_deltaq.png" alt="MMLU-Pro among-K accuracy against question-dependent signal for every readout probed; candidate-blind variants cluster at zero" width="640"></p>
+<p align="center"><em>Raw accuracy on the x-axis, question-dependence on the y-axis. Points high on x and flat on y are answering from candidate-set priors. Every candidate-blind variant lands in that band, including the one run at full depth.</em></p>
+
+### 2.3 The contextual readout
+
+Once the candidates are rendered into the suffix, there is still a choice about what to score.
+
+The cheap version reads the letter logits: render the options as A/B/C/D, take the terminal state, dot it with the letter embeddings. This is the standard MCQ interface, and it works. Our N1 arm reached .325 among-K, above the listwise teacher, with Δ_q^sh of .114.
+
+The obvious non-generative version (N2) scores the terminal decision state against a slot-agnostic semantic embedding of each candidate. It failed in an informative way: .198 among-K, and it collapsed entirely on large unseen label spaces (Banking77 at K=77 scored .012). The mechanism is that h_D encodes "the answer is the option in slot C", and a bilinear score against a semantic vector with no slot identity cannot recover that.
+
+N3 is the fix that prediction implies. Score h_D against **each candidate's own contextual hidden states**, the ones computed inside the suffix, which carry both the candidate's meaning and its position. It matches the letter readout on every knowledge and unseen-label set (among-K .314 against .325, CLINC-heldout .916 against .918) with a quarter of its order fragility: IIA Δlog-odds .13 against .46, reorder Δp .10 against .165. A seed replicate reproduced both the parity and the fragility gap (§3v).
+
+That is the whole claim behind the interface: candidate-conditioned pretrained reasoning can be read out directly as typed probabilities without the generative answer interface, and doing it through the candidates' own contextual states rather than through letters removes most of the order artifacts you get for free with letters.
+
+### 2.4 Abstention is a gate, not a candidate
+
+The obvious way to support "none of the above" is to add it to the candidate list and let the softmax sort it out. It produced the strangest failure in the project: abstention became a function of K.
+
+| null AUROC, CLINC-150 | K=5 | K=20 | K=50 | K=150 |
+|---|---|---|---|---|
+| ∅ rendered as an option | .97 | .94 | .91 | 1.00† |
+| ∅ as a head decision | .98 | .95 | .92 | .95 |
+
+† Degenerate. At K=150 the model abstained on everything, which makes AUROC perfect and the model useless. At the other end, at K=5 it never abstained: P(∅ | gold absent) was .02. Banking77 at K=77 gave a null AUROC of .00 by the same mechanism.
+
+Downstream this was not subtle. MMLU-Pro false-abstention was .692, dragging accuracy to .133. Banking77 with all 77 labels scored .063.
+
+Moving abstention into a factored gate that reads set statistics of the option scores (max, margin, log-sum-exp) rather than competing inside the softmax fixed all of it at once (§3t). The K-sweep became monotone, MMLU-Pro false-abstention went .692 to .003 with accuracy .133 to .353, KL to the teacher went 2.43 to .27, Banking77-77 went .063 to .579, and Δ_q was unchanged at .122. It cost 2 to 7 points on intent and topic label spaces (HWU64 .801 to .757, 20NG .589 to .515) and raised option-order sensitivity.
+
+The portable version: if you have added a "none of these" option to any classifier, check that it behaves the same way at K=5 and K=150. A null score that means something different at every candidate count cannot be thresholded, and a threshold is the entire point of having it.
+
+### 2.5 Typed heads are contracts on the output distribution
+
+Choice, Noul and Score are not three architectures. They are one readout with three different contracts on what the returned distribution must satisfy, and each contract is enforced by a structural choice rather than by hoping the model learns it.
+
+**Choice** is the N3 categorical readout described above. Contract: a distribution over candidate strings you supplied, plus P(∅), with as little dependence on the order you listed them as we can manage.
+
+**Score** is the same categorical readout trained with **ordinal-smoothed targets** (τ = 0.7). Severity 0 to 3 and priority 1 to 5 have an order; a K-way softmax treats the levels as unrelated buckets, so predicting 0 when the answer is 1 costs exactly what predicting 0 when the answer is 3 costs. Smoothing the target across adjacent levels is a loss change with no new parameters (§3ac):
+
+| held-out urgency | K-way | ordinal-smoothed |
+|---|---|---|
+| accuracy | .505 | .508 |
+| NLL | 2.07 | **1.23** |
+| Brier | .79 | **.68** |
+| ECE | .35 | **.19** |
+| ordinal MAE | .58 | **.55** |
+
+Accuracy did not move. On the 12 ordinal items in JevBench the two models produce identical per-item predictions. Every probability-quality metric improved anyway. On an external severity set the same change took accuracy .853 to .939 and MAE .15 to .06. We also tried a cumulative-link head with learned thresholds; it won JevBench standard and lost on every internal set, and at 3k steps for fresh parameters it is an open follow-up rather than a rejection.
+
+**Noul** is a per-row Bernoulli head, `P(yes) = σ(w·h_D)`, with **no candidates rendered at all**. Contract: exact order-invariance. A 2-way Choice over `["no", "yes"]` moves P(yes) by up to .55 when you reverse the label order. The Bernoulli head moves it by zero, on all nine test sets, by construction. It was also the first thing in the project to clear an untouched external floor by a wide margin: PagerDuty .602 to .886 against a constant-prediction floor of .792.
+
+Routing between them is per row, not global. The first attempt made `--noul_head bern` a global flag; every row was then rendered query-only and scored by the Bernoulli head, and the run collapsed to chance. It cost about $10 of H100 time. Rows whose candidate set is exactly {yes, no} now take the Bernoulli path and every other row is bit-identical to the K-way path.
+
+### 2.6 One state encode, many questions
+
+At inference the state text is encoded once into a prefix KV cache and each question is a short right-padded suffix scored against it, batched in chunks. A single decision at K=2 costs 45 ms at 1.7B, 57 ms at 4B and 59 ms at 14B on one H100, same pod and same torch build. An eight-times larger model is 1.3 times slower per decision, because the cached state and the short suffix dominate.
+
+Large candidate sets are where that stops being true. The batched marginal cost per query at K=256 goes 28.0 ms at 1.7B to 109.7 ms at 14B, close to four times, while at K=2 it is 2.7 against 3.9 ms. At high K the cost of rendering every candidate through the backbone dominates, and it dominates more for bigger models, not less. That is the argument for the shortlist path in section 10.
+
+## 3. Training
+
+Roughly half the movement in this project came from the training distribution rather than the architecture, and we did not expect that. We now treat the mixture as a first-class variable on a par with the model.
+
+### 3.1 The E/K/W/U mixture
+
+Four families, sampled at fixed per-batch weights:
+
+- **E — evidence.** NLI-style entailment, intent and topic label spaces.
+- **K — knowledge.** Multiple-choice question answering.
+- **W — workflow.** Rubric-conditioned decisions: routing, extraction, eligibility, urgency, tool selection, long policy documents.
+- **U — uncertainty.** Soft-target rows with no single correct answer.
+
+The mixture is not a tuning detail. The first workflow-trained model used E .35 / K .25 / W .40 and lost 11.2 points on CLINC-150 and 9.6 on TREC-fine, most of it false abstention (§3w). Raising E to .45–.50 brought NLI and BoolQ back to within a point of the untrained base model and intent and topic sets to within 3–4 points, with workflow performance unchanged (§3z). No architecture changed. The shipped 1.7B recipe is E .40 / K .15 / W .35 / U .10.
+
+### 3.2 Counterfactual rubric groups
+
+A decision model that memorises "this kind of ticket gets that label" is useless the first time your policy changes. The hard curriculum (`data_wh`, 60,605 training rows) is built so memorising cannot work: **100% of training rows sit in counterfactual rubric groups**, where the same state and the same candidate set appear at least twice under different rubrics with different gold answers.
+
+That construction is the point. If a row's answer is recoverable from the state alone, or from the candidate strings alone, both members of the group would want the same answer and the loss would be unminimisable. The only way to fit the corpus is to read the rule.
+
+The corpus is a programmatic rule engine over 12 domains crossed with 6 boolean conditions, at rule-depth levels 1 through 7. Levels 1–6 train; **level 7 is eval-only** and holds the composition families the generator deliberately never produces in training: temporal, numeric, expected-value and trade-off. Three whole domains, two rubric styles and one grammar per level are also held out, and the whole corpus is leak-checked against the JevBench public ids (0 of 231 hits).
+
+What it bought (§3ad), against a matched control never trained on it:
+
+| | control | with DecisionMix v2 |
+|---|---|---|
+| held-out family / grammar / style | .481 / .507 / .491 | **.827 / .881 / .888** |
+| rubric-flip accuracy | .477 | **.710** |
+| level 7 (never trained) | .477 | .498 |
+
+The curriculum transfers inside its own rule grammar by 34 to 37 points and does not transfer outside it at all. Level-7 composition stays near .50 across the released family (.493 at 1.7B, .544 at 4B). The 14B candidate is the only checkpoint that has ever been clearly above chance there, at .620, and it is not shipping. What we generated was learned. What we did not generate was not, and capacity mostly did not substitute for it.
+
+The uncertainty corpus (`data_u`, 31,029 rows, all soft-target) is UNLI's validation split, AmbiEnt's ambiguous rows, and four synthetic generators with exact closed-form targets. It buys calibration and costs top-1: the never-soft-trained control has higher argmax accuracy on all three uncertainty sets while the trained model has better NLL. Typed-decisions NLL went 2.06 to 1.71, the first training-side calibration gain in the record.
+
+### 3.3 Null augmentation
+
+Twenty percent of workflow rows are duplicated with the gold answer (and any rendered catch-all) removed, so the correct answer for that copy is ∅.
+
+This does something an eval-time threshold cannot. We first tried fixing abstention by refitting a null-logit offset and temperature after training (§3y), and it does not work, because one global threshold cannot serve the E families and the W families at once: workflow rows are near-deterministic, so an operating point tuned for them reads ordinary entailment margins as "uncertain".
+
+Training the behaviour instead: false-abstention on CLINC .10 to .08 and on TREC .27 to .12, and accuracy *up* by 2.6, 3.6, 4.3 and 6.0 points on CLINC, TREC, HWU64 and 20NG. Teaching the model when to abstain made it better at not abstaining. The cost is soft-target NLL, since the model now spends mass on ∅ where the gold has none. The recipe is insensitive to the exact fraction anywhere in [.10, .20].
+
+### 3.4 Checkpoint selection on calibration
+
+The final recipe selects the checkpoint on validation NLL over the uncertainty and curriculum sets (`--best_on`) rather than on accuracy, and adds a Brier term to the loss.
+
+The reason is a result we did not enjoy. Re-running the Release-1 candidate at batch 16 instead of 64, which is simply four times fewer examples seen, produced the best hard-tier Brier of any run in the project (.76) and hard accuracy .450, while losing ground on everything in-distribution (CLINC .733, MMLU among-K .323). Small batch is not a recipe, it is under-fitting: the same model, less confident, scores higher on the hard tier. That is fairly direct evidence that a large part of our hard-tier problem is probability quality rather than knowledge, and it is why the objective and the selection rule changed rather than the data volume.
+
+At 14B, the recipe with the long-state fix, the Brier term and calibration-based selection took held-out score NLL from 2.87 to 0.95 and typed-decisions NLL from 1.96 to 1.04, with JevBench hard Brier .85 to .66 (§3ah).
+
+<p align="center"><img src="../figures/fig_calibration.png" alt="Held-out score NLL and typed-decisions NLL across checkpoints" width="640"></p>
+<p align="center"><em>Held-out score and typed-decisions NLL across the calibration-fix sequence.</em></p>
+
+## 4. Results, at the resolution the evidence supports
+
+This is the part most technical posts get wrong, usually by quoting point estimates to three decimals from a benchmark that cannot support two.
+
+Here is our JevBench public-subset table with cluster-bootstrapped intervals, resampled over the paraphrase group because the standard tier's 72 items come from only 36 independent states (20,000 resamples, §3ak-b):
+
+| run | standard | 95% CI | hard | 95% CI |
+|---|---:|---|---:|---|
+| `ts1b` (typical-small v1) | .694 | [.569, .819] | .432 | [.342, .523] |
+| `tm1b` (typical-medium v1) | .806 | [.694, .903] | .423 | [.333, .514] |
+| `tm2` (Qwen3.5-4B) | .861 | [.778, .944] | .495 | [.405, .595] |
+| `tl2` (Qwen3.5-9B) | .833 | [.722, .931] | .495 | [.405, .586] |
+| `ladder_14b` | .875 | [.792, .944] | .468 | [.378, .559] |
+| `tl1b` (14B, KD) | .931 | [.861, .986] | .450 | [.360, .541] |
+| `tl1b_nokd` (14B, no KD) | .917 | [.833, .986] | .477 | [.387, .568] |
+
+**Every adjacent pair in that table is statistically indistinguishable.** Hard is ±9 points at n=111 and standard is ±6 to ±13 at n_eff=36. That includes comparisons we had previously written down as findings. The claim that scale lifts standard accuracy monotonically from 1.7B to 4B to 14B is inside the interval; the ladder is a ladder, not a scaling law, and the 8B point remains an unexplained anomaly.
+
+The sharpest illustration: `tl2` (9B) and `tm2` (4B) both score exactly 55 of 111 on hard. They are not the same model. Zero of 111 probability vectors match and they disagree on 26 items, 13 each way. McNemar gives p = 1.000 and the paired interval is [−.090, +.090]. The benchmark cannot resolve 4B against 9B here, which is a different statement from a tie.
+
+Paired per-item tests have more power than differencing those intervals, and they are the only JevBench comparisons we will quote:
+
+| paired comparison | diff | 95% CI | p |
+|---|---:|---|---|
+| frozen 14B (3-shot) − `tl1b`, hard | +.108 | [+.027, +.189] | **.015** |
+| frozen 14B (3-shot) − `tl1b_nokd`, hard | +.081 | [−.009, +.171] | .082 |
+| `tl1b_nokd` − `tl1b` (KD off vs on), hard | +.027 | [−.027, +.090] | .45 |
+| `ts1b_semif` − `ts1b`, standard | +.097 | [−.056, +.250] | .23 |
+| `tl2` (9B) − `tm2` (4B), hard | .000 | [−.090, +.090] | 1.00 |
+
+Exactly one of those five clears significance. Across the entire record only three paired results survive at all: frozen-beats-trained on the hard tier, the rendering effect of section 6, and the long-state result of section 5. Everything else we have written down about JevBench is a direction, not a finding.
+
+One of those rows retired an earlier claim of ours. We had written that the frozen-teacher distillation in the 14B run "contributed nothing measurable and was slightly negative on the hard tier". The paired test says +.027 [−.027, +.090], p = .45. The honest statement is that no effect of KD is detectable in either direction at this sample size, which is weaker than "KD did not help" and much weaker than "KD hurt". The direction was consistent across several metrics, which is worth recording and is not evidence.
+
+<p align="center"><img src="../figures/fig_ladder.png" alt="JevBench standard and hard accuracy across backbone size, trained and frozen" width="640"></p>
+<p align="center"><em>JevBench standard and hard accuracy across the size ladder, trained and frozen. Read the vertical spread against the intervals above before reading any two points as a ranking.</em></p>
+
+## 5. The long-state defect, and three attempts to measure it
+
+This is the best worked example we have of the difference between an effect that is real and an effect that is measurable, and it ended up reshaping both public releases.
+
+### The defect
+
+Our long-policy training corpus (23,318 rows) renders the case facts at the end: policy document first, then `Case: <facts> <request>`. State lengths run p10/p50/p90 = 1,190 / 1,845 / 2,490 tokens. The training loader right-truncated states at `--max_state`, which we verified empirically keeps the start and drops the end.
+
+At the 1,024-token window Release 1 used, **98.8% of those rows lost their facts before the model ever saw them.** At the 256-token window the earlier scaling ladder used, all of them did. For a stretch of this project we were training models to answer confidently about text that had been cut off, and the symptom was visible if you knew to read it: long-document policy accuracy of .053 for the 14B ladder run, with high confidence attached.
+
+The fixes were to regenerate the corpus facts-first (case position inside the first 8% of the text) and to stop truncating. `--drop_truncated` discards a row that does not fit the window rather than quietly cutting it, which is the right default for any loader handling data with a payload at a known position.
+
+### The ablation that could not confirm it
+
+The counterfactual corpus was still on disk, so the ablation was clean to set up: two 1.7B arms, byte-identical flags, a 1,024-token window with `--drop_truncated` deliberately off so truncation bites exactly as it did in Release 1, differing only in which render of the same 23,318 rows is the training file. Identical rows, identical labels, identical lengths, `Case:` at position 0.000 or 0.976 of the text.
+
+It came back underpowered. The pre-registered primary metric, JevBench's hard-tier `long_policy` family, gave .316 for the facts-first arm against .105 for facts-last. That is the predicted direction and it is 6 items against 2, out of 19. Fisher exact two-sided p = 0.232, bootstrap interval on the difference [−0.053, +0.474] containing zero, and the hard aggregate going the other way (.378 against .396). Nineteen items cannot settle this.
+
+### The eval set built to answer the question
+
+So we built one: 605 held-out long states, zero exact-state overlap with either training corpus and Case-stem overlaps dropped, scored with no truncation at all (window 4,096, state p50 1,965 tokens, max 2,843). Two families: `policy_permit`, 330 items at K=2 with a majority-class floor of .612, and `action_select`, 275 items at K=4 with a floor of .233.
+
+Every item is rendered both ways, so both models can be scored in matched and mismatched conditions. That 2 × 2 is what separates the truncation effect from the render effect (§3ak-a):
+
+| trained on | scored on | overall | policy_permit | action_select |
+|---|---|---:|---:|---:|
+| facts-first | facts-first *(matched)* | **.942** | .933 | .953 |
 | facts-first | facts-last | .797 | .788 | .807 |
 | facts-last | facts-first | .640 | .615 *(at floor)* | .669 |
 | facts-last | facts-last *(matched)* | .830 | .842 | .815 |
 
-Compare each model in its own matched condition — the diagonal, which removes the render confound entirely — and facts-first training is ahead by **11.2 points**: .942 against .830, 95% CI [+.077, +.147], p = 5e-10. The facts-first model is also the more robust of the two, losing 14.5 points when the render is switched against it against the facts-last model's 19.0.
+Comparing each model in its own matched condition removes the render confound entirely. **Facts-first training is ahead by 11.2 points: .942 against .830, 95% CI [+.077, +.147], p = 5e-10.** Per family, policy_permit +.091 [+.043, +.139] and action_select +.138 [+.086, +.190].
 
-It replicates at 14B, an order of magnitude up: **+7.8 points, [+.055, +.100], p = 7e-12**, the gap smaller only because the facts-first 14B is at .997 and has nowhere left to go. (That pair is not a single-variable ablation — the 14B arms differ in the rest of the release bundle too — so it corroborates the size and direction rather than isolating the variable twice.)
+It replicates at 14B, with `tl1b_nokd` as the facts-first arm and `ladder_14b` as the facts-last arm (§3ak-c): **+.078, 95% CI [+.055, +.100], p = 7e-12**. The gap is smaller at 14B only because the facts-first 14B is at ceiling (.997). And it replicates at a second seed of the 1.7B pair: **+.111 against +.112**, with every cell of the 605-item measurement reproducing to within a point (§3ak-e).
 
-So three effects were stacked on top of each other, and only the full design separates them. The truncation fix works, unambiguously at 605 items and at two scales. Render mismatch is separately real and large, and it is what dragged the facts-last arm to its floor in the half-finished comparison. And JevBench's long-policy subfamily, at 19 items, could not see either one: it returned p = 0.232 on a mechanism that a better-powered measurement puts below 1e-9 twice.
+Two side findings fell out of the same 2 × 2. The facts-first 1.7B is the more robust model, losing 14.5 points when the render is switched against it against the facts-last model's 19.0. At 14B that difference essentially vanishes (7.6 against 6.8), so capacity appears to buy render tolerance, which the 1.7B pair alone would have missed.
 
-**One number is worth the whole section.** On JevBench's `long_policy` subfamily, `ladder_14b` scores **.053** — two items out of nineteen, indistinguishable from broken. On long states in its own matched render, the same checkpoint scores **.919**. Nothing about the model changed between those two numbers. What changed is whether the evaluation put the evidence where that model had been trained to look for it. If you take one thing from this post, take that a benchmark score is a joint measurement of a model and an interface, and that you cannot tell which one you are reading without varying both.
+### What this changed about the released models
 
-We are publishing the sequence and not just the endpoint, because the intermediate state is the part that generalises. We had a pre-registered primary metric, it came back null, and the null was an artefact of nineteen items and a single-render design — not of the mechanism. If you have run a matched ablation where each arm is evaluated in the condition its own training assumed, you have not run a matched ablation.
+The fixed checkpoints already existed. `ts1c` was trained as the tap-20 control in the depth sweep, on the post-fix defaults, and was filed as a negative on JevBench-shaped grounds before anyone scored it on long states:
+
+| checkpoint | facts-first | facts-last | policy_permit (facts-first) |
+|---|---:|---:|---:|
+| `typical-small` v1 (`ts1b`) | .598 | .798 | .536 |
+| **`ts1c`** | **.947** | .790 | **.948** |
+| `typical-medium` v1 (`tm1b`) | .612 | .866 | .555 |
+| **`tm2`** (Qwen3.5-4B) | **.950** | .879 | **.967** |
+
+Both v1 releases carried a 20 to 25 point deployment trap. Callers write their own state text, and if the case facts go before the policy body, which is the natural ordering, the model lands at or near the majority-class floor on the yes/no family. Both fixed checkpoints are strictly better or equal, and both shipped on 2026-09-23 as v2.
 
 <p align="center"><img src="../figures/fig_truncation.png" alt="Left: state token length distribution against truncation cutoffs at 256/1024/2048/3072 tokens. Right: long-policy accuracy across checkpoints" width="640"></p>
-<p align="center"><em>Left: how much of a long-policy row survives each token budget. Right: long-policy accuracy across checkpoints.</em></p>
+<p align="center"><em>Left: how much of a long-policy row survives each token budget. Right: the 19-item JevBench long_policy family across the bug-and-fix sequence, which is the measurement the next two sections argue we should not have been steering by.</em></p>
 
-## 6. Training distribution moved capability as much as architecture
+## 6. Rendering is a first-class factor
 
-It's tempting to write this project as an architecture story, because architecture is what's interesting. The mixture sweeps say otherwise (§3z, §3ad).
+The 2 × 2 above forced a general conclusion: **a benchmark score is capability plus interface compatibility**, and if you do not control the rendering you cannot tell which one you measured. We have three independent demonstrations of it, all on our own numbers.
 
-Raising the evidence share of the training mixture from .35 to .45–.50 brought NLI and BoolQ back to within a point of the untrained base model and intent and topic sets to within 3–4 points, with workflow performance unchanged. No architecture changed.
+**Rendering alone, with no training at all.** A frozen Qwen3.5-9B moves 12.5 points on JevBench standard, .806 to .931, purely by changing how the state and options are laid out in the prompt (p < .001). All three Qwen3.5 sizes we tested moved the same way under the same change.
 
-Augmenting 20% of workflow rows with the gold answer removed, so the correct answer is ∅, lowered false-abstention on CLINC from .10 to .08 and on TREC from .27 to .12, and *raised* accuracy on CLINC, TREC, HWU64 and 20NG by 2.6, 3.6, 4.3 and 6.0 points. Teaching the model when to abstain made it better at not abstaining.
+**Train/test render mismatch inside one model.** On the 605-item set, with the case fully visible in both conditions and no truncation anywhere, moving the case from the end of the state to the start costs the facts-last-trained model 23 points on the policy_permit family, .842 to .615, and drops it exactly onto its .612 majority-class floor. It is not that the model cannot use the facts; it uses them only where its training put them.
 
-The hard curriculum is the sharpest case. Adding a rule-engine corpus where the same state and options recur under different rubrics with different gold answers took held-out family, grammar and style accuracy from .481 / .507 / .491 to .827 / .881 / .888, and rubric-flip accuracy from .477 to .710. On JevBench's hard tier, the families that corpus covers moved in the same direction, though those are 6 and 7 items respectively and we'd treat them as directional: adversarial .33 to .83, ambiguous .57 to .71.
+**A benchmark number that was never a capability measurement.** `ladder_14b` reads **.053** on JevBench's `long_policy` family. On 605 held-out long states in its own matched render it reads **.919**. That single pair is the cleanest illustration we have: the .053 compounds truncation damage, a render mismatch against JevBench's fixed format, and a 19-item sample, and none of those three is capability.
 
-And level-7 composition, which mixes temporal, unit, expected-value and trade-off reasoning and which the generator never produces, went .477 to .498. What we generated was learned. What we didn't generate was not, and no amount of scale substituted for it.
+We apply this to our own results and only to our own results. It is a reason to control rendering before reading a benchmark delta as an architectural difference, including every delta in this post. It is not a reason to discount anyone else's published numbers.
 
-There is a fourth result in this family that we found unwelcome, and that we read wrong the first time. Rerunning the Release-1 candidate at batch 16 instead of 64 — simply 4× fewer examples seen — improved the hard tier on both axes at once: accuracy .369 to .450, Brier .90 to .76. It lost ground on everything in-distribution (CLINC .733, MMLU among-K .323, held-out noul .609, validation NLL up).
+## 7. What a 19-item metric did to us
 
-We first wrote this up as evidence that the hard tier is a probability-quality problem — the same model, less confident, scoring better. That explanation doesn't survive contact with the accuracy column. Argmax accuracy is invariant to how sharp the distribution is; you cannot move it by being less confident. If fitting our mixture *less* makes the model pick the right answer more often on the hard tier, then fitting it is damaging something the hard tier needs, and calibration is a second, separate effect on top.
+JevBench's `long_policy` family has n = 19. Across two seeds of the same matched comparison it gave 6/19 against 2/19, a four-item gap in the predicted direction, and then 5/19 against 5/19, exactly zero. Same two recipes, same protocol, opposite verdicts. The purpose-built 605-item set gave +.112 and +.111 on the same pair.
 
-Which is the same shape as §8 below, where a backbone we didn't train at all does better still. Under-fit beats fit; untrained beats under-fit. That ordering is the project's central unresolved problem, and it points at our training distribution rather than at the model's confidence.
+Had the second seed been the one we ran first, we would have recorded the truncation mechanism as **refuted**. Separately, the same family gave a checkpoint a .053 that the 605-item set showed to be .919. Three conclusions this project nearly reached from that one cell would have been wrong.
 
-## 7. A loss change bought calibration; it was not free
+The lesson is narrower and more useful than "small samples are noisy". We had pre-registered a decision rule on that metric before running the experiment, which is the thing you are supposed to do, and it did not help. **Pre-registering a rule is not sufficient; the rule has to be pre-registered on a metric with the power to resolve the effect size in question.** Our pass rule for `typical-large` (hard ≥ .559, long_policy ≥ .35) fails that test on both terms: both are point thresholds on quantities whose intervals are wider than the effects being gated.
 
-Score is an ordinal primitive: severity 0 through 3, priority 1 through 5. A K-way softmax treats those levels as unrelated buckets, so predicting 0 when the answer is 1 costs exactly what predicting 0 when the answer is 3 costs.
+Where a question mattered, the fix was to build an eval set big enough to answer it rather than to analyse the small one harder. The 605-item set is a generator script and a leak check, no GPU time at all, and it settled a question that two matched H100 runs and a pre-registered protocol could not.
 
-Training the same head with ordinal-smoothed targets (τ = 0.7), which is a loss change and no new parameters, gave this (§3ac). The held-out urgency set is K = 4 on every item, so we've printed what a model that knows nothing would score:
+## 8. Where our training makes the model worse
 
-| held-out urgency (K = 4) | uniform predictor | K-way | ordinal-smoothed |
-|---|---|---|---|
-| accuracy | .25 | .505 | .508 |
-| NLL | 1.39 | 2.07 | **1.23** |
-| Brier | .75 | .79 | **.68** |
-| ECE | – | .35 | **.19** |
-| ordinal MAE | – | .58 | **.55** |
+The uncomfortable number: on JevBench's hard tier, a frozen 14B base model reading letter logits with three examples in its prompt scores .559. Our trained 14B decision checkpoint scores .450, and its no-KD control .477.
 
-That reference column is not decoration. The K-way model's probabilities were *worse than uniform* on both NLL and Brier — it picked the right level half the time and the numbers it attached were actively misleading. Ordinal smoothing is what moved them to the useful side of the line, and even then 1.23 against 1.39 is a modest margin. We print ln K next to every NLL in the report for this reason, and we'd suggest anyone reporting an NLL do the same; without it, 2.07 and 1.23 look like two points on the same scale rather than opposite sides of "knows nothing."
+Unlike most comparisons on this benchmark, that one survives a paired per-item test: **+.108 [+.027, +.189], p = .015**. The equivalent test against the no-KD control does not (+.081, p = .082). So there is one arm where we can say the frozen model with three exemplars beats our trained model on the tier we care most about, and one where we cannot.
 
-Accuracy barely moved, and on the 12 ordinal items in JevBench the two models produce *identical per-item predictions*. That is the claim we can make narrowly, and it is the one we originally over-generalised into a section heading. Across the rest of the same ablation the change did move decisions, and mostly for the better: an external severity set went .853 to .939 in accuracy, JevBench hard went .360 to .459, and JevBench standard went the other way, .764 to .708. "Improved probabilities, identical decisions" is true of twelve ordinal items and false of the run as a whole.
+The per-family breakdown on the no-KD control shows where it comes from: adversarial .833, trap 1.00, routing 1.00, multi-hop .50, judge-hard .588, probability .50, ambiguous .429, long-policy .211, temporal and numeric .20, trade-off .167. Anything that resembles a workflow decision under a rubric is fine. Anything that requires carrying an intermediate value through several steps is near chance.
 
-The same loss change scaled. At 14B, the recipe with the long-state fix, a Brier term and calibration-based checkpoint selection took held-out score NLL from 2.87 to 0.95 (against the same ln 4 = 1.39 reference: from far worse than uniform to meaningfully better) and typed-decisions NLL from 1.96 to 1.04, with JevBench hard Brier .85 to .66 (§3ah).
+Whether that reflects a limit of direct readout or a limit of this training recipe is open, and the rendering factor from section 6 weakens any strong causal reading of the frozen-model comparison, since the frozen arm and the trained arm are not scored through the same interface. It is a real gap and we do not currently know which of the two things it is evidence for. Designing the experiment that separates them is item 3 in section 11.
 
-The Noul head is a structural version of the same idea. A two-way Choice over `["no", "yes"]` moves P(yes) by up to .55 when you reverse the label order. A Bernoulli head reads the decision state with no candidates rendered at all, so there is no order to reverse: in the matched ablation it moved by exactly zero on all nine test sets. It also cleared an external floor the two-way head couldn't: PagerDuty .602 to .886, against a constant-prediction floor of .792.
+A related data point that points the same way: a frozen Qwen3.5-9B under the better rendering scores .595 on hard, above the .495 of the best checkpoint we have trained at any size, again with overlapping intervals. Backbone generation appears to buy more on this tier than our training does.
 
-One caveat on "by construction," because it holds for the head and not automatically for a call you make. Noul routes per row: a question goes to the Bernoulli head only if its candidate set is exactly `{yes, no}`. Anything else two-way — `{true, false}`, `{approve, reject}` — is scored as ordinary Choice and keeps Choice's order sensitivity. On the eleven held-out sets we ran against the shipped `typical-small`, ten are exactly zero and one moves by .009, and that one is the set that isn't literally yes/no. The invariance is a property of the head, so use `noul()` and let it render the proposition rather than passing your own two labels.
+The generalisable version: a frozen model with a few examples in context is not a strawman to clear before shipping. It is a ceiling to check you have actually cleared, per tier, and we publish the tiers where we have not.
 
-<p align="center"><img src="../figures/fig_calibration.png" alt="Held-out score NLL and typed-decisions NLL across checkpoints" width="640"></p>
-<p align="center"><em>Held-out score and typed-decisions NLL across checkpoints.</em></p>
+## 9. Three bugs that cost more than any architecture change
 
-One thing we added and then couldn't justify. The 14B run bundled knowledge distillation from a frozen 14B teacher, on the theory that it would buy hard-tier reasoning. We ran the matched control with `--distill_beta 0`, one flag different and nothing else (§3ai). The control came out slightly ahead: hard accuracy .477 against .450, long-document policy .211 against .158, standard Brier .127 against .175, validation NLL 0.410 against 0.438, at the cost of 1.4 points of standard accuracy.
-
-The direction is consistent across those metrics, and it is still not a result. Cluster-bootstrapped, the hard-tier numbers are .450 [.360, .541] with KD and .477 [.387, .568] without, intervals that overlap along almost their whole length. We cannot show the teacher helped and we cannot show it hurt; 111 items is not enough to tell. What we can say is that the change we added specifically to buy hard-tier reasoning bought nothing we can detect, which is reason enough not to credit it for the calibration gains above. Those belong to the loss and the data.
-
-## 8. Fine-tuning made the hardest cases worse
-
-The uncomfortable number in this project: on JevBench's hard tier, a frozen 14B base model reading letter logits with three examples in its prompt scores .559. Our trained 14B decision checkpoint scores .450, and its no-KD control .477.
-
-Our first draft of this section said the intervals overlap so we wouldn't call it a defeat. That was the wrong test, and we'd flag it in someone else's paper. The marginal intervals are [.468, .649] and [.360, .541]; differencing two marginal intervals by eye is not a comparison, and it throws away the fact that both models answered the *same 111 items*. The paired test is the one that applies. A paired cluster bootstrap on the per-item difference gives **frozen minus trained = +.108, 95% CI [+.027, +.189], p = .015**. Against the no-KD control it gives +.081 [−.009, +.171], p = .082 — consistent in direction, not separable.
-
-So for the checkpoint we actually trained, the frozen backbone wins, and it is not a coin flip. On the standard tier the ordering reverses (−.111 [−.250, +.014], p = .10), which is what our training was for.
-
-The per-family breakdown shows where it goes wrong, and it is not where we said it was. Here is the trained 14B against the frozen one on the same items:
-
-| hard family | frozen 14B, 3-shot | `tl1b` |
-|---|---|---|
-| trap, routing | 1.00 | 1.00 |
-| adversarial (n=6) | .833 | .667 |
-| ambiguous (n=7) | .714 | .429 |
-| judge-hard (n=17) | .588 | .529 |
-| multi-hop (n=18) | .444 | **.611** |
-| probability | .500 | .300 |
-| long-policy (n=19) | .421 | .158 |
-| temporal/numeric | .333 | .200 |
-| trade-off | .500 | .167 |
-
-We had been explaining the hard tier as missing data coverage: our generators never produce temporal arithmetic, unit conversion or expected-value trade-offs, so the model never learned them. That story predicts the frozen backbone fails these families too. It doesn't. It leads on every serial family in the table, and trails only on multi-hop. Individual cells are single digits and none of them separates alone, but the direction is uniform.
-
-Missing coverage still explains why training didn't *add* the behaviour. It doesn't explain why training appears to have removed it. That distinction matters for what we build next, and we had it wrong until we looked at the columns side by side.
-
-Two related findings sharpen it. First, the backbone generation appears to matter more than our training does here: a frozen Qwen3.5-9B scores .541 hard with three examples and .595 under a different rendering, above the .495 that `tm2` and `tl2`, the best checkpoints we've trained at any size, both reach. Marginal intervals, so read it as a direction.
-
-Second, that rendering effect is visible on its own, and this one does separate. The same frozen Qwen3.5-9B goes from .806 to .931 on the standard tier purely by changing how the state and options are laid out, with zero training: paired, that's +.125 [+.056, +.208], p < .001, and all three Qwen3.5 sizes we tested moved the same way. A protocol change on frozen weights is worth more than a year of our training on that tier. We'd read that as a sign that a meaningful share of the public leaderboard's standard-tier spread is a protocol effect, and as a reason to be careful reading ours.
-
-The obvious follow-up is to run that rendering on our own models, and we did. `ts1b_semif` scores .792 standard against `ts1b`'s .694 — which looks like a large gain until you pair it: +.097 [−.056, +.250], p = .23. Same benchmark, same n_eff of 36, and the effect that was unmissable on a frozen 9B is unresolvable on our 1.7B. That is not evidence the rendering doesn't help us. It is evidence that this benchmark stops being able to tell at our size, which is the theme of §11.
-
-The lesson we'd generalise: a frozen model with a few examples in context is a ceiling to verify you've cleared, per tier, and we publish the tiers where we haven't. One control we have *not* run and should have: the same frozen backbone with a scratchpad, on the same 111 items. Until that exists, nothing here distinguishes "this task needs intermediate computation" from "our fine-tuning damaged a backbone that already had some of it." We think it's the second. It's first on the list.
-
-## 9. One deep copy cost 25–33% of serving latency
-
-The serving path took a state, encoded it once into a KV cache, and then scored each question's suffix against that cache. Correct, and the whole point of the architecture.
-
-It also deep-copied the entire prefix KV cache on every single decision, because mutating a shared cache is the kind of bug you only find in production and the copy made it impossible. Replacing the copy with a stride-0 view (bit-identical output, zero bytes allocated), plus caching the attention masks and position tensors and capping rendered option text:
+**A deep copy in the serving path.** The inference package encoded the state once into a prefix KV cache and scored each question's suffix against it, which is the whole point of the architecture. It also deep-copied the entire prefix cache on every single decision, because mutating a shared cache is the kind of bug you find in production and the copy made it impossible. Replacing the copy with a stride-0 view (bit-identical output, zero bytes allocated), plus caching the attention masks and position tensors and capping rendered option text:
 
 | warm p50 per decision | before | after |
 |---|---|---|
 | `typical-small` (1.7B) | 21–25 ms | **15.5–17 ms** |
-| `typical-medium` (4B) | 26–27 ms | **19–21 ms** |
+| `typical-medium` v1 (4B) | 26–27 ms | **19–21 ms** |
 | Qwen3.5-4B | 42–53 ms | 34–46 ms |
 
-A quarter to a third of serving latency, for a change that removes code.
-
-We also tried `torch.compile` and CUDA graphs and rejected both. They reached 8 ms on a single shape, but probabilities moved by up to .1 across shape buckets and the mutable HF cache produced stale-buffer crashes. Manual per-bucket graph capture is the remaining path to roughly 10 ms, and we haven't done it.
-
-A second one in the same neighbourhood, with a more specific mechanism than we first wrote down. Our packing function built the 2D padding mask as `torch.long`. Hand `transformers` a non-boolean 2D padding mask and its SDPA mask preparation expands it into a 4D additive float bias — which is no longer eligible for the flash or memory-efficient kernels, so attention falls back to the math backend and materialises B×H×L² scores. Irrelevant at 256 tokens. At the 3,072-token states the 14B run used, it was the difference between OOM at 79 GB of 80 with micro-batch 4 and gradient checkpointing on, and running cleanly at 62 GB with micro-batch 2. The fix was `dtype=torch.bool` (commit `6d0a7e3`).
-
-The transferable version isn't "use bool." It's that mask *dtype* silently selects your attention kernel two libraries away from where you wrote it, and the symptom is a memory number, not an error.
+A quarter to a third of serving latency, for a change that removes code. We tried `torch.compile` and CUDA graphs on top and rejected both: 8 ms on a single shape, but probabilities moved by up to .1 across shape buckets and the mutable HF cache produced stale-buffer crashes. Manual per-bucket graph capture is the remaining path to roughly 10 ms and we have not done it.
 
 <p align="center"><img src="../figures/fig_serving.png" alt="Cold and warm p50 latency before and after removing the per-decision KV cache deep copy" width="640"></p>
 <p align="center"><em>Removing the deep copy took roughly a quarter to a third off warm p50 latency across the family.</em></p>
 
-## 10. Where direct decisions stop working
+**A padding mask with the wrong dtype.** The SDPA padding mask was being built as a `long` tensor, which silently forces PyTorch into its O(L²) math kernel. That was the cause of our 14B out-of-memory failures at 3,072-token states, and of a lot of memory pain before that. The fix was `bool`.
 
-Pulling the failures together, they point at one boundary.
+**No BOS token.** Qwen3 has no beginning-of-sequence token, so position 0's hidden state is content-independent. The cosine similarity between the position-0 states of `neutral`, `yes` and `transfer` was 0.9998. Every single-token candidate we embedded was, numerically, the same vector. Prepending `<|endoftext|>` and dropping it fixed it. This was the very first bug in the project and it produced a model that trained, converged and was completely inert.
 
-Decisions that are a readout of the state under a rule work well, and scale the way you'd hope: routing, extraction, adequacy, intent, severity, eligibility, rubric application including rubrics the model has never seen. That's the standard tier, and it's what the released models are for.
+## 10. Releases
 
-Decisions that require carrying an intermediate value through several steps do not work, at any size we've trained. Temporal arithmetic, unit conversion, expected-value comparison, multi-constraint trade-offs. Adding capacity moved them a little — on our own level-7 composition set, against a .441 uniform-guess rate, 1.7B scores .495, 4B .544 and 14B .620, while the same models score .84 to .90 on the held-out families, grammars and styles our generator does produce. The curriculum that moved every in-distribution family by thirty points moved this one by five.
+Both v2 releases shipped on 2026-09-23, and both are trades. The model cards name the regressions:
 
-<p align="center"><img src="../figures/fig_ladder.png" alt="JevBench standard and hard accuracy across backbone size, trained and frozen" width="640"></p>
-<p align="center"><em>JevBench standard and hard accuracy across the size ladder, trained and frozen.</em></p>
+| release | checkpoint | backbone | gains | losses |
+|---|---|---|---|---|
+| `typical-small` v2 | `ts1c` | Qwen3-1.7B-Base | +34.9 long-state facts-first | −6.5 held-out Noul, −4.8 BoolQ, −3.7 uncertainty, −3.4 Score, −2.8 style |
+| `typical-medium` v2 | `tm2` | Qwen3.5-4B-Base | +33.8 long-state, +7.2 JevBench hard, +5.6 standard | −5.5 CLINC-150, −5.3 HWU64 |
 
-Long-document policy looked like it belonged in between, and it turned out to be the clearest case of all once we ran the right experiment: a data problem, at p = 5e-10, that a 19-item benchmark subfamily reported as a null. Section 5 is the whole story.
+`typical-large` is withheld. The 14B candidate reached .931 on JevBench standard, the best number this project has produced, and missed its own pre-registered pass rule on the hard tier and on long-document policy. It would also be wrong to ship it against that rule now, because as section 7 argues the rule itself needs restating on metrics with power.
 
-The open question is narrower than we'd been framing it, and §8 is why. We had been asking when a decision needs intermediate computation and when a single direct read is enough. The data doesn't support that question yet, because the thing beating us on the serial families is another single direct read — a frozen backbone, one forward pass, letter logits, no scratchpad. Whatever those families need, the untrained backbone has more of it than our trained model does, and no amount of arguing about depth explains a result where the same architecture does better without our training.
+One release-engineering note worth passing on. The Qwen3.5-capable `inference/typical/backbone.py` had to be published to all three model repos **before** the medium weights, because 60 of `tm2`'s 124 LoRA tensors sit on modules the previous loader did not know about (Gated-DeltaNet projections, the VL-wrapper unwrap, the `linear_attn` parent walk). Weights first would have given every user a load failure on their first call. The change is purely additive and every new branch is `hasattr`-guarded, so no Qwen3 path moved.
 
-So the question we can actually pose is: what does our fine-tuning remove? Two controls decide it, and neither is expensive. Frozen 14B with a scratchpad on the same 111 items tells us whether intermediate computation is the missing ingredient at all. A frozen backbone trained only on the families it already handles tells us whether the damage is coverage or interference. Both are queued.
+The API, the install flow and the per-suite evaluation tables are in the [launch post](./typical-launch.md).
 
-## 11. What we'd tell you about our own evidence
+## 11. What is open, in priority order
 
-The honest summary of this project's measurement, stated plainly because we'd want it stated in someone else's post: **our benchmark comparisons mostly did not survive contact with confidence intervals.** Look back at the table at the top. Seven checkpoints spanning 1.7B to 14B and four backbone generations, and not one adjacent pair separates. The size ladder, the recipe changes, the backbone port — everything we spent the year comparing on that benchmark is, at n = 111 and n_eff = 36, a set of overlapping intervals we were reading as a ranking.
+1. **Restate the release gate.** No further release decision gets made on point thresholds over a 19-item family or a ±9-point aggregate. The gate moves to the 605-item set and to paired per-item tests.
+2. **Level-7 composition.** Temporal, numeric, expected-value and trade-off decisions sit near .50 across the released sizes and .62 at 14B, and it is the axis nothing in the suite has reliably moved. The curriculum that lifted every other held-out family by 34 points does not touch it, because the generator never produces it. This is generator work before it is scale.
+3. **The hard-tier gap against the frozen backbone.** Design an experiment that separates "direct readout is insufficient for this tier" from "this training recipe is insufficient", with rendering controlled on both arms. Until that exists, section 8 is a measurement and not an explanation.
+4. **A calibration objective on the U corpus.** Log-likelihood plus λ·Brier plus the ordinal term, reported per type, with no global temperature. The evidence that this is the right target is section 3.4: the under-fit run scored best on the hard tier by being less confident.
+5. **Retrain Small without its regression.** The v2 losses on Noul, BoolQ and Score are a data-mixture question, not an architectural one.
+6. **The large-K path.** Marginal cost per query at K=256 grows nearly four times from 1.7B to 14B. The plan is an energy-style front end producing a top-r shortlist that the native readout then scores, which keeps the interface and drops the scaling term.
+7. **Training code.** The repo is private and every public model card currently promises it.
 
-What did survive is a short list, and it has a shape:
-
-- The candidate-blind negative, on a 1,200-item probe with a shuffled-question control.
-- The rendered-∅ pathology, on a K-sweep that measures abstention rate directly.
-- The tap-depth result, on full evidence suites with a premise-blanked control.
-- The render 2×2, on 605 purpose-built items, at two scales, p < 1e-9.
-- The three paired per-item JevBench tests that do separate, chiefly frozen-versus-trained on the hard tier.
-
-Every one of those is either a purpose-built evaluation set sized to the question, or a paired test that exploits both models seeing the same items. Not one is a marginal comparison between two benchmark scores. The benchmark was useful for finding out that something was wrong and useless for finding out what; the diagnosis always came from a control we had to build.
-
-We'd read that as a claim about this whole category rather than about us. Decision models are being ranked on a few hundred items, and a few hundred items cannot rank them. If you are choosing between models in this space — ours included — the number you want is a paired test on your decisions, not a leaderboard row.
+Closed and not reopening: candidate-blind decision-state compilation, further readout variants, confidence-only expert routing, alternative null functional forms, and the tap-depth sweep, which is a matched negative.
 
 ---
 
-The models are on Hugging Face: [`OzLabs/typical-small`](https://huggingface.co/OzLabs/typical-small) and [`OzLabs/typical-medium`](https://huggingface.co/OzLabs/typical-medium), with the inference package and the full evaluation artefacts in each repo. The launch post is [here](./typical-launch.md). Training code and the complete experiment report follow.
+The models are on Hugging Face: [`OzLabs/typical-small`](https://huggingface.co/OzLabs/typical-small), [`OzLabs/typical-medium`](https://huggingface.co/OzLabs/typical-medium) and the earlier [`OzLabs/typical-small-preview`](https://huggingface.co/OzLabs/typical-small-preview). Each repo carries the weights, the self-contained `inference/` package and the evaluation artefacts every number here is read from. Training code and the full experiment report follow.
