@@ -82,7 +82,7 @@ teacher sit at .09--.12 and even N2 keeps .058 (\Cref{fig:deltaq}; per-variant n
 No lever we varied moves $\dqsh$. Cross-attention from the probes over all candidate tokens leaves it at
 $-.003$ while improving null quality (CLINC out-of-scope .568 $\to$ .727); supervising the change in the
 teacher's log-odds across seven candidate sets gives exactly zero; reading all 28 layers gives $-.008$.
-Two variants fall just outside the $\pm.02$ band in opposite directions ($+.023$, $-.026$), the spread
+Two variants fall outside the $\pm.02$ band in opposite directions ($+.023$, $-.026$), the spread
 1{,}200 items allow. One alternative we cannot exclude is optimization: the zero-initialized
 set-conditioning cross-attention stayed inert through 4k steps of direct supervision.
 
@@ -103,8 +103,8 @@ comparison (head, data and steps fixed), reading N3 at layer 20 instead of 28 ra
 from .863/.752/.431/.737 to .906/.865/.519/.834, CLINC-150 from .740 to .862, and lowers validation NLL
 from .430 to .341, while $\dqsh$ stays at .118 against .117. Evidence accuracy lands within 1--4 points of
 a candidate-blind energy-scoring baseline on every evidence set (ANLI trails by 3.6) and 8 points above it
-on CLINC-150, so the evidence and knowledge regimes that had needed separate models are served by one.
-For a candidate-blind state the same change moves nothing. Decision features sitting below the final,
+on CLINC-150, so one model now serves the evidence and knowledge regimes that had needed separate models.
+For a candidate-blind state the same change moves nothing. That decision features sit below the final,
 next-token-specialized layers agrees with work on layer pruning and probing
 \citep{gromov2024deeperlayers,men2024shortgpt,tenney2019pipeline,belrose2023tunedlens}. Every checkpoint
 we report uses the 71\% tap: layer 20 of 28, 26 of 36 and 28 of 40.
@@ -113,8 +113,8 @@ we report uses the 71\% tap: layer 20 of 28, 26 of 36 and 28 of 40.
 \label{sec:analysis:null}
 
 Abstention belongs in the gate alone. A rendered ``none of the above'' line
-competes for softmax mass with the real candidates, so its share depends on how many there are. In a
-matched pair, both arms N3 at layer 20 with the factored gate of \Cref{eq:factored-null}, the treatment
+competes for softmax mass with the real candidates, so its share depends on how many there are. We test this with a
+matched pair, both arms N3 at layer 20 with the factored gate of \Cref{eq:factored-null}, in which the treatment
 removes the rendered $\nullsym$ line. With the line, abstention has degenerate endpoints: on CLINC-150
 with the gold label absent the model almost never abstains at $\numcands{=}5$
 ($P(\nullsym \mid \text{absent}) = .02$) and always abstains at $\numcands{=}150$ (1.00) and on Banking77

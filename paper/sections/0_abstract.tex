@@ -1,9 +1,9 @@
-Software that asks a language model to route a ticket, approve a refund or rate an alert needs a
+Software that asks a language model to route a ticket or rate an alert needs a
 probability distribution over options it names at request time, plus a usable way to
-say that none of them fit. \textbf{Typical} reads that distribution directly out of a pretrained causal
-language model, without generating a token. The state is encoded once into a key-value cache; each
-question and its runtime candidates form a short causal suffix; a head at 71\% of backbone depth scores
-the terminal decision state against each candidate's own contextual hidden state. Output types are
+say that none of them fit. Typical reads that distribution directly out of a pretrained causal
+language model, without generating a token. It encodes the state once into a key-value cache and
+renders each question with its runtime candidates as a short causal suffix, where a head at 71\% of
+backbone depth scores the terminal decision state against each candidate's own contextual hidden state. Output types are
 contracts on the distribution: categorical Choice, ordinal Score, a Bernoulli yes/no head (Noul), and an
 abstention gate outside the candidate softmax. The contextual readout keeps the question-conditioned
 signal of the standard letter-logit interface ($\dqsh$ .106 vs.\ .109) with a quarter of its log-odds

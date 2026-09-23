@@ -34,7 +34,7 @@ candidates to score them.
 \subsection{Cached state and causal suffix}
 \label{sec:method:pass}
 
-The state is encoded once as an ordinary causal prefix and its key-value cache is retained. Each question
+Typical encodes the state once as an ordinary causal prefix and retains its key-value cache. Each question
 against it is a short causal suffix: the question text, the candidates rendered as lettered lines, an
 answer cue, and a terminal decision token. The suffix attends to the cached state, and a batch of
 suffixes against one state runs in chunks without attending to one another. A decision is therefore a
@@ -70,9 +70,9 @@ during training is shared by all three.
 \subsection{Mid-depth tap}
 \label{sec:method:depth}
 
-The backbone is truncated at about 71\% of its depth: the readout taps layer 20 of 28 at 1.7B, 26 of 36 at
+We truncate the backbone at about 71\% of its depth: the readout taps layer 20 of 28 at 1.7B, 26 of 36 at
 4B and 8B, and 28 of 40 at 14B, and the layers above the tap are never computed. LoRA \citep{hu2022lora}
-at rank 16 adapts the top eight kept layers, and everything below is frozen. The tap is chosen for what
+at rank 16 adapts the top eight kept layers, and everything below is frozen. We chose the tap for what
 the representation holds: our first full-scale model read the final layer and scored 58.6 on SNLI, the
 hypothesis-only baseline, because it ignored the premise. The mid-depth tap carries evidence and
 question-conditioned knowledge in one model (\Cref{sec:analysis:depth}), and every released and ladder
@@ -121,7 +121,7 @@ $P(\cand{j})/P(\cand{k}) = \exp((s_j - s_k)/T)$, independent of $r$, because $(1
 non-null candidate; the contextual scores themselves remain set-dependent. (ii)~\emph{The gate is
 temperature-invariant}: $T$ enters only the candidate softmax and $r$ reads untempered statistics, so
 recalibrating $T$ never moves $\pnull$. The gate is symmetric in the pairs $(s_j, v_j)$, so it adds
-no order dependence, while $r$ depends on what was offered by design. The null is never rendered as a candidate line, because a rendered line competes
+no order dependence, while $r$ depends on what was offered by design. We never render the null as a candidate line, because a rendered line competes
 for softmax mass that dilutes as $\numcands$ grows; \Cref{sec:analysis:null} removes that line from a model
 that already has the gate and measures the difference.
 

@@ -43,7 +43,7 @@ the leading open question for `typical-medium-v2` and `typical-large`.
   `--max_state` silently dropped the facts on 98.8% of those rows at 1,024 tokens (all of them at 256) — every
   model since Phase 6A was trained to answer long policies from unreadable states. Fixed (commit `2fad326`):
   facts-first regeneration, `--drop_truncated` (drop rows that don't fit rather than cut them), `--grad_ckpt`,
-  `--best_on` (checkpoint selection on uncertainty+curriculum val NLL), `--brier_lambda`, frozen-backbone teacher
+  `--best_on` (checkpoint selection on uncertainty+curriculum val NLL), frozen-backbone teacher
   labels (`scripts/teacher_label.py --zero_shot --shots 3`). A second bug in the same window: the SDPA padding
   mask was built `long` instead of `bool`, forcing PyTorch's O(L²) math kernel and causing the 14B's long-state
   OOMs (commit `6d0a7e3`).
@@ -416,8 +416,9 @@ stops one idle (no trainer process, GPU util < 5%, no waiter) for 2 checks runni
    calibration, not new data) — the generator has never produced this composition family. Next: extend
    `scripts/decisionmix_v2.py`'s rule engine with explicit temporal/numeric/EV/trade-off composition rows, not more
    of the existing levels 1–6.
-3. **Calibration objective, generalized.** `--brier_lambda` + `--best_on` calibration-val selection worked at 14B
-   (`tl1b`); Phase 10's full `L = log + λ_B·Brier + λ_O·ordinal` per-type/per-tier objective (no single global T)
+3. **Calibration objective, generalized.** `--best_on` calibration-val selection worked at 14B
+   (`tl1b`; no Brier term was trained — `--brier_lambda` is 0.0 in every shipped/candidate run); Phase 10's full
+   `L = log + λ_B·Brier + λ_O·ordinal` per-type/per-tier objective (no single global T)
    is still open, and has not been run at 1.7B/4B where the calibration collapse was first diagnosed (§3ab).
 4. **SemIf-style render, now that it's measured.** The zero-shot probe (`jev_zs_q35_*_semif`) shows rendering alone
    recovers most of the leaderboard's standard-tier gap and grows with size (9B: std .806→.931). `ts1b_semif` /

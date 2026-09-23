@@ -62,7 +62,7 @@ or is the prior art a reviewer will raise, "A" = the attack citation (what a sce
 | Fine-tuning can underperform a frozen backbone out of distribution | §3ab, §3ah | A: kumar2022finetunedistort; C: mosbach2023fewshot, biderman2024loralearnsless, luo2025forgetting |
 | Fine-tuning degrades calibration; prior-knowledge interaction | §3ab, §3w | S: wang2025cogcalib, desai2020calibration, guo2017calibration |
 | Soft / ordinal-smoothed targets fix probability quality without changing decisions | §3ac, §3ae | S: mueller2019labelsmoothing, szegedy2016labelsmoothing, diaz2019softordinal, gneiting2007scoringrules, brier1950verification, epstein1969rps, murphy1970rps |
-| Brier term in the objective + checkpoint selection on held-out calibration NLL | §3ah, §3ag | S: gneiting2007scoringrules, brier1950verification, kumar2019verifiedcalibration, naeini2015calibration |
+| Checkpoint selection on held-out calibration NLL (no Brier term trained; `--brier_lambda` is 0.0 in every shipped/candidate run) | §3ah, §3ag | S: gneiting2007scoringrules, brier1950verification, kumar2019verifiedcalibration, naeini2015calibration |
 | We deliberately do not use a global post-hoc temperature | §3y, §6 | C: guo2017calibration, kumar2019verifiedcalibration |
 | Frozen-teacher KD from the same backbone's few-shot distribution | §3ah | S: hinton2015distillation, askell2021assistant, snell2022contextdistillation, yang2024sdft, yuan2020teacherfree |
 | Alternative uncertainty machinery we did not use (positioning) | §6 | C: yang2024laplacelora, angelopoulos2023conformal, romano2020adaptivecoverage, kumar2023conformalmcq, tian2023verbalized, kadavath2022know |

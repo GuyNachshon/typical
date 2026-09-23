@@ -293,8 +293,9 @@ policies confidently from states without the facts, which is the long_policy sco
 14B (§3ab), .21 for typical-medium.</p>
 <p>Fixes (commit <code>2fad326</code>): facts-first regeneration (<code>wf/train_long_v2.jsonl</code>, case position under 8%
 of the text), <code>--drop_truncated</code> (rows longer than the window are dropped, never cut), <code>--grad_ckpt</code>,
-<code>--best_on</code> (checkpoint selection on the uncertainty and curriculum val NLL), <code>--brier_lambda</code>, and
-frozen-backbone teacher labels via <code>scripts/teacher_label.py --zero_shot --shots 3</code>.</p>
+<code>--best_on</code> (checkpoint selection on the uncertainty and curriculum val NLL), and
+frozen-backbone teacher labels via <code>scripts/teacher_label.py --zero_shot --shots 3</code>.
+(Correction 2026-09-24: <code>--brier_lambda</code> was listed here but the run args record 0.0; no Brier term was trained.)</p>
 <h3 class="t-feature" id="b-the-mask-bug">b) The mask bug</h3>
 <p>The SDPA padding mask was built as <code>long</code>, which forces PyTorch's O(L²) math kernel and caused the
 14B OOMs at 3,072-token states and the scaling ladder's memory pain generally. Building it as

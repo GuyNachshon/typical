@@ -122,68 +122,75 @@ def bench_single_decision_ms(rel_dir: str, k: str, state_tokens: str = "256") ->
 # fig_architecture — schematic of the decision pass (no run data, vector only)
 # ---------------------------------------------------------------------------
 def fig_architecture():
-    fig, ax = plt.subplots(figsize=(7.2, 4.3))
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 6.2)
-    ax.axis("off")
+    # Dark-panel schematic after the Figma reference (node 36:71): light cards, thin white connectors.
+    # Coordinates are in the reference's pixel space (y down).
+    from matplotlib import font_manager
+    for f in ("Regular", "Medium", "Italic"):
+        p = Path.home() / "Library/Fonts" / f"Inter_24pt-{f}.ttf"
+        if p.exists():
+            font_manager.fontManager.addfont(str(p))
+    BG, CARD, INK, SUB, LINE = "#1e1e1e", "#f0f0f0", "#1e1e1e", "#5c5c5c", "#f0f0f0"
+    rc = {"font.family": "Inter 24pt", "mathtext.fontset": "custom", "mathtext.rm": "Inter 24pt",
+          "mathtext.it": "Inter 24pt:italic", "mathtext.bf": "Inter 24pt:medium", "pdf.fonttype": 42}
+    with plt.rc_context(rc):
+        fig = plt.figure(figsize=(5.5, 5.5 * 663 / 1306))
+        ax = fig.add_axes([0, 0, 1, 1])
+        fig.patch.set_facecolor(BG)
+        ax.set_facecolor(BG)
+        ax.set_xlim(-40, 1266)
+        ax.set_ylim(623, -40)
+        ax.axis("off")
 
-    def box(x, y, w, h, text, fc, ec="#333333", fontsize=8.6, weight="normal"):
-        b = FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.06,rounding_size=0.08",
-                            linewidth=1.1, edgecolor=ec, facecolor=fc)
-        ax.add_patch(b)
-        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center",
-                 fontsize=fontsize, weight=weight, wrap=True)
-        return b
+        def card(x, y, w, h, title, *subs):
+            # 1 pt = 3.3 px here; titles 7.2 pt, subtitles 6.2 pt, 25 px between lines
+            ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0,rounding_size=12",
+                                        linewidth=0, facecolor=CARD))
+            n = 1 + len(subs)
+            y0 = y + h / 2 - 25 * (n - 1) / 2 - (3 if subs else 0)
+            ax.text(x + w / 2, y0, title, ha="center", va="center", fontsize=7.2,
+                    color=INK, weight="medium")
+            for i, sub in enumerate(subs, 1):
+                ax.text(x + w / 2, y0 + 25 * i + 3, sub, ha="center", va="center", fontsize=6.2,
+                        color=SUB)
 
-    def arrow(p0, p1, color="#333333", style="-|>", lw=1.3, connectionstyle="arc3,rad=0.0"):
-        a = FancyArrowPatch(p0, p1, arrowstyle=style, mutation_scale=11,
-                             linewidth=lw, color=color, connectionstyle=connectionstyle)
-        ax.add_patch(a)
+        def line(pts, head=True):
+            xs, ys = zip(*pts)
+            if len(pts) > 2:
+                ax.plot(xs[:-1], ys[:-1], color=LINE, lw=0.9, solid_capstyle="butt")
+            ax.add_patch(FancyArrowPatch(pts[-2], pts[-1], arrowstyle="-|>" if head else "-",
+                                         mutation_scale=6.5, lw=0.9, color=LINE,
+                                         shrinkA=0, shrinkB=0))
 
-    # Inputs
-    box(0.15, 4.55, 2.5, 0.95, "state text $x$\n(policy / case / evidence)", "#EAF2F8")
-    box(0.15, 2.9, 2.5, 0.95, "query $q_i$ + rendered\ncandidates $A_i$", "#FDF2E3")
+        card(0, 0, 355, 96, "State text $x$", "policy, case, evidence")
+        card(0, 136, 355, 96, "Question $q$ + candidates $A$", "supplied at request time")
+        card(426, 0, 355, 96, "KV-cached prefix", "encoded once per state")
+        card(426, 136, 355, 96, "Causal suffix", "options + decision token")
+        card(894, 46, 332, 140, "Contextual head (N3)", "$h_D$ scored against each $c_j^{\\mathrm{ctx}}$",
+             "read at 71% of depth")
+        card(894, 282, 332, 100, "$P(a_j \\mid x, q, A)$ and $P(\\varnothing)$",
+             "abstention gate outside softmax")
+        card(162, 483, 332, 100, "Choice", "$K$-way categorical")
+        card(528, 483, 332, 100, "Score", "ordinal target, $\\tau = 0.7$")
+        card(894, 483, 332, 100, "Noul", "Bernoulli yes / no")
 
-    # Prefix / suffix
-    box(3.15, 4.55, 2.55, 0.95, "KV-cached prefix\nencoded ONCE per state", SKY + "33")
-    box(3.15, 2.9, 2.55, 0.95, "suffix (per query, cheap)\noption spans + terminal token", YELLOW + "33")
+        line([(371, 48), (410, 48)])
+        line([(371, 184), (410, 184)])
+        line([(603, 104), (603, 128)])
+        ax.text(615, 116, "attends to cache", ha="left", va="center", fontsize=5.6, color="#9a9a9a")
+        line([(797, 184), (878, 150)])
+        line([(1060, 198), (1060, 268)])
+        line([(1060, 471), (1060, 396)])
+        line([(328, 471), (328, 332), (878, 332)])
+        ax.plot([694, 694], [471, 332], color=LINE, lw=0.9)
 
-    arrow((2.65, 5.02), (3.15, 5.02))
-    arrow((2.65, 3.37), (3.15, 3.37))
-    # prefix feeds every suffix pass (reused across i)
-    arrow((4.4, 4.55), (4.4, 3.85), connectionstyle="arc3,rad=0.0")
-
-    # Head
-    box(6.2, 3.6, 2.6, 1.55,
-        "native head\nreads: pooled option spans\n(N3) + terminal token $h_D$",
-        "#F1EAF7")
-    arrow((5.7, 5.02), (6.2, 4.55))
-    arrow((5.7, 3.37), (6.2, 4.05))
-
-    # Output
-    box(6.55, 1.55, 1.9, 0.95, "$P(y\\,|\\,x, q, A)$\nover $A \\cup \\{\\varnothing\\}$", "#EAF7EE")
-    arrow((7.5, 3.6), (7.5, 2.5))
-
-    # Typed primitives row
-    ax.text(5.0, 1.15, "three typed primitives, one readout", fontsize=9, style="italic",
-             ha="center", color="#333333")
-    prims = [
-        ("Choice", "$K$-way, factored null", BLUE, 0.3, -0.35),
-        ("Score", "ordinal levels, $\\tau{=}0.7$", GREEN, 3.55, -0.12),
-        ("Noul", "Bernoulli, per-row routed", ORANGE, 6.8, 0.12),
-    ]
-    for name, sub, color, x0, rad in prims:
-        box(x0, 0.05, 2.85, 0.85, f"{name}\n{sub}", color + "22", ec=color, fontsize=8.4, weight="bold")
-        arrow((x0 + 1.4, 0.92), (7.05, 1.57), color=color, lw=1.1,
-              connectionstyle=f"arc3,rad={rad}")
-
-    save(
-        fig, "fig_architecture",
-        sources=["pcdm/native.py:1-40 (docstring, class NativeHead)", "PROJECT.md:8-15"],
-        desc="Schematic of the decision pass: KV-cached state prefix, per-query suffix, "
-             "native head reading pooled option spans + terminal token, three typed "
-             "primitives (Choice / Score / Noul) on one readout.",
-    )
+        save(
+            fig, "fig_architecture",
+            sources=["pcdm/native.py:1-40 (docstring, class NativeHead)", "PROJECT.md:8-15",
+                     "Figma e14cKPwSW027HKDUadTVOR node 36:71 (visual reference)"],
+            desc="Decision pass: state encoded once into a KV cache, per-question causal suffix that "
+                 "attends to it, contextual head (N3) at 71% depth, typed outputs Choice / Score / Noul "
+                 "and a factored abstention gate.",
+        )
 
 
 # ---------------------------------------------------------------------------

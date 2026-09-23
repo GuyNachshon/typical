@@ -7,7 +7,7 @@ construction.
 \begin{table}[h]
   \centering
   \caption{Training corpora. ``Held out'' counts whole families, domains, styles or parameter ranges
-  excluded from training entirely, distinct from a random validation split; \Cref{sec:setup:heldout} maps
+  excluded from training, distinct from a random validation split; \Cref{sec:setup:heldout} maps
   these onto generalization axes. No corpus contains any of the 231 public JevBench ids.}
   \label{tab:corpora}
   \small
@@ -27,8 +27,8 @@ construction.
   \end{tabular}
 \end{table}
 
-DecisionMix v2 spreads its 60{,}605 training rows evenly over levels 1--6 and is leak-checked against the
-public JevBench ids with 0 of 231 hits.
+DecisionMix v2 spreads its 60{,}605 training rows evenly over levels 1--6. A leak check against the public
+JevBench ids finds 0 of 231 hits.
 
 \subsection{Cached-state equivalence}
 \label{app:cache-equivalence}

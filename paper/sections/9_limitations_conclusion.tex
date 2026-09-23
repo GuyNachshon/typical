@@ -7,7 +7,7 @@ tools or read images. Per-query cost grows with the rendered candidate tokens, s
 hundreds are served through a shortlisting front end (\Cref{sec:results:cost}).
 
 \paragraph{Multi-step composition.} Decisions that require carrying an intermediate value through
-several steps are the open frontier. On DecisionMix level 7 (temporal, numeric, expected-value and
+several steps remain the main open problem. On DecisionMix level 7 (temporal, numeric, expected-value and
 trade-off composition, never trained) the v1 1.7B and 4B models score .493 and .544 against a .441
 guess rate, and the 14B model .620. On the JevBench hard tier a frozen 14B backbone read with three
 in-context exemplars scores above our trained 14B checkpoint (paired difference $+.108$
@@ -37,12 +37,12 @@ public; the training code is not yet released.
 \section{Conclusion}
 \label{sec:conclusion}
 
-Typical reads decisions directly out of a pretrained causal language model. A state is encoded once, a
-question and its runtime candidates are read in a short suffix, and a head at mid-depth returns a typed
+Typical reads decisions directly out of a pretrained causal language model. It encodes a state once and
+reads each question with its runtime candidates in a short suffix, where a head at mid-depth returns a typed
 distribution with a factored abstention event, at 45\,ms per decision at 1.7B and 60\,ms at 14B. The
 design rests on measured answers to where the decision lives: inside the forward pass over the
 candidates, in their contextual states, below the layers that specialize for generation. The training
 recipe shows that decision types, counterfactual rubrics and abstention targets shape a decision model
-as strongly as its architecture, and render-crossed evaluation shows how to measure such effects
-cleanly. The models and the inference package are public, and the same interface is a natural terminal
+as strongly as its architecture, and render-crossed evaluation separates such data effects from interface
+compatibility. The models and the inference package are public, and the same interface is a natural terminal
 layer for decision systems that add intermediate computation before the typed readout.

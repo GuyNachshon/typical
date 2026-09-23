@@ -623,8 +623,9 @@ policies confidently from states without the facts, which is the long_policy sco
 
 Fixes (commit `2fad326`): facts-first regeneration (`wf/train_long_v2.jsonl`, case position under 8%
 of the text), `--drop_truncated` (rows longer than the window are dropped, never cut), `--grad_ckpt`,
-`--best_on` (checkpoint selection on the uncertainty and curriculum val NLL), `--brier_lambda`, and
+`--best_on` (checkpoint selection on the uncertainty and curriculum val NLL), and
 frozen-backbone teacher labels via `scripts/teacher_label.py --zero_shot --shots 3`.
+(Correction 2026-09-24: `--brier_lambda` was listed here but the run args record 0.0; no Brier term was trained.)
 
 ### b) The mask bug
 

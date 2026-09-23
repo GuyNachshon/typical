@@ -36,8 +36,8 @@ corpus in the \emph{shuffled-question} variant $\dqsh$, primary throughout.
 
 $\dq$ extends the choices-only control of \citet{balepur2024artifacts} to a shuffled real question, which
 is stricter: a placeholder can leak candidate priors through the rendering (on one candidate-blind model
-choices-only reads $+.017$ where $\dqsh$ reads $.000$). High accuracy with $\dqsh \approx 0$ means the
-score is explained by candidate-set priors. The reference is the listwise teacher, a fine-tuned decoder
+choices-only reads $+.017$ where $\dqsh$ reads $.000$). High accuracy with $\dqsh \approx 0$ means that
+candidate-set priors explain the score. The reference is the listwise teacher, a fine-tuned decoder
 reading the options in context, at $\dqsh = .102$ on the MMLU-Pro probe. $|\dqsh| < .02$ (about 1.4 standard
 errors at $n{=}1{,}200$, $p \approx .15$) counts as zero.
 

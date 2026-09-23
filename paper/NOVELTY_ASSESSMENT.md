@@ -119,8 +119,8 @@ section and a negative result that motivates the curriculum work.
 ## F5. Fine-tuning lifts standard-tier accuracy and costs hard-tier accuracy versus a frozen backbone with few-shot prompting; calibration collapses without soft targets and calibration-based selection
 
 **Evidence.** §3ab (frozen 14B 3-shot hard .559 vs trained 14B .468, standard .819 → .875; held-out
-score NLL 2.87, the worst of the ladder), §3ah (long-state fix + Brier term + `--best_on` calibration
-selection: standard .931, score NLL 2.87 → 0.95, hard Brier .85 → .66, hard accuracy .450 — still
+score NLL 2.87, the worst of the ladder), §3ah (long-state fix + `--best_on` calibration
+selection — no Brier term trained: standard .931, score NLL 2.87 → 0.95, hard Brier .85 → .66, hard accuracy .450 — still
 below frozen), §3ac (ordinal-smoothed targets: NLL 2.07 → 1.23 with identical argmax), §3ag (Qwen3.5
 generation shifts hard-tier frozen performance).
 
@@ -134,7 +134,8 @@ soft targets and proper scoring rules as the fix.
 **Genuinely new.** The quantified crossover on an external typed-decision benchmark at three model
 scales, and — more useful — the isolation that the binding constraint was the *selection criterion and
 target distribution*, not capacity: the largest single-run swing in the entire project came from
-selecting checkpoints on held-out calibration NLL plus a Brier term, not from any architecture change.
+selecting checkpoints on held-out calibration NLL, not from any architecture change (no run trains a
+Brier term; `--brier_lambda` is 0.0 throughout).
 The inversion at Qwen3.5-4B (hard .495, above every Qwen3 trained model at any size) is a second
 useful datum: pretraining generation, not parameter count, predicts hard-tier headroom.
 
@@ -167,7 +168,7 @@ length ablation) is a real practitioner's point and, as far as we found, unstate
 **Reproduction / confirmation.** The underlying phenomenon is a bug, not a discovery.
 
 **How a reviewer attacks it.** Fatally, on confounding: the fix was shipped inside `tl1b` together
-with frozen-teacher KD, a Brier term, calibration-based checkpoint selection, 3,072-token states and
+with frozen-teacher KD, calibration-based checkpoint selection, 3,072-token states and
 8k steps. No matched single-variable ablation (facts-first vs facts-last at an identical window and
 seed) exists; `tl1b_nokd` isolates only the KD term. The quantitative claim "this caused the
 long-context collapse" is therefore unsupported as run. **Verdict: not a contribution as stated.**

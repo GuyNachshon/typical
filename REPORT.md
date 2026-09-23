@@ -1329,6 +1329,7 @@ is exactly the long_policy .05 of the 14B (§3ab) and .21 of `typical-medium`. F
 regeneration (`wf/train_long_v2.jsonl`, case position < 8% of the text), `--drop_truncated` (rows longer than the window
 are dropped, never cut), `--grad_ckpt`, `--best_on` (checkpoint selection on the uncertainty + curriculum val NLL),
 `--brier_lambda`, and frozen-backbone teacher labels via `scripts/teacher_label.py --zero_shot --shots 3`.
+(Correction 2026-09-24: `--brier_lambda` was listed here but the run args record 0.0; no Brier term was trained.)
 A second bug (commit 6d0a7e3): the SDPA padding mask was built as `long`, which forces PyTorch's O(L²) math kernel — the
 cause of the 14B OOMs at 3,072-token states (and of the ladder's memory pain); `bool` fixed it.
 
@@ -1406,7 +1407,8 @@ an earlier draft of §3ab quoted .20/.40 for temporal/probability from a transcr
 ## 3ai. `tl1b_nokd` — the KD control, and what it leaves confounded (H100, 2026-09-22, ~$30)
 
 `tl1b` bundled five changes at once (facts-first long corpus, `--drop_truncated`, a 3,072-token window,
-`--brier_lambda`, calibration-based `--best_on`) *plus* KD from the frozen 14B. `tl1b_nokd` is the matched control:
+`--brier_lambda`, calibration-based `--best_on`) *plus* KD from the frozen 14B. (Correction 2026-09-24: `--brier_lambda`
+was listed here but the run args record 0.0; no Brier term was trained.) `tl1b_nokd` is the matched control:
 identical recipe, `--distill_beta 0`, one flag different. All values below read from the artefacts on
 `guychuk/pcdm-runs` (`jev_native_*/hard/summary.json`, `.../original/summary.json`), not from run logs.
 
@@ -1433,7 +1435,8 @@ probability .50 (n=10), routing_hard 1.00 (n=5), temporal_numeric .20 (n=15), tr
 
 **What this does *not* establish.** With KD eliminated, the credit for the long_policy recovery (.053 → .211) falls to
 "the truncation fix" — but that is still four changes in a trenchcoat. Nothing in the record separates facts-first
-rendering from `--drop_truncated`, the wider window, the Brier term, or calibration-based checkpoint selection. §3ag
+rendering from `--drop_truncated`, the wider window, or calibration-based checkpoint selection (not a Brier term —
+correction 2026-09-24: no run in this pair trained one). §3ag
 states the mechanism (states right-truncate, so a `Case:` rendered last was dropped 98.8% of the time at
 `max_state` 1,024) and the mechanism is well-evidenced as a *description of the data*; it is not evidenced as the
 *cause* of the metric movement. The paper says so explicitly rather than claiming the stronger version.

@@ -16,11 +16,11 @@ against a precomputed representation.
 \paragraph{Types are enforced by structure.} Each typed primitive fixes a property that post-hoc
 calibration cannot reach. The Bernoulli head has no candidate order to be sensitive to; the ordinal
 target moves probability mass toward adjacent levels without changing accuracy; keeping abstention out
-of the rendered candidates removes its dependence on how many candidates were offered. The same point
-shows up at the output layer from the other side: one global temperature and null offset, fit on
+of the rendered candidates removes its dependence on how many candidates were offered. The calibration fit
+agrees: one global temperature and null offset, fit on
 held-out soft targets, wants opposite corrections for an evidence-trained and a workflow-trained
 checkpoint (\Cref{sec:results:calibration}). Probability quality for a decision model is indexed by
-decision type, and the head, the target and the training data are where it is shaped.
+decision type, and the head, the target and the training data shape it.
 
 \paragraph{Data and selection as levers.} Several of the largest effects in this paper hold the
 architecture fixed: the DecisionMix v2 curriculum (35--40 points on held-out families, grammars and
@@ -35,8 +35,8 @@ same items (\Cref{sec:results:rendering}), more than the gap between many system
 rank. Two practices made our own measurements decisive: crossing training render with evaluation
 render, so that data effects and compatibility effects separate, and building evaluation sets with the
 power to resolve the effect in question. Our 605 generated, leak-checked long states settled at
-$p < 10^{-9}$ a question that a 19-item benchmark cell returned at $p = .232$. A pre-registered decision
-rule is only as strong as the power of the metric it names.
+$p < 10^{-9}$ a question that a 19-item benchmark cell returned at $p = .232$, so a pre-registered
+decision rule is limited by the power of the metric it names.
 
 \paragraph{What a single pass computes.} Typical decides in one forward pass of fixed depth, with no
 intermediate tokens. Fixed-depth transformers correspond to constant-depth threshold circuits

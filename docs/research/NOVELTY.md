@@ -381,9 +381,11 @@ convenience — get the boundary wrong and the model doesn't degrade gracefully,
 
 **3. Calibration-first checkpoint selection changes what "better" means during training, not just at eval time.**
 `--best_on` selects the checkpoint on held-out uncertainty+curriculum NLL instead of in-distribution val loss;
-combined with `--brier_lambda` in the training objective itself (not a post-hoc temperature fit), this is what took
-`tl1b`'s held-out score NLL from 2.87 (the worst of the whole ladder) to 0.95 and JevBench hard Brier from .85 to
-.66 — a bigger single-run swing than any architecture change measured in this project. The standing result before
+combined with the rest of the `tl1b` bundle (facts-first long states, `--drop_truncated`, the 3,072-token window,
+DecisionMix v2 with the U corpus, typed heads with the ordinal target — no Brier term was trained; `--brier_lambda`
+is 0.0), this is what took `tl1b`'s held-out score NLL from 2.87 (the worst of the whole ladder) to 0.95 and
+JevBench hard Brier from .85 to .66 — a bigger single-run swing than any architecture change measured in this
+project. The standing result before
 this (§3ab) was that soft-target calibration gets *worse* with scale under an accuracy-shaped selection criterion;
 this addendum's finding is that the criterion, not the capacity, was binding.
 

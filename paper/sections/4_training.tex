@@ -10,7 +10,7 @@ measures the six recipe choices below.
 \subsection{Family-balanced mixture}
 \label{sec:train:mixture}
 
-Batches are drawn by decision family, so no large corpus dominates by row count. $E$ is evidence and
+We draw batches by decision family, so no large corpus dominates by row count. $E$ is evidence and
 classification (SNLI \citep{bowman2015snli}, MNLI \citep{williams2018mnli}, ANLI \citep{nie2020anli},
 BoolQ \citep{clark2019boolq}, and wide-vocabulary intent and topic sets including CLINC-150, Banking77 and
 HWU64 \citep{larson2019clinc,casanueva2020banking77}), spanning many label vocabularies at few rows per
@@ -56,8 +56,8 @@ operating points that no single post-hoc temperature and null offset can serve
 \subsection{Evidence-first long states}
 \label{sec:train:long}
 
-The long-state corpus \texttt{data\_wf\_long} (23{,}318 multi-paragraph policy documents) was first
-rendered with the case facts after the policy body, and training right-truncates states at the window, so
+We first rendered the long-state corpus \texttt{data\_wf\_long} (23{,}318 multi-paragraph policy
+documents) with the case facts after the policy body, and training right-truncates states at the window, so
 at 1{,}024 tokens 98.8\% of rows lost their facts (\Cref{app:long-state-stats}). The fixed recipe renders
 facts first and drops any row longer than the window. The v2 releases train at a 2{,}048-token window and
 the 14B model at 3{,}072; \Cref{sec:results:long} isolates the effect with a render-crossed design.

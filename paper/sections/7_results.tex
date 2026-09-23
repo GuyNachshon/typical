@@ -7,8 +7,8 @@ All checkpoints share the architecture fixed in \Cref{sec:analysis}.
 \label{sec:results:typed}
 
 Each output type delivers the property its contract names, with backbone, tap and readout
-fixed. Matched fine-tunes from one parent checkpoint, each trained for 3k steps on the rows of its own
-type, are compared against a control that treats the same rows as plain Choice (full tables in
+fixed. We compare matched fine-tunes from one parent checkpoint, each trained for 3k steps on the rows of its own
+type, against a control that treats the same rows as plain Choice (full tables in
 \Cref{app:typed-primitives}).
 
 \paragraph{Score.} The ordinal-smoothed target ($\tauord = 0.7$) adds no parameters and improves every
@@ -125,7 +125,7 @@ recipe run at 4B, 8B and 14B) the 8B is also below the 4B and 14B (.667 vs.\ .83
 frozen control (.556 vs.\ .778/.819). The second-generation backbone is the strongest point per
 parameter: Qwen3.5-4B, released as \texttt{typical-medium} v2, scores .861 standard and .495 hard, above
 every Qwen3 checkpoint we trained on the hard tier and 9.7 standard-tier points above its own frozen
-control. The hard tier, where the frozen 14B leads, is discussed in \Cref{sec:limitations}.
+control. \Cref{sec:limitations} discusses the hard tier, where the frozen 14B leads.
 
 \subsection{Cost}
 \label{sec:results:cost}
@@ -212,7 +212,7 @@ At 1.7B, render mismatch inside one trained model costs more than the training d
 off-diagonal cells of \Cref{tab:twobytwo}, where the evidence is fully visible and only its position
 changes, switching the evaluation render against the training render costs 14.5 points for the
 facts-first 1.7B model and 19.0 for the facts-last one, which lands on its \texttt{policy\_permit} floor
-(.615 against .612). At 14B the same switch costs 7.6 and 6.8 points, so capacity buys render tolerance.
+(.615 against .612). At 14B the same switch costs 7.6 and 6.8 points, so the larger backbone tolerates render mismatch better.
 The earlier-recipe 14B scores .053 on JevBench's 19-item \texttt{long\_policy} family and .919 on the 605
 held-out long states in its own training render, a pair that also changes the item set and stacks
 truncation damage, render mismatch and a 19-item sample. The frozen controls of \Cref{tab:headline} use a
