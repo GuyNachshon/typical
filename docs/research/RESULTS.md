@@ -199,7 +199,7 @@ the policy body. (Added to all three cards, README and the launch post on 2026-0
 
 The published `inference/` package is current except for `backbone.py`, which predates the Qwen3.5 port: it lacks
 the VL-wrapper unwrap, the Gated-DeltaNet LoRA target names and the `linear_attn` parent walk, so a Qwen3.5
-checkpoint fails to load. `native.py`, `core.py`, `__init__.py`, `example.py` and `requirements.txt` are byte-identical
+checkpoint fails to load. `pcdm/native.py`, `core.py`, `__init__.py`, `example.py` and `requirements.txt` are byte-identical
 to local, so the serving optimisations are already public and the shipped Qwen3 models are not running stale code.
 The `backbone.py` change is purely additive — every new branch is `hasattr`-guarded, so no Qwen3 path changes — but
 it must be published alongside (or before) any Qwen3.5-backed release or users get a load failure on first call.

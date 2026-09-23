@@ -13,10 +13,10 @@ run_if_needed() {
 export -f run_if_needed
 schedule() {
   until [ -f data_v3/train.jsonl ] && [ -f data_v3/eval/snli_test_hyponly.jsonl ]; do sleep 20; done
-  run_if_needed abl_nohybrid   uv run --no-sync python train.py --name abl_nohybrid --tap_layer 20 --zscore --lora_r 16 --data data_v3 --no_hybrid --wandb --hf_repo "$HF_REPO"
-  run_if_needed main_v3_s1     uv run --no-sync python train.py --name main_v3_s1 --tap_layer 20 --zscore --lora_r 16 --data data_v3 --seed 1 --wandb --hf_repo "$HF_REPO"
-  run_if_needed B_1.7B         uv run --no-sync python baselines.py B --backbone Qwen/Qwen3-1.7B-Base --data data_v3 --name B_1.7B
-  run_if_needed B_8B           uv run --no-sync python baselines.py B --backbone Qwen/Qwen3-8B-Base --data data_v3 --name B_8B
+  run_if_needed abl_nohybrid   uv run --no-sync python pcdm/train.py --name abl_nohybrid --tap_layer 20 --zscore --lora_r 16 --data data_v3 --no_hybrid --wandb --hf_repo "$HF_REPO"
+  run_if_needed main_v3_s1     uv run --no-sync python pcdm/train.py --name main_v3_s1 --tap_layer 20 --zscore --lora_r 16 --data data_v3 --seed 1 --wandb --hf_repo "$HF_REPO"
+  run_if_needed B_1.7B         uv run --no-sync python pcdm/baselines.py B --backbone Qwen/Qwen3-1.7B-Base --data data_v3 --name B_1.7B
+  run_if_needed B_8B           uv run --no-sync python pcdm/baselines.py B --backbone Qwen/Qwen3-8B-Base --data data_v3 --name B_8B
   echo POD2_DONE
 }
 export -f schedule

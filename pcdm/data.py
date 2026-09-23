@@ -1,4 +1,4 @@
-"""HF datasets -> DecisionExample JSONL (train/val/eval). Run: uv run data.py [--small] [--selftest]
+"""HF datasets -> DecisionExample JSONL (train/val/eval). Run: uv run pcdm/data.py [--small] [--selftest]
 
 Schema: one JSON object per line with state, query, candidates, target (sums to 1
 among candidates), p_null, task, label, plus optional meta (hyp/question/family)
@@ -934,7 +934,7 @@ def prune_near_dup_train(train_examples, eval_states, tasks, threshold=0.8):
     leakage (boolq_val 4.9% / hwu64_test 5.4% near-identical twins in train, runs/leak_audit.json).
     Drops TRAIN rows in `tasks` whose normalised state is within `threshold` Jaccard (char
     5-gram MinHash, num_perm=64 -- same recipe as leak_audit.py, reimplemented locally to
-    avoid a data.py <-> scripts/leak_audit.py import cycle) of any state in `eval_states`."""
+    avoid a pcdm/data.py <-> scripts/leak_audit.py import cycle) of any state in `eval_states`."""
     if not eval_states:
         return train_examples
     lsh = MinHashLSH(threshold=threshold, num_perm=64)

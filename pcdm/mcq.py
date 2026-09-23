@@ -97,7 +97,7 @@ def _label(i: int) -> str:
 def _render(query: str, cand_texts: list[str]):
     """-> (suffix text, char spans): query, one "<label>. text" line per option, the
     "none of the above" line, "Answer:". spans[k] = (start, end) of option k's text
-    (letters excluded); spans[-1] is the null line's text -- native.py pools these."""
+    (letters excluded); spans[-1] is the null line's text -- pcdm/native.py pools these."""
     text, spans = query + "\n", []
     for i, c in enumerate(cand_texts + ["none of the above"]):
         text += f"{_label(i)}. "
@@ -202,7 +202,7 @@ def _score_one_chunked(head: MCQHead, state, query, cand_texts, max_state, max_s
 def collate_mcq(examples):
     """cmask/target/p_null only -- no cached candidate features (MCQ reads candidate
     text straight into the prompt). Mirrors model.collate's cmask/target/p_null build;
-    duplicated rather than shared since model.py is frozen for this change. teacher/
+    duplicated rather than shared since pcdm/model.py is frozen for this change. teacher/
     has_teacher (PLAN3 E3-T soft labels, scripts/teacher_label.py) ARE shared, via
     model.collate_teacher -- see decision_loss."""
     Kmax = max(len(ex["candidates"]) for ex in examples)

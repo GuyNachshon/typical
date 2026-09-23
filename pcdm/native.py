@@ -1,6 +1,6 @@
 """native_choice_v1 (PLAN4 sec 11-12): one option-aware suffix pass, direct probability readout.
 
-Prompt = mcq.py's exactly ([eos] + state + query + lettered options + "none of the above" +
+Prompt = pcdm/mcq.py's exactly ([eos] + state + query + lettered options + "none of the above" +
 "Answer:") plus one terminal decision token (the tokenizer's eos id, appended as an id so no
 text-level special-token parsing is involved). h_D = the terminal token's last-layer (normed)
 hidden state; the letters stay in the text but are never read out.
@@ -481,7 +481,7 @@ def _cache_batch_repeat_interleave(cache, repeats: int):
 
 
 def _cache_select_rows(cache, lo: int, hi: int):
-    """New cache holding only batch rows [lo:hi) of `cache` (bench.py's B_fair sub-batch
+    """New cache holding only batch rows [lo:hi) of `cache` (pcdm/bench.py's B_fair sub-batch
     chunking). Same hybrid-cache split as _cache_batch_repeat_interleave: DynamicLayer's
     .keys/.values (full-attention) get plain slicing; LinearAttentionLayer has no per-row
     selection of its own, so its conv_states/recurrent_states are sliced directly. Caller

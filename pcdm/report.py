@@ -1,4 +1,4 @@
-"""Compare runs/*/results.json side by side. `uv run report.py [--raw]`."""
+"""Compare runs/*/results.json side by side. `uv run pcdm/report.py [--raw]`."""
 import glob
 import json
 import sys
@@ -20,9 +20,9 @@ COLS = [
 
 def get_metric(run, s, m, key):
     """Normal metrics live at eval[s][key][m]. data v4's cse_*/ksweep_* sets are expected to be
-    stored by train.py as a separate nested dict (eval[s]["cse"] / eval[s]["ksweep"], per-variant
+    stored by pcdm/train.py as a separate nested dict (eval[s]["cse"] / eval[s]["ksweep"], per-variant
     keys like "dup/mass_err"), possibly itself split by scaled/raw or flat -- try both shapes and
-    return None (rendered as "-") if train.py hasn't written them yet."""
+    return None (rendered as "-") if pcdm/train.py hasn't written them yet."""
     ev = run.get("eval", {}).get(s, {})
     v = ev.get(key, {}).get(m)
     if v is not None:

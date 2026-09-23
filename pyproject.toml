@@ -20,3 +20,11 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.30.0",
 ]
+
+[tool.pytest.ini_options]
+# the training modules live in pcdm/, the harness packages (pcdm_jev, scripts) at the root
+pythonpath = ["pcdm", "."]
+
+[tool.uv]
+# the repo is a workspace of scripts, not an installable distribution; do not try to build pcdm/
+package = false

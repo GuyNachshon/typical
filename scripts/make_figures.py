@@ -179,7 +179,7 @@ def fig_architecture():
 
     save(
         fig, "fig_architecture",
-        sources=["native.py:1-40 (docstring, class NativeHead)", "PROJECT.md:8-15"],
+        sources=["pcdm/native.py:1-40 (docstring, class NativeHead)", "PROJECT.md:8-15"],
         desc="Schematic of the decision pass: KV-cached state prefix, per-query suffix, "
              "native head reading pooled option spans + terminal token, three typed "
              "primitives (Choice / Score / Noul) on one readout.",

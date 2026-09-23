@@ -11,12 +11,12 @@ on q,k,v,o,gate,up,down of the top `--lora_layers 8` blocks; lower 20 frozen. `-
 States and queries go through the adapted backbone each step; **candidates stay in the frozen layer-L space** and are cached
 (`FeatureCache`, max_len 16) → candidate cost is K-independent. bf16 weights, fp32 LoRA + tower, no autocast (same code on cuda/mps/cpu).
 
-**Model (`model.py`).** `cand_null=True` default (G). Hybrid scorer: frozen-space features from masked-mean state `Uf`, query `Vf`
+**Model (`pcdm/model.py`).** `cand_null=True` default (G). Hybrid scorer: frozen-space features from masked-mean state `Uf`, query `Vf`
 and candidate `C`: `sim = Linear(2·d_in, d)(cat[ln(Uf)⊙ln(C), ln(Vf)⊙ln(C)])`, `cos_u`, `cos_v`; scorer input
 `cat[h, c, h⊙c, |h−c|, sim, cos_u, cos_v]` → `Linear(5d+2, d) → GELU → Linear(d,1)`. `--no_hybrid` zeros sim/cos. `d_in=2048`, ~13.5M tower.
 MPS-safe decoder layer only on MPS; standard layer on CUDA. `decide()` chunks M instead of materialising M copies of H.
 
-**Data (`data.py`, same JSONL schema + `meta` for baselines).** ~800k train / 4k val; sources and sizes in the table below.
+**Data (`pcdm/data.py`, same JSONL schema + `meta` for baselines).** ~800k train / 4k val; sources and sizes in the table below.
 Null/K synthesis: NLI 0.70/0.15/0.15 as v0; classification with N labels: 0.35 K=N, 0.25 K=min(10,N), 0.15 K=3, 0.25 gold-absent
 (K∈{3,10,N−1}, p_null=1); SQuAD v2 / BoolQ natural nulls. Label paraphrase without LLM: snake/Camel→words; per-example style
 (raw / title-case / synonym table ~120 entries p=0.5 per word / HWU descriptions); NLI `TRAIN_NAMES` (2 wordings held out).
@@ -25,7 +25,7 @@ Held out ENTIRELY: Banking77, TREC (SetFit/TREC-QC), 20 Newsgroups (+ v0's 30 CL
 (premise,hypothesis) overlap between train and every eval set must be 0; group-split train/val by state text.
 Build locally → `hf upload guychuk/pcdm-data --private` → `hf download` on the pod.
 
-**Training (`train.py`).** Integerised examples + string table; `DataLoader(num_workers=4, pin_memory)` on CUDA; length-bucketed
+**Training (`pcdm/train.py`).** Integerised examples + string table; `DataLoader(num_workers=4, pin_memory)` on CUDA; length-bucketed
 batches of 64; 24k steps; AdamW tower lr 3e-4 wd 0.01, LoRA lr 1e-4 wd 0; warmup 500, cosine to 0.1×; clip 1.0.
 val NLL every 1k steps; full eval table + T-fit every 4k and at end; `last.pt` (lora+tower+opt+sched+step+rng+args) every 2k steps,
 `best.pt` by val NLL; auto-resume if `last.pt` exists; W&B project `pcdm` (`train/loss`, per-family loss, lrs, step_time, tokens/s,
@@ -34,7 +34,7 @@ gpu_mem, `val/nll`, `eval/<set>/<metric>` raw+scaled, T, final `wandb.Table`); `
 
 **Baselines.** B: same log-prob protocol with a **KV-cached prefix** (score all candidates of an example from one prefix pass),
 `--backbone` flag (1.7B and `Qwen/Qwen3-8B-Base`), caps 1000 / 300 (K≥50). C_lora: cross-encoder with the same LoRA config + per-dataset
-heads. `bench.py`: ours vs prefix-cached B, K∈{4,32,150}, M∈{1,8,64,256}, latency + peak memory. Undefined cells reported as `N/A`, not sentinels.
+heads. `pcdm/bench.py`: ours vs prefix-cached B, K∈{4,32,150}, M∈{1,8,64,256}, latency + peak memory. Undefined cells reported as `N/A`, not sentinels.
 
 ## Run schedule (H100 SXM ≈ $3/h; each idempotent — `run_gpu.sh` skips runs with `results.json`)
 
@@ -63,24 +63,24 @@ H2 per-query marginal ≥ 5× cheaper than KV-cached B at K=4, growing with K.
 1. `uv run pytest tests/ -q` (< 60 s, CPU): ragged collate masks/shapes; probs pads = 0; permutation equivariance; loss = hand soft-CE;
    p_null=1 → all mass on null; LoRA zero-init ⇒ adapted == frozen output and LoRA/tower get grads, frozen don't; checkpoint
    save→load→one step reproduces loss; W&B offline run; data self-test (schema, no overlap, held-out sets absent from train).
-2. `uv run train.py --smoke` = real Qwen3-0.6B-Base + LoRA top 4, 64 examples, 20 steps, `--device auto`, W&B offline; kill at step 10, rerun → resumes.
-3. `uv run data.py --small` (200/source) → `uv run train.py --name mini --steps 300 --bs 16 --backbone Qwen/Qwen3-0.6B-Base`: no NaN,
+2. `uv run pcdm/train.py --smoke` = real Qwen3-0.6B-Base + LoRA top 4, 64 examples, 20 steps, `--device auto`, W&B offline; kill at step 10, rerun → resumes.
+3. `uv run pcdm/data.py --small` (200/source) → `uv run pcdm/train.py --name mini --steps 300 --bs 16 --backbone Qwen/Qwen3-0.6B-Base`: no NaN,
    snli acc > chance, every eval set present in the table, `results.json` + W&B offline run written.
-4. `uv run baselines.py B --limit 10`, `uv run bench.py --quick` (KV-cache path works on transformers 5.17).
-5. Full `uv run data.py` + leak audit + `hf upload`.
+4. `uv run pcdm/baselines.py B --limit 10`, `uv run pcdm/bench.py --quick` (KV-cache path works on transformers 5.17).
+5. Full `uv run pcdm/data.py` + leak audit + `hf upload`.
 
 ## RunPod mechanics
 Secure Cloud DC with H100 SXM; 100 GB network volume at `/workspace` (HF_HOME, UV_CACHE_DIR, data, runs, `.env`);
 template `runpod/pytorch` (pin at task time); `uv sync`; SSH-exec + `tmux`; `timeout 14h bash run_gpu.sh; runpodctl pod stop $POD`
 as cost guard; terminate after final upload.
 
-## Data sources (HF ids verified by scout; see data.py for the exact mapping)
-(filled in by data.py; held-out: mteb/banking77, SetFit/TREC-QC, SetFit/20_newsgroups)
+## Data sources (HF ids verified by scout; see pcdm/data.py for the exact mapping)
+(filled in by pcdm/data.py; held-out: mteb/banking77, SetFit/TREC-QC, SetFit/20_newsgroups)
 
 ## Interfaces (contract between files; workers code against these)
 
 ```python
-# encode.py
+# pcdm/encode.py
 def pick_device(device="auto") -> str                       # cuda > mps > cpu
 class Backbone(nn.Module):
     def __init__(self, name="Qwen/Qwen3-1.7B-Base", lora_layers=8, lora_r=16, lora_alpha=32, lora_dropout=0.05, device="auto")
@@ -93,7 +93,7 @@ class Backbone(nn.Module):
 class FeatureCache  # unchanged API: add(backbone, texts, max_len) uses backbone.frozen_features; get/save/load; plus .pooled(text) -> mean vector (memoised)
 def build_cache(data_dir, out, backbone) -> encodes ONLY candidates (all jsonl under data_dir), max_len 16
 
-# model.py
+# pcdm/model.py
 class DecisionModel(d_in=2048, d=512, nhead=8, dim_feedforward=1024, num_layers=2, dropout=0.1,
                     no_null=False, cand_null=True, hybrid=True, mps_safe=False)
     forward(H, hmask, Q, qmask, C, cmask, Uf=None, Vf=None) -> logits [B, Kmax+1]   # Uf/Vf [B,d_in] frozen-space masked means; required if hybrid
@@ -102,17 +102,17 @@ def collate(cache, examples) -> dict(state: list[str], query: list[str], C [B,Km
 def run_batch(backbone, model, batch, max_state=256, max_query=64) -> logits   # tokenises state/query, backbone.forward twice, Uf/Vf from h_frozen, model(...)
 @torch.inference_mode() def decide(backbone, model, cache_or_none, state, queries, chunk=64) -> list[Tensor]   # encodes state once; chunks queries
 
-# train.py CLI
-uv run train.py --name X [--backbone Qwen/Qwen3-1.7B-Base] [--lora_layers 8] [--lora_r 16] [--steps 24000] [--bs 64] [--lr 3e-4] [--lora_lr 1e-4]
+# pcdm/train.py CLI
+uv run pcdm/train.py --name X [--backbone Qwen/Qwen3-1.7B-Base] [--lora_layers 8] [--lora_r 16] [--steps 24000] [--bs 64] [--lr 3e-4] [--lora_lr 1e-4]
                 [--seed 0] [--no_hybrid] [--no_cand_null] [--no_null] [--hard_only] [--mix full|nlionly] [--eval_every 4000] [--val_every 1000]
                 [--ckpt_every 2000] [--device auto] [--wandb] [--hf_repo guychuk/pcdm-runs] [--data data] [--smoke] [--eval_only]
 writes runs/<name>/{last.pt,best.pt,results.json}; results.json format unchanged (+ "n/a" strings allowed for undefined cells)
 
-# baselines.py
-uv run baselines.py B [--backbone ...] [--limit N] [--kv_cache]      # KV-cached prefix scoring default
-uv run baselines.py C [--backbone ...] [--lora_layers 8] [--lora_r 16] [--steps N]   # C_lora
-# bench.py
-uv run bench.py --model runs/main_s0 [--quick] [--backbone ...]    # K∈{4,32,150} × M∈{1,8,64,256}; ours vs KV-cached B; latency + peak mem
+# pcdm/baselines.py
+uv run pcdm/baselines.py B [--backbone ...] [--limit N] [--kv_cache]      # KV-cached prefix scoring default
+uv run pcdm/baselines.py C [--backbone ...] [--lora_layers 8] [--lora_r 16] [--steps N]   # C_lora
+# pcdm/bench.py
+uv run pcdm/bench.py --model runs/main_s0 [--quick] [--backbone ...]    # K∈{4,32,150} × M∈{1,8,64,256}; ours vs KV-cached B; latency + peak mem
 ```
 
 ## Revision after main_s0 (2026-09-17, autonomous)

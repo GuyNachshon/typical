@@ -21,17 +21,17 @@ run_if_needed() {
 export -f run_if_needed
 
 schedule() {
-  run_if_needed main_s0       uv run python train.py --name main_s0 --wandb --hf_repo "$HF_REPO"
-  run_if_needed B_1.7B        uv run python baselines.py B --backbone Qwen/Qwen3-1.7B-Base --name B_1.7B
-  run_if_needed B_8B          uv run python baselines.py B --backbone Qwen/Qwen3-8B-Base --name B_8B
-  run_if_needed C_lora        uv run python baselines.py C --name C_lora
-  run_if_needed bench         uv run python bench.py --model runs/main_s0 --backbone Qwen/Qwen3-1.7B-Base --name bench
-  run_if_needed abl_frozen    uv run python train.py --name abl_frozen --lora_r 0 --wandb --hf_repo "$HF_REPO"
-  run_if_needed abl_nohybrid  uv run python train.py --name abl_nohybrid --no_hybrid --wandb --hf_repo "$HF_REPO"
-  run_if_needed abl_nlionly   uv run python train.py --name abl_nlionly --mix nlionly --wandb --hf_repo "$HF_REPO"
-  run_if_needed abl_statenull uv run python train.py --name abl_statenull --no_cand_null --wandb --hf_repo "$HF_REPO"
-  run_if_needed main_s1       uv run python train.py --name main_s1 --seed 1 --wandb --hf_repo "$HF_REPO"
-  run_if_needed main_4B       uv run python train.py --name main_4B --backbone Qwen/Qwen3-4B-Base --lora_layers 10 --wandb --hf_repo "$HF_REPO"
+  run_if_needed main_s0       uv run python pcdm/train.py --name main_s0 --wandb --hf_repo "$HF_REPO"
+  run_if_needed B_1.7B        uv run python pcdm/baselines.py B --backbone Qwen/Qwen3-1.7B-Base --name B_1.7B
+  run_if_needed B_8B          uv run python pcdm/baselines.py B --backbone Qwen/Qwen3-8B-Base --name B_8B
+  run_if_needed C_lora        uv run python pcdm/baselines.py C --name C_lora
+  run_if_needed bench         uv run python pcdm/bench.py --model runs/main_s0 --backbone Qwen/Qwen3-1.7B-Base --name bench
+  run_if_needed abl_frozen    uv run python pcdm/train.py --name abl_frozen --lora_r 0 --wandb --hf_repo "$HF_REPO"
+  run_if_needed abl_nohybrid  uv run python pcdm/train.py --name abl_nohybrid --no_hybrid --wandb --hf_repo "$HF_REPO"
+  run_if_needed abl_nlionly   uv run python pcdm/train.py --name abl_nlionly --mix nlionly --wandb --hf_repo "$HF_REPO"
+  run_if_needed abl_statenull uv run python pcdm/train.py --name abl_statenull --no_cand_null --wandb --hf_repo "$HF_REPO"
+  run_if_needed main_s1       uv run python pcdm/train.py --name main_s1 --seed 1 --wandb --hf_repo "$HF_REPO"
+  run_if_needed main_4B       uv run python pcdm/train.py --name main_4B --backbone Qwen/Qwen3-4B-Base --lora_layers 10 --wandb --hf_repo "$HF_REPO"
 }
 export -f schedule
 

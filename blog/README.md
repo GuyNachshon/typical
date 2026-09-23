@@ -55,7 +55,7 @@ This is the part that goes stale first, so read it before editing.
 - **Licensing. The earlier wording here was wrong and the launch post has been corrected.** It is
   not only the undeclared-license `data_u` portions. Two *trained* sources carry explicitly
   non-commercial licenses: **ANLI is CC BY-NC 4.0** (`facebook/anli`, loaded as training data in
-  `data.py`) and **SciQ is CC BY-NC 3.0** (11.7k rows of `data_kb`). Both were previously covered
+  `pcdm/data.py`) and **SciQ is CC BY-NC 3.0** (11.7k rows of `data_kb`). Both were previously covered
   by "mostly MIT / Apache-2.0 / CC-BY-4.0 for the trained sources", which is false. On top of that,
   `metaeval/ambient` (trained on) and `metaeval/chaos-mnli-ambiguity` (eval-only) declare no
   license at all. The checkpoints and the Qwen3 backbones are Apache-2.0; whether NC training data

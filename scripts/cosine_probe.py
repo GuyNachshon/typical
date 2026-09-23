@@ -28,6 +28,7 @@ import torch.nn.functional as F
 from transformers import AutoTokenizer
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
 from encode import Backbone, pick_device
 
 EVAL_SETS = ["banking77_k", "banking77_test", "trec_coarse", "trec_fine", "ng20_test", "clinc_heldout"]

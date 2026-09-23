@@ -7,7 +7,7 @@
   this cache; stream doesn't need it but we record every call it makes anyway, per spec).
 - site/data/demos/<name>.summary.json: tallies/timings for the report.
 
-Requires server.py running on :8787 (uv run uvicorn server:app --port 8787).
+Requires site/server.py running on :8787 (uv run uvicorn --app-dir site server:app --port 8787).
 Mirrors scripts/record_replays.py's hash_key/post_decide/self_test_hash_parity exactly -
 imported from there rather than re-implemented.
 """

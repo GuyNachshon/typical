@@ -16,6 +16,6 @@ if [ -d "$BUFFALO/runs" ]; then
   done
 fi
 
-uv run precompute.py >/dev/null && uv run scripts/precompute_research.py >/dev/null
+uv run site/precompute.py >/dev/null && uv run scripts/precompute_research.py >/dev/null
 echo "--- changed:"; git status --short inference releases runs site/data | head -40
 echo "--- newest REPORT sections:"; grep '^## ' REPORT.md | tail -3

@@ -100,21 +100,21 @@ is open (§7).
 ## 3. Code map
 
 All Python runs through `uv` (`uv run ...`; on pods `uv run --no-sync ...`). Tests: `tests/test_pipeline.py` (29 tests,
-CPU, tiny random-weight Qwen3 from `conftest.py`).
+CPU, tiny random-weight Qwen3 from `tests/conftest.py`).
 
 | file | role | key entry points / flags | covered by |
 |---|---|---|---|
-| `encode.py` | backbone + LoRA + caches. `Backbone(name, lora_layers, lora_r, tap_layer)` (hand-rolled `LoRALinear`, `tap_layer` truncates the model, `frozen_features` from `split_layer = tap − lora_layers`), `FeatureCache` (token features per string), `EmbedEncoder`/`VecCache` (Qwen3-Embedding-0.6B, `EMBED_DIM=1024`), `build_cache`, `build_vec_cache`, `pick_device`. **Qwen3.5 port (commit `9b1ffac`, §3ag):** unwraps the VL-style `text_config`/`.language_model` config, handles the hybrid stack (3× Gated-DeltaNet + 1× full attention; a 71%-depth tap keeps 4 of 6 full-attention layers at 0.8B), routes LoRA to `in_proj_qkv/z/b/a`+`out_proj` on DeltaNet layers vs q/k/v/o on attention layers (MLP everywhere), and patches a transformers-5.17 cache gap (`LinearAttentionLayer` lacking `batch_repeat_interleave`) in `native_kv_decide`; cached-vs-full parity 1e-7, Qwen3 behaviour unchanged (153 tests) | `uv run encode.py` (v0 cache build); `python -c 'import encode; encode.selftest()'` | `test_lora_zero_init_and_grads`, `test_joint_causal_invariance`, `test_embed_encoder_unit_norm` |
-| `model.py` | `DecisionModel` (optional cross-attn tower `num_layers`, hybrid frozen-space sim features, candidate-aware null, optional `SetMixer` listwise block, `d_cand` for embedder candidates), `decision_loss` (soft-CE over `[(1−p∅)·target, p∅]`), `collate`, `run_batch(joint=…)`, `split_joint`, `decide` (encode state once, chunk M queries, KV cache) | library only | `test_collate_ragged`, `test_permutation_equivariance`, `test_loss_matches_hand_soft_ce`, `test_null_target_all_mass_on_null`, `test_run_batch_end_to_end`, `test_decide_matches_batched`, `test_joint_run_batch_shapes`, `test_decide_joint_matches_run_batch`, `test_candidate_permutation_equivariance`, `test_padding_invariance`, `test_duplicate_slots_identical`, `test_listwise_identity_at_init_and_warm_start`, `test_add_candidate_odds`, `test_decision_model_d_cand_forward_backward`, `test_run_batch_with_fake_vec_cache` |
-| `train.py` | train + eval + temperature fit + `results.json` + W&B + HF upload; auto-resume from `last.pt`; `--eval_only` rebuilds the architecture from `best.pt`'s saved args | `--joint --tower_layers 0 --tap_layer 20 --zscore --lora_r 16 --cand_encoder qwen3emb --listwise --readout energy\|mcq\|native --zero_shot --init_from --eval_only --dump_logits DIR --smoke --data DIR --steps 12000 --bs 64 --seed`. **PLAN7-era flags** (all additive, default = unchanged behaviour): `--family_weights E:0.40,K:0.15,W:0.35,U:0.10` + `--bucket_map` (family-balanced sampler over `meta.fam_bucket`), `--null_aug W:0.20` (seeded fraction of hard-labelled W rows get a gold-removed ∅-only copy), `--max_state 1024` (native decision-state truncation length) + `--drop_truncated` (drop rows that overflow it instead of right-truncating — the long-state-bug fix), `--grad_ckpt` (backbone gradient checkpointing for long states), `--best_on data_u_val,data_wh_val` (checkpoint selection on named eval sets' mean NLL instead of in-distribution val), `--brier_lambda` (add λ·Brier to `decision_loss`), `--calib_sets` (joint grid-search fit of T + null-offset b on named sets), `--nc_render semif` (SemIf-structured chat-template render, alongside `letters`/`tags`/`letters_nonull`), `--score_head cumlink` (cumulative-link ordinal head vs default `choice`), `--noul_head bern` (Bernoulli `P(yes)=σ(w·h_D)` vs default 2-way `choice`), `--qtype_filter choice\|score\|noul` (train/val row filter by `meta.qtype`), `--ordinal_smooth 0.7` (ordinal-smoothed Score targets, τ), `--ckpt_upload` (push `last.pt`/`best.pt` to `--hf_repo` every `--ckpt_every`, for pre-emptible pods), `--shots N` (`--readout mcq`: prepend N fixed exemplars so a base model uses the letter format — the frozen-with-shots controls in §3ab/§3ag). | `test_checkpoint_resume_reproduces_loss`, `test_wandb_offline`, `test_null_bias_real_path_on_mini_v4` |
-| `native.py` | `NativeHead` (factored null, per-row Bernoulli noul routing, `letters`/`tags`/`letters_nonull`/`semif` renderers, `cumlink` score head) + `native_kv_decide` (encode state once into a KV cache, score every query's suffix against it) — the module the public `inference/typical/native.py` is a trimmed port of | library only, via `train.py --readout native` | — |
+| `pcdm/encode.py` | backbone + LoRA + caches. `Backbone(name, lora_layers, lora_r, tap_layer)` (hand-rolled `LoRALinear`, `tap_layer` truncates the model, `frozen_features` from `split_layer = tap − lora_layers`), `FeatureCache` (token features per string), `EmbedEncoder`/`VecCache` (Qwen3-Embedding-0.6B, `EMBED_DIM=1024`), `build_cache`, `build_vec_cache`, `pick_device`. **Qwen3.5 port (commit `9b1ffac`, §3ag):** unwraps the VL-style `text_config`/`.language_model` config, handles the hybrid stack (3× Gated-DeltaNet + 1× full attention; a 71%-depth tap keeps 4 of 6 full-attention layers at 0.8B), routes LoRA to `in_proj_qkv/z/b/a`+`out_proj` on DeltaNet layers vs q/k/v/o on attention layers (MLP everywhere), and patches a transformers-5.17 cache gap (`LinearAttentionLayer` lacking `batch_repeat_interleave`) in `native_kv_decide`; cached-vs-full parity 1e-7, Qwen3 behaviour unchanged (153 tests) | `uv run pcdm/encode.py` (v0 cache build); `python -c 'import encode; encode.selftest()'` | `test_lora_zero_init_and_grads`, `test_joint_causal_invariance`, `test_embed_encoder_unit_norm` |
+| `pcdm/model.py` | `DecisionModel` (optional cross-attn tower `num_layers`, hybrid frozen-space sim features, candidate-aware null, optional `SetMixer` listwise block, `d_cand` for embedder candidates), `decision_loss` (soft-CE over `[(1−p∅)·target, p∅]`), `collate`, `run_batch(joint=…)`, `split_joint`, `decide` (encode state once, chunk M queries, KV cache) | library only | `test_collate_ragged`, `test_permutation_equivariance`, `test_loss_matches_hand_soft_ce`, `test_null_target_all_mass_on_null`, `test_run_batch_end_to_end`, `test_decide_matches_batched`, `test_joint_run_batch_shapes`, `test_decide_joint_matches_run_batch`, `test_candidate_permutation_equivariance`, `test_padding_invariance`, `test_duplicate_slots_identical`, `test_listwise_identity_at_init_and_warm_start`, `test_add_candidate_odds`, `test_decision_model_d_cand_forward_backward`, `test_run_batch_with_fake_vec_cache` |
+| `pcdm/train.py` | train + eval + temperature fit + `results.json` + W&B + HF upload; auto-resume from `last.pt`; `--eval_only` rebuilds the architecture from `best.pt`'s saved args | `--joint --tower_layers 0 --tap_layer 20 --zscore --lora_r 16 --cand_encoder qwen3emb --listwise --readout energy\|mcq\|native --zero_shot --init_from --eval_only --dump_logits DIR --smoke --data DIR --steps 12000 --bs 64 --seed`. **PLAN7-era flags** (all additive, default = unchanged behaviour): `--family_weights E:0.40,K:0.15,W:0.35,U:0.10` + `--bucket_map` (family-balanced sampler over `meta.fam_bucket`), `--null_aug W:0.20` (seeded fraction of hard-labelled W rows get a gold-removed ∅-only copy), `--max_state 1024` (native decision-state truncation length) + `--drop_truncated` (drop rows that overflow it instead of right-truncating — the long-state-bug fix), `--grad_ckpt` (backbone gradient checkpointing for long states), `--best_on data_u_val,data_wh_val` (checkpoint selection on named eval sets' mean NLL instead of in-distribution val), `--brier_lambda` (add λ·Brier to `decision_loss`), `--calib_sets` (joint grid-search fit of T + null-offset b on named sets), `--nc_render semif` (SemIf-structured chat-template render, alongside `letters`/`tags`/`letters_nonull`), `--score_head cumlink` (cumulative-link ordinal head vs default `choice`), `--noul_head bern` (Bernoulli `P(yes)=σ(w·h_D)` vs default 2-way `choice`), `--qtype_filter choice\|score\|noul` (train/val row filter by `meta.qtype`), `--ordinal_smooth 0.7` (ordinal-smoothed Score targets, τ), `--ckpt_upload` (push `last.pt`/`best.pt` to `--hf_repo` every `--ckpt_every`, for pre-emptible pods), `--shots N` (`--readout mcq`: prepend N fixed exemplars so a base model uses the letter format — the frozen-with-shots controls in §3ab/§3ag). | `test_checkpoint_resume_reproduces_loss`, `test_wandb_offline`, `test_null_bias_real_path_on_mini_v4` |
+| `pcdm/native.py` | `NativeHead` (factored null, per-row Bernoulli noul routing, `letters`/`tags`/`letters_nonull`/`semif` renderers, `cumlink` score head) + `native_kv_decide` (encode state once into a KV cache, score every query's suffix against it) — the module the public `inference/typical/native.py` is a trimmed port of | library only, via `pcdm/train.py --readout native` | — |
 | `pcdm_jev/decider.py`, `pcdm_jev/adapter.py` | `PCDMDecider` — the harness-facing `decide()` used by every JevBench run and the `inference/` package's numerically-identical model; `mode="mcq_zero_shot"` reads next-token letter logits over rendered options from a frozen backbone (no checkpoint) — the zero-/few-shot frozen-control path used at every ladder size in §3ab/§3ag | `PCDMDecider(run_dir, mode="native"\|"mcq_zero_shot", shots=N)` | — |
-| `data.py` | HF datasets → JSONL (`train/val/eval/*.jsonl`, `held_out_intents.json`); v4 scheme = K-decoupled nulls + `cse_*`/`ksweep_*`/`null_irrq_*`/`null_nearmiss_*` eval sets; `TRAIN_NAMES`/`PARAPHRASES`; `selftest()` leak audit; **v5 being added by `w-datav5`** | `uv run data.py [--small] [--out DIR]`, `uv run data.py --selftest --out data_v4` | `test_data_audit_if_present` |
-| `mcq.py` | `MCQHead` = same backbone/LoRA, answer read from next-token letter logits over enumerated options + "none" letter; chunked two-stage above 51 options | via `train.py --readout mcq` | `test_mcq_letter_logits_shape_finite`, `test_mcq_padded_columns_are_finfo_min`, `test_mcq_chunked_k70` |
-| `metrics.py` | `summarize` (acc, acc_k, nll, brier, jsd, ece, auroc_null, auroc_conf, sel_acc80, conf_wrong), `choice_set_effects` (cse battery), `ksweep` (P(∅\|absent) vs K, range) | library | `test_metrics_summarize_hand_values` |
-| `baselines.py` | B = prompted log-prob with KV-cached prefix (`--backbone`, `--limit`, `--check`); C = LoRA cross-encoder + per-task heads | `uv run baselines.py B --backbone Qwen/Qwen3-8B-Base --data data_v3 --name B_8B`; `uv run baselines.py C --name C_lora` | none (`--check` self-check only) |
-| `bench.py` | H2 microbench: ours vs B vs B_fair (prefix shared), K ∈ {4,32,150[,1000]} × M ∈ {1,8,64,256}; writes `bench.json` + `results.json` | `uv run bench.py --model runs/joint_v1 --name bench_fair [--full] [--quick]` | none |
-| `report.py` | side-by-side table of `runs/*/results.json` on the hypothesis columns | `uv run report.py [--raw]` | `test_report_handles_na` |
+| `pcdm/data.py` | HF datasets → JSONL (`train/val/eval/*.jsonl`, `held_out_intents.json`); v4 scheme = K-decoupled nulls + `cse_*`/`ksweep_*`/`null_irrq_*`/`null_nearmiss_*` eval sets; `TRAIN_NAMES`/`PARAPHRASES`; `selftest()` leak audit; **v5 being added by `w-datav5`** | `uv run pcdm/data.py [--small] [--out DIR]`, `uv run pcdm/data.py --selftest --out data_v4` | `test_data_audit_if_present` |
+| `pcdm/mcq.py` | `MCQHead` = same backbone/LoRA, answer read from next-token letter logits over enumerated options + "none" letter; chunked two-stage above 51 options | via `pcdm/train.py --readout mcq` | `test_mcq_letter_logits_shape_finite`, `test_mcq_padded_columns_are_finfo_min`, `test_mcq_chunked_k70` |
+| `pcdm/metrics.py` | `summarize` (acc, acc_k, nll, brier, jsd, ece, auroc_null, auroc_conf, sel_acc80, conf_wrong), `choice_set_effects` (cse battery), `ksweep` (P(∅\|absent) vs K, range) | library | `test_metrics_summarize_hand_values` |
+| `pcdm/baselines.py` | B = prompted log-prob with KV-cached prefix (`--backbone`, `--limit`, `--check`); C = LoRA cross-encoder + per-task heads | `uv run pcdm/baselines.py B --backbone Qwen/Qwen3-8B-Base --data data_v3 --name B_8B`; `uv run pcdm/baselines.py C --name C_lora` | none (`--check` self-check only) |
+| `pcdm/bench.py` | H2 microbench: ours vs B vs B_fair (prefix shared), K ∈ {4,32,150[,1000]} × M ∈ {1,8,64,256}; writes `bench.json` + `results.json` | `uv run pcdm/bench.py --model runs/joint_v1 --name bench_fair [--full] [--quick]` | none |
+| `pcdm/report.py` | side-by-side table of `runs/*/results.json` on the hypothesis columns | `uv run pcdm/report.py [--raw]` | `test_report_handles_na` |
 | `scripts/cosine_probe.py` | $0 probe: untrained nearest-label cosine on held-out label spaces for 3 candidate encoders (REVIEW §5a) | `uv run scripts/cosine_probe.py [--limit N]`, `--selftest` | — |
 | `scripts/leak_audit.py` | MinHash char-5-gram near-dup audit train vs every eval set → `runs/leak_audit.json` (+ per-set near-dup lists) | `uv run scripts/leak_audit.py` | — |
 | `scripts/null_bias.py` | post-hoc `s∅' = s∅ + α·log K + β` fitted with T on val from a `--dump_logits` dir (REPORT §3d(1)) | `uv run scripts/null_bias.py runs/dump_joint_emb --out runs/joint_emb_nullbias/results.json` | `test_fit_null_bias_finite_and_improves_val_nll`, `test_fit_null_bias_three_ragged_sets_end_to_end` |
@@ -124,9 +124,9 @@ CPU, tiny random-weight Qwen3 from `conftest.py`).
 | `scripts/jev_hf_datasets.py` | streams Jev-shaped HF datasets (`cua-s1-forms`, `systemone-lite-general`, `jev-4b-distill-data`) into the training row schema → `data_wf_hf/{train,eval}` | `uv run scripts/jev_hf_datasets.py [--limit N]` | — |
 | `scripts/gate_experts.py` | PLAN6 item 3: learned per-input expert gate over the energy/native score mixture — tested, **rejected** (a global-g mixture captures almost none of the oracle envelope; REPORT §3u) | `uv run scripts/gate_experts.py` | — |
 | `scripts/teacher_label.py` | soft labels from a teacher onto a jsonl file; `--zero_shot --backbone ... --shots N` scores with a fully frozen backbone + N fixed exemplars instead of an mcq-readout checkpoint — the frozen-teacher-KD label source for `tl1b` (§3ag/§3ah) and the frozen-with-shots controls (§3ab) | `uv run scripts/teacher_label.py --zero_shot --backbone Qwen/Qwen3-14B-Base --shots 3 --file data_wf_long/train.jsonl` | — |
-| `inference/typical/{backbone,native,core}.py` | the public, training-repo-independent port of the serving path: `backbone.py` (frozen truncated Qwen3/Qwen3.5 trunk + LoRA), `native.py` (`NativeHead` + `native_kv_decide`, same renderers/heads as the training module minus `n2`/`n2n3`), `core.py` (`Typical.from_pretrained` + `choice`/`noul`/`score`/`decide`) | `from typical import Typical; Typical.from_pretrained("OzLabs/typical-small")` | `inference/test_parity.py` (`RUN_SLOW=1`; max abs prob diff 0.0 vs `PCDMDecider` on CPU/MPS) |
+| `inference/typical/{backbone,native,core}.py` | the public, training-repo-independent port of the serving path: `backbone.py` (frozen truncated Qwen3/Qwen3.5 trunk + LoRA), `pcdm/native.py` (`NativeHead` + `native_kv_decide`, same renderers/heads as the training module minus `n2`/`n2n3`), `core.py` (`Typical.from_pretrained` + `choice`/`noul`/`score`/`decide`) | `from typical import Typical; Typical.from_pretrained("OzLabs/typical-small")` | `inference/test_parity.py` (`RUN_SLOW=1`; max abs prob diff 0.0 vs `PCDMDecider` on CPU/MPS) |
 | `demo/app.py` | local Gradio release page: model selector (lazy-load, one resident model), Playground (single decision, probability bar chart incl. ∅), Batch (`native_kv_decide` single-KV-encode over several queries), static release-page tables from `releases/*.md` + REPORT §3ab's latency ladder | `uv run --no-sync python demo/app.py` → http://127.0.0.1:7860 | — |
-| `conftest.py` | tiny Qwen3 backbone / cache fixtures | — | — |
+| `tests/conftest.py` | tiny Qwen3 backbone / cache fixtures | — | — |
 | `scripts/costguard.sh` | every 10 min: stop a RunPod pod idle (no train/baselines/bench process, GPU < 5 %, no waiter) for 2 checks; pod ids hard-coded in `PODS` | `./scripts/costguard.sh &` (log `/tmp/costguard.log`) | — |
 | `scripts/watchdog.sh` | v0 Mac helper: rerun a command if its log stops growing for 5 min (MPS stream hang) | `./scripts/watchdog.sh LOG CMD...` | — |
 | `scripts/run_gpu.sh` / `scripts/run_gpu2.sh` / `scripts/run_gpu3.sh` / `scripts/run_gpu3b.sh` | idempotent pod schedules for phases 1 / diag / 3 (pod 1) / 3 (pod 2); skip a run if `runs/<name>/results.json` exists; `timeout Nh` + `runpodctl pod stop` | `tmux new -d 'bash scripts/run_gpu3.sh'` on the pod | — |
@@ -142,39 +142,39 @@ Phase-2 schedules (joint_v1, tower_big, joint_emb_lw, joint_emb_s1, dump) were o
 # tests (CPU, < 60 s)
 uv run pytest tests/ -q
 
-# data: current data.py builds the v4 scheme (33 eval sets). v3 = 22 sets (data/), v4 = data_v4/
-uv run data.py --out data_v4 && uv run data.py --selftest --out data_v4
-uv run data.py --small                          # 200/source -> data_small/ (local gate)
+# data: current pcdm/data.py builds the v4 scheme (33 eval sets). v3 = 22 sets (data/), v4 = data_v4/
+uv run pcdm/data.py --out data_v4 && uv run pcdm/data.py --selftest --out data_v4
+uv run pcdm/data.py --small                          # 200/source -> data_small/ (local gate)
 uv run hf download guychuk/pcdm-data --repo-type dataset --local-dir data_v3          # v3 at repo root
 uv run hf download guychuk/pcdm-data --repo-type dataset --include 'v4/*' --local-dir .   # v4 under v4/
 uv run scripts/leak_audit.py                    # -> runs/leak_audit.json
 
 # train the current default config (= runs/joint_emb_lw; drop --listwise for joint_emb, add --seed 1 for joint_emb_s1)
-uv run python train.py --name joint_emb_lw --joint --tower_layers 0 --tap_layer 20 --zscore --lora_r 16 \
+uv run python pcdm/train.py --name joint_emb_lw --joint --tower_layers 0 --tap_layer 20 --zscore --lora_r 16 \
     --data data_v4 --cand_encoder qwen3emb --listwise --eval_every 6000 --wandb --hf_repo guychuk/pcdm-runs
 
 # eval-only from best.pt (architecture flags are read from the checkpoint) + logits dump
-uv run python train.py --name joint_emb --eval_only --data data_v4 --dump_logits runs/dump_joint_emb
+uv run python pcdm/train.py --name joint_emb --eval_only --data data_v4 --dump_logits runs/dump_joint_emb
 
-# fit the K-aware null bias on the dump (no retraining) -> results.json in train.py's schema
+# fit the K-aware null bias on the dump (no retraining) -> results.json in pcdm/train.py's schema
 uv run scripts/null_bias.py runs/dump_joint_emb --out runs/joint_emb_nullbias/results.json
 
 # side-by-side table
-uv run report.py            # scaled (T fitted on val);  --raw for unscaled
+uv run pcdm/report.py            # scaled (T fitted on val);  --raw for unscaled
 
 # fair H2 bench (ours vs B vs B_fair with the state prefix shared; --full adds K=1000)
-uv run bench.py --model runs/joint_v1 --backbone Qwen/Qwen3-1.7B-Base --name bench_fair --full
+uv run pcdm/bench.py --model runs/joint_v1 --backbone Qwen/Qwen3-1.7B-Base --name bench_fair --full
 
 # baselines
-uv run baselines.py B --backbone Qwen/Qwen3-1.7B-Base --data data_v3 --name B_1.7B
-uv run baselines.py B --backbone Qwen/Qwen3-8B-Base   --data data_v3 --name B_8B
-uv run baselines.py C --name C_lora
-uv run python train.py --name zs_mcq_8B --zero_shot --readout mcq --backbone Qwen/Qwen3-8B-Base --lora_r 0 --data data_v3
+uv run pcdm/baselines.py B --backbone Qwen/Qwen3-1.7B-Base --data data_v3 --name B_1.7B
+uv run pcdm/baselines.py B --backbone Qwen/Qwen3-8B-Base   --data data_v3 --name B_8B
+uv run pcdm/baselines.py C --name C_lora
+uv run python pcdm/train.py --name zs_mcq_8B --zero_shot --readout mcq --backbone Qwen/Qwen3-8B-Base --lora_r 0 --data data_v3
 uv run scripts/cosine_probe.py
 ```
 
-Smoke / mini gates before renting: `uv run train.py --name smoke --smoke --wandb`, then
-`uv run train.py --name mini_v4 --steps 300 --bs 16 --backbone Qwen/Qwen3-0.6B-Base --data data_small_v4`.
+Smoke / mini gates before renting: `uv run pcdm/train.py --name smoke --smoke --wandb`, then
+`uv run pcdm/train.py --name mini_v4 --steps 300 --bs 16 --backbone Qwen/Qwen3-0.6B-Base --data data_small_v4`.
 
 ## 4. Run registry
 
@@ -384,7 +384,7 @@ against): `--readout native --nc_head n3 --nc_render letters_nonull --null facto
 (`scripts/jevbench_run.py --jevbench_dir /workspace/jevbench --model runs/<run> --mode native --name <run> --device
 cuda`) → `scripts/eval_wf.py --run runs/<run> --mode native --limit 0 --max_state 4096 --files "data_wf/eval/*.jsonl"
 "data_wf_hf/eval/*.jsonl" "data_wh/eval/*.jsonl" "data_u/eval/*.jsonl" --out runs/<run>/eval_wf.json` →
-`bench.py --native` → upload everything under `<run>/`, `probe_<run>/`, `jev_native_<run>/`, `bench_<run>/` to
+`pcdm/bench.py --native` → upload everything under `<run>/`, `probe_<run>/`, `jev_native_<run>/`, `bench_<run>/` to
 `guychuk/pcdm-runs` → echo `<RUN>_DONE`.
 
 **Infra (unchanged since v0/v1).** RunPod Secure Cloud H100 SXM (≈ $3/h), 100 GB network volume at `/workspace`
@@ -456,7 +456,7 @@ stops one idle (no trainer process, GPU util < 5%, no waiter) for 2 checks runni
 - **z-score (`--zscore`)** — per-dimension standardisation of backbone features (stats from 512 train states) to neutralise rogue dimensions.
 - **hybrid scorer** — the energy scorer also sees frozen-space `ln(U)⊙ln(C)`, `ln(V)⊙ln(C)`, cosines; the transfer mechanism for unseen labels (`--no_hybrid` ablation).
 - **candidate encoder (`--cand_encoder qwen3emb`)** — candidate/state/query vectors for the similarity features from Qwen3-Embedding-0.6B (`VecCache`) instead of mean-pooled decoder features.
-- **energy readout vs MCQ readout** — learned per-candidate score + null logit (ours) vs next-token letter logits over enumerated options (`mcq.py`, the "Qwen does everything" baseline).
+- **energy readout vs MCQ readout** — learned per-candidate score + null logit (ours) vs next-token letter logits over enumerated options (`pcdm/mcq.py`, the "Qwen does everything" baseline).
 - **listwise / SetMixer (`--listwise`)** — one zero-init self-attention block over `[h; c_j + sim_j]` so candidates see each other; identity at init; breaks IIA by design.
 - **IIA** — independence of irrelevant alternatives: adding an irrelevant option must not change odds between existing ones (Δlog-odds = 0 for independent scoring).
 - **cse battery** — choice-set-effects eval sets (`cse_*`): variants add-irrelevant / remove-gold / duplicate / reorder / near-dup of a base row; metrics are mass movements per variant (`metrics.choice_set_effects`).
@@ -484,18 +484,18 @@ stops one idle (no trainer process, GPU util < 5%, no waiter) for 2 checks runni
 4. `REPORT.md` §1 says 16 tests; `tests/test_pipeline.py` has 29. §1 says "H100 ×2"; three pods were used.
 5. `REPORT.md` §1/§7 cost lines ($35 / $37) are per-phase; no running total anywhere (≈ $68 by this file's estimate).
 6. `REPORT.md` §6 "a second joint seed" is done (`joint_v1_s1`, `joint_emb_s1`).
-7. `docs/research/REVIEW.md` §5 item 8 says `--dump_probs` not implemented; `train.py --dump_logits` now exists (REPORT §3d). The
+7. `docs/research/REVIEW.md` §5 item 8 says `--dump_probs` not implemented; `pcdm/train.py --dump_logits` now exists (REPORT §3d). The
    utility evaluation itself is still not run.
 8. `docs/research/REVIEW.md` §4 lists IDEA2 wording changes ("reusable neural memory" → "prefix KV cache", H2 "strongly supported" →
    "unmeasured") — `docs/plan/IDEA2.md` §20 still says H2 "already strongly supported by v1" (now actually measured by `bench_fair`).
 9. `docs/research/REVIEW.md` §6 label-name overlap audit (train intents vs Banking77) is still open and not tracked elsewhere.
-10. `README.md` run commands are v0: `uv run encode.py` cache build, `train.py --cand_null` (flag is now the default;
-    the ablation is `--no_cand_null`), `bench.py --model runs/F/model.pt` (now a run dir). README/RESULTS H1 "holds"
+10. `README.md` run commands are v0: `uv run pcdm/encode.py` cache build, `pcdm/train.py --cand_null` (flag is now the default;
+    the ablation is `--no_cand_null`), `pcdm/bench.py --model runs/F/model.pt` (now a run dir). README/RESULTS H1 "holds"
     and H4 K-dependence numbers (0.98 → 0.61 at K=50) are superseded by REPORT §3c/§3d.
-11. `docs/plan/PLAN2.md` interface block says `--steps 24000` default; `train.py` default is 12000 (`main_v3` used 24k explicitly).
+11. `docs/plan/PLAN2.md` interface block says `--steps 24000` default; `pcdm/train.py` default is 12000 (`main_v3` used 24k explicitly).
     PLAN2's "lower 20 frozen / LoRA top 8" is superseded by the revision (tap 20, LoRA 13–20) in the same file.
-12. `data.py` docstring points to PLAN2 "Data" for the spec, but the v4 scheme (K-decoupled nulls, cse/ksweep/null
-    slices) is only specified in REVIEW §5 item 6 and in `data.py` docstrings.
+12. `pcdm/data.py` docstring points to PLAN2 "Data" for the spec, but the v4 scheme (K-decoupled nulls, cse/ksweep/null
+    slices) is only specified in REVIEW §5 item 6 and in `pcdm/data.py` docstrings.
 13. `runs/*/results.json` do not store `args`; run configs are recoverable only from `best.pt` (HF), W&B config, or the
     one-off pod scripts in `/tmp` (reproduced in §3/§4 here). `runs/bench/` has only `bench.log` (no `results.json`).
 14. `main_v3` vs `main_v3_s1` is presented as a seed pair in REPORT §3 but differ in epochs (24k vs 12k steps).

@@ -4,7 +4,7 @@
     P_N(j) = softmax_j(native candidate logits)                (choice given answerable; null excluded)
     P(null) = 1 - r,   P(a_j) = r * P_N(j)
 
-No training: both inputs are `train.py --eval_only --dump_logits DIR` dumps over the same eval
+No training: both inputs are `pcdm/train.py --eval_only --dump_logits DIR` dumps over the same eval
 sets (DIR/<set>.npz logits/target/label/K + <set>.meta.json). The two runs may have rendered
 the candidates in different orders (native shuffles), so every row is aligned by candidate
 string onto the energy dump's order after asserting the same query + candidate multiset.
@@ -13,8 +13,8 @@ string onto the energy dump's order after asserting the same query + candidate m
 --r_from energy_T  softmax-null energy dump tempered by --energy_T (its results.json "T")
 --r_from native    r from the native dump's own null (the ablation: no external gate)
 
-Writes a train.py-format results.json (eval[set][raw|scaled] via metrics.summarize; cse/ksweep/cf
-branches like train.run_full_eval) so report.py / report_native.py read it directly, and prints
+Writes a pcdm/train.py-format results.json (eval[set][raw|scaled] via metrics.summarize; cse/ksweep/cf
+branches like train.run_full_eval) so pcdm/report.py / pcdm/report_native.py read it directly, and prints
 a before/after table (energy alone, native alone, composed).
 
 uv run scripts/compose_support.py DUMP_ENERGY DUMP_NATIVE --out runs/compose_n3/results.json
@@ -27,6 +27,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from metrics import summarize, choice_set_effects, ksweep, counterfactual  # noqa: E402
 from null_bias import apply_bias, load_npz  # noqa: E402
@@ -133,7 +134,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("dump_energy")
     ap.add_argument("dump_native")
-    ap.add_argument("--out", required=True, help="results.json path (train.py format)")
+    ap.add_argument("--out", required=True, help="results.json path (pcdm/train.py format)")
     ap.add_argument("--r_from", choices=["energy", "energy_T", "native"], default="energy")
     ap.add_argument("--energy_T", type=float, default=1.0, help="with --r_from energy_T: the energy run's fitted T")
     a = ap.parse_args()

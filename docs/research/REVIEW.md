@@ -17,7 +17,7 @@ session transcript; this file is the synthesis and the decisions.
 
 | claim | verdict | evidence |
 |---|---|---|
-| "beats prompted LMs on large-K / null" | **unproven — baseline broken** | `baselines.py` B scores each label as a continuation of `Text: …\nLabel:` with no query and *no other options*; literal "none of the above" over/under-fires (B_8B: 2% on HWU64, 96% null on OOS). Subsampled 300/1000; T fitted on our val. |
+| "beats prompted LMs on large-K / null" | **unproven — baseline broken** | `pcdm/baselines.py` B scores each label as a continuation of `Text: …\nLabel:` with no query and *no other options*; literal "none of the above" over/under-fires (B_8B: 2% on HWU64, 96% null on OOS). Subsampled 300/1000; T fitted on our val. |
 | "explicit unknown, not a global OOD score" (IDEA2 §2.5) | **contradicted** | Training couples K and null: K≥50 rows never null, NLI K=2 rows 50% null, K=N never null. Result: `clinc_oos` at K=150 flagged 32%; null over-fires on unfamiliar label sets (TREC acc 5% vs 27% among-K; paraphrase 62 vs 81). The .90/.98/.97 AUROCs are measured where the training prior matches. |
 | "general decisions" on unseen label spaces | **loses to the prompted LM among-K** | banking77_k 0.61 vs 0.69 (B_8B); 20NG 0.22 vs 0.50; TREC-coarse 0.27 vs 0.45. Frozen cosine is the entire transfer mechanism (`abl_nohybrid`: Banking77 33 → 8); candidate encoder (mean-pooled layer-12) is the likely bottleneck. |
 | "calibrated uncertainty" | **in-distribution only** | OOD ECE .19–.69 (Banking77 .29, TREC .69); premise-blanked NLL 1.37 > uniform 1.10 — confidently wrong without evidence. ChaosNLI: joint 1.26 vs B_1.7B 1.16 (sharper on disputed items — expected per Nie et al. 2020; report by agreement subset). |

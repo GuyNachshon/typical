@@ -178,7 +178,7 @@ switching the null off (β = −6 → .850), which kills OOS detection (.001). *
 spaces is a novelty/absence confound, not a K-bias** — unfamiliar label *vocabulary* looks like "gold absent" (null AUROC
 .745 on Banking77-K vs .952 on trained CLINC vocabulary). Fix must come from training signal that separates the two
 (gold-present rows over held-out label vocabularies, i.e. label-space-level held-out splits in training), not from calibration.
-`runs/joint_emb_nullbias/results.json` holds the val-fitted variant in train.py's schema.
+`runs/joint_emb_nullbias/results.json` holds the val-fitted variant in pcdm/train.py's schema.
 
 **(2) `joint_emb + listwise` (`joint_emb_lw`, $4).** Same as `joint_emb` plus the `SetMixer` (identity-at-init) over
 candidates. Best val NLL of any run (0.381 vs 0.389).
@@ -492,7 +492,7 @@ answer generation), read out by a direct head over the terminal decision state h
 (N2 semantic, N3 contextual, N2N3 hybrid) vs the letter-logit control N1. Large K routes through the existing energy scorer
 → top-r → native choice. E3-ms continues as the optional compilation branch. Success axes (PLAN4 §15): evidence retention,
 Δ_q ≈ teacher's, decision quality (NLL/ECE/Brier/ChaosNLI/null, disaggregated abstention), one-suffix-per-query latency
-over K = 2…256. `report_native.py` prints that table.
+over K = 2…256. `pcdm/report_native.py` prints that table.
 
 ## 3l. PLAN4 Phase B/C — `native_choice_v1` (2026-09-19/20, H100)
 
@@ -538,7 +538,7 @@ question-dependent knowledge depending on the variant; its lower raw score is mo
 *less candidate-prior exploitation* (choices-only .121 vs .213) — N2 is less artifact-driven, not less knowledgeable, with a
 third of N1's order bias (reorder Δp .06 vs .17). This is the first non-generative readout in the project that exposes
 question-conditioned parametric knowledge; the candidate-blind Z never did. N3 (contextual candidates) tests whether the
-rest of the raw gap is recoverable. (`false_abstain` column in `report_native.py` needs verification — it disagrees with
+rest of the raw gap is recoverable. (`false_abstain` column in `pcdm/report_native.py` needs verification — it disagrees with
 among-K − acc; use the latter until fixed.)
 
 **`nc_n3` (h_D scored against each option's own contextual hidden states, slot identity preserved; $9):**
@@ -1129,7 +1129,7 @@ base model reading next-token letter logits over the rendered options (`pcdm_jev
 | JevBench Brier std / hard | .40 / .88 | .29 / .83 | .55 / .83 | **.17** / .85 |
 | JevBench p50 latency (s, in-process H100) | .077 (base) / .554 (wf, NVL) | .089 | .087 | .070 |
 | JevBench hard: long_policy / multi_hop / trap / tradeoff | .16 / .17 / .75 / .33 | – | – | **.05** / .44 / 1.00 / .67 |
-| `bench.py --native` L_s = 256: single decision K = 2 / 32 / 256 (ms)† | 65 / 66 / 96 | 90 / 94 / 114 | 70 / 71 / 126 | 61 / 62 / 158 |
+| `pcdm/bench.py --native` L_s = 256: single decision K = 2 / 32 / 256 (ms)† | 65 / 66 / 96 | 90 / 94 / 114 | 70 / 71 / 126 | 61 / 62 / 158 |
 | marginal ms per query, M = 32, K = 2 / 32 / 128 / 256 | 4.0 / 4.7 / 18.4 / 36.0 | 5.9 / 12.1 / 21.9 / 49.9 | | |
 | peak memory K = 2 → 256 (GB) | – | 14.5 → 18.6 | 29.3 → 34.1 | 51.6 → 57.5 |
 | zero-shot control: JevBench std / easy / hard | .583 / .833 / .369 | .722 / 1.00 / .414 | .375 / .354 / .360 (**broken**, see note) | .819 / 1.00 / .441 |

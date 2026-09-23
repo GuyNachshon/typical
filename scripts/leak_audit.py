@@ -1,5 +1,5 @@
 """Near-duplicate leakage audit: train vs each eval set (and val), via MinHash LSH
-over char 5-gram shingles. data.py's dedupe() removes EXACT (premise, hyp)
+over char 5-gram shingles. pcdm/data.py's dedupe() removes EXACT (premise, hyp)
 matches; this catches near-dups it can't (paraphrased premises/hyps, near-
 identical passages). NLI sets also get hyp-alone and (premise, hyp)-pair audits,
 since SNLI/MNLI reuse premises across splits by design.
@@ -13,6 +13,7 @@ from pathlib import Path
 from datasketch import MinHash, MinHashLSH
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
 from data import norm_text  # reuse the repo's normalizer (DRY)
 
 DATA = Path("data")

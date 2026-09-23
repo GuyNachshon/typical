@@ -6,6 +6,7 @@ import argparse, json, random
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
 from data import write_jsonl
 
 ap = argparse.ArgumentParser(); ap.add_argument("--data", default="data_v4"); ap.add_argument("--seed", type=int, default=0)

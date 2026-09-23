@@ -1,7 +1,7 @@
 # PCDM vs TypeSafe Jev / "System One" — comparison (2026-09-18)
 
 Sources: local `REPORT.md` §3c/§3d/§4, `REVIEW.md`, `runs/{bench_fair,joint_emb,joint_emb_lw,joint_emb_s1,mcq_lora,B_8B}/results.json`,
-`uv run report.py`; external pages fetched today (full URLs in §5). Every Jev cell carries a source tag: [TS-blog], [TS-docs-*],
+`uv run pcdm/report.py`; external pages fetched today (full URLs in §5). Every Jev cell carries a source tag: [TS-blog], [TS-docs-*],
 [TS-evals], [AH] (third-party black-box analysis, archerhume.com, 17 Sep 2026), or **n/d** = not disclosed. "Inferred" cells say how.
 "Ours" = `joint_emb` (seed 0) unless noted; `joint_emb_lw` where the null matters; latency from `bench_fair` (checkpoint `joint_v1`).
 
@@ -84,10 +84,10 @@ is raw GPU rent. Their null is a literal option; ours is learned. Model size dif
 
 | # | run | cost | what it settles |
 |---|---|---|---|
-| 1 | Jev on our public eval files via `POST /v1/systemone` (Choice with `criteria` = our label strings, plus a literal "none of the above"): CLINC-150 test + OOS, Banking77-77, HWU64, TREC, 20NG, SNLI/MNLI/ANLI/BoolQ (1k each); score with `metrics.py`. Also run `joint_emb` with the same literal-none candidate for protocol parity | ≈ $0.3 API (~7M tokens), $0 GPU | the only same-items comparison: accuracy, ECE/NLL/Brier, among-K vs null, seen vs unseen label spaces |
+| 1 | Jev on our public eval files via `POST /v1/systemone` (Choice with `criteria` = our label strings, plus a literal "none of the above"): CLINC-150 test + OOS, Banking77-77, HWU64, TREC, 20NG, SNLI/MNLI/ANLI/BoolQ (1k each); score with `pcdm/metrics.py`. Also run `joint_emb` with the same literal-none candidate for protocol parity | ≈ $0.3 API (~7M tokens), $0 GPU | the only same-items comparison: accuracy, ECE/NLL/Brier, among-K vs null, seen vs unseen label spaces |
 | 2 | `cse_*` / `ksweep_*` battery on Jev (add-irrelevant, reorder, duplicate, remove-gold, P("none") vs K 2→150) | ≈ $0.1 API | IIA Δ, reorder sensitivity, duplicate mass, K-dilution of the literal null vs our ∅ (.67 range) — head-to-head on our exact protocol |
 | 3 | MMLU-Pro 1,200-item sample (from [AH] evidence bundle) on `joint_emb`: state = question, K=10 options; report acc, 10-bin ECE with their binning | ≈ $0.5 | the one number Jev has publicly; expected loss quantifies the "1.7B, no knowledge training" gap; bundle gives Jev per-item p for identical ECE/Brier |
-| 4 | Replicate their latency protocol on ours: `bench.py` with state 360 → 30k tokens (raise the 256 cap) and M 1 → 1,500, plus a *query-batched* B_fair; report ms/question slope and ms per 1k state tokens; add K=150 with option descriptions (~20 tokens) to show the K-independence claim under realistic option text | ≈ $2 | whether 0.73 ms/query and the 16–73× survive long states and a fairer baseline; the O(M·L_s) prediction |
+| 4 | Replicate their latency protocol on ours: `pcdm/bench.py` with state 360 → 30k tokens (raise the 256 cap) and M 1 → 1,500, plus a *query-batched* B_fair; report ms/question slope and ms per 1k state tokens; add K=150 with option descriptions (~20 tokens) to show the K-independence claim under realistic option text | ≈ $2 | whether 0.73 ms/query and the 16–73× survive long states and a fairer baseline; the O(M·L_s) prediction |
 | 5 | Backbone-scale control: `joint_emb` recipe on Qwen3-4B-Base (LoRA top 8, tap 20 → scale layer accordingly), one seed | ≈ $10–12 | whether the unseen-label/false-null gap (our known weakness) is a size effect before attributing it to the head |
 
 ## 4. Threats to our numbers under their protocol

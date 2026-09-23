@@ -1,6 +1,6 @@
 """Post-hoc, val-fitted K-aware null bias: s_null' = s_null + alpha*log(K) + beta, fit jointly
 with a shared temperature T by minimising val soft-CE, then applied (no retraining) to every
-eval set dumped by `train.py --eval_only --dump_logits DIR`.
+eval set dumped by `pcdm/train.py --eval_only --dump_logits DIR`.
 
 See REPORT.md sec 3c: P(null | gold absent) falls 0.98 -> 0.35 from K=2 to K=150 even with
 nulls present at every K in training -- softmax dilutes the null logit as K grows, structurally,
@@ -8,7 +8,7 @@ not as a data-prior artifact. This is the cheapest fix that doesn't touch the ch
 
 uv run scripts/null_bias.py DIR [--out runs/<name>_nullbias/results.json]
 DIR must hold val.npz/val.meta.json + <set>.npz/<set>.meta.json for every eval set (as written
-by train.py's --dump_logits). Also fits a beta-only (alpha=0) variant for comparison.
+by pcdm/train.py's --dump_logits). Also fits a beta-only (alpha=0) variant for comparison.
 """
 import argparse
 import json
@@ -18,11 +18,12 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
 from metrics import summarize, choice_set_effects, ksweep
 
 ALPHAS = np.arange(-3.0, 3.0 + 1e-9, 0.1)
 BETAS = np.arange(-6.0, 6.0 + 1e-9, 0.25)
-TS = np.geomspace(0.1, 10, 60)  # same grid as train.py's fit_temperature
+TS = np.geomspace(0.1, 10, 60)  # same grid as pcdm/train.py's fit_temperature
 
 
 def _valid_mask(K, Kmax):
@@ -35,7 +36,7 @@ def _valid_mask(K, Kmax):
 def apply_bias(logits, K, alpha, beta, T):
     """probs = softmax((logits + bias)/T); bias adds alpha*log(K)+beta to the null column only.
     Validity (which candidate slots are real vs. padding) is reconstructed from K, not from the
-    magnitude of the padded logits -- so it doesn't matter what pad value train.py wrote."""
+    magnitude of the padded logits -- so it doesn't matter what pad value pcdm/train.py wrote."""
     Kmax = logits.shape[1] - 1
     valid = _valid_mask(K, Kmax)
     biased = logits.copy()
@@ -67,7 +68,7 @@ def _fit(logits, target, K, alphas):
 
 def fit_null_bias(logits, target, K):
     """Grid-search (alpha, beta, T) minimising val soft-CE: alpha in [-3,3] step 0.1,
-    beta in [-6,6] step 0.25, T over the same geomspace as train.py's fit_temperature."""
+    beta in [-6,6] step 0.25, T over the same geomspace as pcdm/train.py's fit_temperature."""
     return _fit(logits, target, K, ALPHAS)
 
 

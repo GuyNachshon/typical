@@ -1,6 +1,6 @@
 """Train the decision tower + LoRA backbone and evaluate it.
 
-uv run train.py --name X [--backbone Qwen/Qwen3-1.7B-Base] [--lora_layers 8] [--lora_r 16]
+uv run pcdm/train.py --name X [--backbone Qwen/Qwen3-1.7B-Base] [--lora_layers 8] [--lora_r 16]
                  [--steps 12000] [--bs 64] [--lr 3e-4] [--lora_lr 1e-4] [--seed 0]
                  [--no_hybrid] [--no_cand_null] [--no_null] [--null softmax|factored] [--hard_only] [--mix full|nlionly]
                  [--eval_every 4000] [--val_every 1000] [--ckpt_every 2000] [--eval_bs 128]
@@ -115,7 +115,7 @@ def apply_ordinal_smooth(examples, tau):
 
 def apply_drop_truncated(examples, tokenizer, max_state, label):
     """--drop_truncated (tl1b item 1): drop train rows whose state exceeds --max_state backbone
-    tokens (no special tokens) -- states are right-truncated at train/eval time (native.py),
+    tokens (no special tokens) -- states are right-truncated at train/eval time (pcdm/native.py),
     so a row whose facts land past max_state was training the model to answer confidently from
     a state it never actually saw (REPORT S3ab/S3af: data_wf_long p50 1,845 tokens, 98.8% of
     long rows > 1,024). Cheap pre-filter: only tokenize rows already longer than 3.5*max_state
@@ -1043,15 +1043,15 @@ def parse_args():
     p.add_argument("--extra_tap", type=int, default=0, help="also concatenate layer E's state onto the top state ([h_E; h_top]); needs --cand_encoder qwen3emb")
     p.add_argument("--init_from", default=None, help="warm-start tower+lora from a checkpoint (tower loaded strict=False, e.g. adding the listwise mixer)")
     p.add_argument("--readout", choices=["energy", "mcq", "native"], default="energy",
-                    help="mcq: options enumerated in the suffix, answer read from next-token letter logits (see mcq.py); "
-                         "native: same suffix + terminal decision token, direct scorer over candidates (see native.py)")
+                    help="mcq: options enumerated in the suffix, answer read from next-token letter logits (see pcdm/mcq.py); "
+                         "native: same suffix + terminal decision token, direct scorer over candidates (see pcdm/native.py)")
     p.add_argument("--nc_head", choices=["n2", "n3", "n2n3"], default="n2n3",
                     help="--readout native candidates: n2 = Qwen3-Embedding vectors, n3 = pooled option spans "
                          "from the suffix, n2n3 = both (PLAN4 sec 12)")
     p.add_argument("--nc_render", choices=["letters", "tags", "letters_nonull", "semif"], default="letters",
                     help="--readout native suffix: letters = mcq's 'A. opt' lines + null line + 'Answer:' (unchanged); "
                          "tags = native_v2 (PLAN5 sec 2) letter-free '<choice>\\n opt \\n</choice>' blocks, no null line; "
-                         "semif = SemIf-structured chat-template prefix/suffix around the state (native.py module docstring)")
+                         "semif = SemIf-structured chat-template prefix/suffix around the state (pcdm/native.py module docstring)")
     p.add_argument("--score_head", choices=["choice", "cumlink"], default="choice",
                     help="PLAN7 track C: score_C_cumlink -- cumulative-link ordinal head over the rendered "
                          "levels instead of the K-way Choice scorer (choice = today's default, unchanged)")

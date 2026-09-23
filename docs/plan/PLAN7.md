@@ -23,7 +23,7 @@ of reopened-only-with-evidence architecture items.
 | track | what | pods | owner |
 |---|---|---|---|
 | 0 | **Release 0**: freeze `nc_v3_tap20_wf` as `typical-small-preview` on HF (weights + card with §3t/§3w numbers + known limitations from the memo), git tag | – | fast-worker |
-| A | **Scaling ladder, same recipe** (native N3, `letters_nonull`, factored null, LoRA r16 top-8, tap ≈ 71% depth, v5+kb+wf+wf_hf, E .35/K .25/W .40, 12k steps): Qwen3-4B-Base, Qwen3-8B-Base, Qwen3-14B-Base. Each: probe (Δ_q), `eval_wf`, JevBench, `bench.py --native` latency + memory. Plus **zero-shot frozen-logit controls** (letter logits over options, no training) at 1.7B/4B/8B/14B on JevBench + the evidence/knowledge suite — separates backbone capacity from our training. | 3 | fast-worker (+ me for pod ops) |
+| A | **Scaling ladder, same recipe** (native N3, `letters_nonull`, factored null, LoRA r16 top-8, tap ≈ 71% depth, v5+kb+wf+wf_hf, E .35/K .25/W .40, 12k steps): Qwen3-4B-Base, Qwen3-8B-Base, Qwen3-14B-Base. Each: probe (Δ_q), `eval_wf`, JevBench, `pcdm/bench.py --native` latency + memory. Plus **zero-shot frozen-logit controls** (letter logits over options, no training) at 1.7B/4B/8B/14B on JevBench + the evidence/knowledge suite — separates backbone capacity from our training. | 3 | fast-worker (+ me for pod ops) |
 | B | **Mixture sweep (memo 7B)** at 1.7B: E/K/W ∈ {.50/.20/.30, .45/.20/.35, .40/.25/.35, .40/.20/.40} + null control: W rows with gold removed → ∅ at 15% (`--null_aug`) at the .40/.25/.35 point. Scorecards E/K/W/U tracked separately; pick the Pareto point (E, K within 3; W ≥ 6A; false-abstain ≤ baseline). | 2–3 | fast-worker |
 | C | **Typed primitives (memo 8)** on the native head at 1.7B: Score — K-way Choice vs ordinal threshold (cumulative link) vs distributional ordinal; Noul — Bernoulli head vs 2-way Choice. Matched runs on the 6A mix; metrics acc / ordinal MAE / NLL / Brier / ECE / threshold utility. Design from deep-reasoner review, then implement. | 1–2 | deep-reasoner → fast-worker |
 | D | **DecisionMix v2 (memo 7A) + hard curriculum (9) + U corpus**: extend `scripts/workflow_corpus.py` with the memo's metadata schema, rule-depth levels 1–7 with counterfactual rubric groups, long-policy distractors, temporal/numeric/probability/trade-off families; U from soft-label sources (ChaosNLI, UNLI, ambiguity sets, synthetic known-distribution). CPU only. | – | fast-worker ×2 |
@@ -69,9 +69,9 @@ Holdouts: 1 domain/level as `wh_heldout_grammar`, 3 whole domains (`wh_heldout_f
 workflow_corpus.py's `flip_pairs`/`shuffled_rubric`/`leak_check` unmodified.
 
 **data_u**: 31,029 train / 2,000 val / 3 eval files, 100% soft_target, 0/231 leak hits. Real sources: UNLI's
-*validation* split only (train/test already fully consumed by data.py's `unli`/`unli_test`) and metaeval/ambient's
+*validation* split only (train/test already fully consumed by pcdm/data.py's `unli`/`unli_test`) and metaeval/ambient's
 ambiguous rows (uniform target over listed labels, no per-annotator counts on the HF mirror). chaos-mnli-ambiguity
-is eval-only (`u_chaosnli`) since data.py's `chaos_mnli` eval already claims the whole file. Remaining 92% is 4
+is eval-only (`u_chaosnli`) since pcdm/data.py's `chaos_mnli` eval already claims the whole file. Remaining 92% is 4
 synthetic generators with exact closed-form targets (partial evidence, noisy-sensor Bayes posterior, ordinal
 confusion via inverted confusion matrix, conflicting-sources log-odds), each with a held-out parameter range.
 

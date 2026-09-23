@@ -1,5 +1,5 @@
 """Reads runs/*.json (+ hand-transcribed release-card tables) and writes site/data/*.json --
-small, flat, chart-ready. Run: uv run python precompute.py
+small, flat, chart-ready. Run: uv run python site/precompute.py
 
 ponytail: JevBench acc/Brier/ECE, ECE bins, chance baselines and the K/M latency sweep have one
 unambiguous JSON source each, so those are read programmatically. NLU/topic-intent/MMLU/held-out/
@@ -12,7 +12,7 @@ with a table parser. Every model dict carries a "sources" map, one path per metr
 import json
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent  # this file lives in site/
 OUT = ROOT / "site" / "data"
 OUT.mkdir(parents=True, exist_ok=True)
 

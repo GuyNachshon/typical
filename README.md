@@ -113,7 +113,7 @@ Training code is not yet public (the release cards ship inference only). The Rel
 (`typical-small`, checkpoint `ts1b`, from `releases/typical-small.md`):
 
 ```bash
-uv run --no-sync python train.py --readout native --nc_head n3 --nc_render letters_nonull --null factored \
+uv run --no-sync python pcdm/train.py --readout native --nc_head n3 --nc_render letters_nonull --null factored \
     --tap_layer 20 --zscore --lora_r 16 --lora_layers 8 \
     --data data_v5 --extra_data data_kb,data_wf,data_wf_hf,data_wf_long,data_wh,data_u \
     --bucket_map data_wf_long=W,data_wh=W,data_u=U \

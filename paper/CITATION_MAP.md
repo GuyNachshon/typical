@@ -88,7 +88,7 @@ or is the prior art a reviewer will raise, "A" = the attack citation (what a sce
 | Claim | Source | Keys |
 |---|---|---|
 | Ordinal targets / cumulative-link heads for Score | §3ac | S: mccullagh1980ordinal, frank2001ordinal, niu2016ordinalcnn, cao2020coral, shi2023corn, diaz2019softordinal |
-| Ordinal-aware scoring metric (RPS) for the Score tier | §3ac, metrics.py | S: epstein1969rps, murphy1970rps, gneiting2007scoringrules |
+| Ordinal-aware scoring metric (RPS) for the Score tier | §3ac, pcdm/metrics.py | S: epstein1969rps, murphy1970rps, gneiting2007scoringrules |
 | Bernoulli Noul head is exactly order-invariant; 2-way Choice is not | §3ac | S: zheng2024selectionbias, pezeshkpour2024optionorder, xue2024symbolbinding |
 | Architectural abstain option; selective classification framing | §3h, §3t, §3y | S: chow1970reject, geifman2017selective, geifman2019selectivenet, hendrycks2017msp, liu2020energyood, wen2024abstention; C: chen2023selfevalselective, kumar2023conformalmcq |
 | Out-of-scope intent detection as the abstention benchmark | §3c–§3e, COMPARE §2a | S: larson2019clinc, casanueva2020banking77 |

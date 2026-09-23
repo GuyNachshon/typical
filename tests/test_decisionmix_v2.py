@@ -175,7 +175,7 @@ def test_u_has_real_and_synthetic_sources(u):
 
 
 def test_u_never_trains_on_the_datasets_already_used_as_base_evals(u):
-    # data.py's "chaos_mnli" eval consumes the entire metaeval/chaos-mnli-ambiguity file; data_u must
+    # pcdm/data.py's "chaos_mnli" eval consumes the entire metaeval/chaos-mnli-ambiguity file; data_u must
     # only use it in its own eval file, never in train/val.
     train_val = u["train"] + u["val"]
     assert not any(r["meta"]["source_dataset"] == "metaeval/chaos-mnli-ambiguity" for r in train_val)

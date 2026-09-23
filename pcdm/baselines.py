@@ -1,8 +1,8 @@
 """Baselines B (prompted log-prob, KV-cached prefix) and C (LoRA cross-encoder
 + per-task linear heads). See PLAN2.md "Baselines".
 
-uv run baselines.py B [--backbone Qwen/Qwen3-1.7B-Base] [--limit N] [--no_kv_cache] [--check]
-uv run baselines.py C [--backbone ...] [--lora_layers 8] [--lora_r 16] [--steps 3000] [--bs 32] [--train_limit N]
+uv run pcdm/baselines.py B [--backbone Qwen/Qwen3-1.7B-Base] [--limit N] [--no_kv_cache] [--check]
+uv run pcdm/baselines.py C [--backbone ...] [--lora_layers 8] [--lora_r 16] [--steps 3000] [--bs 32] [--train_limit N]
 """
 import argparse
 import glob
@@ -22,7 +22,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from encode import Backbone, pick_device
 from metrics import summarize
 
-# data.py is being rewritten concurrently; FAMILY may not exist yet in older checkouts.
+# pcdm/data.py is being rewritten concurrently; FAMILY may not exist yet in older checkouts.
 try:
     from data import FAMILY
 except ImportError:
@@ -76,7 +76,7 @@ def strip_query_prefix(query):
     return query
 
 def get_hyp(ex):
-    """The hypothesis/question text for an example. Prefers data.py's meta dict
+    """The hypothesis/question text for an example. Prefers pcdm/data.py's meta dict
     (hyp/question), falls back to stripping the v0 query-prefix convention."""
     meta = ex.get("meta") or {}
     if "hyp" in meta:
@@ -142,7 +142,7 @@ NA_ROW = {k: "n/a" for k in METRIC_KEYS}
 def evaluate(name, val_examples, eval_sets, score_fn, val_limit=2000):
     """score_fn(examples) -> (scores[N,Kmax+1], target[N,Kmax+1], label[N], has_null) or
     None if the whole set can't be scored (e.g. no head for this task).
-    Writes runs/<name>/results.json in train.py's format; undefined cells are "n/a"."""
+    Writes runs/<name>/results.json in pcdm/train.py's format; undefined cells are "n/a"."""
     val = subsample(val_examples, val_limit)
     v = score_fn(val)
     assert v is not None, f"[{name}] val.jsonl must be scorable"
@@ -179,7 +179,7 @@ def evaluate(name, val_examples, eval_sets, score_fn, val_limit=2000):
 
 def b_prompt(ex):
     """-> (prefix ending right before the candidate continuation, null candidate literal).
-    data.TEMPLATES[family] is a list of *query*-wording variants (what data.py used to
+    data.TEMPLATES[family] is a list of *query*-wording variants (what pcdm/data.py used to
     build ex["query"]), not an LM prompt format -- not reusable here. family_of() still
     uses data.FAMILY for routing; the prompt shape per family is hardcoded below."""
     fam = family_of(ex["task"])

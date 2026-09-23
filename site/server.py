@@ -2,7 +2,7 @@
 (mirrors gpu-runpod-full-experiment:demo/app.py's Batch tab -- native_kv_decide, not per-query
 .choice/.score/.noul). Serves site/ as static files at "/".
 
-Run: uv run uvicorn server:app --port 8787
+Run: uv run uvicorn --app-dir site server:app --port 8787
 """
 import os
 import sys
@@ -10,7 +10,7 @@ import threading
 import time
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parent.parent  # this file lives in site/
 sys.path.insert(0, str(REPO_ROOT / "inference"))
 
 # ponytail: HF_TOKEN lives in .env, not the shell env -- same three-line loader as demo/app.py,

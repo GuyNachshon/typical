@@ -50,7 +50,7 @@ See `example.py` for a runnable end-to-end script.
 path (`pcdm_jev.decider.PCDMDecider(mode="native")`):
 
 - `typical/backbone.py` -- frozen Qwen3 trunk truncated at `tap_layer`, LoRA on its top
-  `lora_layers` blocks (`encode.py`'s `Backbone`, minus the training-only
+  `lora_layers` blocks (`pcdm/encode.py`'s `Backbone`, minus the training-only
   FeatureCache/EmbedEncoder/forward() machinery the serving path never touches).
 - `typical/native.py` -- `NativeHead` (factored null, the per-row Bernoulli "noul" route,
   the `letters`/`tags`/`letters_nonull`/`query_only` renderers) and `native_kv_decide`

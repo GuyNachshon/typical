@@ -24,7 +24,7 @@ uv run scripts/multiset.py --file data_kbms/orig.jsonl --out data_kbms/train.jso
 cp data_kb/val.jsonl data_kbms/val.jsonl   # val stays single-set, becomes the data_kbms_val eval set
 uv run scripts/teacher_label.py --run runs/mcq_lora --file data_kbms/train.jsonl --perms 3
 uv run scripts/ms_targets.py --file data_kbms/train.teacher.jsonl   # -> meta.orig_idx / meta.delta_t
-uv run train.py --extra_data data_kbms --delta_gamma 1 ...   # (same flags as the plain data_kb E3 run)
+uv run pcdm/train.py --extra_data data_kbms --delta_gamma 1 ...   # (same flags as the plain data_kb E3 run)
 """
 import argparse
 import json
@@ -33,6 +33,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
 from data import write_jsonl  # same writer convention as the rest of the repo
 from scripts.mmlu_counterfactual import near_dup_text
 

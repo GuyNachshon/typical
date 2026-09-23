@@ -1,6 +1,6 @@
 """PLAN4 §15 key table: evidence retention / parametric knowledge (Δ_q) / decision quality / systems, one row per run.
 Reads runs/<name>/results.json (+ runs/probe_<name>/results.json for Δ_q, runs/bench_*<name>*/bench.json for latency).
-uv run report_native.py [names...]   (default: every run with an mmlu_pro eval)"""
+uv run pcdm/report_native.py [names...]   (default: every run with an mmlu_pro eval)"""
 import glob
 import json
 import sys

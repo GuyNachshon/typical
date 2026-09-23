@@ -36,12 +36,12 @@ if [ ! -f data/train.jsonl ]; then
   uv run hf download guychuk/pcdm-data --repo-type dataset --local-dir data
 fi
 
-# candidate cache is built lazily by train.py per backbone (data/cache_<backbone>_L<split>.pt)
+# candidate cache is built lazily by pcdm/train.py per backbone (data/cache_<backbone>_L<split>.pt)
 
 # GPU smoke: 300 steps, W&B on, then tail the log for peak memory / step time.
 # Kill+resume (last.pt auto-resume) is a manual follow-up check, not scripted here.
 mkdir -p logs
-uv run python train.py --name smoke_gpu --steps 300 --eval_every 150 --val_every 50 --ckpt_every 100 --eval_limit 200 --wandb \
+uv run python pcdm/train.py --name smoke_gpu --steps 300 --eval_every 150 --val_every 50 --ckpt_every 100 --eval_limit 200 --wandb \
   2>&1 | tee logs/smoke_gpu.log
 echo "--- tail of logs/smoke_gpu.log (step time / peak memory) ---"
 tail -n 20 logs/smoke_gpu.log

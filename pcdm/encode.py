@@ -442,7 +442,7 @@ def build_vec_cache(data_dir: str = "data", out: str = "data/veccache_qwen3emb.p
 
 
 def selftest():
-    print("running encode.py selftest on Qwen/Qwen3-0.6B-Base ...")
+    print("running pcdm/encode.py selftest on Qwen/Qwen3-0.6B-Base ...")
     name = "Qwen/Qwen3-0.6B-Base"
     device = pick_device("auto")
     bb = Backbone(name=name, lora_layers=4, lora_r=8, device=device)
@@ -497,7 +497,7 @@ def selftest():
     assert torch.equal(mask_r.sum(1), am.sum(1) - 1)
     print("PASS: tokenize -> forward shape/mask contract on ragged input")
 
-    print("encode.py selftest passed")
+    print("pcdm/encode.py selftest passed")
 
 
 if __name__ == "__main__":

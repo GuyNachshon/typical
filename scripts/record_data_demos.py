@@ -9,7 +9,7 @@ comment of each site/js/demos/{sql,ads,compaction}.js - the hash key api.js comp
 client-side only matches a replay if the (state, queries) strings are identical, so any
 drift between here and the JS breaks static mode silently.
 
-Requires server.py running on :8787 (uv run uvicorn server:app --port 8787).
+Requires site/server.py running on :8787 (uv run uvicorn --app-dir site server:app --port 8787).
 """
 import json
 import sys

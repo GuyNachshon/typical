@@ -1,6 +1,6 @@
 """Local CPU gate for the v1 pipeline (PLAN2.md "Local gate" item 1). Must finish in
 < 60s total: `uv run pytest tests/ -q`. Uses the tiny_backbone/tiny_cache fixtures
-from conftest.py (a real, tiny, random-weight Qwen3 + the real Qwen3-0.6B-Base
+from tests/conftest.py (a real, tiny, random-weight Qwen3 + the real Qwen3-0.6B-Base
 tokenizer) instead of the full-size backbone.
 """
 import argparse
@@ -750,7 +750,7 @@ def test_factored_iia_add_candidate():
 
 
 # ---------------------------------------------------------------------------
-# 13. MCQ-LoRA readout (mcq.py)
+# 13. MCQ-LoRA readout (pcdm/mcq.py)
 # ---------------------------------------------------------------------------
 
 def _make_tied_mcq_head(d, lora_layers=2, lora_r=4):
@@ -980,14 +980,14 @@ def test_fit_null_bias_three_ragged_sets_end_to_end():
 @pytest.mark.skipif(not os.environ.get("RUN_SLOW"), reason="loads the real Qwen3-0.6B-Base "
                      "backbone + full eval sweep; set RUN_SLOW=1 to run")
 def test_null_bias_real_path_on_mini_v4(tmp_path):
-    """End to end on runs/mini_v4 if it's still around: train.py --eval_only --dump_logits,
+    """End to end on runs/mini_v4 if it's still around: pcdm/train.py --eval_only --dump_logits,
     then scripts/null_bias.py on the dump. Skipped (not failed) if the checkpoint is gone."""
     repo_root = Path(__file__).resolve().parent.parent
     if not (repo_root / "runs" / "mini_v4" / "best.pt").exists():
         pytest.skip("runs/mini_v4/best.pt not present")
 
     dump_dir = tmp_path / "mini_dump"
-    subprocess.run([sys.executable, "train.py", "--name", "mini_v4", "--eval_only",
+    subprocess.run([sys.executable, "pcdm/train.py", "--name", "mini_v4", "--eval_only",
                      "--data", "data_small_v4", "--dump_logits", str(dump_dir), "--eval_limit", "40"],
                     check=True, cwd=str(repo_root))
     assert (dump_dir / "val.npz").exists() and (dump_dir / "val.meta.json").exists()
@@ -1892,7 +1892,7 @@ def test_max_state_threads_through_run_readout_and_forward_batches(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 15. native_choice_v1 (native.py, PLAN4 sec 11-12): --readout native --nc_head {n2,n3,n2n3}
+# 15. native_choice_v1 (pcdm/native.py, PLAN4 sec 11-12): --readout native --nc_head {n2,n3,n2n3}
 # ---------------------------------------------------------------------------
 
 from native import NativeHead, run_batch_native, native_features, shuffle_options, _fit_chunks, _is_bern_row, _yes_idx, RENDERS  # noqa: E402
@@ -2265,7 +2265,7 @@ def test_bern_out_of_domain_kway_row_degrades_instead_of_crashing():
 
 
 # ---------------------------------------------------------------------------
-# 15c. --nc_render semif: SemIf-structured native head (native.py module docstring,
+# 15c. --nc_render semif: SemIf-structured native head (pcdm/native.py module docstring,
 # pcdm_jev.decider --prompt_style semif's frozen-probe +8 JevBench-standard result)
 # ---------------------------------------------------------------------------
 
@@ -2273,7 +2273,7 @@ from native import _render_semif, _render_row, _semif_head_tail, native_kv_decid
 
 
 def test_every_render_dispatches_through_render_row(tied_mcq_head):
-    """bench.py called RENDERS[name](query, cands) directly and crashed the ts1b_semif
+    """pcdm/bench.py called RENDERS[name](query, cands) directly and crashed the ts1b_semif
     latency bench with "TypeError: _render_semif() missing 1 required positional argument:
     'tail_text'" -- semif is the one render needing the tokenizer's chat-template tail, which
     is exactly why _render_row exists. Any caller reaching RENDERS directly breaks on semif
@@ -2628,7 +2628,7 @@ def test_render_letters_nonull_has_letters_no_null_line():
 
 # ---------------------------------------------------------------------------
 # 19. scripts/gate_experts.py (PLAN6 item 3): learned per-input gate g(x) over the two experts,
-# trained on the dumps' val split only, one val-fitted T, train.py-format results.json.
+# trained on the dumps' val split only, one val-fitted T, pcdm/train.py-format results.json.
 # ---------------------------------------------------------------------------
 
 import gate_experts as GE  # noqa: E402

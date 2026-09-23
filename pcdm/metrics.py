@@ -84,7 +84,7 @@ def summarize(probs, target, label=None) -> dict:
 
 
 def choice_set_effects(probs, examples) -> dict:
-    """data_v4 cse_* battery (see data.py cse_variants). examples: the ordered list of eval
+    """data_v4 cse_* battery (see pcdm/data.py cse_variants). examples: the ordered list of eval
     rows, each carrying meta.pair (groups a base row with its variants) and meta.variant in
     {base, add_irr, remove_gold, dup, reorder, near_dup}. probs: [N, Kmax+1], null last, row
     order == examples order. A property that should hold for a well-behaved scorer: adding an
@@ -253,7 +253,7 @@ def counterfactual(probs, examples, teacher_probs=None) -> dict:
 
 
 def ksweep(probs, examples) -> dict:
-    """data_v4 ksweep_* sets (see data.py build_ksweep): examples carry meta.K/meta.u/meta.present.
+    """data_v4 ksweep_* sets (see pcdm/data.py build_ksweep): examples carry meta.K/meta.u/meta.present.
     Returns P(null | absent)@K, P(null | present)@K, acc@K, null-detection AUROC@K (present vs.
     absent, scored by P(null)), and p_null_absent_range = max-min of P(null | absent) over K
     (data_v4's target: this should be small -- p_null shouldn't be a function of K)."""
@@ -303,7 +303,7 @@ if __name__ == "__main__":
     assert m["acc_k"] == 1.0, m["acc_k"]
     assert m["conf_wrong"] == 0.0, m["conf_wrong"]
     assert abs(m["auroc_null"] - 1.0) < 1e-9, m["auroc_null"]
-    print("metrics.py self-check passed:", m)
+    print("pcdm/metrics.py self-check passed:", m)
 
     # choice_set_effects: a base row (a=.2,b=.3,c=.5, gold=c) and its 5 variants, built so a
     # "perfect" (IIA-respecting) scorer gives dlo_top2=0, mass_err=0, slot_gap=0, max_dp=0,

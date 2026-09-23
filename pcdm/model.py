@@ -124,7 +124,7 @@ class DecisionModel(nn.Module):
         # built only when used, so checkpoints from --null softmax load strictly in both directions
         self.null_gate = nn.Sequential(nn.Linear(4 + 3 * dh, 256), nn.GELU(), nn.Linear(256, 1)) if null == "factored" else None
         # temperature: only used by the factored null (see _factored_logits) to scale the
-        # candidate softmax before composition. Left at 1.0 by training/eval (see train.py's
+        # candidate softmax before composition. Left at 1.0 by training/eval (see pcdm/train.py's
         # fit_temperature ponytail comment) -- a knob for a caller that wants it baked into forward().
         self.temperature = 1.0
 
@@ -689,4 +689,4 @@ if __name__ == "__main__":
     assert torch.isfinite(logits_lw).all()
     print(f"listwise=True path: OK (mixer params={n_mixer:,})")
 
-    print("model.py smoke test passed")
+    print("pcdm/model.py smoke test passed")

@@ -25,6 +25,7 @@ import torch
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "pcdm"))
 
 TIER_DISPLAY = {"original": "standard (public 72/96)"}  # jevbench's own name for the 72-item public standard tier
 LEADERBOARD_TIER = {"original": "standard", "easy": "easy", "hard": "hard"}  # our tier name -> jevbench-v1.2-per-task.json's tier name

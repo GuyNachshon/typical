@@ -4,11 +4,11 @@ vs B_fair (KV-cached prefix, state shared across queries -- only the question su
 and candidates are redone per query, one query at a time) vs B_batched (B_fair with
 queries processed in --b_chunk-sized batches instead of one at a time -- closes the
 fairness gap noted in COMPARE.md #4: B_fair still paid an unbatched-loop tax B never
-had to). See PLAN2.md "Baselines" / "bench.py", REVIEW.md #5 item 2.
+had to). See PLAN2.md "Baselines" / "pcdm/bench.py", REVIEW.md #5 item 2.
 
-uv run bench.py --model runs/<name> [--quick] [--backbone Qwen/Qwen3-1.7B-Base] [--device auto]
-uv run bench.py --check --backbone Qwen/Qwen3-0.6B-Base  # correctness-only, no benchmark
-uv run bench.py --native --model runs/nc_n3 [--energy_model runs/joint_emb_lw]  # PLAN5 sec 1 grid -> bench.json["native"]
+uv run pcdm/bench.py --model runs/<name> [--quick] [--backbone Qwen/Qwen3-1.7B-Base] [--device auto]
+uv run pcdm/bench.py --check --backbone Qwen/Qwen3-0.6B-Base  # correctness-only, no benchmark
+uv run pcdm/bench.py --native --model runs/nc_n3 [--energy_model runs/joint_emb_lw]  # PLAN5 sec 1 grid -> bench.json["native"]
 """
 JOINT = False
 ENCODER = None  # EmbedEncoder when the checkpoint used --cand_encoder qwen3emb (set by load_ours)
@@ -256,7 +256,7 @@ def score_b_fair_query(lm, tok, device, state_cache, state_len, q, cands):
     of once per query, which dominates cost at realistic K (32, 150) since it's usually
     longer than the per-candidate continuation itself. Mirrors
     baselines.score_example_kv's cache-expansion math; kept local since this task only
-    owns the bench.py side, not the shared baselines.py."""
+    owns the pcdm/bench.py side, not the shared pcdm/baselines.py."""
     q_cache = copy.deepcopy(state_cache)
     q_ids = tok("\nQuestion: " + q + "\nAnswer:", add_special_tokens=False, return_tensors="pt").input_ids.to(device)
     attn = torch.cat([torch.ones(1, state_len, dtype=torch.long, device=device),

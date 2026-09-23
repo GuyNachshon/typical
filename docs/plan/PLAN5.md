@@ -13,7 +13,7 @@ Before another training run:
 * upload N3 and all critical checkpoints;
 * save the MMLU frozen slice + leak exclusions;
 * save generated teacher labels;
-* make `report_native.py` regenerate the headline tables from checkpoints;
+* make `pcdm/report_native.py` regenerate the headline tables from checkpoints;
 * delete the volume only after this works from a clean checkout.
 
 At this point the experiments are valuable enough that reproducibility is higher priority than another +2%.
@@ -433,13 +433,13 @@ After that, the problem stops being architecture discovery and becomes **trainin
 
 - **§0 done:** commit `fbd737e` pushed (`gpu-runpod-full-experiment`); `frozen/` holds the MMLU-Pro slice, counterfactual battery, Δ_q
   probes, sibling-excluded K-sweep, leak exclusions and the corpus manifest; `uv.lock` pins the env; checkpoints/results/labels on HF;
-  `report_native.py` / `report.py` regenerate the tables from `runs/*/results.json` (`RESULTS.md`). Clean-checkout reproduction of
-  the tables = `git clone … && uv sync && uv run report_native.py …`; regenerating a *number* from a checkpoint = `train.py --eval_only`
+  `pcdm/report_native.py` / `pcdm/report.py` regenerate the tables from `runs/*/results.json` (`RESULTS.md`). Clean-checkout reproduction of
+  the tables = `git clone … && uv sync && uv run pcdm/report_native.py …`; regenerating a *number* from a checkpoint = `pcdm/train.py --eval_only`
   after `hf download guychuk/pcdm-runs --include <run>/best.pt`. Volume `pcdm-vol` can go once that has been exercised once.
-- **Critical experiment 1 — native latency with state KV reuse:** `bench.py --native` (KV-cached state, one suffix per query,
+- **Critical experiment 1 — native latency with state KV reuse:** `pcdm/bench.py --native` (KV-cached state, one suffix per query,
   K = 2…256, L_s = 256/1k/2k, M = 1/32/256) vs the energy path and the batched log-prob baseline → empirical K*. Code built locally
   (tests); needs ~$2 of GPU.
-- **Critical experiment 2 — `native_v2` (letter-free `<choice>` spans) + support gate composition:** rendering change in `native.py`
+- **Critical experiment 2 — `native_v2` (letter-free `<choice>` spans) + support gate composition:** rendering change in `pcdm/native.py`
   (`--nc_render tags`), the composition `P(∅) = 1 − r_energy`, `P(a_j) = r_energy · P_N3(a_j | answerable)` as an eval-time script over
   two checkpoints (`scripts/compose_support.py`), then one 12k-step run (~$9) with the goals: keep N3's Δ_q (.111), reorder Δp
   .10 → < .03, recover evidence. Budget: actual RunPod balance queried 2026-09-20 = **$120.89** (earlier "≈$5 left" was an unverified running estimate); both experiments are funded.

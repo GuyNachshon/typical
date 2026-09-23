@@ -2,7 +2,7 @@
 
 Builds data_kb/train.jsonl + data_kb/val.jsonl (eval-row schema: state/query/candidates/
 target/p_null/task/label/meta, family "qa" -- same shape as scripts/mmlu_pro_eval.py's
-rows, see data.py) from ~10 knowledge-MCQ HF sources. Never touches MMLU test/validation
+rows, see pcdm/data.py) from ~10 knowledge-MCQ HF sources. Never touches MMLU test/validation
 or MMLU-Pro. truthfulqa_mc1 and gpqa are held out entirely to data_kb/eval/*.jsonl.
 
 uv run scripts/distill_corpus.py [--out data_kb] [--limit N] [--seed 0]
@@ -18,7 +18,8 @@ from pathlib import Path
 from datasets import load_dataset
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from data import trunc, norm_text, group_split, write_jsonl  # reuse data.py's conventions
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
+from data import trunc, norm_text, group_split, write_jsonl  # reuse pcdm/data.py's conventions
 
 QUERY = "Which option is correct?"  # same fixed query mmlu_pro_eval.py uses for this family
 MAX_CAND = 300

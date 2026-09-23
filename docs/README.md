@@ -4,6 +4,21 @@ Everything except `README.md` and `REPORT.md` moved off the repo root on 2026-09
 written before that date cites these by bare filename ("PLAN2.md", "REVIEW.md §3"); the
 section numbers are unchanged, only the path moved.
 
+## Repo layout
+
+| path | what |
+|---|---|
+| `pcdm/` | the training/research modules: `train.py`, `model.py`, `native.py`, `encode.py`, `data.py`, `mcq.py`, `metrics.py`, `baselines.py`, `bench.py`, `report*.py`. Run them from the repo root — `uv run pcdm/train.py …` — so `runs/` and `data_*/` resolve. |
+| `pcdm_jev/` | the JevBench-facing decider/adapter over those modules. |
+| `inference/` | the public, training-repo-independent `typical` package (+ parity test). |
+| `scripts/` | one-off builders, evals, audits, and the shell drivers (`run_gpu*.sh`, `pod_setup.sh`, `watchdog.sh`, `costguard.sh`, `sync_research.sh`). |
+| `site/` | the research + marketing site, its `server.py`/`precompute.py`, and its `package.json`. |
+| `demo/`, `blog/`, `paper/`, `figures/`, `releases/`, `runs/`, `frozen/`, `vendor/` | the Gradio demo, posts, the paper source, generated figures, release cards, run artefacts, the frozen eval slice, and the vendored DOOM build. |
+| `tests/` | `uv run pytest tests/ -q` (~2.5 min, CPU). `pyproject.toml`'s `pythonpath` puts `pcdm/` and the root on the path. |
+
+
+## Docs
+
 | where | what |
 |---|---|
 | `REPORT.md` (root) | the consolidated results log, §3a…§3ah. The number you are looking for is here. |

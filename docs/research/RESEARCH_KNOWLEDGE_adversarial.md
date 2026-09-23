@@ -1,7 +1,7 @@
 # PCDM and MMLU-Pro-class tasks — adversarial memo (2026-09-19)
 
-Scope: no code changed; reasoning from `REPORT.md` §1/§3c–§3f, `COMPARE.md`, `IDEA2.md`, `model.py`, `encode.py`,
-`baselines.py`, `mcq.py`, `scripts/mmlu_pro_eval.py`. Budget: ~$40 H100, two weeks. Constraints kept: state encoded once,
+Scope: no code changed; reasoning from `REPORT.md` §1/§3c–§3f, `COMPARE.md`, `IDEA2.md`, `pcdm/model.py`, `pcdm/encode.py`,
+`pcdm/baselines.py`, `pcdm/mcq.py`, `scripts/mmlu_pro_eval.py`. Budget: ~$40 H100, two weeks. Constraints kept: state encoded once,
 per-query cost K-independent-ish, direct calibrated probabilities with a learned null, no generation.
 
 ## 0. Three facts that reframe the question
@@ -87,8 +87,8 @@ backbone size, truncation, or training data changes that until the option text r
   than. The result is "prompted LM + temperature + a learned null", with the economics thesis deleted. Not a head feature,
   a different model.
 - **The K-independent version that is worth one run.** The next-token distribution at the suffix's last position is one
-  softmax per query (`logp_first` in `baselines.py:265` already computes it; `lm_head` = `embed_tokens` for the tied 1.7B,
-  see `mcq.py:34`). Feeding the *last-position* hidden state (the answer-start latent) to the scorer instead of / alongside
+  softmax per query (`logp_first` in `pcdm/baselines.py:265` already computes it; `lm_head` = `embed_tokens` for the tied 1.7B,
+  see `pcdm/mcq.py:34`). Feeding the *last-position* hidden state (the answer-start latent) to the scorer instead of / alongside
   the mean-pooled query tokens is a free change to `DecisionModel.forward` and fixes a real defect: the current `h` averages
   over the question words, which is fine for NLI/intents and wrong for "what is the answer". First-token log-probs of each
   option are a cheap, K-independent extra feature (gather K entries of one V-softmax) but weak on their own (options share
@@ -151,7 +151,7 @@ Cost: one eval $0.5, one fine-tune $5. It belongs in the plan if the MMLU-Pro fr
 ## 3. Ranked plan (~$40)
 
 **Step 0 — decompose the 9% ($1, day 1–2, no training).** Same 1,200 items:
-`B_1.7B` full (option-text log-prob, KV-cached, `baselines.py`) = C_full; `B_1.7B` truncated at layer 20 = C_20;
+`B_1.7B` full (option-text log-prob, KV-cached, `pcdm/baselines.py`) = C_full; `B_1.7B` truncated at layer 20 = C_20;
 `mcq_lora` checkpoint (`--readout mcq --eval_only`, options in context, tap 20 + LoRA, v3 data) = M_20;
 Jev per-category from the [AH] bundle. Decision tree:
 - C_full < 15 → closed-book at 1.7B is dead; skip Step 1's closed-book targets, go to Step 2 (framing) directly, note the size axis is out of budget.

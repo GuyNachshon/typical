@@ -1097,7 +1097,7 @@ The candidate-blind \(Z(x,q)\) architecture remains an optional stronger result�
 
 # 21. Execution notes (lead, 2026-09-19)
 
-- **What already exists:** `mcq.py` (`MCQHead`: options rendered in the suffix, LoRA on the top 8 of 28 layers, letter readout with
+- **What already exists:** `pcdm/mcq.py` (`MCQHead`: options rendered in the suffix, LoRA on the top 8 of 28 layers, letter readout with
   hierarchical chunking above 51 options; `run_batch_mcq`, `collate_mcq`; `--readout mcq`) *is* N1. `teacher_kb` (N1 on data_kb) and
   `mcq_lora` (N1 on evidence data v3) are the existing capability controls: MMLU-Pro among-K .310 / Δ_q +.088, and evidence-level
   .853/.727/.400/.768 respectively. Cold/warm latency, counterfactual battery, choices-only/shuffled probes, disaggregated
@@ -1124,5 +1124,5 @@ The candidate-blind \(Z(x,q)\) architecture remains an optional stronger result�
   `nc_n2` (semantic candidates) retains 87% of the teacher's Δ_q but loses raw score for lack of slot identity. Native choice is
   adopted for Regime A; the energy path stays for evidence / null / large K. Open, in order: a K-robust native null (abstention error
   .18 on MMLU-Pro, P(∅|absent) .99 at K = 150), the 5–13-pt evidence gap of the options-in-suffix formulation, native-path latency vs K
-  (Phase D, needs a KV-cached suffix in bench.py), an 8B fine-tuned teacher as scale reference. Full numbers: REPORT.md §3l;
-  `uv run report_native.py teacher_kb nc_n1 nc_n2 nc_n3`.
+  (Phase D, needs a KV-cached suffix in pcdm/bench.py), an 8B fine-tuned teacher as scale reference. Full numbers: REPORT.md §3l;
+  `uv run pcdm/report_native.py teacher_kb nc_n1 nc_n2 nc_n3`.

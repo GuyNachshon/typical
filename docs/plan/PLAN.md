@@ -10,13 +10,13 @@ Add LoRA only if ours < baseline C − 8 pts on SNLI.
 
 | file | role |
 |---|---|
-| `data.py` | HF datasets → `DecisionExample` JSONL (train/val/eval sets). `uv run data.py` |
-| `encode.py` | frozen backbone; `FeatureCache` of token features for every unique string |
-| `model.py` | `DecisionModel` (cross-attn slot + energy scorer + null) and `decision_loss` |
-| `metrics.py` | nll, brier, ece, auroc_null, selective acc, confident-wrong |
-| `train.py` | train tower on cache, evaluate all eval sets, temperature-scale on val, write `runs/<name>/results.json` |
-| `baselines.py` | B (prompted log-prob), C (cross-encoder linear head), C-late (pooled MLP) |
-| `bench.py` | H2: latency vs M queries on one state, ours vs B |
+| `pcdm/data.py` | HF datasets → `DecisionExample` JSONL (train/val/eval sets). `uv run pcdm/data.py` |
+| `pcdm/encode.py` | frozen backbone; `FeatureCache` of token features for every unique string |
+| `pcdm/model.py` | `DecisionModel` (cross-attn slot + energy scorer + null) and `decision_loss` |
+| `pcdm/metrics.py` | nll, brier, ece, auroc_null, selective acc, confident-wrong |
+| `pcdm/train.py` | train tower on cache, evaluate all eval sets, temperature-scale on val, write `runs/<name>/results.json` |
+| `pcdm/baselines.py` | B (prompted log-prob), C (cross-encoder linear head), C-late (pooled MLP) |
+| `pcdm/bench.py` | H2: latency vs M queries on one state, ours vs B |
 
 ## Data schema (JSONL, one per line)
 
@@ -57,7 +57,7 @@ Add LoRA only if ours < baseline C − 8 pts on SNLI.
 ## Interfaces
 
 ```python
-# encode.py
+# pcdm/encode.py
 class Encoder:
     def __init__(self, name="Qwen/Qwen3-0.6B-Base", layers=20, device="mps"): ...
     @torch.inference_mode()
@@ -68,14 +68,14 @@ class FeatureCache:            # dict[str, (offset, length)] + flat bf16 feats
     def save(self, path); @classmethod def load(cls, path, device)
 def build_cache(data_dir="data", out="data/cache.pt")   # state 256, query 64, candidate 16
 
-# model.py
+# pcdm/model.py
 class DecisionModel(nn.Module):   # d_in=1024, d=512, 2 decoder layers, 8 heads, ~9M params, fp32
     def forward(self, H, hmask, Q, qmask, C, cmask) -> logits [B, Kmax+1]   # last column = null
 def decision_loss(logits, target, p_null, cmask) -> scalar   # soft CE over [(1-p_null)*target, p_null]; pads masked
 def collate(cache, examples) -> (H,hmask,Q,qmask,C,cmask,target,p_null)     # C = mean-pooled candidate tokens
 def decide(model, encoder, state: str, queries: list[tuple[str, list[str]]]) -> list[torch.Tensor]  # encodes state once, expands H to M
 
-# metrics.py — all numpy float64 on CPU
+# pcdm/metrics.py — all numpy float64 on CPU
 def summarize(probs [N,K+1], target [N,K+1], label [N]) -> dict   # acc, nll, brier, ece, auroc_null, sel_acc@80, conf_wrong
 ```
 
