@@ -18,6 +18,9 @@ runs/*/*
 !runs/*/bench.json
 !runs/*/eval_wf.json
 !runs/*/eval_wf_full.json
+# fig_serving's before/after pair (scripts/make_figures.py); ~8 KB each, and without
+# them the figure can only be rebuilt on the worktree that ran the bench
+!runs/serve_bench2/before.json
 !runs/*.json
 runs/dump_*/
 .agents/
