@@ -19,17 +19,27 @@ import { svgEl, svgText, registerChart, fitWidth, INK, MID, STEEL, OURS, OTHER }
 
 const COLS = 8;
 const ROWS = 5;
-const CELL = 22;
 const GAP = 4;
-const STACK_W = 660; // below this the two grids stack instead of sitting side by side
+const STACK_W = 520; // below this the two grids stack instead of sitting side by side
 
 export const N = COLS * ROWS;
-const gridW = COLS * CELL + (COLS - 1) * GAP;
-const gridH = ROWS * CELL + (ROWS - 1) * GAP;
+
+// The figure used to draw at a fixed 22px cell inside a 1080px box, so two 200px lanes sat in the
+// left half of their own figure and lined up with nothing -- not the prose above them, not the
+// other figures. It sits on the text measure now and the cell is whatever fills it, so the grids
+// start exactly where the sentence above them starts.
+export function geom(width, stacked) {
+  const lanes = stacked ? 1 : 2;
+  const lane = stacked ? width : (width - LANE_GAP) / lanes;
+  const cell = Math.max(12, Math.min(44, (lane - (COLS - 1) * GAP) / COLS));
+  return { cell, gridW: COLS * cell + (COLS - 1) * GAP, gridH: ROWS * cell + (ROWS - 1) * GAP };
+}
+
+const LANE_GAP = 56;
 
 // Raster order, which is the order a reader's eye already expects to be filled in.
-export function cellAt(i) {
-  return { x: (i % COLS) * (CELL + GAP), y: Math.floor(i / COLS) * (CELL + GAP) };
+export function cellAt(i, cell) {
+  return { x: (i % COLS) * (cell + GAP), y: Math.floor(i / COLS) * (cell + GAP) };
 }
 
 // How many cells are lit at time t. The serial lane spends the whole span; the parallel lane spends
@@ -53,24 +63,26 @@ function label(x, y, str, attrs = {}) {
   return svgText(x, y, str, { 'font-size': 11, 'letter-spacing': 0.72, fill: MID, ...attrs });
 }
 
-function grid(x, y) {
+function grid(x, y, cell) {
   const g = svgEl('g', { transform: `translate(${x},${y})` });
   const cells = [];
   for (let i = 0; i < N; i += 1) {
-    const { x: cx, y: cy } = cellAt(i);
-    const r = svgEl('rect', { x: cx, y: cy, width: CELL, height: CELL, fill: STEEL, opacity: 0.45 });
+    const { x: cx, y: cy } = cellAt(i, cell);
+    const r = svgEl('rect', { class: 'par-cell', x: cx, y: cy, width: cell, height: cell, fill: STEEL, opacity: 0.45 });
     g.appendChild(r);
     cells.push(r);
   }
   return { g, cells };
 }
 
-function lane(x, y, tag, note, serial) {
+function lane(x, y, tag, note, serial, dims) {
   const hue = serial ? OTHER : OURS;
+  const { cell, gridW, gridH } = dims;
   const g = svgEl('g', { transform: `translate(${x},${y})` });
   g.appendChild(label(0, 0, tag.toUpperCase(), { fill: hue, 'font-weight': 700 }));
   g.appendChild(label(0, 18, note, { fill: MID, 'letter-spacing': 0 }));
-  const { g: gg, cells } = grid(0, 34);
+  const { g: gg, cells } = grid(0, 34, cell);
+  gg.setAttribute('color', hue); // currentColor, so the arrival flash is the lane's own hue
   g.appendChild(gg);
   // the arrival axis: an arrow under the serial lane, a single stop under the parallel one
   const ay = 34 + gridH + 16;
@@ -99,27 +111,37 @@ export function mountParallel(container) {
     const width = fitWidth(container, DESIGN_W);
     container.style.maxWidth = `${DESIGN_W}px`;
     const stacked = width < STACK_W;
+    const dims = geom(width, stacked);
+    const { gridW, gridH } = dims;
     const laneH = 34 + gridH + 44;
     const h = 16 + (stacked ? 2 * laneH + 26 : laneH);
     const svg = svgEl('svg', { viewBox: `0 0 ${width} ${h}`, width: '100%', height: h, role: 'img' });
     svg.appendChild(svgEl('title', {})).textContent =
       'Two identical grids of forty cells: the autoregressive lane fills one cell at a time and keeps a gradient showing that order, the decision-model lane fills all forty at once and is flat.';
 
-    // the grids are a fixed size, so the two lanes sit at their own width and the leftover paper
-    // stays paper -- stretching a 40-cell grid to fill a column makes it a rectangle, not a figure
-    const gap = Math.max(60, Math.min(160, (width - 2 * gridW) / 2));
-    const a = lane(0, 16, 'one token at a time', 'each answer waits for the last', true);
-    const b = lane(stacked ? 0 : gridW + gap, stacked ? 16 + laneH + 26 : 16, 'one pass', 'all forty in the same forward pass', false);
+    const a = lane(0, 16, 'one token at a time', 'each answer waits for the last', true, dims);
+    const b = lane(stacked ? 0 : gridW + LANE_GAP, stacked ? 16 + laneH + 26 : 16, 'one pass', 'all forty in the same forward pass', false, dims);
     svg.append(a.g, b.g);
     host.replaceChildren(svg);
 
     const span = 4200;
     let t0 = 0;
     const paint = (lit, ln) => {
+      if (ln.lit === lit) return; // only the cells that changed, so an arrival is a real event
+      const falling = lit < (ln.lit ?? 0);
       ln.cells.forEach((c, i) => {
-        c.setAttribute('fill', i < lit ? ln.hue : STEEL);
-        c.setAttribute('opacity', i < lit ? shadeAt(i, ln.serial) : 0.3);
+        const on = i < lit;
+        const was = i < (ln.lit ?? 0);
+        if (on === was) return;
+        c.setAttribute('fill', on ? ln.hue : STEEL);
+        c.setAttribute('opacity', on ? shadeAt(i, ln.serial) : 0.3);
+        c.classList.remove('is-new');
+        if (on && !falling) {
+          void c.getBoundingClientRect(); // restart the flash even if this cell just lit
+          c.classList.add('is-new');
+        }
       });
+      ln.lit = lit;
       ln.foot.textContent = ln.serial ? `${lit} of ${N} · in order` : `${lit} of ${N} · at once`;
     };
     const step = (now) => {
@@ -148,7 +170,11 @@ export function mountParallel(container) {
 
 export function selfTest() {
   console.assert(N === 40, 'forty cells, both lanes');
-  console.assert(cellAt(0).x === 0 && cellAt(COLS).y === CELL + GAP, 'raster order wraps at the column count');
+  const d = geom(680, false);
+  console.assert(cellAt(0, d.cell).x === 0 && cellAt(COLS, d.cell).y === d.cell + GAP, 'raster order wraps at the column count');
+  console.assert(Math.abs(2 * d.gridW + LANE_GAP - 680) < 1, 'two lanes and their gap fill the measure exactly');
+  console.assert(geom(320, true).gridW <= 320, 'stacked, one lane fits the column it is given');
+  console.assert(geom(2000, false).cell <= 44, 'the cell has a ceiling, so a wide column does not make a billboard');
   console.assert(litAt(0, 1000, true) === 0 && litAt(1000, 1000, true) === N, 'the serial lane spends the whole span');
   console.assert(litAt(500, 1000, true) === N / 2, 'and is linear in between');
   console.assert(litAt(0, 1000, false) === 0, 'the parallel lane is not lit before it has run');

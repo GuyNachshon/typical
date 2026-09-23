@@ -32,6 +32,7 @@ async function mountField() {
   const rowEl = (r) => {
     const tr = document.createElement('tr');
     if (r.ours) tr.className = 'is-ours';
+    tr.dataset.model = r.name;
     const name = r.size ? `${r.name} · ${r.size}` : r.name;
     [name, r.note ? `${r.kind} · ${r.note}` : r.kind, r.size || '—', fmt(r.std)].forEach((v, i) => {
       const td = document.createElement('td');
@@ -131,6 +132,27 @@ function writeUnplottedCount(doc) {
   el.textContent = countWord(n);
 }
 
+// The table and the scatter are the same twenty rows twice. Point at one and the other says which
+// row you are pointing at -- the only way, short of counting, to find `system-one-open` in a field
+// of sixteen dots. Delegated from the section, because the chart redraws itself on every resize and
+// listeners bound to its marks would not survive that.
+function linkFieldAndScatter() {
+  const section = document.getElementById('field');
+  if (!section || section.dataset.linked) return;
+  section.dataset.linked = '1';
+  const set = (name) => {
+    section.classList.toggle('is-linking', !!name);
+    section.querySelectorAll('[data-model]').forEach((el) => {
+      el.classList.toggle('is-lit', !!name && el.dataset.model === name);
+    });
+  };
+  section.addEventListener('pointerover', (e) => {
+    const hit = e.target.closest?.('[data-model]');
+    set(hit ? hit.dataset.model : null);
+  });
+  section.addEventListener('pointerleave', () => set(null));
+}
+
 function mountSizeScore(host, doc) {
   writeUnplottedCount(doc);
   const pts = doc.rows.filter((r) => sizeOfRow(r) && r.std != null);
@@ -222,29 +244,33 @@ function mountSizeScore(host, doc) {
     const draw = ({ p, cx, cy, flip, ly }) => {
       const s = flip ? -1 : 1;
       const tx = cx + s * LABEL_DX;
+      const mark = svgEl('g', { class: 'jev-mark' });
+      mark.dataset.model = p.name;
+      g.appendChild(mark);
       // any displacement at all gets a leader: a label nudged 6px is exactly the one a reader
       // cannot tell is nudged
       if (Math.abs(ly - (cy + 4)) > 2) {
         const gutter = cx + s * (LABEL_DX - 3);
-        g.appendChild(svgEl('polyline', {
+        mark.appendChild(svgEl('polyline', {
           points: `${cx + s * 7},${cy} ${gutter},${cy} ${gutter},${ly - 4} ${tx},${ly - 4}`,
           fill: 'none', stroke: MID, 'stroke-width': 1,
         }));
       }
       // knocked out of whatever rule it lands on — the frontier step and the .8 gridline ran
       // straight through `jeff (GLiFormer)` and `system-one-open` like a strike-through
-      g.appendChild(svgText(tx, ly, p.name, {
+      mark.appendChild(svgText(tx, ly, p.name, {
         fill: p.ours ? OURS : MID, 'font-size': p.ours ? 12 : 11, 'font-family': FONT_MONO,
         'font-weight': p.ours ? 700 : 400, 'text-anchor': flip ? 'end' : 'start',
         stroke: '#f0eeeb', 'stroke-width': 3, 'paint-order': 'stroke',
       }));
-      g.appendChild(p.ours
+      mark.appendChild(p.ours
         ? svgEl('circle', { cx, cy, r: 6, fill: OURS })
         : svgEl('circle', { cx, cy, r: 4.5, fill: '#f0eeeb', stroke: MID, 'stroke-width': 1.4 }));
     };
     items.filter((it) => !it.p.ours).forEach(draw);
     items.filter((it) => it.p.ours).forEach(draw);
     host.appendChild(svg);
+    linkFieldAndScatter();
   };
   draw();
   registerChart(host, draw);

@@ -81,12 +81,29 @@ export function bindWidows(root = document.body) {
     if (!last) return;
     // two real words, and neither so long that gluing them would overflow the column
     const m = last.nodeValue.match(/(\S+)(\s+)(\S+)\s*$/);
-    if (!m || m[1].length + m[3].length > 22) return;
-    last.nodeValue = last.nodeValue.replace(/(\S+)(\s+)(\S+)(\s*)$/, `$1${NB}$3$4`);
+    if (m) {
+      if (m[1].length + m[3].length > 22) return;
+      last.nodeValue = last.nodeValue.replace(/(\S+)(\s+)(\S+)(\s*)$/, `$1${NB}$3$4`);
+      return;
+    }
+    // A paragraph ending "…<code>typical-medium</code> (4B)." leaves " (4B)." as its whole final
+    // text node: one word, so the pair rule above finds nothing to bind and the word drops to a
+    // line of its own. Bind it backwards across the element boundary instead -- the thing before
+    // it is the element that made this node one word long.
+    const solo = last.nodeValue.match(/^(\s+)(\S+)(\s*)$/);
+    if (solo && solo[2].length <= 16) last.nodeValue = `${NB}${solo[2]}${solo[3]}`;
   });
 }
 
 export function selfTest() {
+  const soloDoc = typeof document !== 'undefined';
+  if (soloDoc) {
+    const host = document.createElement('p');
+    host.innerHTML = 'two open models: <code>typical-small</code> and <code>typical-medium</code> (4B).';
+    bindWidows(host.ownerDocument.body.appendChild(host).parentNode);
+    console.assert(host.textContent.includes(`${NB}(4B).`), 'a lone word after an inline element binds backwards');
+    host.remove();
+  }
   console.assert(glue('a · b') === `a ·${NB}b`, 'bullet binds to the following word');
   console.assert(glue('83.6% / 87.4%') === `83.6%${NB}/${NB}87.4%`, 'number pairs stay together');
   console.assert(glue('inference / typical') === `inference /${NB}typical`, 'a slash binds to the word after it');

@@ -76,7 +76,7 @@
     <h2>Forty answers, two ways</h2>
     <p>A generative model produces answers in an order, because each one is conditioned on the last. A decision model does not have an order to produce them in. The state is read once into a cache and every question is a short suffix scored against it in the same forward pass, so the fortieth answer does not wait behind the thirty-ninth. It is computed alongside it.</p>
   </div>
-  <figure class="fig">
+  <figure class="fig fignarrow">
     <div class="chart" id="chart-parallel"></div>
     <figcaption>Schematic. Cell shade is arrival order. The measured version is <a class="figref" href="#head-to-head">the figure below</a>.</figcaption>
   </figure>

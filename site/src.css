@@ -527,7 +527,17 @@
   .runreq td { font-size: 13px; }
   .register td:first-child { font-weight: 700; }
   .register.field td:first-child { font-weight: 400; }
-  .register.field tr.is-ours td { font-weight: 700; } /* no nowrap here: it set the grid track's min-content width and pushed the research page sideways — model ids are kept whole with non-breaking hyphens instead (js/typography.js) */
+  .register.field tr.is-ours td { font-weight: 700; }
+
+  /* ---- table and scatter, pointing at each other ---- */
+  .register.field tbody tr { transition: background var(--duration-tap) var(--ease-out); }
+  #field.is-linking .register.field tbody tr.is-lit { background: rgba(47, 93, 80, 0.09); }
+  .jev-mark { transition: opacity var(--duration-state) var(--ease-out); }
+  /* the rest recede rather than vanish: the point of the chart is still the shape of the field */
+  #field.is-linking .jev-mark:not(.is-lit) { opacity: 0.28; }
+  #field.is-linking .jev-mark.is-lit circle { r: 7; }
+  #field.is-linking .jev-mark.is-lit text { font-weight: 700; fill: var(--color-off); }
+  @media (hover: none) { #field.is-linking .jev-mark:not(.is-lit) { opacity: 1; } }
   @media (max-width: 40rem) {
     .register thead { display: none; }
     .register tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--color-steel); }
@@ -619,6 +629,9 @@
   /* one figure on the page is a pair of terminals printing real response objects; it gets the
      page, because the thing being shown is exactly the part that a narrower column cuts off */
   .post .fig.figfull { max-width: none; }
+  /* a schematic that fits the measure should sit on the measure: at 1080 its two small grids sat
+     in the left half of their own box and lined up with nothing */
+  .post .fig.fignarrow { max-width: 680px; }
   /* the steps are a numbered list and were rendering unnumbered: preflight strips the marker, so
      the numerals are drawn in the gutter where an editorial list puts them anyway */
   .steps { counter-reset: step; list-style: none; padding-left: 0; }
@@ -645,6 +658,19 @@
   /* ---- types: each panel keeps its own heading and paragraph under it ---- */
   .typegrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 44px 40px; }
   .typecard > .chart { margin-bottom: 16px; }
+
+  /* ---- the grids: a cell flashes as it lands, and is flat once it has ---- */
+  /* A standing bloom on every lit cell made the resting figure look smudged, which is the one
+     thing a schematic cannot afford. The light belongs to the moment of arrival instead: a cell
+     glows as it lands and settles flat, so the serial lane reads as forty separate arrivals and
+     the parallel lane as one. Nothing glows once the figure is at rest. */
+  @keyframes cellArrive {
+    from { filter: drop-shadow(0 0 7px currentColor) brightness(1.25); }
+    to { filter: none; }
+  }
+  .par-cell.is-new { animation: cellArrive 620ms var(--ease-out-expo) both; }
+  @media (prefers-reduced-motion: reduce) { .par-cell.is-new { animation: none; } }
+
   .typecard > h3 { font-size: 17px; }
   .typecard > p { margin-top: 8px; font-size: 15px; line-height: 1.55; color: var(--color-slate); }
   @media (max-width: 48rem) { .typegrid { grid-template-columns: minmax(0, 1fr); gap: 34px; } }
@@ -652,12 +678,12 @@
   /* ---- the showdown: two terminals, started together, each printing what it actually returned ---- */
   .show { display: grid; grid-template-columns: minmax(0, 1fr); }
   .show-head { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; padding-bottom: 18px; }
-  .show-stat { font-size: 11px; letter-spacing: 0.36px; color: var(--color-off); font-weight: 700; }
+  .show-stat { margin-right: auto; font-size: 11px; letter-spacing: 0.36px; color: var(--color-off); font-weight: 700; }
   .pane-cost { padding: 0 22px; margin-top: 14px; font-family: var(--font-mono); font-size: 11.5px; color: var(--color-mid); }
   .pane.is-ours .pane-cost { color: var(--color-slate); }
   .pane-foot { margin-top: 2px; }
   .show-eyebrow { flex: 1 1 100%; font-size: 11px; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); }
-  .show-pick { display: flex; gap: 1px; background: var(--color-steel); border: 1px solid var(--color-steel); }
+  .show-pick { display: flex; gap: 1px; margin-left: auto; background: var(--color-steel); border: 1px solid var(--color-steel); }
   .show-pick-btn { appearance: none; border: 0; background: var(--color-warm); padding: 8px 12px; cursor: pointer; font-size: 11px; letter-spacing: 0.36px; color: var(--color-slate); transition: background var(--duration-tap) var(--ease-out), color var(--duration-tap) var(--ease-out); }
   .show-pick-btn:hover { color: var(--color-off); }
   .show-pick-btn.is-on { background: var(--color-off); color: var(--color-warm); }
