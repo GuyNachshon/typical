@@ -7,7 +7,8 @@
  "caveats": [
   "Not ranked leaderboard entries: the leaderboard needs at least 95% coverage including 146 non-public judge items.",
   "The hard tier is 111 items, so a 95% interval is about plus or minus 9 points. Adjacent rows are not separable.",
-  "Rows other than ours and the frozen controls are REPORT section 3q's comparison and predate our workflow training."
+  "Rows other than ours and the frozen controls are REPORT section 3q's comparison and predate our workflow training.",
+  "Parameter counts are the published ones; entries that do not state a size are left blank rather than guessed. A mixture-of-experts entry carries both what you host and what each token pays, and the chart plots the active count. There is no cost column: typical-small is the only row we have measured a latency for, and typical-medium's is still outstanding."
  ],
  "sources": {
   "ours": "site/data/models.json",
@@ -36,7 +37,9 @@
    "size": "4B",
    "std": 0.986,
    "hard": 0.613,
-   "ours": false
+   "ours": false,
+   "params_total": 4.0,
+   "params_active": 4.0
   },
   {
    "name": "OpenJev",
@@ -44,7 +47,9 @@
    "size": "26B-A4B",
    "std": 0.972,
    "hard": 0.64,
-   "ours": false
+   "ours": false,
+   "params_total": 26.0,
+   "params_active": 4.0
   },
   {
    "name": "system-one-open",
@@ -52,16 +57,9 @@
    "size": "2B",
    "std": 0.931,
    "hard": 0.486,
-   "ours": false
-  },
-  {
-   "name": "14B ladder point",
-   "kind": "decision model",
-   "size": "14B",
-   "std": 0.875,
-   "hard": 0.468,
-   "ours": true,
-   "note": "not released: missed its own pass rule"
+   "ours": false,
+   "params_total": 2.0,
+   "params_active": 2.0
   },
   {
    "name": "typical-medium",
@@ -69,7 +67,9 @@
    "size": "4B",
    "std": 0.8611111111111112,
    "hard": 0.4954954954954955,
-   "ours": true
+   "ours": true,
+   "params_total": 4.0,
+   "params_active": 4.0
   },
   {
    "name": "open-alternative-jev",
@@ -77,42 +77,59 @@
    "size": "4B",
    "std": 0.833,
    "hard": 0.568,
-   "ours": false
+   "ours": false,
+   "params_total": 4.0,
+   "params_active": 4.0
   },
   {
    "name": "Qwen3-14B-Base",
    "kind": "prompted, 3 exemplars",
    "std": 0.819,
    "hard": 0.559,
-   "ours": false
+   "ours": false,
+   "size": "14B",
+   "params_total": 14.0,
+   "params_active": 14.0
   },
   {
    "name": "Qwen3.5-9B-Base",
    "kind": "prompted, 3 exemplars",
    "std": 0.806,
    "hard": 0.541,
-   "ours": false
+   "ours": false,
+   "size": "9B",
+   "params_total": 9.0,
+   "params_active": 9.0
   },
   {
    "name": "Qwen3-4B-Base",
    "kind": "prompted, 3 exemplars",
    "std": 0.778,
    "hard": 0.441,
-   "ours": false
+   "ours": false,
+   "size": "4B",
+   "params_total": 4.0,
+   "params_active": 4.0
   },
   {
    "name": "Qwen3-4B (instruct)",
    "kind": "prompted, 3 exemplars",
    "std": 0.778,
    "hard": 0.423,
-   "ours": false
+   "ours": false,
+   "size": "4B",
+   "params_total": 4.0,
+   "params_active": 4.0
   },
   {
    "name": "Qwen3.5-4B-Base",
    "kind": "prompted, 3 exemplars",
    "std": 0.764,
    "hard": 0.495,
-   "ours": false
+   "ours": false,
+   "size": "4B",
+   "params_total": 4.0,
+   "params_active": 4.0
   },
   {
    "name": "jeff (GLiFormer)",
@@ -120,7 +137,9 @@
    "size": "400M",
    "std": 0.75,
    "hard": 0.387,
-   "ours": false
+   "ours": false,
+   "params_total": 0.4,
+   "params_active": 0.4
   },
   {
    "name": "typical-small",
@@ -128,7 +147,9 @@
    "size": "1.7B",
    "std": 0.7083333333333334,
    "hard": 0.43243243243243246,
-   "ours": true
+   "ours": true,
+   "params_total": 1.7,
+   "params_active": 1.7
   },
   {
    "name": "Laya (ModernBERT)",
@@ -149,21 +170,30 @@
    "kind": "prompted, 3 exemplars",
    "std": 0.583,
    "hard": 0.387,
-   "ours": false
+   "ours": false,
+   "size": "2B",
+   "params_total": 2.0,
+   "params_active": 2.0
   },
   {
    "name": "Qwen3-8B-Base",
    "kind": "prompted, 3 exemplars",
    "std": 0.556,
    "hard": 0.369,
-   "ours": false
+   "ours": false,
+   "size": "8B",
+   "params_total": 8.0,
+   "params_active": 8.0
   },
   {
    "name": "Qwen3-1.7B-Base",
    "kind": "prompted, 3 exemplars",
    "std": 0.528,
    "hard": 0.369,
-   "ours": false
+   "ours": false,
+   "size": "1.7B",
+   "params_total": 1.7,
+   "params_active": 1.7
   },
   {
    "name": "open-jev-deberta-v3-large",
@@ -172,5 +202,12 @@
    "hard": 0.378,
    "ours": false
   }
+ ],
+ "unknown_size": [
+  "GLiNER2",
+  "Jev 1.13.0",
+  "Laya (ModernBERT)",
+  "djev",
+  "open-jev-deberta-v3-large"
  ]
 }

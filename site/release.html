@@ -205,7 +205,12 @@
   </div>
   <figure class="fig">
     <div id="jev-field"></div>
-    <figcaption>JevBench standard and hard, same 231 public ids. Ours are marked. Easy is 1.00 for every entry and is left out.</figcaption>
+    <figcaption>JevBench standard and hard, same 231 public ids. Ours are marked. Click any column to re-sort. Easy is 1.00 for every entry and is left out.</figcaption>
+  </figure>
+  <p class="mt-30">Plotted against the parameters each token actually pays for, neither of our models sits on the frontier. A 400M classifier scores above <code>typical&#8209;small</code>, and <code>SemIf</code> scores above <code>typical&#8209;medium</code> on the same 4B base — a gap our report puts down to their rendering and method and is still probing. What our models do lead is every prompted backbone we ran, at every size, including a 14B.</p>
+  <figure class="fig">
+    <div class="chart" id="size-score"></div>
+    <figcaption>JevBench standard against active parameters. The dashed step is the frontier: the cheapest entry at or above every score to its left. Five entries publish no size and are not plotted.</figcaption>
   </figure>
 </section>
 

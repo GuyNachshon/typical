@@ -560,5 +560,10 @@
   .field tr.is-ours td:first-child::before { content: '\2192\00a0'; color: var(--color-mid); }
   .field tr.is-chance td { color: var(--color-mid); border-top: 1px solid var(--color-off); }
 
+  .field th.is-sortable { cursor: pointer; user-select: none; }
+  .field th.is-sortable:hover { color: var(--color-off); }
+  .field th[aria-sort="descending"]::after { content: ' \2193'; }
+  .field th[aria-sort="ascending"]::after { content: ' \2191'; }
+
   .todo { background: var(--color-lgray); color: var(--color-off); padding: 1px 6px; border-radius: 2px; font-family: var(--font-mono); font-size: 12px; }
 }
