@@ -2276,15 +2276,19 @@ source = { virtual = "." }
 dependencies = [
     { name = "datasets" },
     { name = "datasketch" },
+    { name = "fastapi" },
     { name = "gradio" },
+    { name = "huggingface-hub" },
     { name = "matplotlib" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "peft" },
     { name = "pytest" },
+    { name = "safetensors" },
     { name = "scikit-learn" },
     { name = "torch" },
     { name = "transformers" },
+    { name = "uvicorn" },
     { name = "wandb" },
 ]
 
@@ -2292,14 +2296,18 @@ dependencies = [
 requires-dist = [
     { name = "datasets", specifier = ">=5.0.1" },
     { name = "datasketch", specifier = ">=2.0.0" },
+    { name = "fastapi", specifier = ">=0.115.0" },
     { name = "gradio", specifier = ">=6.28.0" },
+    { name = "huggingface-hub", specifier = ">=0.25.0" },
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "peft", specifier = ">=0.21.0" },
     { name = "pytest", specifier = ">=9.1.1" },
+    { name = "safetensors", specifier = ">=0.4.0" },
     { name = "scikit-learn", specifier = ">=1.9.1" },
     { name = "torch", specifier = ">=2.14.0" },
     { name = "transformers", specifier = ">=5.17.0" },
+    { name = "uvicorn", specifier = ">=0.30.0" },
     { name = "wandb", specifier = ">=0.30.0" },
 ]
 
