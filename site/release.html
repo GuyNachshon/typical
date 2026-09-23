@@ -42,7 +42,7 @@
     <span>Oz Labs</span>
     <span>23 September 2026</span>
     <a href="https://huggingface.co/OzLabs/typical-small">Weights</a>
-    <a href="https://huggingface.co/OzLabs/typical-small/tree/main/inference">Inference code</a>
+    <a href="https://github.com/GuyNachshon/typical">Source</a>
     <a href="research.html">Research</a>
   </div>
 </header>
@@ -204,16 +204,16 @@
   <div class="claim">
     <h2>Try it</h2>
   </div>
-  <div class="code"><pre>pip install -r inference/requirements.txt</pre></div>
-  <div class="code"><pre>from typical import Typical
+  <div class="code"><pre>pip install typical-ai</pre></div>
+  <div class="code"><pre>from typical_ai import Typical
 
 m = Typical.from_pretrained("OzLabs/typical-medium", device="auto")
 
 m.choice(state, "What does the customer want?", ["refund", "replacement", "repair"])
 m.noul(state, "Is the order still under warranty?")
 m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
-  <p class="note mt-18" style="max-width:72ch"><code>state</code> is a string or any JSON-serialisable dict. The inference package needs only torch, transformers, safetensors, huggingface_hub and numpy.</p>
-  <p class="note mt-18" style="max-width:72ch">Training code will follow. <span class="todo">License line.</span></p>
+  <p class="note mt-18" style="max-width:72ch"><code>state</code> is a string or any JSON-serialisable dict. The package is <code>typical‑ai</code> on PyPI, Apache‑2.0, Python 3.11 or newer. The import is <code>typical_ai</code>: PyPI’s bare <code>typical</code> is an established typing toolkit and is not us.</p>
+  <p class="note mt-18" style="max-width:72ch">The source is on <a class="ul" href="https://github.com/GuyNachshon/typical">GitHub</a>. <span class="todo">License line.</span></p>
 </section>
 
 <section class="page chapter" id="next">
@@ -241,7 +241,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
 
 <footer class="footer"><div class="page">
   <div class="cols">
-    <div><p class="t-card" style="max-width:20ch">Models that decide, not generate.</p><p class="t-eyebrow mt-30" style="color:var(--color-mid)">Weights and inference code on Hugging Face. Training code to follow.</p></div>
+    <div><p class="t-card" style="max-width:20ch">Models that decide, not generate.</p><p class="t-eyebrow mt-30" style="color:var(--color-mid)">Weights on Hugging Face, package on PyPI, source on GitHub.</p></div>
     <div class="t-mono"><p class="t-eyebrow mb-18">Models</p><p><a href="https://huggingface.co/OzLabs/typical-small">typical-small</a></p><p><a href="https://huggingface.co/OzLabs/typical-medium">typical-medium</a></p><p><a href="https://huggingface.co/OzLabs/typical-small-preview">typical-small-preview</a></p></div>
     <div class="t-mono"><p class="t-eyebrow mb-18">Site</p><p><a href="#results">Results</a></p><p><a href="#demos">Demos</a></p><p><a href="research.html">Research</a></p><p><a href="research.html#limitations">Limitations</a></p></div>
   </div>

@@ -438,11 +438,9 @@ which declare no license on their HF cards.</p></div>
   <div class="chapter-body"><div class="body">
 <div class="prose"><p>The public inference package ships inside the model repos on Hugging Face; there is no separate
 GitHub repo yet.</p></div>
-<div class="code"><pre>pip install huggingface_hub
-hf download OzLabs/typical-small --include &quot;inference/*&quot; --local-dir typical
-pip install -r typical/inference/requirements.txt
+<div class="code"><pre>pip install typical-ai
 </pre></div>
-<div class="code"><pre>from typical import Typical  # typical/inference/typical/, from the hf download above
+<div class="code"><pre>from typical_ai import Typical  # pip install typical-ai
 
 m = Typical.from_pretrained(&quot;OzLabs/typical-small&quot;, device=&quot;auto&quot;)
 

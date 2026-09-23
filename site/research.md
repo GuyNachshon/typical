@@ -434,13 +434,11 @@ The public inference package ships inside the model repos on Hugging Face; there
 GitHub repo yet.
 
 ```bash
-pip install huggingface_hub
-hf download OzLabs/typical-small --include "inference/*" --local-dir typical
-pip install -r typical/inference/requirements.txt
+pip install typical-ai
 ```
 
 ```python
-from typical import Typical  # typical/inference/typical/, from the hf download above
+from typical_ai import Typical  # pip install typical-ai
 
 m = Typical.from_pretrained("OzLabs/typical-small", device="auto")
 
