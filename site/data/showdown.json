@@ -186,8 +186,8 @@
   "typical-small": {
    "ours": true,
    "device": "mps",
-   "ms": 477.7,
-   "measured_utc": "2026-09-23T19:55:41Z",
+   "ms": 494.9,
+   "measured_utc": "2026-09-23T20:23:54Z",
    "answers": [
     {
      "pick": "yes",
@@ -370,337 +370,343 @@
     }
    ]
   },
-  "openrouter/openai/gpt-5.4-nano (low reasoning)": {
-   "ms": 6423.8,
-   "first_token_ms": 5192.0,
-   "measured_utc": "2026-09-23T19:55:40Z",
+  "openrouter/openai/gpt-5.6-terra (low reasoning)": {
+   "ms": 7220.6,
+   "cost_usd": 0.007624,
+   "tokens_in": 1183,
+   "tokens_out": 389,
+   "first_token_ms": 5537.2,
+   "measured_utc": "2026-09-23T20:23:53Z",
    "timeline": [
     {
      "q": 0,
-     "t_ms": 5192.0
+     "t_ms": 5537.2
     },
     {
      "q": 1,
-     "t_ms": 5310.0
+     "t_ms": 5643.6
     },
     {
      "q": 2,
-     "t_ms": 5405.8
+     "t_ms": 5741.5
     },
     {
      "q": 3,
-     "t_ms": 5453.3
+     "t_ms": 5765.4
     },
     {
      "q": 4,
-     "t_ms": 5541.3
+     "t_ms": 5807.0
     },
     {
      "q": 5,
-     "t_ms": 5617.0
+     "t_ms": 5819.6
     },
     {
      "q": 6,
-     "t_ms": 5737.1
+     "t_ms": 5889.5
     },
     {
      "q": 7,
-     "t_ms": 5803.0
+     "t_ms": 5995.4
     },
     {
      "q": 8,
-     "t_ms": 5908.4
+     "t_ms": 6058.2
     },
     {
      "q": 9,
-     "t_ms": 5999.5
+     "t_ms": 6142.0
     },
     {
      "q": 10,
-     "t_ms": 6075.9
+     "t_ms": 6213.7
     },
     {
      "q": 11,
-     "t_ms": 6131.7
+     "t_ms": 6283.4
     },
     {
      "q": 12,
-     "t_ms": 6273.2
+     "t_ms": 6367.3
     },
     {
      "q": 13,
-     "t_ms": 6294.2
+     "t_ms": 6442.2
     },
     {
      "q": 14,
-     "t_ms": 6305.0
+     "t_ms": 6528.0
     },
     {
      "q": 15,
-     "t_ms": 6316.5
+     "t_ms": 6600.1
     },
     {
      "q": 16,
-     "t_ms": 6331.4
+     "t_ms": 6692.2
     },
     {
      "q": 17,
-     "t_ms": 6337.0
+     "t_ms": 6757.2
     },
     {
      "q": 18,
-     "t_ms": 6351.5
+     "t_ms": 6830.4
     },
     {
      "q": 19,
-     "t_ms": 6360.5
+     "t_ms": 6932.7
     }
    ],
    "answers": [
     {
      "pick": "yes",
-     "stated_confidence": 0.93
+     "stated_confidence": 0.99
     },
     {
      "pick": "webhooks",
-     "stated_confidence": 0.74
+     "stated_confidence": 0.98
     },
     {
      "pick": "yes",
-     "stated_confidence": 0.9
+     "stated_confidence": 0.99
     },
     {
      "pick": "3",
-     "stated_confidence": 0.82
+     "stated_confidence": 0.98
     },
     {
      "pick": "platform",
-     "stated_confidence": 0.67
-    },
-    {
-     "pick": "yes",
-     "stated_confidence": 0.9
-    },
-    {
-     "pick": "2",
-     "stated_confidence": 0.62
-    },
-    {
-     "pick": "yes",
-     "stated_confidence": 0.92
-    },
-    {
-     "pick": "this week",
-     "stated_confidence": 0.88
-    },
-    {
-     "pick": "yes",
-     "stated_confidence": 0.9
-    },
-    {
-     "pick": "3",
-     "stated_confidence": 0.86
-    },
-    {
-     "pick": "yes",
-     "stated_confidence": 0.85
-    },
-    {
-     "pick": "restore the service",
      "stated_confidence": 0.72
     },
     {
-     "pick": "no",
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "3",
+     "stated_confidence": 0.91
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "this week",
+     "stated_confidence": 0.96
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.97
+    },
+    {
+     "pick": "3",
+     "stated_confidence": 0.98
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "restore the service",
      "stated_confidence": 0.78
     },
     {
      "pick": "no",
-     "stated_confidence": 0.95
-    },
-    {
-     "pick": "2",
-     "stated_confidence": 0.6
-    },
-    {
-     "pick": "yes",
-     "stated_confidence": 0.92
-    },
-    {
-     "pick": "one",
-     "stated_confidence": 0.8
+     "stated_confidence": 0.93
     },
     {
      "pick": "no",
-     "stated_confidence": 0.88
+     "stated_confidence": 0.99
     },
     {
      "pick": "2",
-     "stated_confidence": 0.6
+     "stated_confidence": 0.76
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "one",
+     "stated_confidence": 0.9
+    },
+    {
+     "pick": "no",
+     "stated_confidence": 0.66
+    },
+    {
+     "pick": "3",
+     "stated_confidence": 0.94
     }
    ]
   },
-  "openrouter/google/gemini-2.5-flash-lite (low reasoning)": {
-   "ms": 11171.0,
-   "first_token_ms": 10788.7,
-   "measured_utc": "2026-09-23T19:55:52Z",
+  "openrouter/anthropic/claude-haiku-4.5 (low reasoning)": {
+   "ms": 28796.9,
+   "cost_usd": 0.015289,
+   "tokens_in": 2339,
+   "tokens_out": 2590,
+   "first_token_ms": 28218.5,
+   "measured_utc": "2026-09-23T20:24:22Z",
    "timeline": [
     {
      "q": 0,
-     "t_ms": 10788.7
+     "t_ms": 28218.5
     },
     {
      "q": 1,
-     "t_ms": 10788.7
+     "t_ms": 28218.5
     },
     {
      "q": 2,
-     "t_ms": 10868.3
+     "t_ms": 28223.9
     },
     {
      "q": 3,
-     "t_ms": 10868.3
+     "t_ms": 28223.9
     },
     {
      "q": 4,
-     "t_ms": 10868.3
+     "t_ms": 28223.9
     },
     {
      "q": 5,
-     "t_ms": 10872.0
+     "t_ms": 28226.5
     },
     {
      "q": 6,
-     "t_ms": 10872.0
+     "t_ms": 28226.5
     },
     {
      "q": 7,
-     "t_ms": 10872.0
+     "t_ms": 28392.9
     },
     {
      "q": 8,
-     "t_ms": 10872.1
+     "t_ms": 28392.9
     },
     {
      "q": 9,
-     "t_ms": 10872.1
+     "t_ms": 28396.7
     },
     {
      "q": 10,
-     "t_ms": 10872.1
+     "t_ms": 28396.7
     },
     {
      "q": 11,
-     "t_ms": 11020.4
+     "t_ms": 28396.7
     },
     {
      "q": 12,
-     "t_ms": 11020.4
+     "t_ms": 28396.8
     },
     {
      "q": 13,
-     "t_ms": 11022.1
+     "t_ms": 28458.9
     },
     {
      "q": 14,
-     "t_ms": 11022.1
+     "t_ms": 28458.9
     },
     {
      "q": 15,
-     "t_ms": 11022.1
+     "t_ms": 28565.1
     },
     {
      "q": 16,
-     "t_ms": 11022.1
+     "t_ms": 28565.1
     },
     {
      "q": 17,
-     "t_ms": 11022.1
+     "t_ms": 28565.1
     },
     {
      "q": 18,
-     "t_ms": 11022.1
+     "t_ms": 28625.1
     },
     {
      "q": 19,
-     "t_ms": 11169.4
+     "t_ms": 28625.1
     }
    ],
    "answers": [
     {
      "pick": "yes",
-     "stated_confidence": 1.0
+     "stated_confidence": 0.99
     },
     {
      "pick": "webhooks",
-     "stated_confidence": 1.0
+     "stated_confidence": 0.95
     },
     {
      "pick": "yes",
-     "stated_confidence": 1.0
+     "stated_confidence": 0.99
     },
     {
      "pick": "3",
-     "stated_confidence": 0.9
+     "stated_confidence": 0.95
     },
     {
      "pick": "platform",
-     "stated_confidence": 1.0
+     "stated_confidence": 0.7
     },
     {
      "pick": "yes",
-     "stated_confidence": 1.0
-    },
-    {
-     "pick": "3",
-     "stated_confidence": 0.9
-    },
-    {
-     "pick": "yes",
-     "stated_confidence": 1.0
-    },
-    {
-     "pick": "today",
-     "stated_confidence": 0.9
-    },
-    {
-     "pick": "yes",
-     "stated_confidence": 1.0
-    },
-    {
-     "pick": "3",
-     "stated_confidence": 1.0
-    },
-    {
-     "pick": "yes",
-     "stated_confidence": 1.0
-    },
-    {
-     "pick": "restore the service",
-     "stated_confidence": 1.0
-    },
-    {
-     "pick": "no",
-     "stated_confidence": 1.0
-    },
-    {
-     "pick": "no",
-     "stated_confidence": 1.0
+     "stated_confidence": 0.98
     },
     {
      "pick": "2",
+     "stated_confidence": 0.85
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "this week",
      "stated_confidence": 0.9
     },
     {
      "pick": "yes",
-     "stated_confidence": 1.0
+     "stated_confidence": 0.99
     },
     {
-     "pick": "one",
-     "stated_confidence": 1.0
+     "pick": "3",
+     "stated_confidence": 0.98
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "restore the service",
+     "stated_confidence": 0.8
     },
     {
      "pick": "no",
-     "stated_confidence": 1.0
+     "stated_confidence": 0.9
+    },
+    {
+     "pick": "no",
+     "stated_confidence": 0.98
+    },
+    {
+     "pick": "2",
+     "stated_confidence": 0.75
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.97
+    },
+    {
+     "pick": "one",
+     "stated_confidence": 0.85
+    },
+    {
+     "pick": "no",
+     "stated_confidence": 0.8
     },
     {
      "pick": "3",

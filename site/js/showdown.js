@@ -12,6 +12,9 @@
 //   mountShowdown(host, doc)   doc = site/data/showdown.json
 
 const secs = (ms) => `${(ms / 1000).toFixed(3)}s`;
+// four significant places, because two of these calls cost less than a cent and rounding one of
+// them to $0.01 would be a bigger number than the one that was charged
+const usd = (v) => `$${v < 0.01 ? v.toFixed(6) : v.toFixed(4)}`;
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -32,14 +35,20 @@ export function jnum(p) {
   return s;
 }
 
-// A choice ranks, so the reader sees where the mass went. A score is ordered and keeps its own
-// order, because the thing worth seeing in an ordered distribution is that it decays away from the
-// answer -- re-sorting 0..3 by probability destroys exactly that.
+// One line per answer, in the order the object's own fields matter: what it decided, how much mass
+// that got, what it kept for none-of-these, and then the rest of the distribution -- which is the
+// part that runs past the pane edge. That tail is not hidden, it is the last field of a real object
+// and the full vector is in site/data/showdown.json; a pane wide enough to never clip it would be
+// a pane too narrow to read. A choice ranks so the reader sees where the mass went; a score keeps
+// its own order, because an ordered distribution is worth seeing precisely for how it decays away
+// from the answer, and re-sorting 0..3 by probability destroys exactly that.
 export function oursLine(q, a) {
   const entries = Object.entries(a.probs);
   if (q.type !== 'score') entries.sort((x, y) => y[1] - x[1]);
-  const body = entries.map(([k, v]) => `"${k}": ${jnum(v)}`).concat(`"p_null": ${jnum(a.p_null)}`);
-  return `${JSON.stringify(q.question)}: {${body.join(', ')}},`;
+  const probs = entries.map(([k, v]) => `"${k}": ${jnum(v)}`).join(', ');
+  if (q.type === 'noul') return `${JSON.stringify(q.question)}: {"noul": ${jnum(a.probs.yes)}, "p_null": ${jnum(a.p_null)}},`;
+  const head = `"${q.type}": ${JSON.stringify(a.pick)}, "p": ${jnum(a.probs[a.pick])}, "p_null": ${jnum(a.p_null)}`;
+  return `${JSON.stringify(q.question)}: {${head}, "probs": {${probs}}},`;
 }
 
 export function hostedLine(q, a) {
@@ -54,12 +63,36 @@ export function certainty(answers, at = 0.9) {
   return { n: p.length, sure: p.filter((v) => v >= at).length, max: p.filter((v) => v >= 0.999).length };
 }
 
+const BOLD = /^("[^"]*")|("(?:choice|noul|score)")/;
+
+// The panes are read, not parsed, so the two keys that carry meaning are given weight: the question
+// and the primitive that answered it. Done with text nodes rather than innerHTML because every
+// string in here is model output.
+export function writeLine(node, str) {
+  node.replaceChildren();
+  let rest = str;
+  let guard = 0;
+  while (rest && guard < 64) {
+    guard += 1;
+    const m = BOLD.exec(rest);
+    if (!m) break;
+    if (m.index > 0) node.appendChild(document.createTextNode(rest.slice(0, m.index)));
+    const b = document.createElement('b');
+    b.textContent = m[0];
+    node.appendChild(b);
+    rest = rest.slice(m.index + m[0].length);
+  }
+  if (rest) node.appendChild(document.createTextNode(rest));
+  return node;
+}
+
 function pane(tagText) {
   const box = el('div', 'pane');
   const body = el('div', 'pane-body');
+  const cost = el('p', 'pane-cost t-mono', '');
   const foot = el('p', 'pane-foot t-mono', '');
-  box.append(el('p', 'pane-tag t-mono', tagText), body, foot);
-  return { box, body, foot, setFoot: (t) => { foot.textContent = t; } };
+  box.append(el('p', 'pane-tag t-mono', tagText), body, cost, foot);
+  return { box, body, cost, foot, setFoot: (t) => { foot.textContent = t; } };
 }
 
 export function mountShowdown(host, doc) {
@@ -75,7 +108,8 @@ export function mountShowdown(host, doc) {
   const replay = el('button', 'btn dark', 'Ask all 20');
   replay.type = 'button';
   const picker = el('div', 'show-pick');
-  head.append(el('p', 'show-eyebrow t-mono', `${qs.length} questions · one request each · started together`), picker, replay);
+  const stat = el('p', 'show-stat t-mono', '');
+  head.append(el('p', 'show-eyebrow t-mono', `${qs.length} questions · one request each · started together`), stat, picker, replay);
   host.appendChild(head);
 
   const panes = el('div', 'show-panes');
@@ -106,7 +140,9 @@ export function mountShowdown(host, doc) {
     target.body.replaceChildren();
     target.body.append(el('p', 'pane-cmd', header));
     const out = lines.map((t) => {
-      const n = el('p', t === '{' || t === '}' ? 'pane-line is-brace' : 'pane-line', t);
+      const brace = t === '{' || t === '}';
+      const n = el('p', brace ? 'pane-line is-brace' : 'pane-line');
+      if (brace) n.textContent = t; else writeLine(n, t);
       target.body.appendChild(n);
       return n;
     });
@@ -121,6 +157,12 @@ export function mountShowdown(host, doc) {
     rows.R = fill(R, `$ POST /chat/completions            # ${qs.length} questions, one request`, ['{', ...qs.map((q, i) => hostedLine(q, m.answers[i])), '}']);
     L.box.dataset.model = `typical-small · ${doc.typical_device || ours.device || 'local'}`;
     R.box.dataset.model = `${name} · ${(key.match(/\((\w+) reasoning\)/) || [, ''])[1]} reasoning`;
+    // ours has no price because it ran on the machine rendering this page, which is the point of
+    // shipping weights; inventing a dollar figure for it would be the one dishonest cell here
+    L.cost.textContent = 'cost — · your own hardware';
+    R.cost.textContent = m.cost_usd == null ? '' : `cost ${usd(m.cost_usd)}`;
+    // a ratio, not a superlative: both halves were measured in the same minute, the same way
+    stat.textContent = `${secs(ours.ms)} vs ${secs(m.ms)} · same ${qs.length} questions, same options`;
   }
 
   function paint(target, lines, shown, done, ms, t) {
@@ -156,7 +198,7 @@ export function mountShowdown(host, doc) {
       at.forEach((v) => { if (t >= v) shown += 1; });
       const done = t >= m.ms;
       const waiting = t < first;
-      rows.R[0].textContent = waiting ? 'waiting for first token…' : '{';
+      rows.R[0].textContent = waiting ? `waiting for first token… ${secs(Math.max(0, t))}` : '{';
       rows.R[0].classList.toggle('is-wait', waiting);
       rows.R[0].classList.toggle('is-brace', !waiting);
       paint(R, rows.R, done ? rows.R.length : (waiting ? 0 : shown), done, m.ms, t);
@@ -179,10 +221,12 @@ export function selfTest() {
   const q = { type: 'choice', question: 'Which team should own this ticket?' };
   const a = { pick: 'support', probs: { platform: 0.3, support: 0.46, billing: 0.2, success: 0.04 }, p_null: 0.02 };
   const line = oursLine(q, a);
-  console.assert(line.indexOf('"support": 0.46') < line.indexOf('"platform": 0.3'), 'a choice ranks');
-  console.assert(line.endsWith('"p_null": 0.02},'), 'the abstention is the last field, always present');
+  console.assert(line.startsWith('"Which team should own this ticket?": {"choice": "support", "p": 0.46, "p_null": 0.02, "probs": {'), 'the decision, its mass and its abstention come before the tail that clips');
+  console.assert(line.indexOf('"support": 0.46') < line.indexOf('"platform": 0.3'), 'a choice ranks inside the tail');
   const ord = oursLine({ type: 'score', question: 'x' }, { pick: '3', probs: { 0: 0.02, 1: 0.11, 2: 0.23, 3: 0.64 }, p_null: 0.001 });
-  console.assert(ord.indexOf('"0"') < ord.indexOf('"3"'), 'ordered levels keep their order');
+  console.assert(ord.indexOf('"0": 0.02') < ord.indexOf('"3": 0.64'), 'ordered levels keep their order');
+  const nl = oursLine({ type: 'noul', question: 'x' }, { pick: 'yes', probs: { no: 0.16, yes: 0.84 }, p_null: 0.01 });
+  console.assert(nl === '"x": {"noul": 0.84, "p_null": 0.01},', 'a noul is one Bernoulli and prints as one number');
   console.assert(hostedLine(q, { pick: 'platform' }) === '"Which team should own this ticket?": "platform",', 'the hosted pane prints the label and nothing else');
   const c = certainty([{ pick: 'a', probs: { a: 0.46 } }, { pick: 'a', probs: { a: 0.99 } }]);
   console.assert(c.n === 2 && c.sure === 1, 'certainty counts what cleared the bar');

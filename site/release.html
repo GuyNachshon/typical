@@ -89,13 +89,14 @@
   </div>
   <figure class="fig figfull">
     <div id="showdown"></div>
-    <figcaption>A replay of a recording, not a live call &mdash; a browser cannot hold an API key. <code>scripts/bench_llm.py --capture</code> streams the hosted request and timestamps each answer the instant its value is complete in the token buffer, so a line appears here exactly when the model finished writing it. <code>typical-small</code> on an M-series laptop, not the H100 the 45&nbsp;ms figure was measured on.</figcaption>
+    <figcaption>A replay of a recording, not a live call &mdash; a browser cannot hold an API key. <code>scripts/bench_llm.py --capture</code> streams the hosted request and timestamps each answer the instant its value is complete in the token buffer, so a line appears here exactly when the model finished writing it. <code>typical-small</code> on an M-series laptop, not the H100 the 45&nbsp;ms figure was measured on. A <code>noul</code> line prints P(yes), so anything under .5 is a no. What runs past the right edge of a line is the tail of its <code>probs</code> object; the full vectors are in <code>site/data/showdown.json</code>.</figcaption>
   </figure>
   <div class="claim">
-    <p>The left pane does not fill in. It appears. Twenty questions is one pass over one cached state, so there is no order in which the answers arrive and no first token to wait for: 0.478&nbsp;s, all of it, on a laptop. The right pane is the same twenty questions written out one at a time, because that is the only way a generative model can produce them &mdash; 5.2&nbsp;s before the first answer exists, 6.4&nbsp;s before the last one does.</p>
-    <p>Then read what is in them. Every line on the left carries the distribution it was read from and an explicit <code>p_null</code>. Every line on the right carries a label. We disagree with <code>gpt-5.4-nano</code> on five of the twenty, and four of those five are the four answers we were least sure of. Against <code>gemini-2.5-flash-lite</code> the correspondence is exact: the five we differ on are the five lowest numbers we returned &mdash; .36, .43, .46, .52, .63. You do not need the other model to know which of our answers to distrust. The number is in the answer.</p>
-    <p>That cuts both ways, and one of those five is ours to lose. Asked when the customer needs this fixed, we put .63 on <em>no deadline given</em>; the ticket says a board demo Friday morning, and both hosted models read it. A distribution does not make you right. It makes being wrong something a program can catch.</p>
-    <p>The confidences coming back the other way are a different kind of object, and the two hosted models are not alike in it. <code>gpt-5.4-nano</code> spreads properly: fifteen distinct values from .60 to .95, and three of its four lowest are among the five it differs from us on. <code>gemini-2.5-flash-lite</code> used two numbers for twenty answers, .90 and 1.00, fifteen of them 1.00. Whatever is left of a scale with two points on it, the deadline it got wrong sat on the lower one. Neither number was read off anything. We asked for a field and the model wrote a field, with the same process that wrote the answer above it.</p>
+    <p>The left pane does not fill in. It appears. Twenty questions is one pass over one cached state, so there is no order in which the answers arrive and no first token to wait for: 0.495&nbsp;s, all of it, on a laptop. The right pane is the same twenty questions written out one at a time, because that is the only way a generative model can produce them &mdash; 5.5&nbsp;s before <code>gpt-5.6-terra</code>'s first answer exists, 7.2&nbsp;s before the last one does. Switch the pane to <code>claude-haiku-4.5</code> and the first answer lands at 28.2&nbsp;s.</p>
+    <p>Then read what is in them. Every line on the left names what was decided, how much mass that got, what it kept for none of these, and then the distribution it was all read from. Every line on the right carries a label. We differ from <code>gpt-5.6-terra</code> on five of the twenty, and four of those five are the four lowest numbers we returned &mdash; .36, .43, .46, .52. Against <code>claude-haiku-4.5</code> it is four differences, three of them in that same bottom five. You do not need the second model to know which of our answers to distrust; the number is in the answer.</p>
+    <p>That cuts both ways, and one of the five is ours to lose. Asked when the customer needs this fixed, we put .63 on <em>no deadline given</em>; the ticket says a board demo Friday morning, and both hosted models read it. A distribution does not make you right. It makes being wrong something a program can catch before a customer does.</p>
+    <p>The confidences coming back the other way are a different kind of object. <code>gpt-5.6-terra</code> put .90 or higher on sixteen of twenty, <code>claude-haiku-4.5</code> on fourteen, and both of them did it on the questions they got wrong as readily as on the ones they got right. Neither number was read off anything. We asked the schema for a confidence field and the model wrote a confidence field, with the same process that wrote the answer above it.</p>
+    <p>The call cost <code>gpt-5.6-terra</code> $0.0076 and <code>claude-haiku-4.5</code> $0.0153, as billed. Ours has no price on it because it ran on the machine that drew this page, which is the whole argument for shipping weights rather than an endpoint.</p>
 </div>
 </section>
 
@@ -126,6 +127,10 @@
     <p>It failed a simple control. When we replaced each question with an unrelated one, the model performed almost the same. It had learned which answers looked plausible in general, not which answer matched the question.</p>
     <p>Putting the options inside the decision pass restored the question-dependent signal. The candidate set isn't just an output vocabulary; it's part of the question.</p>
   </div>
+  <figure class="fig">
+    <div class="chart" id="chart-deltaq"></div>
+    <figcaption>&Delta;<sub>q</sub> is the accuracy a model gives up when the real question is replaced by a shuffled one. A design that scores the same either way never used the question. The candidate-blind state read &minus;.008 at full depth &mdash; within noise of zero, and the same across every student shape we tried. The shipped models read +.127 and +.193. Sources: <code>releases/typical-small.md</code>, <code>releases/typical-medium.md</code>, REPORT &sect;3s.</figcaption>
+  </figure>
 </section>
 
 <section class="page chapter" id="types">
@@ -133,6 +138,10 @@
     <h2>Types are contracts</h2>
     <p>Different decisions deserve different probability spaces.</p>
   </div>
+  <figure class="fig">
+    <div class="chart" id="chart-types"></div>
+    <figcaption>Schematic: the probability space each primitive owns. Choice is a categorical over the K options you passed. Noul is one Bernoulli from a head that never sees the labels. Score is a ladder whose mass sits near the true level instead of scattering. Abstain is set apart from the options because it is a judgment about the set, not a member of it. No values are claimed here; the measured ones are in the text.</figcaption>
+  </figure>
   <div>
     <div><h3 class="t-feature">Choice</h3><p class="mt-18">Picks one of K options defined at call time, as a categorical distribution.</p></div>
     <div class="mt-30"><h3 class="t-feature">Noul</h3><p class="mt-18">Answers yes or no with a single Bernoulli probability, from a head that never sees the labels. That makes it exactly invariant to which label you call "yes." When we treated yes/no as a two-way Choice instead, reversing the label order moved P(yes) by as much as .55. In a matched comparison, the dedicated head also generalized better: on PagerDuty incidents, a dataset never used in training, accuracy rose from .60 to .89.</p></div>

@@ -285,7 +285,7 @@ def main() -> None:
     print(f"wrote {OUT.relative_to(ROOT)} ({len(doc['runs'])} hosted model(s))")
 
 
-def stream_llm(client: httpx.Client, provider: str, model: str, state: str, questions: list[dict], effort: str) -> tuple[dict, list[dict], float]:
+def stream_llm(client: httpx.Client, provider: str, model: str, state: str, questions: list[dict], effort: str) -> tuple[dict, list[dict], float, dict]:
     """The same call as call_llm, streamed, timestamping the moment each answer finishes arriving.
 
     The side-by-side on the page replays a hosted model filling in its answers one at a time. That
@@ -301,12 +301,15 @@ def stream_llm(client: httpx.Client, provider: str, model: str, state: str, ques
         "response_format": {"type": "json_schema", "json_schema": {"name": "answer", "strict": True, "schema": schema}},
         "reasoning": {"effort": effort},
         "stream": True,
+        # the provider bills this call and knows what it charged; asking it beats multiplying our
+        # own token count by a price list that changes without telling us
+        "usage": {"include": True},
     }
     headers = {"Authorization": f"Bearer {os.environ[key_env]}"}
     # a value counts as arrived once the token after it has landed, which is what the closing comma
     # or brace is: until then the model could still be writing digits
     done_re = re.compile(r'"q(\d+)"\s*:\s*(?:"[^"]*"|-?[\d.]+)\s*[,}]')
-    buf, seen, timeline = "", set(), []
+    buf, seen, timeline, usage = "", set(), [], {}
     t0 = time.perf_counter()
     with client.stream("POST", url, json=body, headers=headers, timeout=600) as res:
         res.raise_for_status()
@@ -316,7 +319,10 @@ def stream_llm(client: httpx.Client, provider: str, model: str, state: str, ques
             payload = line[6:]
             if payload.strip() == "[DONE]":
                 break
-            delta = ((json.loads(payload).get("choices") or [{}])[0].get("delta") or {})
+            chunk = json.loads(payload)
+            if chunk.get("usage"):
+                usage = chunk["usage"]
+            delta = ((chunk.get("choices") or [{}])[0].get("delta") or {})
             buf += delta.get("content") or ""
             now = (time.perf_counter() - t0) * 1000
             for m in done_re.finditer(buf):
@@ -325,7 +331,7 @@ def stream_llm(client: httpx.Client, provider: str, model: str, state: str, ques
                     seen.add(i)
                     timeline.append({"q": i, "t_ms": round(now, 1)})
     total = (time.perf_counter() - t0) * 1000
-    return json.loads(buf), timeline, total
+    return json.loads(buf), timeline, total, usage
 
 
 def capture(client: httpx.Client, args, state: str, queries: list[dict], device: str) -> None:
@@ -365,12 +371,15 @@ def capture(client: httpx.Client, args, state: str, queries: list[dict], device:
     }
     print(f"  typical: {ms:.0f} ms, {len(results)} answers")
 
-    hosted, timeline, total = stream_llm(client, args.provider, args.model, state, queries, args.reasoning)
+    hosted, timeline, total, usage = stream_llm(client, args.provider, args.model, state, queries, args.reasoning)
     missing = [i for i in range(len(queries)) if f"q{i}" not in hosted]
     if missing:
         raise RuntimeError(f"{key} left {len(missing)} answer(s) unwritten: {missing[:3]}")
     models[key] = {
         "ms": round(total, 1),
+        "cost_usd": usage.get("cost"),
+        "tokens_in": usage.get("prompt_tokens"),
+        "tokens_out": usage.get("completion_tokens"),
         "first_token_ms": timeline[0]["t_ms"] if timeline else None,
         "measured_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "timeline": timeline,
@@ -379,7 +388,7 @@ def capture(client: httpx.Client, args, state: str, queries: list[dict], device:
             for i in range(len(queries))
         ],
     }
-    print(f"  {key}: {total:.0f} ms, first answer at {timeline[0]['t_ms'] if timeline else '?'} ms")
+    print(f"  {key}: {total:.0f} ms, first answer at {timeline[0]['t_ms'] if timeline else '?'} ms, cost {usage.get('cost')}")
     out.write_text(json.dumps(doc, indent=1) + "\n")
     print(f"wrote {out.relative_to(ROOT)} ({len(models)} model(s))")
 

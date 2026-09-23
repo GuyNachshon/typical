@@ -182,6 +182,7 @@ function mountSizeScore(host, doc) {
 
 import { mountShowdown } from './showdown.js';
 import { mountParallel } from './parallel.js';
+import { mountDeltaQ, mountTypes } from './relfigs.js';
 
 // Figure numbers were typed into the captions by hand, so moving a section renumbered nothing and
 // two figures both called themselves Fig. 1. They are numbered from document order instead, and a
@@ -206,6 +207,8 @@ function numberFigures() {
 document.addEventListener('DOMContentLoaded', async () => {
   numberFigures();
   mountParallel(document.getElementById('chart-parallel'));
+  mountDeltaQ(document.getElementById('chart-deltaq'));
+  mountTypes(document.getElementById('chart-types'));
   const host = document.getElementById('showdown');
   if (!host) return;
   const doc = await fetch('data/showdown.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);

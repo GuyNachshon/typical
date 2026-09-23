@@ -581,15 +581,19 @@
   /* ---- the showdown: two terminals, started together, each printing what it actually returned ---- */
   .show { display: grid; grid-template-columns: minmax(0, 1fr); }
   .show-head { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; padding-bottom: 18px; }
-  .show-eyebrow { flex: 1 1 260px; font-size: 11px; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); }
+  .show-stat { font-size: 11px; letter-spacing: 0.36px; color: var(--color-off); font-weight: 700; }
+  .pane-cost { padding: 0 22px; margin-top: 14px; font-family: var(--font-mono); font-size: 11.5px; color: var(--color-mid); }
+  .pane.is-ours .pane-cost { color: var(--color-slate); }
+  .pane-foot { margin-top: 2px; }
+  .show-eyebrow { flex: 1 1 100%; font-size: 11px; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); }
   .show-pick { display: flex; gap: 1px; background: var(--color-steel); border: 1px solid var(--color-steel); }
   .show-pick-btn { appearance: none; border: 0; background: var(--color-warm); padding: 8px 12px; cursor: pointer; font-size: 11px; letter-spacing: 0.36px; color: var(--color-slate); transition: background var(--duration-tap) var(--ease-out), color var(--duration-tap) var(--ease-out); }
   .show-pick-btn:hover { color: var(--color-off); }
   .show-pick-btn.is-on { background: var(--color-off); color: var(--color-warm); }
 
-  /* the left pane prints distributions and the right prints labels, so an even split starves the
-     one with something to say and leaves the other half empty */
-  .show-panes { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 20px; }
+  /* equal halves: the two panes are being compared line for line, and a split that gives one of
+     them more room reads as the figure taking a side before the reader has */
+  .show-panes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
   .pane { position: relative; min-width: 0; padding: 26px 0 30px; border: 1px solid var(--color-steel); }
   /* the label sits on the border the way a fieldset legend does, which is what the frame is for */
   .pane-tag { position: absolute; top: -7px; left: 22px; padding: 0 8px; background: var(--color-warm); font-size: 10px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); }
@@ -598,16 +602,17 @@
   .pane-body { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.7; color: var(--color-off); padding: 0 22px; }
   .pane-cmd { color: var(--color-slate); white-space: pre; overflow: hidden; text-overflow: ellipsis; margin-bottom: 14px; }
   /* every line is laid out from the start and only revealed, so a landing answer never reflows.
-     A distribution over four options does not fit a half-width pane at any font size worth reading,
-     so a long line wraps with a hanging indent rather than losing its tail to an ellipsis: the
-     whole point of the pane is the part that was getting cut off. */
-  .pane-line { white-space: pre-wrap; overflow-wrap: break-word; padding-left: 4ch; text-indent: -2ch; color: transparent; }
-  .pane-line.is-brace { padding-left: 0; text-indent: 0; }
+     One line per answer, both panes, so the two read line for line -- a wrapped line would put the
+     same answer on different rows in each pane. What runs past the edge is the tail of the probs
+     object, after the decision, its mass and its abstention have all been printed. */
+  .pane-line { white-space: pre; overflow: hidden; text-overflow: ellipsis; padding-left: 2ch; color: transparent; }
+  .pane-line.is-brace { padding-left: 0; }
+  .pane-line b { font-weight: 700; color: inherit; }
   .pane-line.is-in { color: inherit; }
   /* the brace row carries the waiting message, so the message needs no position of its own */
   .pane-line.is-wait.is-in { color: var(--color-mid); }
   .pane.is-ours .pane-line.is-in { color: var(--color-off); }
-  .pane-foot { min-height: 1.7em; margin-top: 14px; padding: 0 22px; font-family: var(--font-mono); font-size: 11.5px; color: var(--color-mid); }
+  .pane-foot { min-height: 1.7em; padding: 0 22px; font-family: var(--font-mono); font-size: 11.5px; color: var(--color-mid); }
   .pane.is-done.is-ours .pane-foot { color: var(--color-off); font-weight: 700; }
 
   @media (max-width: 64rem) {
