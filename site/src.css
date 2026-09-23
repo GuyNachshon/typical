@@ -167,6 +167,7 @@
   /* full-bleed out of the .page column it is nested in: a band spans the viewport by definition */
   /* was a charcoal full-bleed band. Every reference the client chose is light end to end, and
      dark on this page now means only one thing: a screen with something running on it. */
+  .post .figband { margin: 30px 0 54px; }
   .figband { padding-block: 34px 6px; border-top: 1px solid var(--color-off); border-bottom: 1px solid var(--color-steel); }
   .figband-row { display: grid; grid-template-columns: repeat(3, 1fr); }
   .figband-row p { border-left: 1px solid var(--color-steel); padding-left: 28px; }
@@ -175,7 +176,8 @@
   .figband i { font-family: var(--font-mono); font-size: 22px; font-style: normal; margin-left: 8px; color: var(--color-mid); }
   .figband em { display: block; margin-top: 16px; font: 700 12px/1.3 var(--font-mono); letter-spacing: 0.72px; text-transform: uppercase; font-style: normal; color: var(--color-mid); }
   @media (max-width: 64rem) {
-    .figband { padding-block: 56px; }
+    .post .figband { margin: 30px 0 54px; }
+  .figband { padding-block: 56px; }
     .figband-row { grid-template-columns: 1fr; gap: 34px; }
     .figband-row p { border-left: 0; padding-left: 0; }
     .figband em { margin-top: 12px; }
@@ -531,10 +533,7 @@
      footer read as the page breaking rather than ending. An end-mark on paper, then air, then the
      dark: the transition is the same one, it is just deliberate now. */
   .post .footer { margin-top: 0; }
-  .post .chapter:last-of-type::after {
-    content: ''; display: block; width: 18px; height: 18px; margin: 96px auto 110px;
-    border: 1px solid var(--color-steel); background: var(--color-warm);
-  }
+  .post .chapter:last-of-type { padding-bottom: 130px; }
 
   /* ---- the FAQ, as disclosures ---- */
   .faq-item { border-bottom: 1px solid var(--color-steel); }
@@ -611,6 +610,13 @@
   /* the explicit column is load-bearing: with none, this grid sizes its implicit column to
      max-content, and a row's 1fr track resolves to zero inside that measurement, so the whole
      component collapsed to the width of its label and value columns */
+  /* ---- types: each panel keeps its own heading and paragraph under it ---- */
+  .typegrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 44px 40px; }
+  .typecard > .chart { margin-bottom: 16px; }
+  .typecard > h3 { font-size: 17px; }
+  .typecard > p { margin-top: 8px; font-size: 15px; line-height: 1.55; color: var(--color-slate); }
+  @media (max-width: 48rem) { .typegrid { grid-template-columns: minmax(0, 1fr); gap: 34px; } }
+
   /* ---- the showdown: two terminals, started together, each printing what it actually returned ---- */
   .show { display: grid; grid-template-columns: minmax(0, 1fr); }
   .show-head { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; padding-bottom: 18px; }

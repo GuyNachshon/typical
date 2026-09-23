@@ -13,89 +13,74 @@ import { svgEl, svgText, registerChart, fitWidth, INK, MID, STEEL, OURS, OTHER }
 
 const DESIGN_W = 1080;
 
-// The four primitives, drawn as the probability space each one owns. No values: these are shapes,
-// and the numbers that belong to each type are in the prose beside them.
-const TYPES = [
-  { name: 'choice', bars: [0.12, 0.62, 0.18, 0.08], ticks: ['A', 'B', 'C', 'D'], note: 'one of K, named at call time' },
-  { name: 'noul', bars: [0.16, 0.84], ticks: ['no', 'yes'], note: 'one Bernoulli, no labels' },
-  { name: 'score', bars: [0.03, 0.11, 0.26, 0.6], ticks: ['0', '1', '2', '3'], note: 'ordered levels', ordered: true },
-  { name: 'abstain', bars: [0.58, 0.2, 0.09], tail: 0.13, ticks: ['A', 'B', 'C'], tailTick: 'none', note: 'on every Choice and Score' },
-];
+// The four primitives, drawn as the probability space each one owns. One panel per card, with the
+// card's own heading and paragraph underneath it -- a single strip of four charts above a separate
+// block of four paragraphs made the reader match them up by counting.
+//
+// Schematic: these are shapes, not measurements. The numbers that belong to each type are in the
+// prose beside them.
+//
+//   mountTypeCards()   draws into every [data-type] chart div on the page
 
-export function mountTypes(container) {
-  if (!container) return;
-  const draw = () => {
-    const w = fitWidth(container, DESIGN_W);
-    const cols = w < 620 ? 2 : 4;
-    const colW = (w - (cols - 1) * 20) / cols;
-    const rows = Math.ceil(TYPES.length / cols);
-    const plotH = 84;
-    const cardH = plotH + 92;
-    const h = rows * cardH + (rows - 1) * 16;
-    container.replaceChildren();
-    container.style.maxWidth = `${DESIGN_W}px`;
-    const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, width: '100%', role: 'img' });
-    const t = svgEl('title');
-    t.textContent = 'Four probability spaces drawn as shapes: a categorical over K, a single Bernoulli, an ordered ladder, and an abstention set apart from the options.';
-    svg.appendChild(t);
+const TYPES = {
+  choice: { bars: [0.12, 0.62, 0.18, 0.08], ticks: ['A', 'B', 'C', 'D'] },
+  noul: { bars: [0.16, 0.84], ticks: ['no', 'yes'] },
+  score: { bars: [0.03, 0.11, 0.26, 0.6], ticks: ['0', '1', '2', '3'], ordered: true },
+  abstain: { bars: [0.58, 0.2, 0.09], tail: 0.13, ticks: ['A', 'B', 'C'], tailTick: 'none' },
+};
 
-    TYPES.forEach((ty, i) => {
-      const gx = (i % cols) * (colW + 20);
-      const gy = Math.floor(i / cols) * (cardH + 16);
-      const g = svgEl('g', { transform: `translate(${gx},${gy})` });
-      g.appendChild(svgEl('line', { x1: 0, y1: 0, x2: colW, y2: 0, stroke: STEEL, 'stroke-width': 1 }));
-      g.appendChild(svgText(0, 20, ty.name.toUpperCase(), { 'font-size': 11, 'font-weight': 700, 'letter-spacing': 0.72, fill: INK }));
+export function panelFor(name) {
+  return TYPES[name] || null;
+}
 
-      const n = ty.bars.length + (ty.tail != null ? 1 : 0);
-      const gap = 8;
-      const bw = (colW - (n - 1) * gap) / n;
-      const top = 38;
-      const peak = Math.max(...ty.bars);
-      ty.bars.forEach((v, j) => {
-        const bh = Math.max(2, v * plotH);
-        // the argmax carries the colour; everything else is the mass it did not take
-        const top_ = v === peak;
-        g.appendChild(svgEl('rect', {
-          x: j * (bw + gap), y: top + plotH - bh, width: bw, height: bh,
-          fill: top_ ? OURS : STEEL, opacity: ty.ordered && !top_ ? 0.45 + 0.55 * v : 1,
-        }));
-        g.appendChild(svgText(j * (bw + gap) + bw / 2, top + plotH + 15, ty.ticks[j], { 'font-size': 10, fill: MID, 'text-anchor': 'middle' }));
-      });
-      if (ty.tail != null) {
-        const j = ty.bars.length;
-        const bh = Math.max(2, ty.tail * plotH);
-        // the abstention is not one of your options, so it does not share their baseline
-        g.appendChild(svgEl('rect', { x: j * (bw + gap), y: top + plotH - bh, width: bw, height: bh, fill: OTHER }));
-        g.appendChild(svgText(j * (bw + gap) + bw / 2, top + plotH + 15, ty.tailTick, { 'font-size': 10, fill: OTHER, 'text-anchor': 'middle' }));
-        g.appendChild(svgEl('line', { x1: j * (bw + gap) - gap / 2, y1: top, x2: j * (bw + gap) - gap / 2, y2: top + plotH, stroke: STEEL, 'stroke-dasharray': '2 3' }));
-      }
-      g.appendChild(svgEl('line', { x1: 0, y1: top + plotH + 1, x2: colW, y2: top + plotH + 1, stroke: STEEL }));
-      const note = svgText(0, top + plotH + 36, '', { 'font-size': 11, fill: MID });
-      // one wrap point is enough at these widths, and it keeps the four cards the same height
-      const words = ty.note.split(' ');
-      let line = '';
-      const lines = [];
-      words.forEach((word) => {
-        if ((line + ' ' + word).trim().length * 6.3 > colW && line) { lines.push(line); line = word; } else { line = (line + ' ' + word).trim(); }
-      });
-      lines.push(line);
-      lines.slice(0, 2).forEach((ln, k) => {
-        const ts = svgEl('tspan', { x: 0, dy: k === 0 ? 0 : 14 });
-        ts.textContent = ln;
-        note.appendChild(ts);
-      });
-      g.appendChild(note);
-      svg.appendChild(g);
-    });
-    container.appendChild(svg);
-  };
-  draw();
-  registerChart(container, draw);
+function drawPanel(host, ty) {
+  const w = fitWidth(host, 460);
+  const plotH = 88;
+  const h = plotH + 26;
+  const n = ty.bars.length + (ty.tail != null ? 1 : 0);
+  const gap = 8;
+  const bw = (w - (n - 1) * gap) / n;
+  const peak = Math.max(...ty.bars);
+  const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, width: '100%', role: 'img' });
+
+  ty.bars.forEach((v, j) => {
+    const bh = Math.max(2, v * plotH);
+    const isTop = v === peak;
+    svg.appendChild(svgEl('rect', {
+      x: j * (bw + gap), y: plotH - bh, width: bw, height: bh,
+      fill: isTop ? OURS : STEEL, opacity: ty.ordered && !isTop ? 0.45 + 0.55 * v : 1,
+    }));
+    svg.appendChild(svgText(j * (bw + gap) + bw / 2, plotH + 16, ty.ticks[j], { 'font-size': 10, fill: MID, 'text-anchor': 'middle' }));
+  });
+
+  if (ty.tail != null) {
+    const j = ty.bars.length;
+    const bh = Math.max(2, ty.tail * plotH);
+    // the abstention is not one of your options, so it does not share their baseline
+    svg.appendChild(svgEl('rect', { x: j * (bw + gap), y: plotH - bh, width: bw, height: bh, fill: OTHER }));
+    svg.appendChild(svgText(j * (bw + gap) + bw / 2, plotH + 16, ty.tailTick, { 'font-size': 10, fill: OTHER, 'text-anchor': 'middle' }));
+    svg.appendChild(svgEl('line', { x1: j * (bw + gap) - gap / 2, y1: 0, x2: j * (bw + gap) - gap / 2, y2: plotH, stroke: STEEL, 'stroke-dasharray': '2 3' }));
+  }
+  svg.appendChild(svgEl('line', { x1: 0, y1: plotH + 1, x2: w, y2: plotH + 1, stroke: STEEL }));
+  host.replaceChildren(svg);
+}
+
+export function mountTypeCards(root = document) {
+  root.querySelectorAll('[data-type]').forEach((host) => {
+    const ty = panelFor(host.dataset.type);
+    if (!ty) return;
+    const draw = () => drawPanel(host, ty);
+    draw();
+    registerChart(host, draw);
+  });
 }
 
 export function selfTest() {
-  console.assert(TYPES.length === 4 && TYPES.filter((t) => t.tail != null).length === 1, 'only abstain draws a tail');
-  console.assert(Math.max(...TYPES[2].bars) === TYPES[2].bars[3] && TYPES[2].ordered, 'score peaks at its top level and is drawn as a ladder');
+  console.assert(Object.keys(TYPES).length === 4, 'four primitives, four panels');
+  console.assert(panelFor('abstain').tail != null && panelFor('choice').tail == null, 'only abstain draws a tail outside the options');
+  console.assert(panelFor('score').ordered && Math.max(...panelFor('score').bars) === panelFor('score').bars[3], 'score peaks at its top level and is drawn as a ladder');
+  console.assert(panelFor('noul').bars.length === 2 && panelFor('noul').ticks.join() === 'no,yes', 'a noul is two outcomes and says which');
+  console.assert(panelFor('nope') === null, 'an unknown data-type draws nothing rather than guessing');
   const ordered = orderRows([
     { name: 'Jev', weights: 'hosted only', ours: false },
     { name: 'OpenJev', weights: 'downloadable', ours: false },

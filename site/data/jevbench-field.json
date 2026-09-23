@@ -1,14 +1,12 @@
 {
- "what": "JevBench, the same 231 public ids for every row (72 standard / 48 easy / 111 hard). Easy is 1.00 for every entry and is omitted.",
+ "what": "The same 231 public JevBench ids for every row.",
  "chance": {
   "std": 0.311,
   "hard": 0.336
  },
  "caveats": [
-  "Not ranked leaderboard entries: the leaderboard needs at least 95% coverage including 146 non-public judge items.",
-  "The hard tier is 111 items, so a 95% interval is about plus or minus 9 points. Adjacent rows are not separable.",
-  "Rows other than ours and the frozen controls are REPORT section 3q's comparison and predate our workflow training.",
-  "Parameter counts are the published ones; entries that do not state a size are left blank rather than guessed. A mixture-of-experts entry carries both what you host and what each token pays, and the chart plots the active count. There is no cost column: typical-small is the only row we have measured a latency for, and typical-medium's is still outstanding."
+  "A public-subset run against fstandhartinger/jevbench v1.2.1, not a ranked leaderboard entry.",
+  "Adjacent rows are not separable: the hard tier is 111 items, so a 95% interval is about plus or minus 9 points."
  ],
  "sources": {
   "ours": "site/data/models.json",
@@ -30,7 +28,7 @@
    "std": 0.986,
    "hard": 0.676,
    "ours": false,
-   "size": "26B-A4B",
+   "size": "26B",
    "params_total": 26.0,
    "params_active": 4.0
   },
@@ -47,7 +45,7 @@
   {
    "name": "OpenJev",
    "kind": "decision model",
-   "size": "26B-A4B",
+   "size": "26B",
    "std": 0.972,
    "hard": 0.64,
    "ours": false,

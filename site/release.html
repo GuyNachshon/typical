@@ -113,29 +113,16 @@
   </figure>
 </section>
 
-<section class="page chapter" id="options">
-  <div class="claim">
-    <h2>The options are part of the question</h2>
-    <p>Our first design was more efficient. It computed one reusable representation of the state and question, then scored any candidate against it afterwards, so new options were nearly free.</p>
-    <p>It failed a simple control. When we replaced each question with an unrelated one, the model performed almost the same. It had learned which answers looked plausible in general, not which answer matched the question.</p>
-    <p>Putting the options inside the decision pass restored the question-dependent signal. The candidate set isn't just an output vocabulary; it's part of the question.</p>
-  </div>
-</section>
-
 <section class="page chapter" id="types">
   <div class="claim">
     <h2>Types are contracts</h2>
     <p>Different decisions deserve different probability spaces.</p>
   </div>
-  <figure class="fig">
-    <div class="chart" id="chart-types"></div>
-    <figcaption>Schematic. The probability space each type owns.</figcaption>
-  </figure>
-  <div>
-    <div><h3 class="t-feature">Choice</h3><p class="mt-18">Picks one of K options defined at call time, as a categorical distribution.</p></div>
-    <div class="mt-30"><h3 class="t-feature">Noul</h3><p class="mt-18">Answers yes or no with a single Bernoulli probability, from a head that never sees the labels. That makes it exactly invariant to which label you call "yes." When we treated yes/no as a two-way Choice instead, reversing the label order moved P(yes) by as much as .55. In a matched comparison, the dedicated head also generalized better: on PagerDuty incidents, a dataset never used in training, accuracy rose from .60 to .89.</p></div>
-    <div class="mt-30"><h3 class="t-feature">Score</h3><p class="mt-18">Returns a distribution over ordered levels, trained so that probability concentrates near the true level instead of spreading over every wrong one. In a matched comparison this halved negative log-likelihood on held-out Score tasks (2.07 to 1.23) without changing any top answer.</p></div>
-    <div class="mt-30"><h3 class="t-feature">Abstain</h3><p class="mt-18">Attaches a probability to every Choice and Score answer that none of the options fit. It is a judgment about the set as a whole, not an extra label you have to remember to add.</p></div>
+  <div class="typegrid fig">
+    <div class="typecard"><div class="chart" data-type="choice"></div><h3 class="t-feature">Choice</h3><p>Picks one of K options defined at call time, as a categorical distribution.</p></div>
+    <div class="typecard"><div class="chart" data-type="noul"></div><h3 class="t-feature">Noul</h3><p>Answers yes or no with a single Bernoulli probability, from a head that never sees the labels. That makes it exactly invariant to which label you call "yes." When we treated yes/no as a two-way Choice instead, reversing the label order moved P(yes) by as much as .55. In a matched comparison, the dedicated head also generalized better: on PagerDuty incidents, a dataset never used in training, accuracy rose from .60 to .89.</p></div>
+    <div class="typecard"><div class="chart" data-type="score"></div><h3 class="t-feature">Score</h3><p>Returns a distribution over ordered levels, trained so that probability concentrates near the true level instead of spreading over every wrong one. In a matched comparison this halved negative log-likelihood on held-out Score tasks (2.07 to 1.23) without changing any top answer.</p></div>
+    <div class="typecard"><div class="chart" data-type="abstain"></div><h3 class="t-feature">Abstain</h3><p>Attaches a probability to every Choice and Score answer that none of the options fit. It is a judgment about the set as a whole, not an extra label you have to remember to add.</p></div>
   </div>
 </section>
 
@@ -153,8 +140,7 @@
   </div>
   <div class="mb-18">
     <p>Asking a generative model each of those means re-reading the ticket each time. With Typical, the state is paid for once. On <code>typical-small</code>, with the state cached and 32 questions batched against it, each question costs about 3 ms for up to 32 options. A single cold decision, including reading the state, is in the tens of milliseconds. Cost grows with the total length of the option text, so for hundreds of options, narrow the set first.</p>
-    <p class="mt-18">Measured in process on one H100, one decision at a time, over a 256‑token state with two options per question, model load excluded. That is not a hosted-endpoint number and is not comparable to one measured over a network. A wider answer space costs more: at 256 options a single decision is 106 ms and each further question 28.</p>
-  </div>
+    div>
   <div class="mt-18 mb-18">
     <p>That per-question cost is what lets a decision model live inside a loop rather than at the end of a pipeline.</p>
   </div>
@@ -200,16 +186,16 @@
 <section class="page chapter" id="field">
   <div class="claim">
     <h2>The whole field, on the same items</h2>
-    <p>Every row below answered the same 231 public JevBench ids. That makes the table comparable, and it does not flatter us: two open decision models and one closed one are ahead of <code>typical&#8209;medium</code> on the standard tier, and a 400M classifier is ahead of <code>typical&#8209;small</code>. We would rather print the field we sit in than the one we win.</p>
+    <p>Every row below answered the same 231 public JevBench ids. That makes the table comparable, and it does not flatter us: four open decision models and one closed one are ahead of <code>typical&#8209;medium</code> on the standard tier, and a 400M classifier is ahead of <code>typical&#8209;small</code>. We would rather print the field we sit in than the one we win.</p>
   </div>
   <figure class="fig">
     <div id="jev-field"></div>
     <figcaption>JevBench standard, same 231 public ids. Click a column to re-sort.</figcaption>
   </figure>
-  <p class="mt-30">Plotted against the parameters each token actually pays for, neither of our models sits on the frontier. A 400M classifier scores above <code>typical&#8209;small</code>, and <code>SemIf</code> scores above <code>typical&#8209;medium</code> on the same 4B base — a gap our report puts down to their rendering and method and is still probing. What our models do lead is every prompted backbone we ran, at every size, including a 14B.</p>
+  <p class="mt-30">Plotted against the parameters you have to host, neither of our models sits on the frontier. A 400M classifier scores above <code>typical&#8209;small</code>, and <code>SemIf</code> scores above <code>typical&#8209;medium</code> on the same 4B base — a gap our report puts down to their rendering and method and is still probing. What our models do lead is every prompted backbone we ran, at every size, including a 14B.</p>
   <figure class="fig">
     <div class="chart" id="size-score"></div>
-    <figcaption>JevBench standard against active parameters. The dashed step is the frontier. <span data-count="unplotted">Four</span> entries publish no size.</figcaption>
+    <figcaption>JevBench standard against parameters. The dashed step is the frontier. <span data-count="unplotted">Four</span> entries publish no size.</figcaption>
   </figure>
   <figure class="fig">
     <div class="chart" id="chart-runreq"></div>

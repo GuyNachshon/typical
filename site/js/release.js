@@ -26,7 +26,7 @@ async function mountField() {
   const table = document.createElement('table');
   table.className = 'register field';
   const head = ['model', 'kind', 'size', 'standard'];
-  const keyOf = ['name', 'kind', 'params_active', 'std'];
+  const keyOf = ['name', 'kind', 'params_total', 'std'];
   table.innerHTML = `<thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead>`;
   const body = document.createElement('tbody');
   const rowEl = (r) => {
@@ -84,7 +84,11 @@ async function mountField() {
 
   const note = document.createElement('p');
   note.className = 'note mt-18';
-  note.textContent = `${doc.what} ${doc.caveats.join(' ')}`;
+  note.textContent = `${doc.what} ${doc.caveats.join(' ')} `;
+  const more = document.createElement('a');
+  more.href = 'research.html#limitations';
+  more.textContent = 'Full method and limits.';
+  note.appendChild(more);
   host.appendChild(note);
 }
 
@@ -104,6 +108,13 @@ const D_W = 1000, D_H = 460, M = { t: 24, r: 150, b: 54, l: 52 };
 // vertical pitch two labels need to clear each other at 11-12px mono.
 const LABEL_DX = 17, LINE_H = 13;
 
+
+// What a row's size is, for every purpose in this figure. A mixture-of-experts entry counts at the
+// size you have to host, not at the parameters one token activates -- 26B-A4B needs 26B resident
+// however little of it any given token touches. One accessor so the axis, the ticks, the frontier
+// and the exclusion count can never disagree with each other.
+const sizeOfRow = (r) => r.params_total ?? r.params_active;
+
 // The caption used to say "Five entries publish no size" and then a data edit gave one of those
 // five a size, so the page carried a wrong number until someone counted by hand. It counts itself
 // now: the word in the caption comes from the same array the chart excludes rows by.
@@ -116,13 +127,13 @@ function countWord(n) {
 function writeUnplottedCount(doc) {
   const el = document.querySelector('[data-count="unplotted"]');
   if (!el) return;
-  const n = (doc.rows || []).filter((r) => !r.params_active).length;
+  const n = (doc.rows || []).filter((r) => !sizeOfRow(r)).length;
   el.textContent = countWord(n);
 }
 
 function mountSizeScore(host, doc) {
   writeUnplottedCount(doc);
-  const pts = doc.rows.filter((r) => r.params_active && r.std != null);
+  const pts = doc.rows.filter((r) => sizeOfRow(r) && r.std != null);
   if (!host || pts.length < 3) return;
   const draw = () => {
     const w = fitWidth(host, D_W), h = D_H;
@@ -136,7 +147,7 @@ function mountSizeScore(host, doc) {
     const g = svgEl('g', { transform: `translate(${M.l},${M.t})` });
     svg.appendChild(g);
 
-    const xs = pts.map((p) => p.params_active);
+    const xs = pts.map(sizeOfRow);
     const x = logScale([Math.min(...xs) * 0.7, Math.max(...xs) * 1.4], [0, iw]);
     const y = scale([0.3, 1.0], [ih, 0]);
 
@@ -163,7 +174,7 @@ function mountSizeScore(host, doc) {
       g.appendChild(svgText(cx, ih + 20, label, { fill: MID, 'font-size': 11, 'text-anchor': 'middle' }));
     });
     g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: ih, y2: ih, stroke: STEEL }));
-    g.appendChild(svgText(iw / 2, ih + 44, 'active parameters (log)', { fill: MID, 'font-size': 11, 'text-anchor': 'middle' }));
+    g.appendChild(svgText(iw / 2, ih + 44, 'parameters (log)', { fill: MID, 'font-size': 11, 'text-anchor': 'middle' }));
     // The y axis had no title at all: a reader met a .4-1.0 scale and the only statement of what
     // it measures was in the SVG <title>, where nothing but a screen reader finds it. Same idiom
     // as the x title above, same place every other chart on the site puts it (barChart, ladder,
@@ -171,12 +182,12 @@ function mountSizeScore(host, doc) {
     g.appendChild(svgText(-M.l + 4, -8, 'JevBench standard (public subset)', { fill: MID, 'font-size': 11 }));
 
     // the frontier: cheapest model at or above every score to its left
-    const sorted = [...pts].sort((a, b) => a.params_active - b.params_active);
+    const sorted = [...pts].sort((a, b) => sizeOfRow(a) - sizeOfRow(b));
     const front = [];
     let best = -1;
     sorted.forEach((p) => { if (p.std > best) { front.push(p); best = p.std; } });
     let d = '';
-    front.forEach((p, i) => { d += i ? ` H${x(p.params_active)} V${y(p.std)}` : `M${x(p.params_active)} ${y(p.std)}`; });
+    front.forEach((p, i) => { d += i ? ` H${x(sizeOfRow(p))} V${y(p.std)}` : `M${x(sizeOfRow(p))} ${y(p.std)}`; });
     g.appendChild(svgEl('path', { d, fill: 'none', stroke: MID, 'stroke-width': 1, 'stroke-dasharray': '5,4' }));
 
     // Eight entries sit in the 4B column, three of them within two points of each other, so the
@@ -197,7 +208,7 @@ function mountSizeScore(host, doc) {
     // Each label keeps its dot's x, so the leader only has to say "up/down from here": a stub out
     // of the dot, a vertical run in the gutter just left of the text, a stub into the text.
     const items = pts.map((p) => {
-      const cx = x(p.params_active), cy = y(p.std);
+      const cx = x(sizeOfRow(p)), cy = y(p.std);
       // measure the box the text will actually occupy (11px mono is ~6.6px a character, our own
       // rows are set at 12px bold) rather than assuming a fixed window
       const wpx = p.name.length * (p.ours ? 7.2 : 6.6) + 14;
@@ -241,7 +252,7 @@ function mountSizeScore(host, doc) {
 
 import { mountShowdown } from './showdown.js';
 import { mountParallel } from './parallel.js';
-import { mountTypes, mountRunReq } from './relfigs.js';
+import { mountTypeCards, mountRunReq } from './relfigs.js';
 
 // Figure numbers were typed into the captions by hand, so moving a section renumbered nothing and
 // two figures both called themselves Fig. 1. They are numbered from document order instead, and a
@@ -266,7 +277,7 @@ function numberFigures() {
 document.addEventListener('DOMContentLoaded', async () => {
   numberFigures();
   mountParallel(document.getElementById('chart-parallel'));
-  mountTypes(document.getElementById('chart-types'));
+  mountTypeCards();
   fetch('data/run-requirements.json')
     .then((r) => (r.ok ? r.json() : null))
     .then((doc) => doc && mountRunReq(document.getElementById('chart-runreq'), doc))

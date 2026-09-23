@@ -1,87 +1,87 @@
 {
-  "note": "What it takes to run each decision model: openness and deployment cost only. No accuracy or benchmark scores live here -- those are in site/data/jevbench-field.json. Every non-null cell is sourced in its row's `source` field; a cell nobody states is null rather than guessed. Our two rows come from this repo only; the other five come from the cited HF community article of 2026-09-23 (its own numbers are a dated snapshot, not a product guarantee).",
-  "fetched_utc": "2026-09-23T20:17:33Z",
-  "sources": {
-    "ours": "releases/typical-small.md, releases/typical-medium.md, inference/README.md, site/data/models.json, .context/content-spec.md",
-    "others": "https://huggingface.co/blog/sora-2/jev-ai-vs-djev-vs-laya-vs-openjev-vs-semif-which-d (published 2026-09-23); parameter counts for the non-ours rows from site/data/jevbench-field.json, whose caveat states they are the published ones"
+ "note": "What it takes to run each decision model: openness and deployment cost only. No accuracy or benchmark scores live here -- those are in site/data/jevbench-field.json. Every non-null cell is sourced in its row's `source` field; a cell nobody states is null rather than guessed. Our two rows come from this repo only; the other five come from the cited HF community article of 2026-09-23 (its own numbers are a dated snapshot, not a product guarantee).",
+ "fetched_utc": "2026-09-23T20:17:33Z",
+ "sources": {
+  "ours": "releases/typical-small.md, releases/typical-medium.md, inference/README.md, site/data/models.json, .context/content-spec.md",
+  "others": "https://huggingface.co/blog/sora-2/jev-ai-vs-djev-vs-laya-vs-openjev-vs-semif-which-d (published 2026-09-23); parameter counts for the non-ours rows from site/data/jevbench-field.json, whose caveat states they are the published ones"
+ },
+ "rows": [
+  {
+   "name": "typical-small",
+   "ours": true,
+   "weights": "downloadable",
+   "license": "Apache-2.0",
+   "params": "1.7B",
+   "hardware": "laptop (Apple Silicon / MPS)",
+   "needs_your_labels": false,
+   "context": "4k state / 256-token query",
+   "source": "releases/typical-small.md (License: backbone Qwen3-1.7B-Base Apache-2.0; How to run: from_pretrained on the public repo OzLabs/typical-small, then choice/noul/score, no fine-tuning step; JevBench disclosures: run at up to 4096-token states / 256-token queries); inference/README.md (parity verified on CPU and MPS); .context/content-spec.md (site demos run the local model on Apple silicon); site/data/models.json (params 1.7B). Training-data licences are per-source, with metaeval/ambient and metaeval/chaos-mnli-ambiguity flagged as undeclared."
   },
-  "rows": [
-    {
-      "name": "typical-small",
-      "ours": true,
-      "weights": "downloadable",
-      "license": "Apache-2.0",
-      "params": "1.7B",
-      "hardware": "laptop (Apple Silicon / MPS)",
-      "needs_your_labels": false,
-      "context": "4k state / 256-token query",
-      "source": "releases/typical-small.md (License: backbone Qwen3-1.7B-Base Apache-2.0; How to run: from_pretrained on the public repo OzLabs/typical-small, then choice/noul/score, no fine-tuning step; JevBench disclosures: run at up to 4096-token states / 256-token queries); inference/README.md (parity verified on CPU and MPS); .context/content-spec.md (site demos run the local model on Apple silicon); site/data/models.json (params 1.7B). Training-data licences are per-source, with metaeval/ambient and metaeval/chaos-mnli-ambiguity flagged as undeclared."
-    },
-    {
-      "name": "typical-medium",
-      "ours": true,
-      "weights": "downloadable",
-      "license": "Apache-2.0",
-      "params": "4B",
-      "hardware": "GPU, 14.6-18.6 GB peak (measured on one H100)",
-      "needs_your_labels": false,
-      "context": "4k state / 256-token query",
-      "source": "releases/typical-medium.md (License: backbone Qwen3-4B-Base Apache-2.0; Latency: peak memory 14.6 -> 18.6 GB for K=2 -> 256 on one H100; How to run: from_pretrained on the public repo OzLabs/typical-medium, then choice/noul/score, no fine-tuning step; JevBench disclosures: run at up to 4096-token states / 256-token queries); site/data/models.json (params 4B). No CPU/MPS run is stated for this size, so the smallest stated device is the measured GPU."
-    },
-    {
-      "name": "Jev",
-      "ours": false,
-      "weights": "hosted only",
-      "license": null,
-      "params": null,
-      "hardware": "vendor API",
-      "needs_your_labels": false,
-      "context": "64k tokens/request",
-      "source": "HF article: \"a hosted System One model\", \"a hosted production API\", \"without operating a GPU or fitting a calibration layer first\", \"Jev works as delivered through a hosted API, without an idle GPU or training run to manage\", \"Jev accepts up to 64k tokens per request in the comparison\". site/data/jevbench-field.json marks the row \"closed\" and lists it under unknown_size."
-    },
-    {
-      "name": "DiffusionGemma-as-Jev",
-      "ours": false,
-      "weights": "hosted only",
-      "license": null,
-      "params": "26B-A4B",
-      "hardware": "vendor API",
-      "needs_your_labels": null,
-      "context": null,
-      "source": "HF article: \"a hosted API with multimodal input\", \"available as a free preview with announced pricing\". Parameter count from site/data/jevbench-field.json (row DiffusionGemma-as-Jev, size 26B-A4B: 26B hosted, 4B active per token)."
-    },
-    {
-      "name": "OpenJev",
-      "ours": false,
-      "weights": "downloadable",
-      "license": "Apache-2.0",
-      "params": "26B-A4B",
-      "hardware": "24GB NVIDIA GPU or Apple Silicon",
-      "needs_your_labels": null,
-      "context": null,
-      "source": "HF article: \"Choose OpenJev when you need image inputs, self-hosting, Apache-2.0 code and weights\", \"run on a 24GB NVIDIA GPU or Apple Silicon\", \"accept up to eight images per request\". Parameter count from site/data/jevbench-field.json (row OpenJev, size 26B-A4B)."
-    },
-    {
-      "name": "SemIf",
-      "ours": false,
-      "weights": "downloadable",
-      "license": "MIT (code); upstream weights keep their own licences",
-      "params": "4B",
-      "hardware": "your own GPU (size not stated)",
-      "needs_your_labels": null,
-      "context": null,
-      "source": "HF article: \"SemIf uses an open-model logit-reading approach, with Qwen3.5-4B as the primary benchmark configuration. Its code is MIT, but upstream model weights retain their own licences\", \"you own the GPU, serving stack, capacity planning, and calibration for your workload\". Parameter count from site/data/jevbench-field.json (row SemIf, size 4B), consistent with the article's Qwen3.5-4B configuration."
-    },
-    {
-      "name": "Laya",
-      "ours": false,
-      "weights": "downloadable",
-      "license": "Apache-2.0",
-      "params": null,
-      "hardware": "CPU or GPU self-hosting",
-      "needs_your_labels": true,
-      "context": "512 tokens/question",
-      "source": "HF article: \"Apache-2.0 weights, CPU/GPU self-hosting, fine-tuning\", \"Laya needs labelled examples and fine-tuning for a stable production task\", \"Laya's per-question context is 512 tokens\". site/data/jevbench-field.json lists Laya (ModernBERT) under unknown_size, so no parameter count is asserted."
-    }
-  ]
+  {
+   "name": "typical-medium",
+   "ours": true,
+   "weights": "downloadable",
+   "license": "Apache-2.0",
+   "params": "4B",
+   "hardware": "GPU, 14.6-18.6 GB peak (measured on one H100)",
+   "needs_your_labels": false,
+   "context": "4k state / 256-token query",
+   "source": "releases/typical-medium.md (License: backbone Qwen3-4B-Base Apache-2.0; Latency: peak memory 14.6 -> 18.6 GB for K=2 -> 256 on one H100; How to run: from_pretrained on the public repo OzLabs/typical-medium, then choice/noul/score, no fine-tuning step; JevBench disclosures: run at up to 4096-token states / 256-token queries); site/data/models.json (params 4B). No CPU/MPS run is stated for this size, so the smallest stated device is the measured GPU."
+  },
+  {
+   "name": "Jev",
+   "ours": false,
+   "weights": "hosted only",
+   "license": null,
+   "params": null,
+   "hardware": "vendor API",
+   "needs_your_labels": false,
+   "context": "64k tokens/request",
+   "source": "HF article: \"a hosted System One model\", \"a hosted production API\", \"without operating a GPU or fitting a calibration layer first\", \"Jev works as delivered through a hosted API, without an idle GPU or training run to manage\", \"Jev accepts up to 64k tokens per request in the comparison\". site/data/jevbench-field.json marks the row \"closed\" and lists it under unknown_size."
+  },
+  {
+   "name": "DiffusionGemma-as-Jev",
+   "ours": false,
+   "weights": "downloadable",
+   "license": "Apache-2.0",
+   "params": "26B",
+   "hardware": "your own GPU (26B to host)",
+   "needs_your_labels": null,
+   "context": null,
+   "source": "Google DeepMind released DiffusionGemma as open weights under Apache-2.0 on 2026-06-10, as google/diffusiongemma-26B-A4B-it on Hugging Face (26B total, 4B active, Gemma 4 MoE). The HF comparison article describes the Jev-style service built on it as a hosted API; the underlying weights are downloadable."
+  },
+  {
+   "name": "OpenJev",
+   "ours": false,
+   "weights": "downloadable",
+   "license": "Apache-2.0",
+   "params": "26B",
+   "hardware": "24GB NVIDIA GPU or Apple Silicon",
+   "needs_your_labels": null,
+   "context": null,
+   "source": "HF article: \"Choose OpenJev when you need image inputs, self-hosting, Apache-2.0 code and weights\", \"run on a 24GB NVIDIA GPU or Apple Silicon\", \"accept up to eight images per request\". Parameter count from site/data/jevbench-field.json (row OpenJev, size 26B-A4B)."
+  },
+  {
+   "name": "SemIf",
+   "ours": false,
+   "weights": "downloadable",
+   "license": "MIT (code); upstream weights keep their own licences",
+   "params": "4B",
+   "hardware": "your own GPU (size not stated)",
+   "needs_your_labels": null,
+   "context": null,
+   "source": "HF article: \"SemIf uses an open-model logit-reading approach, with Qwen3.5-4B as the primary benchmark configuration. Its code is MIT, but upstream model weights retain their own licences\", \"you own the GPU, serving stack, capacity planning, and calibration for your workload\". Parameter count from site/data/jevbench-field.json (row SemIf, size 4B), consistent with the article's Qwen3.5-4B configuration."
+  },
+  {
+   "name": "Laya",
+   "ours": false,
+   "weights": "downloadable",
+   "license": "Apache-2.0",
+   "params": null,
+   "hardware": "CPU or GPU self-hosting",
+   "needs_your_labels": true,
+   "context": "512 tokens/question",
+   "source": "HF article: \"Apache-2.0 weights, CPU/GPU self-hosting, fine-tuning\", \"Laya needs labelled examples and fine-tuning for a stable production task\", \"Laya's per-question context is 512 tokens\". site/data/jevbench-field.json lists Laya (ModernBERT) under unknown_size, so no parameter count is asserted."
+  }
+ ]
 }
