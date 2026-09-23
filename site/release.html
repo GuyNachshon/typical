@@ -124,7 +124,7 @@
   </div>
   <div class="mb-18" style="max-width:72ch">
     <p>Asking a generative model each of those means re-reading the ticket each time. With Typical, the state is paid for once. On <code>typical-small</code>, with the state cached and 32 questions batched against it, each question costs about 3 ms for up to 32 options. A single cold decision, including reading the state, is in the tens of milliseconds. Cost grows with the total length of the option text, so for hundreds of options, narrow the set first.</p>
-    <p class="mt-18"><span class="todo">Methodology line: hardware, state length, which measurement applies to which model.</span></p>
+    <p class="mt-18">Measured in process on one H100, one decision at a time, over a 256‑token state with two options per question, model load excluded. That is not a hosted-endpoint number and is not comparable to one measured over a network. A wider answer space costs more: at 256 options a single decision is 106 ms and each further question 28.</p>
   </div>
   <div class="figband">
     <div class="page figband-row">
@@ -152,7 +152,7 @@
       <p class="media-label t-eyebrow">The road · Three.js</p>
       <div class="media-split"><div class="media-scene"><div class="game-mount" data-game="drive"></div></div></div>
     </div>
-    <figcaption><b>Drive.</b> <span class="todo">State, questions per tick, model, hardware, ms per tick.</span> Several decision types run against the same state on every tick.</figcaption>
+    <figcaption><b>Drive.</b> One sentence per tick giving lane, speed, limit and what is ahead; one Choice over five to seven manoeuvres. typical‑small on Apple silicon, end to end from the browser over a socket — not the in‑process H100 figure above: median 192 ms a tick over 108 decisions. Several decision types run against the same state on every tick.</figcaption>
   </figure>
   <div class="gamepair">
     <figure class="fig">
@@ -160,7 +160,7 @@
         <p class="media-label t-eyebrow">Snake · canvas</p>
         <div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="snake"></div></div>
       </div>
-      <figcaption><b>Snake.</b> <span class="todo">State per tick, questions per tick, model, hardware, ms per tick.</span> This is the simplest loop: one state, one bounded action, repeated.</figcaption>
+      <figcaption><b>Snake.</b> One sentence per tick describing the gaps and what each move hits; one Choice over the two or three legal moves. typical‑small on Apple silicon, end to end from the browser over a socket — not the in‑process H100 figure above: median 128 ms a tick over 201 decisions. This is the simplest loop: one state, one bounded action, repeated.</figcaption>
     </figure>
     <figure class="fig">
       <div class="media dark">
@@ -168,7 +168,7 @@
         <div class="media-scene" style="min-height:520px"><iframe class="card-film" id="film-card" src="games/doom/index.html?film=1" title="DOOM played by typical-small" loading="lazy"></iframe></div>
         <div class="card-hud t-mono"><p class="rec"><i></i><span id="card-rec">REC · typical-small · E1M1</span></p><p class="rec-sub" id="card-rec2">booting</p><div id="card-rows"></div><p class="sentence" id="card-sentence"></p></div>
       </div>
-      <figcaption><b>Doom.</b> <span class="todo">State, questions per tick, model, hardware, ms per tick.</span> TypeSafe used Doom to make the Jev interface visible. We liked the idea enough to build our own with Typical: one text state per tick, one bounded action distribution back.</figcaption>
+      <figcaption><b>Doom.</b> Two facts a tick, whether the player is badly hurt and whether an enemy is in sight; one Choice over four or five actions. typical‑small on Apple silicon, end to end from the browser over a socket — not the in‑process H100 figure above: median 129 ms a tick over 43 decisions. TypeSafe used Doom to make the Jev interface visible. We liked the idea enough to build our own with Typical: one text state per tick, one bounded action distribution back.</figcaption>
     </figure>
   </div>
   <p class="note mt-18">In all three games the model does not see pixels. The game produces a structured text state, and Typical decides from that.</p>
@@ -337,7 +337,7 @@ m.choice(state, "What does the customer want?", ["refund", "replacement", "repai
 m.noul(state, "Is the order still under warranty?")
 m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
   <p class="note mt-18" style="max-width:72ch"><code>state</code> is a string or any JSON-serialisable dict. The package is <code>typical‑ai</code> on PyPI, Apache‑2.0, Python 3.11 or newer. The import is <code>typical_ai</code>: PyPI’s bare <code>typical</code> is an established typing toolkit and is not us.</p>
-  <p class="note mt-18" style="max-width:72ch">The source is on <a class="ul" href="https://github.com/GuyNachshon/typical">GitHub</a>. <span class="todo">License line.</span></p>
+  <p class="note mt-18" style="max-width:72ch">The source is on <a class="ul" href="https://github.com/GuyNachshon/typical">GitHub</a>. Both checkpoints are Apache‑2.0 over Apache‑2.0 Qwen3 base models. The training mix is not uniformly permissive and we are not going to imply it is: ANLI is CC BY‑NC 4.0, SciQ is CC BY‑NC 3.0, and two portions of the uncertainty corpus declare no licence at all. Whether non‑commercially‑licensed training data constrains the use of the resulting weights is genuinely unsettled, and a launch post is not the place it gets resolved. The whole per‑source table is in each model card so your own counsel has something to read.</p>
 </section>
 
 <section class="page chapter" id="next">
@@ -359,7 +359,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
     <div class="mt-30"><h3 class="t-feature">Does it reason?</h3><p class="mt-18">For bounded decisions it can apply evidence from the state and rules given at runtime. Hard multi-step composition is still weak. For genuinely serial reasoning, use a generative reasoning model.</p></div>
     <div class="mt-30"><h3 class="t-feature">Does it see the game in Doom?</h3><p class="mt-18">No. The demo supplies a text description of the game state.</p></div>
     <div class="mt-30"><h3 class="t-feature">Why Qwen?</h3><p class="mt-18">Good open base models at the sizes we wanted, in one family we could test consistently. <code>typical-medium</code> uses Qwen3.5-4B.</p></div>
-    <div class="mt-30"><h3 class="t-feature">What was it trained on, and under what license?</h3><p class="mt-18"><span class="todo">Link to the model cards.</span></p></div>
+    <div class="mt-30"><h3 class="t-feature">What was it trained on, and under what license?</h3><p class="mt-18">The per‑source training table and the exact flags are on each model card: <a class="ul" href="https://huggingface.co/OzLabs/typical-small">typical‑small</a> and <a class="ul" href="https://huggingface.co/OzLabs/typical-medium">typical‑medium</a>.</p></div>
   </div>
 </section>
 
