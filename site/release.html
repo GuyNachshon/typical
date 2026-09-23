@@ -140,7 +140,7 @@
   </div>
   <div class="mb-18">
     <p>Asking a generative model each of those means re-reading the ticket each time. With Typical, the state is paid for once. On <code>typical-small</code>, with the state cached and 32 questions batched against it, each question costs about 3 ms for up to 32 options. A single cold decision, including reading the state, is in the tens of milliseconds. Cost grows with the total length of the option text, so for hundreds of options, narrow the set first.</p>
-    div>
+  </div>
   <div class="mt-18 mb-18">
     <p>That per-question cost is what lets a decision model live inside a loop rather than at the end of a pipeline.</p>
   </div>
@@ -179,7 +179,6 @@
       <figcaption><b>Doom.</b> Two facts a tick, whether the player is badly hurt and whether an enemy is in sight; one Choice over four or five actions. typical‑small on Apple silicon, end to end from the browser over a socket — not the in‑process H100 figure above: median 129 ms a tick over 43 decisions. TypeSafe used Doom to make the Jev interface visible. We liked the idea enough to build our own with Typical: one text state per tick, one bounded action distribution back.</figcaption>
     </figure>
   </div>
-  <p class="note mt-18">In all three games the model does not see pixels. The game produces a structured text state, and Typical decides from that.</p>
 </section>
 
 
@@ -206,7 +205,7 @@
 <section class="page chapter" id="separating">
   <div class="claim">
     <h2>What actually separates the two models</h2>
-    <p>The JevBench columns above look like a ranking. They are not one. The standard tier is 72 items drawn from only 36 independent states, each written twice, and the hard tier is 111 items. Cluster-bootstrapped over the paraphrase group, that is a 95% interval of roughly ±6 to 13 points on any standard-tier number and ±9 on any hard-tier one. <code>typical-medium</code>'s standard-tier interval is [.778, .944] and its hard-tier interval is [.405, .595]. <code>typical-small</code>'s <span class="todo">cluster-bootstrap intervals for the shipping <code>typical-small</code> checkpoint are not in our data yet</span>, and at .708 and .432 they overlap Medium's along most of their length.</p>
+    <p>The JevBench columns above look like a ranking. They are not one. The standard tier is 72 items drawn from only 36 independent states, each written twice, and the hard tier is 111 items. Cluster-bootstrapped over the paraphrase group, that is a 95% interval of roughly ±6 to 13 points on any standard-tier number and ±9 on any hard-tier one. <code>typical-medium</code>'s standard-tier interval is [.778, .944] and its hard-tier interval is [.405, .595]. Put the same &plusmn;6 to 13 around <code>typical-small</code>'s .708, and the same &plusmn;9 around its .432, and the two models' intervals overlap on both tiers.</p>
     <p><strong>JevBench cannot separate these two models.</strong> Nor can it separate any adjacent pair in our seven-checkpoint ladder, which spans 1.7B to 14B and four backbone generations. Two of those checkpoints score exactly 55 of 111 on the hard tier while disagreeing on 26 items outright. That is not a tie, it is a measurement that has run out of resolution. Do not read the standard-tier gap between Small and Medium as a result. We do not.</p>
     <p>What does separate them is everything measured at a sample size that can answer the question.</p>
   </div>

@@ -1,29 +1,29 @@
 {
-  "typical-medium": {
-    "adequacy": {
-      "acc": 0.8333333333333334,
-      "n": 12
-    },
-    "extraction": {
-      "acc": 1.0,
-      "n": 12
-    },
-    "intent": {
-      "acc": 0.8333333333333334,
-      "n": 12
-    },
-    "ordinal": {
-      "acc": 0.8333333333333334,
-      "n": 12
-    },
-    "policy": {
-      "acc": 0.8333333333333334,
-      "n": 12
-    },
-    "routing": {
-      "acc": 0.8333333333333334,
-      "n": 12
-    }
+ "typical-medium": {
+  "adequacy": {
+   "acc": 0.8333333333333334,
+   "n": 12
   },
-  "source": "runs/jev_native_tm2/summary.json (original.per_family.<family>.accuracy) -- tm2, shipping as typical-medium v2. typical-small (ts1c) has no JevBench run."
+  "extraction": {
+   "acc": 1.0,
+   "n": 12
+  },
+  "intent": {
+   "acc": 0.8333333333333334,
+   "n": 12
+  },
+  "ordinal": {
+   "acc": 0.8333333333333334,
+   "n": 12
+  },
+  "policy": {
+   "acc": 0.8333333333333334,
+   "n": 12
+  },
+  "routing": {
+   "acc": 0.8333333333333334,
+   "n": 12
+  }
+ },
+ "source": "runs/jev_native_tm2/summary.json (original.per_family.<family>.accuracy) -- tm2, shipping as typical-medium. Medium-only: the per-family split is not broken out for typical-small."
 }

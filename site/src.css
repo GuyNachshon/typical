@@ -499,7 +499,9 @@
   .runreq .is-unstated { color: var(--color-steel); }
   .runreq tr.is-ours td { color: var(--color-ours); }
   .runreq td { font-size: 13px; }
-  .register td:first-child { font-weight: 700; } /* no nowrap here: it set the grid track's min-content width and pushed the research page sideways — model ids are kept whole with non-breaking hyphens instead (js/typography.js) */
+  .register td:first-child { font-weight: 700; }
+  .register.field td:first-child { font-weight: 400; }
+  .register.field tr.is-ours td { font-weight: 700; } /* no nowrap here: it set the grid track's min-content width and pushed the research page sideways — model ids are kept whole with non-breaking hyphens instead (js/typography.js) */
   @media (max-width: 40rem) {
     .register thead { display: none; }
     .register tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--color-steel); }
