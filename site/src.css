@@ -552,6 +552,15 @@
   .post .fig, .post .figband, .post .chapter > table, .post .gamepair { max-width: 1080px; margin-inline: auto; }
   .post .figband-row { max-width: 1080px; padding-inline: 0; }
   .post .claim { max-width: 680px; }
+  /* one figure on the page is a pair of terminals printing real response objects; it gets the
+     page, because the thing being shown is exactly the part that a narrower column cuts off */
+  .post .fig.figfull { max-width: none; }
+  /* the steps are a numbered list and were rendering unnumbered: preflight strips the marker, so
+     the numerals are drawn in the gutter where an editorial list puts them anyway */
+  .steps { counter-reset: step; list-style: none; padding-left: 0; }
+  .steps > li { position: relative; padding-left: 38px; line-height: 1.55; }
+  .steps > li + li { margin-top: 10px; }
+  .steps > li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 0.15em; font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--color-mid); }
   @media (max-width: 64rem) { .post .fig, .post .figband, .post .gamepair { max-width: none; } }
 
   /* ours marked in a table where we are mid-field: weight, not colour, and the chance row set
@@ -578,7 +587,9 @@
   .show-pick-btn:hover { color: var(--color-off); }
   .show-pick-btn.is-on { background: var(--color-off); color: var(--color-warm); }
 
-  .show-panes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  /* the left pane prints distributions and the right prints labels, so an even split starves the
+     one with something to say and leaves the other half empty */
+  .show-panes { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 20px; }
   .pane { position: relative; min-width: 0; padding: 26px 0 30px; border: 1px solid var(--color-steel); }
   /* the label sits on the border the way a fieldset legend does, which is what the frame is for */
   .pane-tag { position: absolute; top: -7px; left: 22px; padding: 0 8px; background: var(--color-warm); font-size: 10px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); }
@@ -586,8 +597,12 @@
   .pane::after { content: attr(data-model); position: absolute; bottom: -7px; right: 22px; padding: 0 8px; background: var(--color-warm); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.36px; color: var(--color-mid); }
   .pane-body { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.7; color: var(--color-off); padding: 0 22px; }
   .pane-cmd { color: var(--color-slate); white-space: pre; overflow: hidden; text-overflow: ellipsis; margin-bottom: 14px; }
-  /* every line is laid out from the start and only revealed, so a landing answer never reflows */
-  .pane-line { white-space: pre; overflow: hidden; text-overflow: ellipsis; color: transparent; }
+  /* every line is laid out from the start and only revealed, so a landing answer never reflows.
+     A distribution over four options does not fit a half-width pane at any font size worth reading,
+     so a long line wraps with a hanging indent rather than losing its tail to an ellipsis: the
+     whole point of the pane is the part that was getting cut off. */
+  .pane-line { white-space: pre-wrap; overflow-wrap: break-word; padding-left: 4ch; text-indent: -2ch; color: transparent; }
+  .pane-line.is-brace { padding-left: 0; text-indent: 0; }
   .pane-line.is-in { color: inherit; }
   /* the brace row carries the waiting message, so the message needs no position of its own */
   .pane-line.is-wait.is-in { color: var(--color-mid); }

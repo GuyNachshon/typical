@@ -181,8 +181,31 @@ function mountSizeScore(host, doc) {
 }
 
 import { mountShowdown } from './showdown.js';
+import { mountParallel } from './parallel.js';
+
+// Figure numbers were typed into the captions by hand, so moving a section renumbered nothing and
+// two figures both called themselves Fig. 1. They are numbered from document order instead, and a
+// cross-reference names its target rather than a literal that has to be kept in step.
+function numberFigures() {
+  const figs = [...document.querySelectorAll('.post figure.fig')];
+  figs.forEach((fig, i) => {
+    const cap = fig.querySelector('figcaption');
+    if (!cap || cap.dataset.numbered) return;
+    cap.dataset.numbered = '1';
+    const b = document.createElement('b');
+    b.textContent = `Fig. ${i + 1}.`;
+    cap.prepend(b, ' ');
+    if (fig.closest('section')?.id) fig.dataset.fignum = String(i + 1);
+  });
+  document.querySelectorAll('a.figref').forEach((a) => {
+    const target = document.querySelector(`${a.getAttribute('href')} figure.fig`);
+    if (target?.dataset.fignum) a.textContent = `Fig. ${target.dataset.fignum}`;
+  });
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
+  numberFigures();
+  mountParallel(document.getElementById('chart-parallel'));
   const host = document.getElementById('showdown');
   if (!host) return;
   const doc = await fetch('data/showdown.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);

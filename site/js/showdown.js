@@ -39,11 +39,11 @@ export function oursLine(q, a) {
   const entries = Object.entries(a.probs);
   if (q.type !== 'score') entries.sort((x, y) => y[1] - x[1]);
   const body = entries.map(([k, v]) => `"${k}": ${jnum(v)}`).concat(`"p_null": ${jnum(a.p_null)}`);
-  return `  ${JSON.stringify(q.question)}: {${body.join(', ')}},`;
+  return `${JSON.stringify(q.question)}: {${body.join(', ')}},`;
 }
 
 export function hostedLine(q, a) {
-  return `  ${JSON.stringify(q.question)}: ${JSON.stringify(a.pick)},`;
+  return `${JSON.stringify(q.question)}: ${JSON.stringify(a.pick)},`;
 }
 
 // How often a model asserted it was sure. Typical's number is its head's probability; the hosted
@@ -106,7 +106,7 @@ export function mountShowdown(host, doc) {
     target.body.replaceChildren();
     target.body.append(el('p', 'pane-cmd', header));
     const out = lines.map((t) => {
-      const n = el('p', 'pane-line', t);
+      const n = el('p', t === '{' || t === '}' ? 'pane-line is-brace' : 'pane-line', t);
       target.body.appendChild(n);
       return n;
     });
@@ -158,6 +158,7 @@ export function mountShowdown(host, doc) {
       const waiting = t < first;
       rows.R[0].textContent = waiting ? 'waiting for first token…' : '{';
       rows.R[0].classList.toggle('is-wait', waiting);
+      rows.R[0].classList.toggle('is-brace', !waiting);
       paint(R, rows.R, done ? rows.R.length : (waiting ? 0 : shown), done, m.ms, t);
       if (t < span) raf = requestAnimationFrame(step);
     };
@@ -182,7 +183,7 @@ export function selfTest() {
   console.assert(line.endsWith('"p_null": 0.02},'), 'the abstention is the last field, always present');
   const ord = oursLine({ type: 'score', question: 'x' }, { pick: '3', probs: { 0: 0.02, 1: 0.11, 2: 0.23, 3: 0.64 }, p_null: 0.001 });
   console.assert(ord.indexOf('"0"') < ord.indexOf('"3"'), 'ordered levels keep their order');
-  console.assert(hostedLine(q, { pick: 'platform' }) === '  "Which team should own this ticket?": "platform",', 'the hosted pane prints the label and nothing else');
+  console.assert(hostedLine(q, { pick: 'platform' }) === '"Which team should own this ticket?": "platform",', 'the hosted pane prints the label and nothing else');
   const c = certainty([{ pick: 'a', probs: { a: 0.46 } }, { pick: 'a', probs: { a: 0.99 } }]);
   console.assert(c.n === 2 && c.sure === 1, 'certainty counts what cleared the bar');
   console.assert(certainty([{ pick: 'a', stated_confidence: 1 }]).max === 1, 'a stated 1.00 is counted on either side');
