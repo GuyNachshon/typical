@@ -148,16 +148,12 @@ One data-licensing note we'd rather state than bury: most of the training mix is
 
 ## Try it
 
-The inference package ships inside each model repo:
-
 ```bash
-huggingface-cli download OzLabs/typical-small --local-dir typical-small
-pip install -r typical-small/inference/requirements.txt
+pip install typical-ai
 ```
 
 ```python
-import sys; sys.path.insert(0, "typical-small/inference")
-from typical import Typical
+from typical_ai import Typical
 
 m = Typical.from_pretrained("OzLabs/typical-small", device="auto")  # or "OzLabs/typical-medium"
 
@@ -166,7 +162,7 @@ m.noul(state,   "Is the order still under warranty?")
 m.score(state,  "How urgent is this ticket?", ["0", "1", "2", "3"])
 ```
 
-It needs `torch`, `transformers`, `safetensors`, `huggingface_hub` and `numpy`, and nothing from our training stack. `example.py` in the same directory runs end to end.
+It needs `torch`, `transformers`, `safetensors`, `huggingface_hub` and `numpy`, and nothing from our training stack. The import is `typical_ai` rather than `typical` because the bare name on PyPI belongs to an unrelated package. Weights download from the Hub on first call, and the package also ships inside each model repo if you would rather vendor it.
 
 Pick one bounded decision your software currently makes by calling an LLM and parsing the answer. Write down the label set as it actually varies at runtime. Swap the generation step for `choice`, `noul` or `score`, and test it on your own labels. If the model abstains a lot, that's telling you something about your label set. If a frozen larger model with a few examples beats it, believe that number before you believe ours.
 

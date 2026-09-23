@@ -61,6 +61,18 @@ benchmark is inside the noise.
 ## Quickstart
 
 ```bash
+pip install typical-ai
+```
+
+```python
+from typical_ai import Typical
+
+m = Typical.from_pretrained("OzLabs/typical-small")   # or OzLabs/typical-medium
+```
+
+<details><summary>Run from a source checkout instead</summary>
+
+```bash
 pip install -r inference/requirements.txt
 ```
 
@@ -83,6 +95,8 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])
 (`inference/example.py`). The `inference/` package (`inference/README.md`) is self-contained — no dependency on
 this training repo, just `torch`, `transformers`, `safetensors`, `huggingface_hub`, `numpy` — and is numerically
 verified against the internal decider (`inference/test_parity.py`, max abs probability diff `0.0` on CPU and MPS).
+
+</details>
 
 ## Demo
 
