@@ -15,7 +15,7 @@
 // Monochrome, like everything else here. The contrast is carried by fill order, which is the thing
 // the figure is about -- colour would only be decoration competing with the grids.
 
-import { svgEl, svgText, registerChart, fitWidth, INK, MID, STEEL } from './charts.js';
+import { svgEl, svgText, registerChart, fitWidth, INK, MID, STEEL, OURS, OTHER } from './charts.js';
 
 const COLS = 8;
 const ROWS = 5;
@@ -39,6 +39,16 @@ export function litAt(t, span, serial) {
   return Math.max(0, Math.min(N, Math.floor((t / span) * N)));
 }
 
+// A cell's resting shade is WHEN it arrived. The first version of this figure animated beautifully
+// and then finished as two identical black grids reading "40 of 40" twice -- the contrast lived
+// only in the four seconds you had to be watching for. So arrival order is encoded in the image
+// itself: the serial lane fades across its own fill order, and the parallel lane is flat because
+// every one of its cells arrived in the same instant. The figure now says the same thing standing
+// still as it does mid-run.
+export function shadeAt(i, serial) {
+  return serial ? 1 - 0.68 * (i / (N - 1)) : 1;
+}
+
 function label(x, y, str, attrs = {}) {
   return svgText(x, y, str, { 'font-size': 11, 'letter-spacing': 0.72, fill: MID, ...attrs });
 }
@@ -55,15 +65,24 @@ function grid(x, y) {
   return { g, cells };
 }
 
-function lane(x, y, w, tag, note, serial) {
+function lane(x, y, tag, note, serial) {
+  const hue = serial ? OTHER : OURS;
   const g = svgEl('g', { transform: `translate(${x},${y})` });
-  g.appendChild(label(0, 0, tag.toUpperCase(), { fill: INK, 'font-weight': 700 }));
-  const { g: gg, cells } = grid(0, 18);
+  g.appendChild(label(0, 0, tag.toUpperCase(), { fill: hue, 'font-weight': 700 }));
+  g.appendChild(label(0, 18, note, { fill: MID, 'letter-spacing': 0 }));
+  const { g: gg, cells } = grid(0, 34);
   g.appendChild(gg);
-  const foot = svgText(0, 18 + gridH + 22, '', { 'font-size': 11, fill: MID });
+  // the arrival axis: an arrow under the serial lane, a single stop under the parallel one
+  const ay = 34 + gridH + 16;
+  if (serial) {
+    g.appendChild(svgEl('path', { d: `M0 ${ay} H${gridW - 7}`, stroke: STEEL, 'stroke-width': 1 }));
+    g.appendChild(svgEl('path', { d: `M${gridW - 9} ${ay - 3.5} l5 3.5 l-5 3.5 z`, fill: STEEL }));
+  } else {
+    g.appendChild(svgEl('path', { d: `M0 ${ay - 4} V${ay + 4}`, stroke: STEEL, 'stroke-width': 1 }));
+  }
+  const foot = svgText(0, ay + 20, '', { 'font-size': 11, fill: MID });
   g.appendChild(foot);
-  g.appendChild(label(gridW + 26, 18 + gridH / 2 + 4, note, { fill: MID }));
-  return { g, cells, foot, serial };
+  return { g, cells, foot, serial, hue, h: ay + 28 };
 }
 
 const DESIGN_W = 1080;
@@ -80,14 +99,17 @@ export function mountParallel(container) {
     const width = fitWidth(container, DESIGN_W);
     container.style.maxWidth = `${DESIGN_W}px`;
     const stacked = width < STACK_W;
-    const laneW = stacked ? width : (width - 60) / 2;
-    const h = stacked ? 2 * (gridH + 70) + 20 : gridH + 78;
-    const svg = svgEl('svg', { viewBox: `0 0 ${width} ${h}`, width, height: h, role: 'img' });
+    const laneH = 34 + gridH + 44;
+    const h = 16 + (stacked ? 2 * laneH + 26 : laneH);
+    const svg = svgEl('svg', { viewBox: `0 0 ${width} ${h}`, width: '100%', height: h, role: 'img' });
     svg.appendChild(svgEl('title', {})).textContent =
-      'Two identical grids of forty cells: the autoregressive lane fills one cell at a time, the decision-model lane fills all forty at once.';
+      'Two identical grids of forty cells: the autoregressive lane fills one cell at a time and keeps a gradient showing that order, the decision-model lane fills all forty at once and is flat.';
 
-    const a = lane(0, 16, laneW, 'one token at a time', 'each answer waits for the last', true);
-    const b = lane(stacked ? 0 : laneW + 60, stacked ? gridH + 86 : 16, laneW, 'one pass', 'every question reads the same cache', false);
+    // the grids are a fixed size, so the two lanes sit at their own width and the leftover paper
+    // stays paper -- stretching a 40-cell grid to fill a column makes it a rectangle, not a figure
+    const gap = Math.max(60, Math.min(160, (width - 2 * gridW) / 2));
+    const a = lane(0, 16, 'one token at a time', 'each answer waits for the last', true);
+    const b = lane(stacked ? 0 : gridW + gap, stacked ? 16 + laneH + 26 : 16, 'one pass', 'all forty in the same forward pass', false);
     svg.append(a.g, b.g);
     host.replaceChildren(svg);
 
@@ -95,10 +117,10 @@ export function mountParallel(container) {
     let t0 = 0;
     const paint = (lit, ln) => {
       ln.cells.forEach((c, i) => {
-        c.setAttribute('fill', i < lit ? INK : STEEL);
-        c.setAttribute('opacity', i < lit ? 1 : 0.45);
+        c.setAttribute('fill', i < lit ? ln.hue : STEEL);
+        c.setAttribute('opacity', i < lit ? shadeAt(i, ln.serial) : 0.3);
       });
-      ln.foot.textContent = `${lit} of ${N}`;
+      ln.foot.textContent = ln.serial ? `${lit} of ${N} · in order` : `${lit} of ${N} · at once`;
     };
     const step = (now) => {
       const t = now - t0;
@@ -132,6 +154,8 @@ export function selfTest() {
   console.assert(litAt(0, 1000, false) === 0, 'the parallel lane is not lit before it has run');
   console.assert(litAt(1000 / N, 1000, false) === N, 'and lands whole, in one slot');
   console.assert(litAt(500, 1000, false) === N, 'then holds');
+  console.assert(shadeAt(0, true) === 1 && shadeAt(N - 1, true) < 0.4, 'the serial lane keeps its arrival order at rest');
+  console.assert(shadeAt(0, false) === shadeAt(N - 1, false), 'the parallel lane is flat, because its cells all arrived together');
   console.log('parallel.js self-test OK');
   return true;
 }

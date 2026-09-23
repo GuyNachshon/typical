@@ -14,6 +14,8 @@
   --color-mid: #938f89;       /* secondary copy, numerals, hairlines */
   --color-steel: #c2bfba;     /* borders, outlines */
   --color-slate: #595855;     /* secondary copy: #938f89 on canvas is 2.78:1, under AA-large */
+  --color-ours: #2f5d50;      /* figures only: our side of a comparison (7.0:1 on canvas) */
+  --color-other: #9a5b3d;     /* figures only: the other side (5.2:1 on canvas) */
 
   --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -492,6 +494,9 @@
   .register { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
   .register th { white-space: nowrap; /* "ECE std", "ms K2→K256": short pairs, never split */ text-align: left; font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--color-off); }
   .register td { padding: 12px 12px 12px 0; border-bottom: 1px solid var(--color-steel); vertical-align: top; }
+  .runreq .is-unstated { color: var(--color-steel); }
+  .runreq tr.is-ours td { color: var(--color-ours); }
+  .runreq td { font-size: 13px; }
   .register td:first-child { font-weight: 700; } /* no nowrap here: it set the grid track's min-content width and pushed the research page sideways — model ids are kept whole with non-breaking hyphens instead (js/typography.js) */
   @media (max-width: 40rem) {
     .register thead { display: none; }
@@ -522,6 +527,34 @@
 
   /* ---- footer ---- */
   .footer { background: var(--color-off); color: var(--color-warm); padding: 88px 0 55px; }
+  /* On the post the last paragraph of the FAQ used to butt straight into the dark slab, so the
+     footer read as the page breaking rather than ending. An end-mark on paper, then air, then the
+     dark: the transition is the same one, it is just deliberate now. */
+  .post .footer { margin-top: 0; }
+  .post .chapter:last-of-type::after {
+    content: ''; display: block; width: 18px; height: 18px; margin: 96px auto 110px;
+    border: 1px solid var(--color-steel); background: var(--color-warm);
+  }
+
+  /* ---- the FAQ, as disclosures ---- */
+  .faq-item { border-bottom: 1px solid var(--color-steel); }
+  .faq-item:first-of-type { border-top: 1px solid var(--color-steel); }
+  .faq-item > summary {
+    list-style: none; cursor: pointer; padding: 18px 34px 18px 0; position: relative;
+    font-size: 17px; line-height: 1.4; color: var(--color-off);
+  }
+  .faq-item > summary::-webkit-details-marker { display: none; }
+  /* a plus that becomes a minus: two rules, the vertical one rotated away when the item is open */
+  .faq-item > summary::after,
+  .faq-item > summary::before {
+    content: ''; position: absolute; right: 2px; top: 50%; width: 13px; height: 1px;
+    background: var(--color-slate); transition: transform var(--duration-tap) var(--ease-out);
+  }
+  .faq-item > summary::before { transform: rotate(90deg); }
+  .faq-item[open] > summary::before { transform: rotate(0deg); }
+  .faq-item[open] > summary { color: var(--color-off); font-weight: 700; }
+  .faq-item > p { padding: 0 34px 22px 0; font-size: 17px; line-height: 1.55; color: var(--color-slate); }
+  .faq-item > summary:hover { color: var(--color-ours); }
   .footer .cols { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 30px; }
   @media (max-width: 48rem) { .footer .cols { grid-template-columns: 1fr; } }
   .footer a:hover { text-decoration: underline; text-underline-offset: 4px; }

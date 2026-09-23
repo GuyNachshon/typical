@@ -368,7 +368,9 @@
      },
      "p_null": 0.0
     }
-   ]
+   ],
+   "h100_projected_ms": 96.3,
+   "h100_basis": "Projected, not measured on this call: 45 ms for a single cold decision plus 2.7 ms for each of the other 19, from the published K=2 ladder in releases/typical-small.md#latency (one H100, 256-token state, model load excluded). This call's own measurement is the 494.9 ms it took on mps."
   },
   "openrouter/openai/gpt-5.6-terra (low reasoning)": {
    "ms": 7220.6,

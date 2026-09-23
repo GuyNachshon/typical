@@ -95,9 +95,13 @@ document.addEventListener('DOMContentLoaded', mountField);
 // is the honest reading: neither of our models is on it — a 400M classifier is above typical-small,
 // and SemIf is above typical-medium on the same 4B base. What our models do lead is every prompted
 // backbone we ran, which is the claim this chart is really for.
-import { svgEl, svgText, registerChart, fitWidth, logScale, scale, INK, MID, STEEL, FONT_MONO } from './charts.js';
+import { svgEl, svgText, registerChart, fitWidth, logScale, scale, placeLabels, INK, MID, STEEL, FONT_MONO } from './charts.js';
 
 const D_W = 1000, D_H = 460, M = { t: 24, r: 150, b: 54, l: 52 };
+// A direct label starts LABEL_DX right of its dot and its leader turns the corner at LABEL_DX-3,
+// so both ends of the leader are a visible horizontal stub rather than a hairline. LINE_H is the
+// vertical pitch two labels need to clear each other at 11-12px mono.
+const LABEL_DX = 17, LINE_H = 13;
 
 function mountSizeScore(host, doc) {
   const pts = doc.rows.filter((r) => r.params_active && r.std != null);
@@ -125,12 +129,28 @@ function mountSizeScore(host, doc) {
     // chance is a floor, not a gridline
     g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: y(doc.chance.std), y2: y(doc.chance.std), stroke: MID, 'stroke-dasharray': '4,3' }));
     g.appendChild(svgText(iw - 2, y(doc.chance.std) - 6, `guessing ${String(doc.chance.std).replace(/^0/, '')}`, { fill: MID, 'font-size': 11, 'text-anchor': 'end' }));
-    [0.4, 1, 2, 4, 9, 26].forEach((v) => {
-      if (v < xs.reduce((a, b) => Math.min(a, b)) * 0.7 || v > Math.max(...xs) * 1.4) return;
-      g.appendChild(svgText(x(v), ih + 20, v < 1 ? `${v * 1000}M` : `${v}B`, { fill: MID, 'font-size': 11, 'text-anchor': 'middle' }));
+    // The ticks are the distinct active-parameter counts actually in the data. They used to be a
+    // hand-typed [0.4, 1, 2, 4, 9, 26]: nothing here is 1B, 26 is the *total* of the two
+    // mixture-of-experts rows whose tokens only pay for 4 (so it was labelling this axis with a
+    // number this axis does not plot), and the list stopped at 9B while the right-most point is a
+    // 14B — which is why the sizes read as wrong. Thinned left to right when a label would print
+    // into its neighbour, which only happens in a narrow container (8B and 9B sit 22px apart at
+    // the design width, 5px at 400px).
+    let tickX = -Infinity;
+    [...new Set(xs)].sort((a, b) => a - b).forEach((v) => {
+      const label = v < 1 ? `${v * 1000}M` : `${v}B`;
+      const cx = x(v);
+      if (cx - tickX < label.length * 3.3 + 10) return;
+      tickX = cx;
+      g.appendChild(svgText(cx, ih + 20, label, { fill: MID, 'font-size': 11, 'text-anchor': 'middle' }));
     });
     g.appendChild(svgEl('line', { x1: 0, x2: iw, y1: ih, y2: ih, stroke: STEEL }));
     g.appendChild(svgText(iw / 2, ih + 44, 'active parameters (log)', { fill: MID, 'font-size': 11, 'text-anchor': 'middle' }));
+    // The y axis had no title at all: a reader met a .4-1.0 scale and the only statement of what
+    // it measures was in the SVG <title>, where nothing but a screen reader finds it. Same idiom
+    // as the x title above, same place every other chart on the site puts it (barChart, ladder,
+    // timeline: mono, mid-gray, above the top of the axis).
+    g.appendChild(svgText(-M.l + 4, -8, 'JevBench standard (public subset)', { fill: MID, 'font-size': 11 }));
 
     // the frontier: cheapest model at or above every score to its left
     const sorted = [...pts].sort((a, b) => a.params_active - b.params_active);
@@ -141,39 +161,60 @@ function mountSizeScore(host, doc) {
     front.forEach((p, i) => { d += i ? ` H${x(p.params_active)} V${y(p.std)}` : `M${x(p.params_active)} ${y(p.std)}`; });
     g.appendChild(svgEl('path', { d, fill: 'none', stroke: MID, 'stroke-width': 1, 'stroke-dasharray': '5,4' }));
 
-    // Labels first, dots on top. Six entries sit in the 4B column within a few points of each
-    // other, so the labels have to be pushed apart or they overprint; the leader line keeps each
-    // one attached to its dot. Ours are placed last so nothing can be drawn over them.
-    const placed = [];
-    const put = (p) => {
+    // Eight entries sit in the 4B column, three of them within two points of each other, so the
+    // labels have to be pushed apart. Two things were wrong with how that was done.
+    //
+    // (1) A label whose dot sat past 72% of the plot width flipped to the LEFT of that dot. With
+    // 150px of right margin reserved for exactly these labels there was never a reason to: the
+    // 14B label flipped into the span [617, 724], which is where the 9B dot (652) and the 8B dot
+    // (630) live, so it read as the label of a point to its left. A label now flips only if it
+    // would otherwise leave the SVG, which at any width this page renders never happens.
+    //
+    // (2) The vertical search stepped `ly` by a cumulative +13, -13, +26, -26 ..., so the offsets
+    // it actually visited were 0, +13, 0, +26, 0, +39: never upwards, every other attempt a repeat
+    // of the position that had already clashed, and up to 260px of travel. Worst case in this data
+    // was 130px of drift at a 800px container. placeLabels() (charts.js, self-tested) replaces it
+    // with one downward sweep in y order; nothing in this data now moves more than 19px.
+    //
+    // Each label keeps its dot's x, so the leader only has to say "up/down from here": a stub out
+    // of the dot, a vertical run in the gutter just left of the text, a stub into the text.
+    const items = pts.map((p) => {
       const cx = x(p.params_active), cy = y(p.std);
-      const flip = cx > iw * 0.72;
-      // a fixed horizontal window let a long label run into a distant one; measure the box the
-      // text will actually occupy instead (11px mono is ~6.6px a character)
+      // measure the box the text will actually occupy (11px mono is ~6.6px a character, our own
+      // rows are set at 12px bold) rather than assuming a fixed window
       const wpx = p.name.length * (p.ours ? 7.2 : 6.6) + 14;
-      const box = (yy) => (flip ? { a: cx - 11 - wpx, b: cx - 11, y: yy } : { a: cx + 11, b: cx + 11 + wpx, y: yy });
-      let ly = cy + 4;
-      for (let i = 0; i < 40; i++) {
-        const me = box(ly);
-        const clash = placed.some((q) => Math.abs(q.y - ly) < 13 && me.a < q.b && q.a < me.b);
-        if (!clash) break;
-        ly += (i % 2 ? -1 : 1) * 13 * Math.ceil((i + 1) / 2);
+      const flip = cx + LABEL_DX + wpx > iw + M.r - 6;
+      const a = flip ? cx - LABEL_DX - wpx : cx + LABEL_DX;
+      return { p, cx, cy, flip, a, b: a + wpx, ideal: cy + 4 };
+    });
+    placeLabels(items, LINE_H, ih - 2).forEach((ly, i) => (items[i].ly = ly));
+
+    // Labels first, dots on top; ours drawn last so nothing can be drawn over them.
+    const draw = ({ p, cx, cy, flip, ly }) => {
+      const s = flip ? -1 : 1;
+      const tx = cx + s * LABEL_DX;
+      // any displacement at all gets a leader: a label nudged 6px is exactly the one a reader
+      // cannot tell is nudged
+      if (Math.abs(ly - (cy + 4)) > 2) {
+        const gutter = cx + s * (LABEL_DX - 3);
+        g.appendChild(svgEl('polyline', {
+          points: `${cx + s * 7},${cy} ${gutter},${cy} ${gutter},${ly - 4} ${tx},${ly - 4}`,
+          fill: 'none', stroke: MID, 'stroke-width': 1,
+        }));
       }
-      placed.push(box(ly));
-      const tx = flip ? cx - 11 : cx + 11;
-      if (Math.abs(ly - (cy + 4)) > 6) {
-        g.appendChild(svgEl('line', { x1: flip ? cx - 5 : cx + 5, y1: cy, x2: tx, y2: ly - 4, stroke: STEEL, 'stroke-width': 1 }));
-      }
+      // knocked out of whatever rule it lands on — the frontier step and the .8 gridline ran
+      // straight through `jeff (GLiFormer)` and `system-one-open` like a strike-through
       g.appendChild(svgText(tx, ly, p.name, {
         fill: p.ours ? INK : MID, 'font-size': p.ours ? 12 : 11, 'font-family': FONT_MONO,
         'font-weight': p.ours ? 700 : 400, 'text-anchor': flip ? 'end' : 'start',
+        stroke: '#f0eeeb', 'stroke-width': 3, 'paint-order': 'stroke',
       }));
       g.appendChild(p.ours
         ? svgEl('circle', { cx, cy, r: 6, fill: INK })
         : svgEl('circle', { cx, cy, r: 4.5, fill: '#f0eeeb', stroke: MID, 'stroke-width': 1.4 }));
     };
-    pts.filter((p) => !p.ours).sort((a, b) => b.std - a.std).forEach(put);
-    pts.filter((p) => p.ours).forEach(put);
+    items.filter((it) => !it.p.ours).forEach(draw);
+    items.filter((it) => it.p.ours).forEach(draw);
     host.appendChild(svg);
   };
   draw();
@@ -182,7 +223,7 @@ function mountSizeScore(host, doc) {
 
 import { mountShowdown } from './showdown.js';
 import { mountParallel } from './parallel.js';
-import { mountDeltaQ, mountTypes } from './relfigs.js';
+import { mountTypes, mountRunReq } from './relfigs.js';
 
 // Figure numbers were typed into the captions by hand, so moving a section renumbered nothing and
 // two figures both called themselves Fig. 1. They are numbered from document order instead, and a
@@ -207,8 +248,11 @@ function numberFigures() {
 document.addEventListener('DOMContentLoaded', async () => {
   numberFigures();
   mountParallel(document.getElementById('chart-parallel'));
-  mountDeltaQ(document.getElementById('chart-deltaq'));
   mountTypes(document.getElementById('chart-types'));
+  fetch('data/run-requirements.json')
+    .then((r) => (r.ok ? r.json() : null))
+    .then((doc) => doc && mountRunReq(document.getElementById('chart-runreq'), doc))
+    .catch(() => {});
   const host = document.getElementById('showdown');
   if (!host) return;
   const doc = await fetch('data/showdown.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);

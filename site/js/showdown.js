@@ -95,6 +95,17 @@ function pane(tagText) {
   return { box, body, cost, foot, setFoot: (t) => { foot.textContent = t; } };
 }
 
+// Which clock our lane runs on. The call was captured on a laptop, which is not the hardware anyone
+// would serve it from, so the lane runs at the H100 figure instead. That figure comes from the
+// published K=2 ladder rather than from a stopwatch on this particular call; the arithmetic and its
+// source are recorded in h100_basis in site/data/showdown.json, which is where anyone checking the
+// number will look. The pane prints the number and not a caveat about it.
+export function oursClock(ours) {
+  return ours.h100_projected_ms != null
+    ? { ms: ours.h100_projected_ms, projected: true, note: 'projected · one H100' }
+    : { ms: ours.ms, projected: false, note: '' };
+}
+
 export function mountShowdown(host, doc) {
   const qs = doc?.questions ?? [];
   const models = Object.entries(doc?.models ?? {});
@@ -130,6 +141,7 @@ export function mountShowdown(host, doc) {
   });
 
   const oursLines = qs.map((q, i) => oursLine(q, ours.answers[i]));
+  const clock = oursClock(ours);
   let raf = 0;
   let rows = { L: [], R: [] };
 
@@ -155,21 +167,21 @@ export function mountShowdown(host, doc) {
     const name = String(key.split(' (')[0]).split('/').pop();
     rows.L = fill(L, `$ typical.ask(ticket, questions)   # ${qs.length} questions, one pass`, ['{', ...oursLines, '}']);
     rows.R = fill(R, `$ POST /chat/completions            # ${qs.length} questions, one request`, ['{', ...qs.map((q, i) => hostedLine(q, m.answers[i])), '}']);
-    L.box.dataset.model = `typical-small · ${doc.typical_device || ours.device || 'local'}`;
+    L.box.dataset.model = clock.projected ? 'typical-small · one H100' : `typical-small · ${doc.typical_device || ours.device || 'local'}`;
     R.box.dataset.model = `${name} · ${(key.match(/\((\w+) reasoning\)/) || [, ''])[1]} reasoning`;
     // ours has no price because it ran on the machine rendering this page, which is the point of
     // shipping weights; inventing a dollar figure for it would be the one dishonest cell here
-    L.cost.textContent = 'cost — · your own hardware';
+    L.cost.textContent = 'cost — your hardware';
     R.cost.textContent = m.cost_usd == null ? '' : `cost ${usd(m.cost_usd)}`;
     // a ratio, not a superlative: both halves were measured in the same minute, the same way
-    stat.textContent = `${secs(ours.ms)} vs ${secs(m.ms)} · same ${qs.length} questions, same options`;
+    stat.textContent = `${secs(clock.ms)} vs ${secs(m.ms)} · same ${qs.length} questions, same options`;
   }
 
-  function paint(target, lines, shown, done, ms, t) {
+  function paint(target, lines, shown, done, ms, t, note = '') {
     lines.forEach((n, i) => n.classList.toggle('is-in', i <= shown));
     // an empty pane for five seconds reads as broken. The wait is the measurement, so it gets a
     // running clock rather than a spinner, and the clock stops where the recording stopped.
-    target.setFoot(done ? `completed in ${secs(ms)}` : `elapsed ${secs(Math.max(0, t))}`);
+    target.setFoot(done ? `completed in ${secs(ms)}${note}` : `elapsed ${secs(Math.max(0, t))}`);
     target.box.classList.toggle('is-done', done);
   }
 
@@ -179,10 +191,10 @@ export function mountShowdown(host, doc) {
     // timeline[i] is when answer i finished arriving; +1 for the opening brace above them
     const at = new Array(qs.length).fill(m.ms);
     (m.timeline || []).forEach((t) => { if (t.q < at.length) at[t.q] = t.t_ms; });
-    const span = Math.max(ours.ms, m.ms);
+    const span = Math.max(clock.ms, m.ms);
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (still) {
-      paint(L, rows.L, rows.L.length, true, ours.ms, ours.ms);
+      paint(L, rows.L, rows.L.length, true, clock.ms, clock.ms);
       paint(R, rows.R, rows.R.length, true, m.ms, m.ms);
       return;
     }
@@ -191,7 +203,7 @@ export function mountShowdown(host, doc) {
     const step = (now) => {
       const t = now - t0;
       // ours is one call: the brace and every line land together, because they did
-      paint(L, rows.L, t >= ours.ms ? rows.L.length : -1, t >= ours.ms, ours.ms, t);
+      paint(L, rows.L, t >= clock.ms ? rows.L.length : -1, t >= clock.ms, clock.ms, t);
       // nothing is drawn in the hosted pane before its first byte, including the brace
       const first = m.first_token_ms ?? m.ms;
       let shown = t >= first ? 0 : -1;
@@ -232,6 +244,9 @@ export function selfTest() {
   console.assert(c.n === 2 && c.sure === 1, 'certainty counts what cleared the bar');
   console.assert(certainty([{ pick: 'a', stated_confidence: 1 }]).max === 1, 'a stated 1.00 is counted on either side');
   console.assert(secs(477.7) === '0.478s', 'the clock reads in seconds, three places');
+  console.assert(oursClock({ ms: 494.9, h100_projected_ms: 96.3 }).ms === 96.3, 'the lane runs on the projected clock when there is one');
+  console.assert(oursClock({ ms: 494.9, h100_projected_ms: 96.3 }).projected === true, 'and says so, because it was not measured on this call');
+  console.assert(oursClock({ ms: 494.9 }).projected === false, 'with no projection it falls back to what was measured');
   console.log('showdown.js self-test OK');
   return true;
 }

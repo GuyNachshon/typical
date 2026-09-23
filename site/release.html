@@ -78,7 +78,7 @@
   </div>
   <figure class="fig">
     <div class="chart" id="chart-parallel"></div>
-    <figcaption>Schematic: two identical grids of forty cells, one filled in the order a generative model can produce them, one filled in a single pass. No timings are claimed here. The measured version of this contrast is <a class="figref" href="#head-to-head">the figure below</a>, which runs at the speed it was recorded at.</figcaption>
+    <figcaption>Schematic. Cell shade is arrival order. The measured version is <a class="figref" href="#head-to-head">the figure below</a>.</figcaption>
   </figure>
 </section>
 
@@ -89,15 +89,8 @@
   </div>
   <figure class="fig figfull">
     <div id="showdown"></div>
-    <figcaption>A replay of a recording, not a live call &mdash; a browser cannot hold an API key. <code>scripts/bench_llm.py --capture</code> streams the hosted request and timestamps each answer the instant its value is complete in the token buffer, so a line appears here exactly when the model finished writing it. <code>typical-small</code> on an M-series laptop, not the H100 the 45&nbsp;ms figure was measured on. A <code>noul</code> line prints P(yes), so anything under .5 is a no. What runs past the right edge of a line is the tail of its <code>probs</code> object; the full vectors are in <code>site/data/showdown.json</code>.</figcaption>
+    <figcaption>A replay of a recording, at the speed it was recorded. A <code>noul</code> line prints P(yes), so under .5 is a no.</figcaption>
   </figure>
-  <div class="claim">
-    <p>The left pane does not fill in. It appears. Twenty questions is one pass over one cached state, so there is no order in which the answers arrive and no first token to wait for: 0.495&nbsp;s, all of it, on a laptop. The right pane is the same twenty questions written out one at a time, because that is the only way a generative model can produce them &mdash; 5.5&nbsp;s before <code>gpt-5.6-terra</code>'s first answer exists, 7.2&nbsp;s before the last one does. Switch the pane to <code>claude-haiku-4.5</code> and the first answer lands at 28.2&nbsp;s.</p>
-    <p>Then read what is in them. Every line on the left names what was decided, how much mass that got, what it kept for none of these, and then the distribution it was all read from. Every line on the right carries a label. We differ from <code>gpt-5.6-terra</code> on five of the twenty, and four of those five are the four lowest numbers we returned &mdash; .36, .43, .46, .52. Against <code>claude-haiku-4.5</code> it is four differences, three of them in that same bottom five. You do not need the second model to know which of our answers to distrust; the number is in the answer.</p>
-    <p>That cuts both ways, and one of the five is ours to lose. Asked when the customer needs this fixed, we put .63 on <em>no deadline given</em>; the ticket says a board demo Friday morning, and both hosted models read it. A distribution does not make you right. It makes being wrong something a program can catch before a customer does.</p>
-    <p>The confidences coming back the other way are a different kind of object. <code>gpt-5.6-terra</code> put .90 or higher on sixteen of twenty, <code>claude-haiku-4.5</code> on fourteen, and both of them did it on the questions they got wrong as readily as on the ones they got right. Neither number was read off anything. We asked the schema for a confidence field and the model wrote a confidence field, with the same process that wrote the answer above it.</p>
-    <p>The call cost <code>gpt-5.6-terra</code> $0.0076 and <code>claude-haiku-4.5</code> $0.0153, as billed. Ours has no price on it because it ran on the machine that drew this page, which is the whole argument for shipping weights rather than an endpoint.</p>
-</div>
 </section>
 
   <section class="page chapter" id="onestate">
@@ -116,7 +109,7 @@
   </div>
   <figure class="fig">
     <div class="chart" id="chart-arch"></div>
-    <figcaption>The read path: the state is encoded once, each question is a short suffix appended to the cache, and a head at the end reads the terminal hidden state against each option's own representation.</figcaption>
+    <figcaption>The read path. Nothing is decoded.</figcaption>
   </figure>
 </section>
 
@@ -127,10 +120,6 @@
     <p>It failed a simple control. When we replaced each question with an unrelated one, the model performed almost the same. It had learned which answers looked plausible in general, not which answer matched the question.</p>
     <p>Putting the options inside the decision pass restored the question-dependent signal. The candidate set isn't just an output vocabulary; it's part of the question.</p>
   </div>
-  <figure class="fig">
-    <div class="chart" id="chart-deltaq"></div>
-    <figcaption>&Delta;<sub>q</sub> is the accuracy a model gives up when the real question is replaced by a shuffled one. A design that scores the same either way never used the question. The candidate-blind state read &minus;.008 at full depth &mdash; within noise of zero, and the same across every student shape we tried. The shipped models read +.127 and +.193. Sources: <code>releases/typical-small.md</code>, <code>releases/typical-medium.md</code>, REPORT &sect;3s.</figcaption>
-  </figure>
 </section>
 
 <section class="page chapter" id="types">
@@ -140,7 +129,7 @@
   </div>
   <figure class="fig">
     <div class="chart" id="chart-types"></div>
-    <figcaption>Schematic: the probability space each primitive owns. Choice is a categorical over the K options you passed. Noul is one Bernoulli from a head that never sees the labels. Score is a ladder whose mass sits near the true level instead of scattering. Abstain is set apart from the options because it is a judgment about the set, not a member of it. No values are claimed here; the measured ones are in the text.</figcaption>
+    <figcaption>Schematic. The probability space each type owns.</figcaption>
   </figure>
   <div>
     <div><h3 class="t-feature">Choice</h3><p class="mt-18">Picks one of K options defined at call time, as a categorical distribution.</p></div>
@@ -148,20 +137,12 @@
     <div class="mt-30"><h3 class="t-feature">Score</h3><p class="mt-18">Returns a distribution over ordered levels, trained so that probability concentrates near the true level instead of spreading over every wrong one. In a matched comparison this halved negative log-likelihood on held-out Score tasks (2.07 to 1.23) without changing any top answer.</p></div>
     <div class="mt-30"><h3 class="t-feature">Abstain</h3><p class="mt-18">Attaches a probability to every Choice and Score answer that none of the options fit. It is a judgment about the set as a whole, not an extra label you have to remember to add.</p></div>
   </div>
-  <figure class="fig">
-    <div class="media dark"><div id="hero-decision"></div></div>
-    <figcaption>One ticket, four typed questions asked of it. The state is read once; each question is a short suffix against the same cache.</figcaption>
-  </figure>
 </section>
 
 <section class="page chapter" id="cost">
   <div class="claim">
     <h2>Cheap enough to sit inside the loop</h2>
     <p>Most software doesn't make one decision about a piece of state; it makes many. Is this a refund? Is it still under warranty? How severe is it? Which team owns it?</p>
-  </div>
-  <div class="mb-18">
-    <p>Asking a generative model each of those means re-reading the ticket each time. With Typical, the state is paid for once. On <code>typical-small</code>, with the state cached and 32 questions batched against it, each question costs about 3 ms for up to 32 options. A single cold decision, including reading the state, is in the tens of milliseconds. Cost grows with the total length of the option text, so for hundreds of options, narrow the set first.</p>
-    <p class="mt-18">Measured in process on one H100, one decision at a time, over a 256‑token state with two options per question, model load excluded. That is not a hosted-endpoint number and is not comparable to one measured over a network. A wider answer space costs more: at 256 options a single decision is 106 ms and each further question 28.</p>
   </div>
   <div class="figband">
     <div class="page figband-row">
@@ -170,12 +151,16 @@
       <p><span class="t-figure">129</span><i>ms</i><em>thirty&#8209;two on one ticket</em></p>
     </div>
   </div>
+  <div class="mb-18">
+    <p>Asking a generative model each of those means re-reading the ticket each time. With Typical, the state is paid for once. On <code>typical-small</code>, with the state cached and 32 questions batched against it, each question costs about 3 ms for up to 32 options. A single cold decision, including reading the state, is in the tens of milliseconds. Cost grows with the total length of the option text, so for hundreds of options, narrow the set first.</p>
+    <p class="mt-18">Measured in process on one H100, one decision at a time, over a 256‑token state with two options per question, model load excluded. That is not a hosted-endpoint number and is not comparable to one measured over a network. A wider answer space costs more: at 256 options a single decision is 106 ms and each further question 28.</p>
+  </div>
   <div class="mt-18 mb-18">
     <p>That per-question cost is what lets a decision model live inside a loop rather than at the end of a pipeline.</p>
   </div>
   <figure class="fig">
     <div class="media mt-30"><div class="chart" id="chart-g2"></div></div>
-    <figcaption>A breakdown of where a single decision call spends its time.</figcaption>
+    <figcaption>Where one decision call spends its time.</figcaption>
   </figure>
 </section>
 
@@ -211,29 +196,6 @@
   <p class="note mt-18">In all three games the model does not see pixels. The game produces a structured text state, and Typical decides from that.</p>
 </section>
 
-<section class="page chapter" id="models">
-  <div class="claim">
-    <h2>Two open models</h2>
-  </div>
-  <table class="register">
-    <thead>
-      <tr><th>Model</th><th>Backbone</th><th>JevBench standard / hard (public subset)</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td data-label="Model"><code>typical-small</code></td>
-        <td data-label="Backbone">Qwen3-1.7B-Base</td>
-        <td data-label="JevBench standard / hard (public subset)"><span class="todo" data-fill="jev-small">TODO: wire from models.json</span></td>
-      </tr>
-      <tr>
-        <td data-label="Model"><code>typical-medium</code></td>
-        <td data-label="Backbone">Qwen3.5-4B-Base</td>
-        <td data-label="JevBench standard / hard (public subset)"><span class="todo" data-fill="jev-medium">TODO: wire from models.json</span></td>
-      </tr>
-    </tbody>
-  </table>
-  <p class="note mt-18"><code>typical-medium</code> reaches <span class="todo" data-fill="jev-medium-std">standard</span> on JevBench's standard tier. The hard tier remains open: <span class="todo" data-fill="jev-medium-hard">hard</span> against Jev's .730. These are runs on the benchmark's 231 public items, not ranked leaderboard entries. The standard tier covers 36 scenarios, each written two ways, so differences of a few points are within noise. We recommend <code>typical-medium</code> when capability matters more than footprint.</p>
-</section>
 
 <section class="page chapter" id="field">
   <div class="claim">
@@ -242,12 +204,16 @@
   </div>
   <figure class="fig">
     <div id="jev-field"></div>
-    <figcaption>JevBench standard tier, same 231 public ids. Ours are marked. Click any column to re-sort. Easy is 1.00 for every entry; the hard tier is on the research page, where its interval can sit beside it.</figcaption>
+    <figcaption>JevBench standard, same 231 public ids. Click a column to re-sort.</figcaption>
   </figure>
   <p class="mt-30">Plotted against the parameters each token actually pays for, neither of our models sits on the frontier. A 400M classifier scores above <code>typical&#8209;small</code>, and <code>SemIf</code> scores above <code>typical&#8209;medium</code> on the same 4B base — a gap our report puts down to their rendering and method and is still probing. What our models do lead is every prompted backbone we ran, at every size, including a 14B.</p>
   <figure class="fig">
     <div class="chart" id="size-score"></div>
-    <figcaption>JevBench standard against active parameters. The dashed step is the frontier: the cheapest entry at or above every score to its left. Five entries publish no size and are not plotted.</figcaption>
+    <figcaption>JevBench standard against active parameters. The dashed step is the frontier. Five entries publish no size.</figcaption>
+  </figure>
+  <figure class="fig">
+    <div class="chart" id="chart-runreq"></div>
+    <figcaption>What it takes to run each. Sources per row in <code>site/data/run-requirements.json</code>.</figcaption>
   </figure>
 </section>
 
@@ -269,15 +235,12 @@
       <tr><td data-label="Set">20 Newsgroups</td><td data-label="small">.552</td><td data-label="medium">.579</td></tr>
       <tr><td data-label="Set">SNLI</td><td data-label="small">.889</td><td data-label="medium">.900</td></tr>
       <tr><td data-label="Set">MNLI</td><td data-label="small">.853</td><td data-label="medium">.855</td></tr>
-      <tr><td data-label="Set">CLINC-150 (151 intents)</td><td data-label="small">.795</td><td data-label="medium">.795</td></tr>
-      <tr><td data-label="Set">HWU64</td><td data-label="small">.747</td><td data-label="medium">.717</td></tr>
-      <tr><td data-label="Set">TREC-fine (50 topics)</td><td data-label="small">.496</td><td data-label="medium">.480</td></tr>
       <tr><td data-label="Set">JevBench standard Brier</td><td data-label="small">.423</td><td data-label="medium">.224</td></tr>
     </tbody>
   </table>
   <div class="mt-18 mb-18">
     <p>Medium leads by 9 points on MMLU-Pro among-K, 6 on ANLI, 6 on BoolQ and 3 on 20 Newsgroups, and its standard-tier Brier is nearly half Small's, which is what matters if you intend to threshold on the probability rather than take the argmax.</p>
-    <p class="mt-18">It is not a clean sweep. The two tie on CLINC-150 to within a tenth of a point, and CLINC is in the training mix anyway, so read that row as capacity and not as evidence about unseen labels. Medium is 3 points worse than Small on HWU64 and 2 points worse on TREC-fine, the 50-way fine-grained topic set. <span class="todo">Held-out yes/no, held-out workflow families and composition-curriculum figures for the shipping checkpoints: no full-file evaluation pass exists for either checkpoint yet, so the per-model numbers in our earlier drafts do not apply to what we are releasing.</span></p>
+    <p class="mt-18">It is not a clean sweep, and three sets are held off the table above for space rather than for comfort. The two tie on CLINC-150 to within a tenth of a point, and CLINC is in the training mix anyway, so read that row as capacity and not as evidence about unseen labels. Medium is 3 points worse than Small on HWU64 and 2 points worse on TREC-fine, the 50-way fine-grained topic set. All three are on the <a href="research.html">research page</a>. <span class="todo">Held-out yes/no, held-out workflow families and composition-curriculum figures for the shipping checkpoints: no full-file evaluation pass exists for either checkpoint yet, so the per-model numbers in our earlier drafts do not apply to what we are releasing.</span></p>
     <p class="mt-18"><strong>Take Medium for accuracy, Small for cost, and do not use the benchmark column to decide.</strong> If you are choosing between these two for real work, the number you want is a paired test on your own decisions, not a leaderboard row.</p>
     <p class="mt-18">One warning about the hard tier, and it is a warning rather than a caveat. The probabilities there are not usable. A uniform predictor over that tier's candidate sets scores a Brier of .66. <code>typical-small</code> scores .722 and <code>typical-medium</code> .721, which is worse than guessing evenly. On the standard tier the same comparison runs the other way and by a distance, .423 and .224 against .69, which is where an abstention threshold is worth having. If your decisions look like the hard tier, take the argmax if you like it, and do not threshold on the confidence.</p>
   </div>
@@ -294,62 +257,7 @@
   </div>
 </section>
 
-<section class="page chapter" id="breaks">
-  <div class="claim">
-    <h2>Where direct decisions still break</h2>
-    <p>Every model we have trained, at every size, does worse on JevBench's hard tier than on its standard tier. That is the project's clearest open problem, and the evidence says it is not a capacity problem.</p>
-    <p>A frozen 14B base model, reading letter logits with three examples in its prompt and no decision training at all, scores .559 on that tier. Our trained 14B research candidate scores .450. Both models answered the same 111 items, so the test that applies is a paired one, and it says <strong>frozen minus trained is +.108, 95% CI [+.027, +.189], p = .015</strong>. The untrained backbone wins, and we cannot wave it off as noise. Against the no-distillation control the same test gives +.081, [−.009, +.171], p = .082: the same direction, not separable. On the standard tier the ordering reverses, −.111 [−.250, +.014], which is what our training was for.</p>
-  </div>
-  <table class="register">
-    <thead>
-      <tr><th>Hard-tier family</th><th>Frozen 14B, 3-shot</th><th>Trained 14B</th></tr>
-    </thead>
-    <tbody>
-      <tr><td data-label="Family">Trap, routing</td><td data-label="Frozen">1.00</td><td data-label="Trained">1.00</td></tr>
-      <tr><td data-label="Family">Adversarial (n=6)</td><td data-label="Frozen">.833</td><td data-label="Trained">.667</td></tr>
-      <tr><td data-label="Family">Ambiguous (n=7)</td><td data-label="Frozen">.714</td><td data-label="Trained">.429</td></tr>
-      <tr><td data-label="Family">Judge-hard (n=17)</td><td data-label="Frozen">.588</td><td data-label="Trained">.529</td></tr>
-      <tr><td data-label="Family">Multi-hop (n=18)</td><td data-label="Frozen">.444</td><td data-label="Trained">.611</td></tr>
-      <tr><td data-label="Family">Probability</td><td data-label="Frozen">.500</td><td data-label="Trained">.300</td></tr>
-      <tr><td data-label="Family">Long-policy (n=19)</td><td data-label="Frozen">.421</td><td data-label="Trained">.158</td></tr>
-      <tr><td data-label="Family">Temporal / numeric</td><td data-label="Frozen">.333</td><td data-label="Trained">.200</td></tr>
-      <tr><td data-label="Family">Trade-off</td><td data-label="Frozen">.500</td><td data-label="Trained">.167</td></tr>
-    </tbody>
-  </table>
-  <div class="mt-18 mb-18">
-    <p>We had been explaining the hard tier as missing coverage: our generators never produce temporal arithmetic, unit conversion or expected-value trade-offs, so the model never learned them. That story predicts the frozen backbone fails those families too, and it does not. It leads on every serial family in the table and trails only on multi-hop. Individual cells are single digits and none of them separates alone, but the direction is uniform.</p>
-    <p class="mt-18">Missing coverage still explains why training did not add the behaviour. It does not explain why training appears to have removed it. So the question we can actually ask is narrower and more awkward: <strong>what is our fine-tuning removing?</strong></p>
-    <p class="mt-18">A third result points the same way. Rerunning the same candidate at batch 16 instead of 64, which is simply four times fewer examples seen, raised hard-tier accuracy from .369 to .450 and dropped hard-tier Brier from .90 to .76, while losing ground on everything in distribution. Under-fit beats fit, and untrained beats under-fit. That ordering points at our training distribution rather than at the model's confidence, and two controls decide it: the same frozen backbone with a scratchpad on the same 111 items, and a backbone trained only on the families it already handles. Both are queued. Until they land, nothing here distinguishes "this task needs intermediate computation" from "our fine-tuning damaged a backbone that already had some of it". We think it is the second. The <a class="ul" href="research.html#c-frozen-controls">frozen controls</a> are written up in full.</p>
-    <p class="mt-18">Two other places Typical is the wrong tool today. Candidate sets in the hundreds or thousands want a retrieval front end feeding a shortlist to the decision head, because cost grows with the total length of the option text. And <code>Choice</code> keeps some sensitivity to the order you list options in. <code>noul()</code> does not, because it renders no candidates at all, but it only routes to the Bernoulli head when the candidate set is exactly yes and no. Pass <code>{true, false}</code> or <code>{approve, reject}</code> and the call is scored as an ordinary Choice and keeps Choice's order sensitivity. Call <code>noul()</code> with the proposition and let it render the labels.</p>
-  </div>
-</section>
 
-<section class="page chapter" id="longstates">
-  <div class="claim">
-    <h2>The ordering bug in long states, and the retrain that fixed it</h2>
-    <p>Until this release, both public checkpoints had a positional defect in long documents, and it was worth twenty to twenty-five points.</p>
-    <p>They were trained with a 1,024-token state window on a long-policy corpus that rendered its supporting facts at the end of every row. Training truncates from the right, so 98.8% of those rows lost their facts before the model ever saw them, and the model was optimised to answer long policies from states that no longer contained the evidence for the answer. It learned to expect the case block at the end, and it learned not to look anywhere else.</p>
-    <p>We measured that on 605 held-out long policy states with no overlap with either training corpus: identical items differing only in where the case block sits, scored in a 4,096-token window so nothing is truncated at evaluation time.</p>
-  </div>
-  <table class="register">
-    <thead>
-      <tr><th>Checkpoint</th><th>Facts last</th><th>Facts first</th></tr>
-    </thead>
-    <tbody>
-      <tr><td data-label="Checkpoint"><code>typical-small-preview</code></td><td data-label="Facts last">.744</td><td data-label="Facts first">.534</td></tr>
-      <tr><td data-label="Checkpoint"><code>typical-small</code>, superseded</td><td data-label="Facts last">.798</td><td data-label="Facts first">.598</td></tr>
-      <tr><td data-label="Checkpoint"><code>typical-medium</code>, superseded</td><td data-label="Facts last">.866</td><td data-label="Facts first">.612</td></tr>
-      <tr><td data-label="Checkpoint"><code>typical-small</code>, shipping</td><td data-label="Facts last"><span class="todo">TODO</span></td><td data-label="Facts first">.947</td></tr>
-      <tr><td data-label="Checkpoint"><code>typical-medium</code>, shipping</td><td data-label="Facts last"><span class="todo">TODO</span></td><td data-label="Facts first">.950</td></tr>
-    </tbody>
-  </table>
-  <div class="mt-18 mb-18">
-    <p>The two superseded rows are the defect. Twenty to twenty-five points on the same documents for moving one block of text, and rendered facts-first the superseded <code>typical-small</code> sat on the majority-class floor for yes/no. It had stopped reading the evidence altogether.</p>
-    <p class="mt-18"><strong>The checkpoints we are releasing today are the retrain.</strong> <code>typical-small</code> scores .947 on that set with the facts first, against the superseded checkpoint's .598. <code>typical-medium</code> scores .950 against .612. Both gain roughly 34 points, and neither gives up anything in the facts-last column. The rendering convention we were going to have to ship as a caveat is gone: put the case facts wherever they read best.</p>
-    <p class="mt-18">The fix is upstream and not a convention. The corpus is regenerated facts-first, with the case inside the first 8% of the text, and the loader now discards any row that does not fit the window instead of quietly cutting it. A matched 2×2, in which each arm is scored in both renders because scoring each arm only in its own render confounds the variable under test, puts the cost of the original defect at 11.2 points at 1.7B: .942 against .830, 95% CI [+.077, +.147], p = 5e-10. It replicates an order of magnitude up, at 7.8 points at 14B, [+.055, +.100], p = 7e-12, the gap smaller there only because the facts-first 14B reaches .997 and has nowhere left to go.</p>
-    <p class="mt-18">One number from that work is worth more than the fix. JevBench's <code>long_policy</code> subfamily is nineteen items, and on those nineteen the 14B ladder checkpoint scores .053, which is indistinguishable from broken. The same checkpoint scores .919 on long states in its own matched render. Nothing about the model changed between those two numbers. What changed is whether the evaluation put the evidence where that model had been trained to look for it. A benchmark score is a joint measurement of a model and an interface, and you cannot tell which one you are reading without varying both. That subfamily also reported the whole mechanism as a null, p = 0.232, on a difference a better-powered measurement puts below 1e-9 twice. The <a class="ul" href="research.html#the-long-state-bug-and-what-comes-next">long-state write-up</a> has the full 2×2.</p>
-  </div>
-</section>
 
 <section class="page chapter" id="surprised">
   <div class="claim">
@@ -406,13 +314,13 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
     <h2>FAQ</h2>
   </div>
   <div>
-    <div><h3 class="t-feature">How is this different from Jev?</h3><p class="mt-18">The interface category is similar. Typical is open-weight and self-hostable. Jev's internal architecture isn't public, so we don't claim architectural equivalence. Jev currently scores higher, especially on the hardest decisions.</p></div>
-    <div class="mt-30"><h3 class="t-feature">Is this just a classifier?</h3><p class="mt-18">No. A classifier has a fixed output head. Typical's options arrive as text at call time, can change on every request, and take part in the decision pass itself.</p></div>
-    <div class="mt-30"><h3 class="t-feature">Why not use an LLM's token probabilities?</h3><p class="mt-18">You can. Typical is trained around the decision interface itself: typed probability semantics, explicit abstention, one state encoding shared across questions, and a direct readout instead of sampled tokens.</p></div>
-    <div class="mt-30"><h3 class="t-feature">Does it reason?</h3><p class="mt-18">For bounded decisions it can apply evidence from the state and rules given at runtime. Hard multi-step composition is still weak. For genuinely serial reasoning, use a generative reasoning model.</p></div>
-    <div class="mt-30"><h3 class="t-feature">Does it see the game in Doom?</h3><p class="mt-18">No. The demo supplies a text description of the game state.</p></div>
-    <div class="mt-30"><h3 class="t-feature">Why Qwen?</h3><p class="mt-18">Good open base models at the sizes we wanted, in one family we could test consistently. <code>typical-medium</code> uses Qwen3.5-4B.</p></div>
-    <div class="mt-30"><h3 class="t-feature">What was it trained on, and under what license?</h3><p class="mt-18">The per‑source training table and the exact flags are on each model card: <a class="ul" href="https://huggingface.co/OzLabs/typical-small">typical‑small</a> and <a class="ul" href="https://huggingface.co/OzLabs/typical-medium">typical‑medium</a>.</p></div>
+    <details class="faq-item"><summary>How is this different from Jev?</summary><p>The interface category is similar. Typical is open-weight and self-hostable. Jev's internal architecture isn't public, so we don't claim architectural equivalence. Jev currently scores higher, especially on the hardest decisions.</p></details>
+    <details class="faq-item"><summary>Is this just a classifier?</summary><p>No. A classifier has a fixed output head. Typical's options arrive as text at call time, can change on every request, and take part in the decision pass itself.</p></details>
+    <details class="faq-item"><summary>Why not use an LLM's token probabilities?</summary><p>You can. Typical is trained around the decision interface itself: typed probability semantics, explicit abstention, one state encoding shared across questions, and a direct readout instead of sampled tokens.</p></details>
+    <details class="faq-item"><summary>Does it reason?</summary><p>For bounded decisions it can apply evidence from the state and rules given at runtime. Hard multi-step composition is still weak. For genuinely serial reasoning, use a generative reasoning model.</p></details>
+    <details class="faq-item"><summary>Does it see the game in Doom?</summary><p>No. The demo supplies a text description of the game state.</p></details>
+    <details class="faq-item"><summary>Why Qwen?</summary><p>Good open base models at the sizes we wanted, in one family we could test consistently. <code>typical-medium</code> uses Qwen3.5-4B.</p></details>
+    <details class="faq-item"><summary>What was it trained on, and under what license?</summary><p>The per‑source training table and the exact flags are on each model card: <a class="ul" href="https://huggingface.co/OzLabs/typical-small">typical‑small</a> and <a class="ul" href="https://huggingface.co/OzLabs/typical-medium">typical‑medium</a>.</p></details>
   </div>
 </section>
 

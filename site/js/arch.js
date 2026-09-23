@@ -16,7 +16,7 @@
 // Deliberately static. The instrument in the hero owns the page's only moving thing; an
 // architecture diagram that pulses is decoration competing with it.
 
-import { svgEl, svgText, registerChart, fitWidth, INK, MID, STEEL, FONT_MONO } from './charts.js';
+import { svgEl, svgText, registerChart, fitWidth, INK, MID, STEEL, OURS, FONT_MONO } from './charts.js';
 
 const DESIGN_W = 1120;
 const STACK_W = 620; // below this the row does not fit, so the stages stack
@@ -87,19 +87,35 @@ export function mountFlow(container) {
 
 // Wide: the three stages left to right, then the fan-out at the cache. The fan gets a long run of
 // its own — bending three lines inside a 34px gap bundled them into one grey smudge.
+//
+// The fan used to start at a fixed y=60 while the stage row sat at 161, so the right-hand column
+// floated above the left and the figure had a hole under it. The branch block is centred on the
+// stage row's centre line now, and the whole drawing is measured off that one number.
+const BRANCH_PITCH = 78;
+
 function row(svg, w) {
   const pad = 2;
   const gap = 34;
   const fanGap = 96;
   const branchW = Math.min(340, w * 0.31);
   const colW = (w - pad * 2 - branchW - fanGap - gap * 2) / 3;
-  const bodyY = 161; // the stage row sits on the fan's centre line, not above it
+  const bodyY = 12 + (BRANCHES.length * BRANCH_PITCH) / 2; // the two columns share one centre line
   const bodyH = 66;
   STAGES.forEach((s, i) => {
     const x = pad + i * (colW + gap);
-    svg.appendChild(mono(x, bodyY - 44, s.tag.toUpperCase(), { size: 10, fill: MID, weight: 700 }));
+    svg.appendChild(mono(x, bodyY - 44, s.tag.toUpperCase(), { size: 10, fill: i === 0 ? OURS : MID, weight: 700 }));
     svg.appendChild(box(x, bodyY - 30, colW, bodyH, s));
-    s.lines.forEach((l, n) => svg.appendChild(mono(x + 14, bodyY - 6 + n * 17, l, { size: 12 })));
+    if (i === 0) {
+      // the ticket drawn as what it becomes: a run of cells, the same ones Fig. 1 counts
+      const n = 22;
+      const cw = (colW - 28 - (n - 1) * 3) / n;
+      for (let k = 0; k < n; k += 1) {
+        svg.appendChild(svgEl('rect', { x: x + 14 + k * (cw + 3), y: bodyY - 18, width: cw, height: 12, fill: OURS, opacity: 0.85 }));
+      }
+      svg.appendChild(mono(x + 14, bodyY + 18, s.lines[0], { size: 11, fill: MID }));
+    } else {
+      s.lines.forEach((l, n2) => svg.appendChild(mono(x + 14, bodyY - 6 + n2 * 17, l, { size: 12 })));
+    }
     svg.appendChild(mono(x, bodyY + 56, s.note, { size: 11, fill: MID }));
     if (i > 0) {
       arrow(svg, `M${x - gap + 5} ${bodyY + 3} H${x - 7}`);
@@ -110,17 +126,18 @@ function row(svg, w) {
   // the fan: one line out of the cache, splitting into the three typed questions
   const cacheRight = pad + 2 * (colW + gap) + colW;
   const x4 = cacheRight + fanGap;
+  const fanTop = bodyY + 3 - (BRANCHES.length - 1) * BRANCH_PITCH / 2 - 20;
   BRANCHES.forEach((b, n) => {
-    const y = 60 + n * 84;
+    const y = fanTop + n * BRANCH_PITCH;
     arrow(svg, elbow(cacheRight + 5, bodyY + 3, x4 - 9, y + 20, 16));
     head(svg, x4 - 5, y + 20);
-    svg.appendChild(mono(x4, y + 8, b.k.toUpperCase(), { size: 10, fill: MID, weight: 700 }));
+    svg.appendChild(mono(x4, y + 8, b.k.toUpperCase(), { size: 10, fill: OURS, weight: 700 }));
     svg.appendChild(mono(x4, y + 26, b.q, { size: 12 }));
     svg.appendChild(svgEl('line', { x1: x4, y1: y + 36, x2: x4 + branchW, y2: y + 36, stroke: STEEL, 'stroke-width': 1 }));
     svg.appendChild(mono(x4, y + 52, b.out, { size: 11, fill: MID }));
   });
-  svg.appendChild(mono(x4, 44, 'ASK \u00b7 READ OUT', { size: 10, fill: MID, weight: 700 }));
-  return footer(svg, pad, 310, w - pad * 2, 11);
+  svg.appendChild(mono(x4, fanTop - 22, 'ASK \u00b7 READ OUT', { size: 10, fill: MID, weight: 700 }));
+  return footer(svg, pad, Math.max(bodyY + 96, fanTop + BRANCHES.length * BRANCH_PITCH + 14), w - pad * 2, 11);
 }
 
 // Narrow: the same path top to bottom. A 390px column cannot hold four stages side by side, and

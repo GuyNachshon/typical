@@ -10,6 +10,14 @@ export const MID = '#938f89'; // mid-gray — axis/legend text, secondary series
 export const STEEL = '#c2bfba'; // steel — gridlines, axis rules, reference lines... except ref lines are mid-gray per spec
 const WHITE = '#ffffff'; // still used for knockout strokes/labels drawn ON an ink mark
 const SURFACE = '#f0eeeb'; // the page canvas: charts draw straight onto paper, not onto a panel
+
+// Two accents, and they live only inside figures -- never in prose, chrome or navigation. The page
+// is monochrome warm paper by design and stays that way; what colour buys here is the one thing
+// shape cannot carry on its own, which is WHICH SIDE a mark belongs to. Both are measured against
+// SURFACE: OURS 6.47:1, OTHER 4.61:1 -- above AA for normal text, so either can carry a label and
+// not just a fill.
+export const OURS = '#2f5d50';  // deep green — our models, the one-pass side
+export const OTHER = '#9a5b3d'; // clay — hosted models, the serial side
 export const FONT_MONO = '"Geist Mono", ui-monospace, "SF Mono", Menlo, monospace';
 
 // Fixed style slots (never cycled by data order) plus a name-keyed lookup so the same model
@@ -170,6 +178,39 @@ export function niceTicks(min, max, count = 5) {
   const step = [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw);
   const out = [];
   for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) out.push(Number(v.toFixed(10)));
+  return out;
+}
+
+// Direct labels on a scatter collide as soon as two points share a column. This is the 1-D
+// de-overlap every such chart needs, kept pure so it can be tested under plain `node charts.js`:
+// each label declares the horizontal span its text will occupy (`a`..`b`) and the `ideal` y it
+// wants (its point's y), and gets back the y it may use, in the same order.
+//
+// The rule is one downward sweep in `ideal` order: a label keeps its ideal y unless a label
+// already placed overlaps it horizontally, in which case it drops to exactly one line below that
+// one. Because a label's y only ever increases, one pass over the placed set is enough to satisfy
+// every member of it at once, whatever order that set is in — so the result is deterministic and
+// free of the "push up, push down, land back where you started" wandering a per-label search does.
+// A label never moves sideways, so it stays under/over its own point and a short leader is enough
+// to read the attachment.
+//
+// ponytail: O(n^2) against the placed set. n is a benchmark field (16 rows today); bucket by
+// column if a chart ever draws hundreds.
+export function placeLabels(items, lineH = 13, maxY = Infinity) {
+  const out = items.map((it) => it.ideal);
+  const placed = [];
+  items
+    .map((_, i) => i)
+    .sort((i, j) => items[i].ideal - items[j].ideal)
+    .forEach((i) => {
+      const me = items[i];
+      let y = me.ideal;
+      for (const q of placed) if (me.a < q.b && q.a < me.b && y < q.y + lineH) y = q.y + lineH;
+      // A label outside the plot is worse than a crowded one, so the clamp wins. It can only bite
+      // if a single column carries more labels than the chart is tall.
+      out[i] = y = Math.min(y, maxY);
+      placed.push({ a: me.a, b: me.b, y });
+    });
   return out;
 }
 
@@ -660,6 +701,17 @@ function selfTest() {
   console.assert(t.length === 5 && t[0] === 0 && t[4] === 10, 'ticks spans domain with count entries');
   console.assert(JSON.stringify(niceTicks(0, 172.7)) === '[0,50,100,150]', 'niceTicks rounds to 1/2/5 steps');
   console.assert(fmtNum(1.6500000001) === '1.65' && fmtNum(45) === '45', 'fmtNum rounds float noise');
+  // placeLabels: only x-overlapping labels move, they move down by exactly one line, and a label
+  // that clears everything keeps the y of its own point (the old per-label search in release.js
+  // walked 0, +13, 0, +26, 0, +39 ... and could strand a label 260px from its dot).
+  const box = (ideal, a = 0, b = 50) => ({ a, b, ideal });
+  console.assert(
+    JSON.stringify(placeLabels([box(10), box(12), box(100), box(11, 80, 120)])) === '[10,23,100,11]',
+    'placeLabels drops overlapping labels one line, leaves the rest on their point'
+  );
+  const stack = placeLabels([box(40), box(41), box(42), box(43)]);
+  console.assert(JSON.stringify(stack) === '[40,53,66,79]', 'placeLabels stacks a full column at one line each');
+  console.assert(JSON.stringify(placeLabels([box(40), box(41)], 13, 45)) === '[40,45]', 'placeLabels clamps to maxY');
   console.log('charts.js self-test OK (pure helpers only - DOM chart fns need a browser)');
   return true;
 }
