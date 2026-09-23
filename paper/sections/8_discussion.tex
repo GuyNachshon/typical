@@ -1,61 +1,54 @@
 \section{Discussion}
 \label{sec:discussion}
 
-\paragraph{A. Candidate dependence is not merely a scoring inconvenience.} The standard reading of the
-cross-encoder/dual-encoder trade-off is a cost-accuracy curve: putting the candidate in the encoder
-costs a forward pass and buys some accuracy. \Cref{sec:repr:blind} says something sharper for
-question-conditioned closed-book decisions. It is not that a candidate-blind state scores a few points
-lower; it is that under every factorization, objective, and depth we tested, its above-chance accuracy
-carries \emph{no} question-dependent component at all. The candidates appear to need to participate in
-the language model's own computation for that capability to be expressible. Two practical consequences
-follow. The reusable-state formulation a systems engineer wants is available for \emph{shortlisting}
-(\Cref{sec:train:latency}) -- which does not require question-conditioned capability -- and not for the
-decision itself. And any evaluation of a candidate-independent decision architecture should report
-$\dq$, or an equivalent, because accuracy and calibration will both look healthy while the question is
-being ignored.
+\paragraph{Decisions live in candidate-contextual states at mid-depth.} Three measurements point at the
+same place. Question-conditioned capability appears only when the candidates are processed inside the
+language model's own forward pass (\Cref{sec:analysis:deltaq}); among readouts that do process them,
+the candidate's contextual state carries the decision and an independently embedded copy of the same
+text does not (\Cref{sec:analysis:readout}); and the layer that holds it sits before the top of the
+stack specializes for next-token prediction (\Cref{sec:analysis:depth}). This refines the cross-encoder
+versus dual-encoder picture. In every configuration we tested, a candidate-independent state reproduced the teacher's candidate
+priors and calibration, and the question-dependent component appeared only with the candidates in
+context. The reusable-state formulation remains valuable for shortlisting large
+candidate sets, a sub-task that runs on priors (\Cref{sec:results:cost}), and $\dq$ is the measurement
+that tells the two roles apart. We recommend reporting it for any architecture that scores candidates
+against a precomputed representation.
 
-\paragraph{B. Direct decision interfaces trade generative flexibility for structural control.} What the
-interface buys is concrete: output bounded to a runtime-supplied set, no answer parsing, typed
-probability semantics with an explicit abstention event, and state-prefix reuse across many decisions.
-What it costs is equally concrete and we found all of it empirically. Candidate tokens must fit in the
-suffix, so the per-query cost is not independent of $\numcands$. Choice remains order-sensitive --
-reduced to about a quarter of the letter interface's sensitivity, not eliminated
-(\Cref{sec:repr:readout}). Large candidate sets need a second stage. And hard serial computation is
-unresolved. This is a trade, not a strict improvement, and the paper should not be read as claiming
-otherwise.
+\paragraph{An output type is a contract, and structure enforces it.} Each typed primitive fixes a
+property that post-hoc calibration cannot reach. The Bernoulli head is order-invariant because there is
+no candidate order to be sensitive to; the ordinal target moves probability mass toward adjacent levels
+without changing a decision; the gate keeps null AUROC between .92 and .98 from
+$\numcands = 5$ to $\numcands = 150$, where a rendered abstain option collapsed at both ends. The same lesson appears in reverse at the output layer: one global
+temperature and null offset, fit on held-out soft targets, wants opposite corrections for an
+evidence-trained and a workflow-trained checkpoint (\Cref{sec:results:calibration}). Probability
+quality for a decision model is indexed by decision type, and the productive place to shape it is the
+head, the target and the training data.
 
-\paragraph{C. Fine-tuning reshapes capability, not only interface.} It would be convenient if training a
-model to emit direct decisions changed only the output format. \Cref{sec:boundary:frozen} says it does
-not: the same recipe that improves the standard tier leaves the hard tier behind a same-size frozen
-backbone with three exemplars. The lesson generalizes past our architecture -- teaching a model a target
-output distribution can improve behavior inside that distribution while degrading capability outside it,
-and aggregate in-domain metrics hide this by construction. The counterpart, which is the same coin, is
-\Cref{sec:train:mixture}: the distribution of decision types in training is a first-order lever on
-capability, comparable in magnitude to the architectural choices this paper is otherwise about.
+\paragraph{The distribution of decision types is a first-order lever.} Several of the largest effects in
+this paper come from data and selection with the architecture held fixed: counterfactual rubric groups
+(35--40 points on held-out families, grammars and styles), null augmentation (2.6--6.0 points on
+label-space accuracy, from teaching the model when to abstain), family-balanced sampling (bringing
+evidence and intent accuracy back to within 1 and 3--4 points of the evidence-only base after an
+unbalanced mix cost 10--11), evidence-first rendering of long states (11.2 points), and a 14B recipe built around calibration-based
+checkpoint selection (a threefold reduction in held-out ordinal NLL). Decision models are trained on a mixture of decision \emph{shapes}, and each shape the
+mixture contains is one the model learns.
 
-\paragraph{D. Probability quality is task-conditional.} There is no evidence in this paper for a single
-universal ``confidence'' calibration of a decision model. The same global temperature-and-offset fit
-wants opposite corrections on an evidence-trained and a workflow-trained checkpoint
-(\Cref{sec:train:calibration}); ordinal targets fix Score's likelihood without changing a single
-decision; a Bernoulli head fixes an invariance problem that no amount of recalibration would; and
-hard-tier calibration stays poor after every fix. Calibration is best treated as a measured axis indexed
-by decision type and task family, and pursued at the data and objective level rather than through one
-scalar knob at the output.
+\paragraph{A benchmark score measures capability together with interface compatibility.} Changing only
+the rendering moves a frozen 9B model 12.5 points on the same items (\Cref{sec:results:rendering}), more
+than the gap between many systems a benchmark is used to rank. Two practices made our own measurements
+decisive. The first is to cross training render with evaluation render, so that data effects and
+compatibility effects separate. The second is to build an evaluation set with the power to resolve the
+effect in question: 605 generated, leak-checked long states settled at $p < 10^{-9}$ a question that a
+19-item benchmark cell returned as $p = .232$. Pre-registration protects a decision rule only when the
+metric it names can resolve the effect it gates.
 
-\paragraph{How much computation must happen between state and decision?} The decision pass computes at
-fixed depth with no generated token, so there is no mechanism for a sequence of dependent intermediate
-computations. Log-precision transformers of fixed depth are equivalent in expressive power to
-constant-depth threshold circuits \citep{merrill2023parallelism}, which provably cannot solve certain
-sequential composition problems at any parameter count, while conditioning on self-generated
-intermediate tokens provably escapes that class
-\citep{merrill2024expressive,feng2023chain}. The families where our hard tier stays at chance -- temporal
-arithmetic, unit conversion, expected value, multi-attribute trade-offs -- are exactly the shape this
-picture predicts a single constant-depth pass should struggle with. We are careful not to convert that
-into an explanation of our result: \Cref{sec:boundary:hard} favors the data-coverage reading, the two
-are not exclusive, and the rendering confound of \Cref{sec:boundary:rendering} weakens any causal claim
-built on the frozen comparison. What the theory does suggest is where to look next. If the gap is
-computational rather than distributional, the fix is an explicit intermediate-computation mechanism --
-more passes, or a small amount of scratch work before a final typed readout -- rather than more
-parameters or more of the same data. The question this paper leaves sharpened is not whether generation
-is necessary in general, but \emph{how much computation must occur between state and decision, and when
-it can remain non-generative}.
+\paragraph{What a single pass computes.} Typical decides in one forward pass of fixed depth, with no
+intermediate tokens. Fixed-depth transformers correspond to constant-depth threshold circuits
+\citep{merrill2023parallelism}, while conditioning on self-generated intermediate tokens extends what
+they can compute \citep{merrill2024expressive,feng2023chain}. The decisions that remain hard for every
+model we trained, temporal arithmetic, unit conversion, expected value and multi-attribute trade-offs
+(\Cref{app:hard-tier}), have the serial shape that picture singles out. That makes a concrete next step:
+keep the typed readout and the cached state, and add a bounded amount of intermediate computation
+before the decision token, in the form of extra passes or a short scratchpad. The interface in this
+paper is the natural terminal layer for such a system, since a decision still has to end in a typed,
+thresholdable distribution over the options the caller supplied.

@@ -1,0 +1,137 @@
+\section{Training decision models}
+\label{sec:train}
+
+The architecture of \Cref{sec:method} fixes what a decision model can represent; the training
+distribution decides what it learns to represent. Six choices define the recipe, and \Cref{sec:results} measures each. Every row is a typed decision rendered as in
+\Cref{sec:method:pass}, and the loss is cross-entropy against a hard or soft gold distribution over
+$\cands \cup \{\nullsym\}$, with a Brier term and, for the 14B model, a distillation term
+(\Cref{sec:train:selection}). Training uses AdamW in bf16 at an effective batch size of 64 for
+8{,}000--12{,}000 steps (\Cref{app:hyperparams}). \Cref{tab:corpora} lists the seven training corpora.
+
+\begin{table}[t]
+  \centering
+  \caption{Training corpora. ``Held out'' counts whole families, domains, styles or parameter ranges
+  excluded from training entirely, distinct from a random validation split; \Cref{sec:setup:heldout} maps
+  these onto generalization axes. No corpus contains any of the 231 public JevBench ids.}
+  \label{tab:corpora}
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{llrp{3.0cm}p{4.2cm}}
+    \toprule
+    Corpus & Family & Train rows & Held out & Role \\
+    \midrule
+    \texttt{data\_v5} & $E$ & 633{,}213 & label wordings & Evidence (NLI, BoolQ) and wide-vocabulary classification \\
+    \texttt{data\_kb} & $K$ & 147{,}447 & TruthfulQA-MC1, GPQA & Closed-book multiple-choice knowledge \\
+    \texttt{data\_wf} & $W$ & 72{,}006 & 3 of 15 families & Rubric-conditioned workflow (Noul, Choice, Score) \\
+    \texttt{data\_wf\_hf} & $W$ & 86{,}600 & 3 external test/demo splits & External workflow sets (forms, rules, distillation) \\
+    \texttt{data\_wf\_long} & $W$ & 23{,}318 & -- & Long-state (multi-paragraph policy) workflow rows \\
+    \texttt{data\_wh} & $W$ & 60{,}605 & 3 domains, 2 styles, 1 grammar per level, level 7 & DecisionMix v2 counterfactual rubric groups \\
+    \texttt{data\_u} & $U$ & 31{,}029 & 4 synthetic parameter ranges & Soft-target uncertainty \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Family-balanced mixture}
+\label{sec:train:mixture}
+
+Batches are drawn by decision family, so that no large corpus dominates by row count. The four families
+are $E$ (evidence and classification: SNLI \citep{bowman2015snli}, MNLI \citep{williams2018mnli}, ANLI
+\citep{nie2020anli}, BoolQ \citep{clark2019boolq}, and wide-vocabulary intent and topic sets including
+CLINC-150, Banking77 and HWU64 \citep{larson2019clinc,casanueva2020banking77}); $K$ (closed-book
+multiple-choice knowledge from nine standard sources, with TruthfulQA-MC1 \citep{lin2022truthfulqa} held
+out and a leakage audit against MMLU-Pro \citep{wang2024mmlupro,hendrycks2021mmlu}); $W$
+(rubric-conditioned workflow decisions: routing, eligibility, extraction, urgency, tool selection and
+long policy documents); and $U$ (soft-target uncertainty). The evidence corpus spans many label
+vocabularies at few rows per source, so the model cannot memorize a small set of label sets and has to
+read the rendered candidates.
+
+The released recipe samples $E{:}0.40$, $K{:}0.15$, $W{:}0.35$, $U{:}0.10$ of every batch. The family
+weights are a first-order control on capability. Adding workflow data to an evidence-and-knowledge
+model without rebalancing costs evidence and intent accuracy, mostly through false abstention, and
+restoring the evidence share recovers it with workflow metrics within 1--4 points; \Cref{sec:results:mixture}
+gives the sweep over the evidence weight that sets this point.
+
+\subsection{Counterfactual rubric groups}
+\label{sec:train:rubric}
+
+A workflow model that learns ``this kind of ticket gets that label'' fails the first time the policy
+changes. DecisionMix v2 (\texttt{data\_wh}) is built so that this shortcut cannot fit the data: every
+training row belongs to a \emph{counterfactual rubric group}, in which the same state and the same
+candidate set appear under at least two rubrics with distinct gold answers. Within a group the state and
+candidate text are identical, so any predictor that ignores the rubric assigns the same distribution to
+every member. For a two-member group with golds $y_1 \neq y_2$, such a predictor incurs an average
+cross-entropy of at least $\log 2$ nats, reached only by splitting its mass evenly between the two
+answers. The loss can fall below that floor only by reading the rubric.
+
+The corpus comes from a programmatic rule engine over 12 domains crossed with 6 boolean conditions, at
+compositional depth levels 1 through 7, with 60{,}605 training rows spread evenly over levels 1--6.
+Level 7, which composes temporal, unit-conversion, expected-value and trade-off reasoning, is
+evaluation-only, and the generator never produces those compositions for training. Three whole domains,
+two rubric styles and one grammar per level are also held out, and the corpus is leak-checked against the
+public JevBench ids with 0 of 231 hits. The earlier workflow generator (\texttt{data\_wf}) placed 26{,}513
+of its 72{,}006 rows in rubric groups; DecisionMix v2 places all of them. Against a matched control
+never trained on it, DecisionMix v2 lifts held-out family, grammar and style accuracy from .481, .507
+and .491 to .827, .881 and .888, and rubric-flip accuracy from .477 to .710
+(\Cref{sec:results:mixture}).
+
+\subsection{Soft-target uncertainty corpus}
+\label{sec:train:uncertainty}
+
+Decisions with a single correct answer cannot teach a model how much probability to spread. The
+uncertainty corpus \texttt{data\_u} (31{,}029 training rows, all with soft targets) supplies that signal
+from three sources: the validation split of UNLI \citep{chen2020unli} (2{,}068 rows), the ambiguous rows
+of AmbiEnt (401 rows, uniform target over the listed labels), and four synthetic generators with exact
+closed-form posteriors (28{,}560 rows): partial-evidence combination, a noisy-sensor Bayesian update,
+ordinal confusion through an inverted confusion matrix, and log-odds pooling of conflicting sources. Each
+generator holds out a parameter range. By type the corpus is 23{,}403 Noul, 7{,}225 Score and 401 Choice
+rows. ChaosNLI \citep{nie2020chaosnli} is used for evaluation only. The corpus trades top-1 accuracy for
+likelihood. In the run that added it together with DecisionMix v2, typed-decisions NLL fell from 2.06 to
+1.71 and ChaosNLI NLL from 1.27 to 1.00, while a control never trained on soft targets keeps higher argmax accuracy on all three uncertainty sets
+(\Cref{sec:results:calibration}).
+
+\subsection{Null augmentation}
+\label{sec:train:nullaug}
+
+A fraction of workflow rows is duplicated with the gold candidate, and any rendered catch-all option,
+removed; the target for the copy is $\nullsym$. The released recipe augments 20\% of $W$ rows, and results
+are insensitive to the fraction across $[.10, .20]$.
+
+The fix belongs in the data because the families disagree about abstention. Under 1\% of $W$ rows carry
+a null target against over 20\% of $E$ rows, so a model trained on both learns two operating points. A
+single global temperature and null offset fitted after training cannot serve both. The same fitting
+procedure moves the offset in opposite directions for an evidence-only and a workflow-trained checkpoint;
+for the workflow-trained one it reaches $+3.0$, which repairs typed-decisions NLL (1.95 to 1.19) and
+collapses intent and topic coverage to 5--9\%. Training the behavior instead lowers false abstention on
+TREC from .27 to .12 and raises accuracy by 2.6, 3.6, 4.3 and 6.0 points on CLINC-150, TREC, HWU64 and
+20 Newsgroups (\Cref{sec:results:mixture}). The cost is soft-target NLL, since the model now places mass
+on $\nullsym$ where soft gold has none.
+
+\subsection{Evidence-first long states}
+\label{sec:train:long}
+
+The long-state corpus \texttt{data\_wf\_long} (23{,}318 rows of multi-paragraph policy documents, state
+length p10/p50/p90 of 1{,}190, 1{,}845 and 2{,}490 tokens) was first rendered with the case facts after
+the policy body. Training right-truncates states at the window, so at a 1{,}024-token window 98.8\% of
+these rows lost their facts before the model saw them, and at 256 tokens all of them did. The fixed
+recipe regenerates the corpus facts-first, with the case inside the first 8\% of the text, and drops any
+row longer than the window (\texttt{--drop\_truncated}) so that no row is silently cut. The released v2
+models train at a 2{,}048-token window and the 14B model at 3{,}072.
+
+Placement is a controlled factor in our evaluation: \Cref{sec:results:long} crosses training render
+with evaluation render on 605 held-out long states. The v2 releases, trained with the fixed recipe, score
+.947 (1.7B) and .950 (4B) on facts-first long states, against .598 and .612 for v1.
+
+\subsection{Selection on held-out likelihood}
+\label{sec:train:selection}
+
+Checkpoints are selected on held-out negative log-likelihood over the uncertainty and curriculum
+validation sets, and a Brier term is added to the training loss. Selection on in-distribution loss
+favors the hard-label majority of the mixture at the expense of the soft and ordinal minority. Under
+accuracy-shaped selection, held-out soft-target NLL grew with backbone size, from 2.03 at 1.7B to 2.15 at 4B and 2.87
+at 14B.
+
+The 14B model also distills from its own frozen backbone read with a fixed three-shot letter rendering,
+$\alpha \cdot \mathrm{CE} + \beta \cdot \mathrm{KL}$ at temperature $T = 2$ on 63k labelled rows. The
+full recipe (evidence-first long states, DecisionMix v2, typed heads, likelihood-based selection with the
+Brier term, and distillation) takes the 14B model's held-out Score NLL from 2.87 to 0.95 and
+typed-decisions NLL from 1.96 to 1.04 at the same backbone size (\Cref{sec:results:calibration}).

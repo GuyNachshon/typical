@@ -1,23 +1,19 @@
-Software that calls a language model to make a bounded decision -- route this ticket, flag this
-transaction, score this alert -- usually recovers the decision from generated answer symbols,
-constrained decoding, or candidate log-probabilities, even though what the caller needs is a
-distribution over a label set defined at request time. We ask whether a pretrained causal language
-model can expose that decision \emph{directly}, without generating an answer, and what must remain
-inside its computation for the decision to stay question-conditioned. Our central result is negative
-and scoped. A decision state computed \emph{before} the candidate set is known -- the formulation
-that would make one state reusable across arbitrary candidate sets -- transfers a listwise teacher's
-candidate priors and calibration but not its question-conditioned closed-book capability. This holds
-across six tested factorizations and distillation objectives and at both backbone depths we tapped,
-and it is invisible to raw accuracy: it appears only under $\dq$, the drop in accuracy when the real
-question is replaced by a shuffled one with the candidate set held fixed. \textbf{Typical} instead
-renders the query and its runtime-defined candidates inside one causal suffix against a state whose
-key-value cache is computed once, and scores the terminal decision state against each candidate's own
-\emph{contextual} hidden state. That readout recovers the question-conditioned signal of a
-letter-generating interface ($\dqsh$ .106 vs.\ .109; teacher .102) with about a quarter of its order
-sensitivity, and carries typed output contracts -- categorical Choice, ordinal Score, Bernoulli Noul
--- plus an abstention gate factored out of the candidate softmax. Standard bounded decisions
-generally improve with backbone scale (1.7B--14B, with an anomalous 8B point) and soft-target
-probability quality improves substantially at fixed capacity through objective and
-checkpoint-selection changes. The boundary is sharp and we report it as prominently: hard
-compositional decisions remain unresolved at every size we trained, and a same-size \emph{frozen}
-backbone read with three in-context exemplars is not beaten there by any model we fine-tuned.
+Software that asks a language model for a decision -- route this ticket, approve this refund, rate this
+alert -- needs a probability distribution over options it names at request time, plus a usable way to
+say that none of them fit. \textbf{Typical} reads that distribution directly out of a pretrained causal
+language model, without generating a token. The state is encoded once into a key-value cache; each
+question and its runtime candidates form a short causal suffix; a head at 71\% of backbone depth scores
+the terminal decision state against each candidate's own contextual hidden state. Output types are
+contracts on the distribution: categorical Choice, ordinal Score, Bernoulli Noul, and an abstention
+gate outside the candidate softmax. The contextual readout keeps the question-conditioned signal of the
+standard letter-logit interface ($\dqsh$ .106 vs.\ .109) with a quarter of its log-odds shift under
+candidate-set edits. We measure that signal with $\dq$, a shuffled-question control that separates
+question-conditioned capability from candidate-set priors, and use it to show that the capability lives
+in computation over the candidates: in all six configurations we tested, a decision state computed
+before the candidates are seen stays within .03 of zero, against .09--.12 for readouts over them. A training recipe built on counterfactual rubric groups, decision-type balancing, null
+augmentation and calibration-based checkpoint selection lifts held-out rule families by 35--40 points
+and cuts held-out ordinal NLL threefold at 14B. A decision costs 45\,ms at 1.7B and 59\,ms at 14B in a
+research harness, and 15.5--17\,ms on the optimized 1.7B serving path; the 14B model reaches .931 on the
+JevBench standard tier. A train-render $\times$ eval-render design on 605 held-out long documents shows
+that evidence-first training adds 11.2 points ($p = 5\times10^{-10}$), reproduced at a second seed. We
+release 1.7B and 4B models and an inference package.

@@ -1,93 +1,47 @@
 \section{Limitations}
 \label{sec:limitations}
 
-\paragraph{Scope.} Text-only, bounded decisions over candidate sets that fit in a short suffix. No
-planning, search, tool execution, or vision. The typed primitives cover categorical, ordinal, and
-Bernoulli contracts and nothing else.
+\paragraph{Scope.} Typical makes text-only, bounded decisions over candidate sets that fit in a short
+suffix: categorical, ordinal and Bernoulli contracts with abstention. It does not plan, search, call
+tools or read images. Per-query cost grows with the rendered candidate tokens, so candidate sets in the
+hundreds are served through a shortlisting front end (\Cref{sec:results:cost}).
 
-\paragraph{Generalization.} ``Runtime-defined labels'' means the axes of \Cref{tab:generalization}, not
-arbitrary unseen domains or ontologies. Transfer is strong on unseen label wordings and unseen label
-spaces inside trained domains, mixed on external workflow sets (several sit at or below their own
-majority-class floor for every checkpoint, which measures the set as much as the model), and absent on
-unseen composition grammar. Our rubric-conditioned generalization results share one rule engine between
-the training generator and the held-out families, so they are an evaluation-protocol result rather than a
-claim about general compositional rule execution.
+\paragraph{Multi-step composition.} Decisions that require carrying an intermediate value through
+several steps are the open frontier. On DecisionMix level 7 (temporal, numeric, expected-value and
+trade-off composition, never trained) the v1 1.7B and 4B models score .493 and .544 against a .441 guess rate,
+and the 14B model .620. On the JevBench hard tier a frozen 14B backbone read with three in-context
+exemplars scores above our trained 14B checkpoint (paired difference $+.108$ $[+.027, +.189]$,
+$p = .015$), while the trained model leads on the standard tier. \Cref{app:hard-tier} gives the
+per-family breakdown. \Cref{sec:discussion} describes the extension this points to.
 
-\paragraph{Computation.} Hard compositional decisions are unresolved at every size tested. Large
-candidate sets require a shortlisting front end. Per-query cost scales with candidate tokens, so the
-cached-state saving is real but bounded.
+\paragraph{Statistics.} The readout comparison in \Cref{sec:analysis:readout} and the evidence-first
+result in \Cref{sec:results:long} are replicated across seeds; other rows are single training runs.
+JevBench numbers use the 231 public items and are not a ranked leaderboard entry. Its intervals are
+$\pm6$--13 points on the standard tier (36 independent states) and $\pm9$ points on the hard tier
+(111 items), so we base comparisons between our own checkpoints on paired tests and on larger
+purpose-built sets.
 
-\paragraph{Probability quality.} Calibration does not hold uniformly: not on the hard tier, not
-out-of-distribution, and not across decision types under one global knob. We report it as an axis, never
-as a property of the system.
+\paragraph{Generalization and invariance.} ``Runtime-defined labels'' refers to the axes of
+\Cref{tab:generalization}. The rubric-generalization results share one rule engine between training and
+held-out families. Choice is order-robust rather than order-invariant: the contextual readout reduces
+order sensitivity relative to the letter interface, per-step option shuffling during training
+contributes to that robustness, and only Noul is exactly invariant. The pairwise-odds property of
+\Cref{eq:factored-null} holds among non-null candidates; the abstention gate is set-dependent by design.
 
-\paragraph{Interface artifacts.} Choice retains order sensitivity. The exact-odds property of
-\Cref{eq:factored-null} holds for pairwise non-null candidates under the factored softmax only -- the
-null gate is set-dependent by design, so the model as a whole is not independent of irrelevant
-alternatives. Part of the measured order robustness comes from per-step option shuffling during
-training, not from architecture alone.
-
-\paragraph{Statistical power.} Outside the explicit two-seed comparisons of \Cref{sec:repr:readout},
-every number in this paper is a single training run; noise-floor measurements elsewhere in this project
-put NLI/BoolQ variation at $\pm0.7$ points and held-out label-space variation at $\pm3$--5 points between
-identically configured seeds. JevBench intervals are $\pm6$--13 points (standard, $n_{\mathrm{eff}}{=}36$)
-and $\pm9$ points (hard, $n{=}111$). Several differences we report, including the frozen-teacher
-distillation control and the JevBench-scored truncation ablation, are inside those intervals and are
-reported as such.
-The 1.7B/4B/8B/14B ladder is entirely within the Qwen3 family, with a single Qwen3.5-4B checkpoint as a
-second-family data point, not a second ladder; Qwen3-8B is an outlier in both frozen and trained form and
-we did not find a configuration that recovers it within budget. Two checkpoints were still training at
-the time of writing and are omitted rather than reported provisionally, and a Qwen3.5-9B checkpoint has
-hard-tier results only. We also note the converse of low power: neighbouring rungs of the ladder are not
-separable on JevBench's hard tier at $n{=}111$ (\Cref{sec:train:ladder}), so the ladder's value is its
-trend, not any pairwise ordering within it. Where a question mattered enough, the fix was to build an
-evaluation set large enough to answer it rather than to argue about the benchmark
-(\Cref{sec:boundary:truncation}).
-
-\paragraph{Evaluation.} Every JevBench number is the public 231-item subset and is not a ranked
-leaderboard entry; the 146 judge-scored items required for ranking are not public, so we cannot rule out
-that our public-subset numbers differ systematically from a full-benchmark ranking. Rendering and
-protocol move scores by more than the differences between many entries
-(\Cref{sec:boundary:rendering}), which is why we treat cross-entry comparison as context
-(\Cref{app:leaderboard}) rather than evidence. Several evaluation-only external sets rely on rule-based
-or model-assisted gold labels that we did not independently re-verify. Latency numbers come from a
-single-stream Python harness with no optimized-runtime or saturated-server baseline.
-
-\paragraph{The released checkpoints carry the defect this paper diagnoses.} Both public models were
-trained before the facts-first corpus fix, so they inherit its positional bias, and a reader who
-downloads them inherits it too. On the 605-item held-out long-state set, moving the case block from
-after the policy body to before it costs \texttt{typical-small} 20.0 points (.798 $\to$ .598) and
-\texttt{typical-medium} 25.5 (.866 $\to$ .612), with \texttt{typical-small} landing on the
-majority-class floor of the yes/no family. Since the caller writes the state text, the operational
-consequence is a rendering instruction --- evidence last --- and the correct fix is retraining on the
-corrected corpus, which \Cref{sec:boundary:truncation} values at 8--11 points and which we have not
-yet done for the released sizes. We state this rather than deferring it to the model cards because it
-is the same mechanism the paper reports, observed in the artifacts the paper ships.
-
-\paragraph{Reproducibility and licensing.} Inference code, the released checkpoints, and every run
-manifest (harness commit, checkpoint hash, dependency lock) are public. Training code and several
-generated corpora carry licence constraints from their upstream sources; \Cref{app:corpora} records
-provenance and licence per corpus, and \Cref{app:ops} records what is and is not redistributable.
+\paragraph{Ladder and release.} The size ladder is one recipe on one backbone family (Qwen3) with a
+Qwen3.5-4B checkpoint as a second-generation point; the Qwen3-8B rung underperforms its neighbours in
+both frozen and trained form. Inference code, weights and evaluation outputs are public; the training
+code is not yet released.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-We asked whether a causal language model can be used as a direct typed decision engine without
-generating an answer token, and what has to remain inside its computation for that to work. The central
-result is that the most reusable formulation -- a candidate-blind decision state, computed before the
-candidate set is known -- fails to preserve question-conditioned closed-book capability under the
-factorizations, objectives, and depths we tested, and fails in a way that raw accuracy and calibration
-both conceal. Keeping the candidates inside the causal computation and reading their contextual states
-against a cached state prefix recovers that signal, at roughly a quarter of the letter interface's order
-sensitivity, and supports typed categorical, ordinal, Bernoulli, and abstention outputs with no answer
-token emitted.
-
-The result is not that generation is unnecessary in general. The same fine-tuning that improves standard
-bounded decisions does not solve hard compositional ones, and on that tier a same-size frozen backbone
-read with three exemplars is not beaten by anything we trained. Along the way we found that rendering --
-where the evidence sits, how the options are written -- moves a frozen model's benchmark score by more
-than the architectural differences it is usually used to adjudicate, which is a reason to control it
-before comparing decision architectures at all.
-
-That leaves a sharper question than the one we started with: how much computation must occur between a
-state and a decision, and when can it remain non-generative?
+Typical reads decisions directly out of a pretrained causal language model. A state is encoded once, a
+question and its runtime candidates are read in a short suffix, and a head at mid-depth returns a typed
+distribution with a factored abstention event, at 45\,ms per decision at 1.7B and 59\,ms at 14B. The design rests on measured answers to where the decision lives: inside the forward pass
+over the candidates, in their contextual states, below the layers that specialize for generation. The
+training recipe shows that decision types, counterfactual rubrics, abstention targets and selection
+criteria shape a decision model as strongly as its architecture, and the render-crossed evaluation
+shows how to measure such effects cleanly. The models and the inference package are public, and the
+same interface is the natural terminal layer for decision systems that add intermediate computation
+before the typed readout.
