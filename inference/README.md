@@ -1,4 +1,4 @@
-# typical-decisions
+# typical-ai
 
 **Typed, direct decisions from a pretrained language model.** State + question + a label set you
 define at call time go in; a probability distribution over exactly those labels, plus an explicit
@@ -11,14 +11,14 @@ A self-contained decision head for `OzLabs/typical-small-preview`, `OzLabs/typic
 ## Install
 
 ```bash
-pip install typical-decisions
+pip install typical-ai
 ```
 
-The import name is `typical_decisions`, not `typical`: PyPI's `typical` is an unrelated, established
+The import name is `typical_ai`, not `typical`: PyPI's `typical` is an unrelated, established
 package, so taking that import name would break anyone who has both installed.
 
 ```python
-from typical_decisions import Typical
+from typical_ai import Typical
 
 m = Typical.from_pretrained("OzLabs/typical-small")        # or OzLabs/typical-medium
 
@@ -37,7 +37,7 @@ no build step.)
 ## Usage
 
 ```python
-from typical_decisions import Typical
+from typical_ai import Typical
 
 m = Typical.from_pretrained("OzLabs/typical-small", device="auto")  # or "typical-small-preview" / "typical-medium"
 

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "typical-decisions"
+name = "typical-ai"
 version = "0.1.0"
 description = "Typed, direct decisions from a pretrained language model. State + question + runtime label set in, a probability distribution over those labels (plus abstain) out, in one forward pass with nothing generated."
 readme = "README.md"
@@ -33,16 +33,15 @@ Homepage = "https://github.com/GuyNachshon/typical"
 Source = "https://github.com/GuyNachshon/typical"
 Models = "https://huggingface.co/OzLabs"
 
-# The source directory is `typical/`, but the installed import name is
-# `typical_decisions`: PyPI's `typical` is an unrelated, established package
-# (Sean Stewart's typing toolkit) and squatting that import name would break
-# anyone who has both installed. Every intra-package import is relative, so the
-# remap costs no code changes.
+# Source directory is `typical/`; installed import name is `typical_ai`. PyPI's
+# bare `typical` is Sean Stewart's established typing toolkit, so taking that
+# import name would break anyone with both installed. Every intra-package
+# import is relative, so the remap costs no code changes.
 [tool.hatch.build.targets.wheel]
 packages = ["typical"]
 
 [tool.hatch.build.targets.wheel.sources]
-"typical" = "typical_decisions"
+"typical" = "typical_ai"
 
 [tool.hatch.build.targets.sdist]
 include = ["typical/", "README.md", "example.py", "pyproject.toml"]
