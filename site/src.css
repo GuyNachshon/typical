@@ -136,6 +136,12 @@
   .strip a:hover { border-bottom-color: var(--color-off); color: var(--color-off); }
   .strip b { font-weight: 700; color: var(--color-off); }
 
+  /* the road runs full width; the two canvases pair underneath it, equal height so they read
+     as one row rather than two stacked panels that happen to be adjacent */
+  .gamepair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .gamepair > .fig { min-width: 0; }
+  @media (max-width: 64rem) { .gamepair { grid-template-columns: 1fr; gap: 0; } }
+
   /* ---- bands, not boxes -----------------------------------------------------------------
      A surface spans the full viewport, has no radius, no border and no padding of its own, and
      is entered by scrolling. A *box* — radius, clipped, inset in the column — is reserved for a
