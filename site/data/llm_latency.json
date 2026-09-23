@@ -113,5 +113,156 @@
       }
     }
   },
-  "typical_device": "mps"
+  "typical_device": "mps",
+  "answers": {
+    "questions": [
+      {
+        "type": "choice",
+        "question": "Which team should own this ticket?",
+        "labels": [
+          "billing",
+          "shipping",
+          "support",
+          "retention"
+        ]
+      },
+      {
+        "type": "score",
+        "question": "How urgent is this ticket, 0=low..3=critical?",
+        "labels": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ]
+      },
+      {
+        "type": "noul",
+        "question": "Should this be escalated to a manager? Answer yes if the customer was charged twice or asks for same-day resolution; otherwise answer no.",
+        "labels": [
+          "no",
+          "yes"
+        ]
+      },
+      {
+        "type": "choice",
+        "question": "What is the customer asking for?",
+        "labels": [
+          "a refund of the duplicate charge",
+          "a replacement item",
+          "an apology",
+          "a working tracking number"
+        ]
+      }
+    ],
+    "models": {
+      "typical-small": {
+        "device": "mps",
+        "measured_utc": "2026-09-23T19:46:41Z",
+        "answers": [
+          {
+            "pick": "support",
+            "probs": {
+              "billing": 0.0466,
+              "shipping": 0.3454,
+              "support": 0.5845,
+              "retention": 0.0234
+            },
+            "p_null": 0.0841
+          },
+          {
+            "pick": "3",
+            "probs": {
+              "0": 0.0179,
+              "1": 0.1099,
+              "2": 0.2257,
+              "3": 0.6466
+            },
+            "p_null": 0.0014
+          },
+          {
+            "pick": "yes",
+            "probs": {
+              "no": 0.0016,
+              "yes": 0.9984
+            },
+            "p_null": 0.005
+          },
+          {
+            "pick": "a working tracking number",
+            "probs": {
+              "a refund of the duplicate charge": 0.034,
+              "a replacement item": 0.0003,
+              "an apology": 0.0008,
+              "a working tracking number": 0.9649
+            },
+            "p_null": 0.0025
+          }
+        ]
+      },
+      "openrouter/openai/gpt-5.4-nano (low reasoning)": {
+        "measured_utc": "2026-09-23T19:46:30Z",
+        "answers": [
+          {
+            "pick": "billing",
+            "stated_confidence": 0.9
+          },
+          {
+            "pick": "3",
+            "stated_confidence": 0.95
+          },
+          {
+            "pick": "yes",
+            "stated_confidence": 0.9
+          },
+          {
+            "pick": "a refund of the duplicate charge",
+            "stated_confidence": 0.75
+          }
+        ]
+      },
+      "openrouter/openai/gpt-5.4-nano (high reasoning)": {
+        "measured_utc": "2026-09-23T19:46:32Z",
+        "answers": [
+          {
+            "pick": "billing",
+            "stated_confidence": 0.88
+          },
+          {
+            "pick": "3",
+            "stated_confidence": 0.92
+          },
+          {
+            "pick": "yes",
+            "stated_confidence": 0.95
+          },
+          {
+            "pick": "a refund of the duplicate charge",
+            "stated_confidence": 0.8
+          }
+        ]
+      },
+      "openrouter/google/gemini-2.5-flash-lite (high reasoning)": {
+        "measured_utc": "2026-09-23T19:46:41Z",
+        "answers": [
+          {
+            "pick": "support",
+            "stated_confidence": 0.95
+          },
+          {
+            "pick": "3",
+            "stated_confidence": 1.0
+          },
+          {
+            "pick": "yes",
+            "stated_confidence": 1.0
+          },
+          {
+            "pick": "a refund of the duplicate charge",
+            "stated_confidence": 0.9
+          }
+        ]
+      }
+    }
+  }
 }

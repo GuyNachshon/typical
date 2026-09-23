@@ -492,7 +492,7 @@ models — and not a comparison we draw any claim from.
 | 14B ladder point (not released) | .875 | 1.00 | .468 |
 | open-alternative-jev (Qwen3.5-4B) | .833 | 1.00 | .568 |
 | system-one-open (Gemma E2B LoRA) / system-one (Qwen3-8B) | .931 / – | 1.00 | .486 / .486 |
-| SemIf (Qwen3.5-4B) / OpenJev (26B-A4B) / djev | .986 / .972 / .986 | 1.00 | .613 / .640 / .676 |
+| SemIf (Qwen3.5-4B) / OpenJev (26B-A4B) / DiffusionGemma-as-Jev (26B-A4B) | .986 / .972 / .986 | 1.00 | .613 / .640 / .676 |
 | Jev 1.13.0 (closed) | .986 | 1.00 | .730 |
 
 typical-small/-medium rows are the released checkpoints' own JevBench runs ([REPORT

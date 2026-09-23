@@ -25,11 +25,14 @@
    "note": "closed"
   },
   {
-   "name": "djev",
+   "name": "DiffusionGemma-as-Jev",
    "kind": "decision model",
    "std": 0.986,
    "hard": 0.676,
-   "ours": false
+   "ours": false,
+   "size": "26B-A4B",
+   "params_total": 26.0,
+   "params_active": 4.0
   },
   {
    "name": "SemIf",
@@ -207,7 +210,6 @@
   "GLiNER2",
   "Jev 1.13.0",
   "Laya (ModernBERT)",
-  "djev",
   "open-jev-deberta-v3-large"
  ]
 }

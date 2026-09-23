@@ -27,7 +27,11 @@ export function hashKey(state, queries) {
 // and nearly certain is the only thing a calibrated model is selling.
 export function fmtProb(p) {
   const s = p.toFixed(2);
-  if ((s === '1.00' && p < 1) || (s === '0.00' && p > 0)) return p.toFixed(3).replace(/^0/, '');
+  // two places is the reading width; the only reason to spend a third is that two of them would
+  // print a certainty the model did not have, in either direction. Below a thousandth even three
+  // places round to .000, which reads as impossible rather than unlikely -- so say the bound.
+  if (s === '1.00' && p < 1) return p.toFixed(3).replace(/^0/, '');
+  if (s === '0.00' && p > 0) return p < 0.0005 ? '<.001' : p.toFixed(3).replace(/^0/, '');
   return s.replace(/^0/, '');
 }
 

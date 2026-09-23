@@ -25,15 +25,15 @@ async function mountField() {
 
   const table = document.createElement('table');
   table.className = 'register field';
-  const head = ['model', 'kind', 'size', 'standard', 'hard'];
-  const keyOf = ['name', 'kind', 'params_active', 'std', 'hard'];
+  const head = ['model', 'kind', 'size', 'standard'];
+  const keyOf = ['name', 'kind', 'params_active', 'std'];
   table.innerHTML = `<thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead>`;
   const body = document.createElement('tbody');
   const rowEl = (r) => {
     const tr = document.createElement('tr');
     if (r.ours) tr.className = 'is-ours';
     const name = r.size ? `${r.name} · ${r.size}` : r.name;
-    [name, r.note ? `${r.kind} · ${r.note}` : r.kind, r.size || '—', fmt(r.std), fmt(r.hard)].forEach((v, i) => {
+    [name, r.note ? `${r.kind} · ${r.note}` : r.kind, r.size || '—', fmt(r.std)].forEach((v, i) => {
       const td = document.createElement('td');
       td.textContent = v;
       td.dataset.label = head[i];
@@ -44,7 +44,7 @@ async function mountField() {
   // chance sits in the table rather than in a footnote: a row you cannot beat is a row
   const chance = document.createElement('tr');
   chance.className = 'is-chance';
-  ['guessing', 'majority baseline', '—', fmt(doc.chance.std), fmt(doc.chance.hard)].forEach((v, i) => {
+  ['guessing', 'majority baseline', '—', fmt(doc.chance.std)].forEach((v, i) => {
     const td = document.createElement('td');
     td.textContent = v;
     td.dataset.label = head[i];
@@ -179,3 +179,12 @@ function mountSizeScore(host, doc) {
   draw();
   registerChart(host, draw);
 }
+
+import { mountShowdown } from './showdown.js';
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const host = document.getElementById('showdown');
+  if (!host) return;
+  const doc = await fetch('data/showdown.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (doc) mountShowdown(host, doc);
+});

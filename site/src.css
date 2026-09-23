@@ -565,5 +565,44 @@
   .field th[aria-sort="descending"]::after { content: ' \2193'; }
   .field th[aria-sort="ascending"]::after { content: ' \2191'; }
 
+  /* the race: lanes fill in real time, ours finishes while the others are still going */
+  /* the explicit column is load-bearing: with none, this grid sizes its implicit column to
+     max-content, and a row's 1fr track resolves to zero inside that measurement, so the whole
+     component collapsed to the width of its label and value columns */
+  /* ---- the showdown: two terminals, started together, each printing what it actually returned ---- */
+  .show { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .show-head { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; padding-bottom: 18px; }
+  .show-eyebrow { flex: 1 1 260px; font-size: 11px; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); }
+  .show-pick { display: flex; gap: 1px; background: var(--color-steel); border: 1px solid var(--color-steel); }
+  .show-pick-btn { appearance: none; border: 0; background: var(--color-warm); padding: 8px 12px; cursor: pointer; font-size: 11px; letter-spacing: 0.36px; color: var(--color-slate); transition: background var(--duration-tap) var(--ease-out), color var(--duration-tap) var(--ease-out); }
+  .show-pick-btn:hover { color: var(--color-off); }
+  .show-pick-btn.is-on { background: var(--color-off); color: var(--color-warm); }
+
+  .show-panes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .pane { position: relative; min-width: 0; padding: 26px 0 30px; border: 1px solid var(--color-steel); }
+  /* the label sits on the border the way a fieldset legend does, which is what the frame is for */
+  .pane-tag { position: absolute; top: -7px; left: 22px; padding: 0 8px; background: var(--color-warm); font-size: 10px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); }
+  .pane.is-ours .pane-tag { color: var(--color-off); }
+  .pane::after { content: attr(data-model); position: absolute; bottom: -7px; right: 22px; padding: 0 8px; background: var(--color-warm); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.36px; color: var(--color-mid); }
+  .pane-body { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.7; color: var(--color-off); padding: 0 22px; }
+  .pane-cmd { color: var(--color-slate); white-space: pre; overflow: hidden; text-overflow: ellipsis; margin-bottom: 14px; }
+  /* every line is laid out from the start and only revealed, so a landing answer never reflows */
+  .pane-line { white-space: pre; overflow: hidden; text-overflow: ellipsis; color: transparent; }
+  .pane-line.is-in { color: inherit; }
+  /* the brace row carries the waiting message, so the message needs no position of its own */
+  .pane-line.is-wait.is-in { color: var(--color-mid); }
+  .pane.is-ours .pane-line.is-in { color: var(--color-off); }
+  .pane-foot { min-height: 1.7em; margin-top: 14px; padding: 0 22px; font-family: var(--font-mono); font-size: 11.5px; color: var(--color-mid); }
+  .pane.is-done.is-ours .pane-foot { color: var(--color-off); font-weight: 700; }
+
+  @media (max-width: 64rem) {
+    .show-panes { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+    .pane-body, .pane-cmd, .pane-foot { font-size: 10.5px; }
+    /* stacked, the panes are not being compared at a glance, so holding a screen of empty height
+       for lines that have not arrived costs more than the reflow it was reserved to prevent */
+    .pane-line { display: none; }
+    .pane-line.is-in { display: block; }
+  }
+
   .todo { background: var(--color-lgray); color: var(--color-off); padding: 1px 6px; border-radius: 2px; font-family: var(--font-mono); font-size: 12px; }
 }
