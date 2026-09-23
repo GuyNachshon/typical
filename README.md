@@ -21,8 +21,8 @@ cost barely moves as the candidate set K grows from 2 to 256 (REPORT.md §3ab).
 | model | backbone | JevBench standard / hard (public subset) | link |
 |---|---|---|---|
 | `typical-small-preview` | Qwen3-1.7B-Base | .750 / .387 | https://huggingface.co/OzLabs/typical-small-preview |
-| `typical-small` | Qwen3-1.7B-Base | .694 / .432 | https://huggingface.co/OzLabs/typical-small |
-| `typical-medium` | Qwen3-4B-Base | .806 / .423 | https://huggingface.co/OzLabs/typical-medium |
+| `typical-small` (v2) | Qwen3-1.7B-Base | .708 / .432 | https://huggingface.co/OzLabs/typical-small |
+| `typical-medium` (v2) | **Qwen3.5-4B-Base** | .861 / .495 | https://huggingface.co/OzLabs/typical-medium |
 
 `typical-small` and `typical-medium` are Release 1: DecisionMix v2's hard curriculum, ordinal-smoothed Score,
 a per-row Bernoulli Noul head, and 1,024-token decision states. `typical-small-preview` is the earlier Phase-6A
@@ -35,7 +35,7 @@ standard and +11 points of MMLU-Pro among-K over `typical-small` for 1.25× the 
 **.931** — the best number this project has produced — but is not yet released; see `PROJECT.md` §1 and §7 for
 why and what's still open.
 
-### Known issue: state ordering on long documents
+### Fixed in v2 (2026-09-23): state ordering on long documents
 
 All three public checkpoints were trained before a corpus fix (REPORT.md §3ag) and inherit a positional bias:
 on long policy documents they expect the case facts **after** the policy body. Measured on 605 held-out long

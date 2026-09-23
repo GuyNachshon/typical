@@ -175,10 +175,10 @@ comparable to the in-process numbers above, which use a different harness.
 | release | HF repo | backbone | JevBench std/hard | inference package | demo |
 |---|---|---|---|---|---|
 | `typical-small-preview` | `OzLabs/typical-small-preview` | Qwen3-1.7B-Base | .750 / .387 | `inference/` | `demo/app.py` |
-| `typical-small` | `OzLabs/typical-small` | Qwen3-1.7B-Base | .694 / .432 | `inference/` | `demo/app.py` |
-| `typical-medium` | `OzLabs/typical-medium` | Qwen3-4B-Base | .806 / .423 | `inference/` | `demo/app.py` |
+| `typical-small` **v2** (`ts1c`) | `OzLabs/typical-small` | Qwen3-1.7B-Base | .708 / .432 | `inference/` | `demo/app.py` |
+| `typical-medium` **v2** (`tm2`) | `OzLabs/typical-medium` | **Qwen3.5-4B-Base** | .861 / .495 | `inference/` | `demo/app.py` |
 
-**Both public checkpoints predate the facts-first corpus fix and should be superseded (§5b).** They lose 20–25
+**Superseded 2026-09-23 — both public checkpoints now carry the fixed-corpus weights (§5b).** They lose 20–25
 points on long states when the caller puts case facts before the policy body. Drop-in replacements already exist
 and need no further training — only a card and an upload:
 
