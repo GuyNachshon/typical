@@ -81,6 +81,7 @@ async function mountField() {
   host.replaceChildren(table);
   mountSizeScore(document.getElementById('size-score'), doc);
 
+
   const note = document.createElement('p');
   note.className = 'note mt-18';
   note.textContent = `${doc.what} ${doc.caveats.join(' ')}`;
@@ -95,7 +96,7 @@ document.addEventListener('DOMContentLoaded', mountField);
 // is the honest reading: neither of our models is on it — a 400M classifier is above typical-small,
 // and SemIf is above typical-medium on the same 4B base. What our models do lead is every prompted
 // backbone we ran, which is the claim this chart is really for.
-import { svgEl, svgText, registerChart, fitWidth, logScale, scale, placeLabels, INK, MID, STEEL, FONT_MONO } from './charts.js';
+import { svgEl, svgText, registerChart, fitWidth, logScale, scale, placeLabels, INK, MID, STEEL, OURS, FONT_MONO } from './charts.js';
 
 const D_W = 1000, D_H = 460, M = { t: 24, r: 150, b: 54, l: 52 };
 // A direct label starts LABEL_DX right of its dot and its leader turns the corner at LABEL_DX-3,
@@ -103,7 +104,24 @@ const D_W = 1000, D_H = 460, M = { t: 24, r: 150, b: 54, l: 52 };
 // vertical pitch two labels need to clear each other at 11-12px mono.
 const LABEL_DX = 17, LINE_H = 13;
 
+// The caption used to say "Five entries publish no size" and then a data edit gave one of those
+// five a size, so the page carried a wrong number until someone counted by hand. It counts itself
+// now: the word in the caption comes from the same array the chart excludes rows by.
+const COUNT_WORDS = ['no', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+
+function countWord(n) {
+  return COUNT_WORDS[n] ?? String(n);
+}
+
+function writeUnplottedCount(doc) {
+  const el = document.querySelector('[data-count="unplotted"]');
+  if (!el) return;
+  const n = (doc.rows || []).filter((r) => !r.params_active).length;
+  el.textContent = countWord(n);
+}
+
 function mountSizeScore(host, doc) {
+  writeUnplottedCount(doc);
   const pts = doc.rows.filter((r) => r.params_active && r.std != null);
   if (!host || pts.length < 3) return;
   const draw = () => {
@@ -205,12 +223,12 @@ function mountSizeScore(host, doc) {
       // knocked out of whatever rule it lands on — the frontier step and the .8 gridline ran
       // straight through `jeff (GLiFormer)` and `system-one-open` like a strike-through
       g.appendChild(svgText(tx, ly, p.name, {
-        fill: p.ours ? INK : MID, 'font-size': p.ours ? 12 : 11, 'font-family': FONT_MONO,
+        fill: p.ours ? OURS : MID, 'font-size': p.ours ? 12 : 11, 'font-family': FONT_MONO,
         'font-weight': p.ours ? 700 : 400, 'text-anchor': flip ? 'end' : 'start',
         stroke: '#f0eeeb', 'stroke-width': 3, 'paint-order': 'stroke',
       }));
       g.appendChild(p.ours
-        ? svgEl('circle', { cx, cy, r: 6, fill: INK })
+        ? svgEl('circle', { cx, cy, r: 6, fill: OURS })
         : svgEl('circle', { cx, cy, r: 4.5, fill: '#f0eeeb', stroke: MID, 'stroke-width': 1.4 }));
     };
     items.filter((it) => !it.p.ours).forEach(draw);
