@@ -529,5 +529,30 @@
   .offline { color: var(--color-mid); font-size: 14px; }
 
   /* ---- release.html placeholders: unfilled draft brackets, impossible to miss ---- */
+  /* ---- the post masthead, after pi.website/blog/pi07 ------------------------------------
+     A launch post opens with a title, a byline and a date. This one went straight from the film
+     into its first argument, so nothing on the page said what it was or when it was written. */
+  .masthead { padding-top: 96px; }
+  .masthead h1 { font-size: clamp(38px, 4.6vw, 64px); line-height: 1.02; letter-spacing: -2px; }
+  .masthead-sub { margin-top: 18px; font-size: 21px; line-height: 1.35; color: var(--color-slate); }
+  .masthead-meta { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--color-steel); color: var(--color-slate); }
+  .masthead-meta a { border-bottom: 1px solid var(--color-steel); padding-bottom: 1px; }
+  .masthead-meta a:hover { border-bottom-color: var(--color-off); color: var(--color-off); }
+  @media (max-width: 64rem) { .masthead { padding-top: 56px; } }
+
+  /* ---- post measure ----------------------------------------------------------------------
+     pi07 centres a single column: text at 65-75ch, media modestly wider. Ours ran text at 69ch
+     hard left inside a 1240 container with figures at the full 1240 — a 2:1 mismatch that read
+     as two different pages interleaved. Scoped to .post so the product page keeps its own
+     left-flush editorial grid. */
+  /* one fixed measure, not 68ch: ch resolves against each element's own font-size, so a 64px
+     title, a 21px standfirst and a 12px byline each centred to a different width and therefore
+     a different left edge. 680px is ~68 characters at the 17px body size. */
+  .post .chapter > *, .post .masthead > * { max-width: 680px; margin-inline: auto; }
+  .post .fig, .post .figband, .post .chapter > table, .post .gamepair { max-width: 1080px; margin-inline: auto; }
+  .post .figband-row { max-width: 1080px; padding-inline: 0; }
+  .post .claim { max-width: 680px; }
+  @media (max-width: 64rem) { .post .fig, .post .figband, .post .gamepair { max-width: none; } }
+
   .todo { background: var(--color-lgray); color: var(--color-off); padding: 1px 6px; border-radius: 2px; font-family: var(--font-mono); font-size: 12px; }
 }

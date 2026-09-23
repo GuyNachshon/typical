@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="exhibits.css">
 </head>
-<body>
+<body class="post">
 <nav class="nav"><a class="brand" href="index.html">Typical</a><span class="links"><a href="index.html#results">Results</a><a href="index.html#demos">Demos</a><a href="research.html">Research</a><a href="release.html" aria-current="page">Launch</a><a href="https://huggingface.co/OzLabs/typical-small">Weights</a></span><a class="cta" href="#tryit">Try it live</a></nav>
 
 <div class="stage-track"><header class="stage" id="top">
@@ -34,6 +34,18 @@
     <div class="sentence" id="hud-sentence">booting…</div>
   </div>
 </header></div>
+
+<header class="page masthead">
+  <h1>Introducing Typical</h1>
+  <p class="masthead-sub">Open decision models. Generate an answer, or read a decision.</p>
+  <div class="masthead-meta t-mono">
+    <span>Oz Labs</span>
+    <span>23 September 2026</span>
+    <a href="https://huggingface.co/OzLabs/typical-small">Weights</a>
+    <a href="https://huggingface.co/OzLabs/typical-small/tree/main/inference">Inference code</a>
+    <a href="research.html">Research</a>
+  </div>
+</header>
 
 <section class="page chapter" id="why">
   <div class="claim">
@@ -99,6 +111,12 @@
     <div class="mt-30"><h3 class="t-feature">Score</h3><p class="mt-18">Returns a distribution over ordered levels, trained so that probability concentrates near the true level instead of spreading over every wrong one. In a matched comparison this halved negative log-likelihood on held-out Score tasks (2.07 to 1.23) without changing any top answer.</p></div>
     <div class="mt-30"><h3 class="t-feature">Abstain</h3><p class="mt-18">Attaches a probability to every Choice and Score answer that none of the options fit. It is a judgment about the set as a whole, not an extra label you have to remember to add.</p></div>
   </div>
+</section>
+
+  <figure class="fig">
+    <div class="media dark"><div id="hero-decision"></div></div>
+    <figcaption>One ticket, four typed questions asked of it. The state is read once; each question is a short suffix against the same cache.</figcaption>
+  </figure>
 </section>
 
 <section class="page chapter" id="cost">
