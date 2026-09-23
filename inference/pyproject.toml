@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "typical-decisions"
+version = "0.1.0"
+description = "Typed, direct decisions from a pretrained language model. State + question + runtime label set in, a probability distribution over those labels (plus abstain) out, in one forward pass with nothing generated."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Guy Nachshon", email = "Guy@ozlabs.ai" }]
+keywords = ["llm", "classification", "decision-model", "calibration", "system-one", "zero-shot"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "torch>=2.14.0",
+  "transformers>=5.17.0",
+  "safetensors>=0.4.0",
+  "huggingface_hub>=0.25.0",
+  "numpy>=2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/GuyNachshon/typical"
+Source = "https://github.com/GuyNachshon/typical"
+Models = "https://huggingface.co/OzLabs"
+
+# The source directory is `typical/`, but the installed import name is
+# `typical_decisions`: PyPI's `typical` is an unrelated, established package
+# (Sean Stewart's typing toolkit) and squatting that import name would break
+# anyone who has both installed. Every intra-package import is relative, so the
+# remap costs no code changes.
+[tool.hatch.build.targets.wheel]
+packages = ["typical"]
+
+[tool.hatch.build.targets.wheel.sources]
+"typical" = "typical_decisions"
+
+[tool.hatch.build.targets.sdist]
+include = ["typical/", "README.md", "example.py", "pyproject.toml"]
