@@ -122,14 +122,14 @@ def bench_single_decision_ms(rel_dir: str, k: str, state_tokens: str = "256") ->
 # fig_architecture — schematic of the decision pass (no run data, vector only)
 # ---------------------------------------------------------------------------
 def fig_architecture():
-    # Dark-panel schematic after the Figma reference (node 36:71): light cards, thin white connectors.
+    # Schematic after the Figma reference, on white for print (node 36:71): light cards, thin dark connectors.
     # Coordinates are in the reference's pixel space (y down).
     from matplotlib import font_manager
     for f in ("Regular", "Medium", "Italic"):
         p = Path.home() / "Library/Fonts" / f"Inter_24pt-{f}.ttf"
         if p.exists():
             font_manager.fontManager.addfont(str(p))
-    BG, CARD, INK, SUB, LINE = "#1e1e1e", "#f0f0f0", "#1e1e1e", "#5c5c5c", "#f0f0f0"
+    BG, CARD, INK, SUB, LINE = "#ffffff", "#f0f0f0", "#1e1e1e", "#5c5c5c", "#1e1e1e"
     rc = {"font.family": "Inter 24pt", "mathtext.fontset": "custom", "mathtext.rm": "Inter 24pt",
           "mathtext.it": "Inter 24pt:italic", "mathtext.bf": "Inter 24pt:medium", "pdf.fonttype": 42}
     with plt.rc_context(rc):
@@ -144,7 +144,7 @@ def fig_architecture():
         def card(x, y, w, h, title, *subs):
             # 1 pt = 3.3 px here; titles 7.2 pt, subtitles 6.2 pt, 25 px between lines
             ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0,rounding_size=12",
-                                        linewidth=0, facecolor=CARD))
+                                        linewidth=0.6, edgecolor="#d6d6d6", facecolor=CARD))
             n = 1 + len(subs)
             y0 = y + h / 2 - 25 * (n - 1) / 2 - (3 if subs else 0)
             ax.text(x + w / 2, y0, title, ha="center", va="center", fontsize=7.2,
@@ -176,7 +176,7 @@ def fig_architecture():
         line([(371, 48), (410, 48)])
         line([(371, 184), (410, 184)])
         line([(603, 104), (603, 128)])
-        ax.text(615, 116, "attends to cache", ha="left", va="center", fontsize=5.6, color="#9a9a9a")
+        ax.text(615, 116, "attends to cache", ha="left", va="center", fontsize=5.6, color="#7a7a7a")
         line([(797, 184), (878, 150)])
         line([(1060, 198), (1060, 268)])
         line([(1060, 471), (1060, 396)])
