@@ -36,3 +36,6 @@ vendor/doom/doom-wasm/
 vendor/doom/doom1.wad
 vendor/doom/build.log
 node_modules/
+
+# design exploration notes (local scratch; the accepted lane is documented in docs/site/DESIGN.md)
+designs/

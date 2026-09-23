@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Diagnostic phase after main_s0 (see PLAN2.md): is the tower's memory layer the problem?
 set -x
+cd "$(dirname "$0")/.."   # repo-root relative (runs/, logs/, *.py)
 export PYTHONUNBUFFERED=1
 export HF_REPO=guychuk/pcdm-runs
 mkdir -p logs runs

@@ -80,22 +80,22 @@ is open (§7).
 
 | doc | what it is | read when |
 |---|---|---|
-| `idea.md` | v0 statement of the thesis: §1 core equation, §2 desired properties, §3–§16 architecture/training stages, §17 H1–H5, §18 baselines, §20 v0 experiment | you want the original motivation and the pre-registered hypotheses |
-| `IDEA2.md` | PI's revised statement after v1: §3 "pretrained state–query interaction is load-bearing" (joint prefix architecture), §6 listwise candidates, §8–§12 training stack (Stage A/B/C, RLCD), §14–§19 KDA (deferred), §20 H1–H7, §21 roadmap Phases 1–5 | you want the current architectural position and the full hypothesis stack |
-| `PLAN.md` | v0 PoC plan (Mac/MPS, frozen 0.6B): files, JSONL schema, data mix, interfaces, decision rules for H1–H4 | you need the data schema or the v0 rules |
-| `PLAN2.md` | v1 plan (RunPod H100): LoRA/backbone decisions, data v2 spec, run schedule, pre-registered rules, local gate, RunPod mechanics, **"Revision after main_s0"** (tap layer, z-score, data v3) | you are about to rent a GPU or change the training config |
-| `REVIEW.md` | stop-and-rethink review after `joint_v1`: §1 what stands, §2 what does not (baseline fairness, K–null coupling, OOD calibration), §3 the "fancy classifier over Qwen" question → MCQ-LoRA, §4 cuts, §5 ranked plan + §5a cosine probe + §5b outcomes, §6 threats to validity | you want to know *why* Phase 2 ran what it ran and what is still unproven |
+| `docs/plan/idea.md` | v0 statement of the thesis: §1 core equation, §2 desired properties, §3–§16 architecture/training stages, §17 H1–H5, §18 baselines, §20 v0 experiment | you want the original motivation and the pre-registered hypotheses |
+| `docs/plan/IDEA2.md` | PI's revised statement after v1: §3 "pretrained state–query interaction is load-bearing" (joint prefix architecture), §6 listwise candidates, §8–§12 training stack (Stage A/B/C, RLCD), §14–§19 KDA (deferred), §20 H1–H7, §21 roadmap Phases 1–5 | you want the current architectural position and the full hypothesis stack |
+| `docs/plan/PLAN.md` | v0 PoC plan (Mac/MPS, frozen 0.6B): files, JSONL schema, data mix, interfaces, decision rules for H1–H4 | you need the data schema or the v0 rules |
+| `docs/plan/PLAN2.md` | v1 plan (RunPod H100): LoRA/backbone decisions, data v2 spec, run schedule, pre-registered rules, local gate, RunPod mechanics, **"Revision after main_s0"** (tap layer, z-score, data v3) | you are about to rent a GPU or change the training config |
+| `docs/research/REVIEW.md` | stop-and-rethink review after `joint_v1`: §1 what stands, §2 what does not (baseline fairness, K–null coupling, OOD calibration), §3 the "fancy classifier over Qwen" question → MCQ-LoRA, §4 cuts, §5 ranked plan + §5a cosine probe + §5b outcomes, §6 threats to validity | you want to know *why* Phase 2 ran what it ran and what is still unproven |
 | `REPORT.md` | consolidated results: §1 what was built, §2 bugs/findings in order, §3 v1 tower results + H2, §4 scorecard, §3b joint_v1, §3c Phase 2 (MCQ-LoRA, joint_v2/lw/emb, fair bench), §3d joint_emb follow-ups (null bias, emb+lw, seed), §5 pending, §6 next, §7 decision log | you need a number, a verdict, or the reason a decision was taken |
-| `RESULTS.md` | v0 snapshot table (frozen 0.6B runs B/C/Clate/D/E/F/G, 3 seeds) + v0 H2 bench + v0 verdicts | historical only; superseded by REPORT §3 onwards |
+| `docs/research/RESULTS.md` | v0 snapshot table (frozen 0.6B runs B/C/Clate/D/E/F/G, 3 seeds) + v0 H2 bench + v0 verdicts | historical only; superseded by REPORT §3 onwards |
 | `README.md` | v0 README: v0 run commands, v0 findings, v0 verdicts | historical only; the CLI it shows is stale (see Doc debt) |
-| `COMPARE.md` | PCDM vs TypeSafe Jev / System One comparison, refreshed with the JevBench leaderboard table and the frozen-control ladder | competitive framing, before external claims |
-| `PLAN7.md` | current roadmap: scaling ladder (Track A) + mixture sweep (Track B) + typed primitives (Track C) + DecisionMix v2 / hard curriculum / U corpus (Track D) + calibration (Track E) + large-K path (Track F); "Execution notes" and "Track D build notes" sections record what each worker actually built and when | you need a track's pass rule, a worker assignment, or the DecisionMix v2 corpus stats |
+| `docs/research/COMPARE.md` | PCDM vs TypeSafe Jev / System One comparison, refreshed with the JevBench leaderboard table and the frozen-control ladder | competitive framing, before external claims |
+| `docs/plan/PLAN7.md` | current roadmap: scaling ladder (Track A) + mixture sweep (Track B) + typed primitives (Track C) + DecisionMix v2 / hard curriculum / U corpus (Track D) + calibration (Track E) + large-K path (Track F); "Execution notes" and "Track D build notes" sections record what each worker actually built and when | you need a track's pass rule, a worker assignment, or the DecisionMix v2 corpus stats |
 | `releases/typical-small-preview.md`, `releases/typical-small.md`, `releases/typical-medium.md`, `releases/MANIFEST.json` | public release cards (backbone/adaptation/readout, training args, full results tables, known limitations, license, how-to-run) and the file-copy provenance manifest for each HF upload | before citing a release's numbers or repro command anywhere else |
 | `inference/README.md` (+ `inference/typical/`, `inference/example.py`, `inference/test_parity.py`) | the public, training-repo-independent inference package: `Typical.from_pretrained`, `choice`/`noul`/`score`/`decide`, parity verification | integrating the model outside this repo, or checking what the inference port does/doesn't cover (no `n2`/`n2n3` heads) |
 | `demo/README.md` (+ `demo/app.py`) | local Gradio app: playground + batch (single-KV-encode) + static release-page tables; `uv run --no-sync python demo/app.py` | showing the model running, or as the release-page content source |
-| `REPORT_3x_draft.md`, `REPORT_calib_draft.md`, `REPORT_6b_draft.md` | working drafts behind `REPORT.md` §3x (stratified full-file re-eval), §3y (calibration $0 experiments) and §3ac (Track C typed primitives) — more raw detail than the consolidated section | when a §3x/§3y/§3ac number needs its per-file derivation |
+| `docs/research/REPORT_3x_draft.md`, `docs/research/REPORT_calib_draft.md`, `docs/research/REPORT_6b_draft.md` | working drafts behind `REPORT.md` §3x (stratified full-file re-eval), §3y (calibration $0 experiments) and §3ac (Track C typed primitives) — more raw detail than the consolidated section | when a §3x/§3y/§3ac number needs its per-file derivation |
 | `/tmp/COMMON_POD_BRIEF.md` | the living ops brief every pod-facing worker reads first: exact Release-1 recipe flags, the standard post-training eval chain, and the Qwen3.5-era addenda (torch/kernel rules, micro-batch table, watcher rules) — §6 below is this file's rules folded into the permanent doc | before touching a pod |
-| `PROJECT.md` | this file | first |
+| `docs/plan/PROJECT.md` | this file | first |
 
 ## 3. Code map
 
@@ -119,7 +119,7 @@ CPU, tiny random-weight Qwen3 from `conftest.py`).
 | `scripts/leak_audit.py` | MinHash char-5-gram near-dup audit train vs every eval set → `runs/leak_audit.json` (+ per-set near-dup lists) | `uv run scripts/leak_audit.py` | — |
 | `scripts/null_bias.py` | post-hoc `s∅' = s∅ + α·log K + β` fitted with T on val from a `--dump_logits` dir (REPORT §3d(1)) | `uv run scripts/null_bias.py runs/dump_joint_emb --out runs/joint_emb_nullbias/results.json` | `test_fit_null_bias_finite_and_improves_val_nll`, `test_fit_null_bias_three_ragged_sets_end_to_end` |
 | `scripts/eval_wf.py` | post-hoc full-state-length evaluation of a checkpoint on any `--files` glob (train-time evals truncate/cap); batched, stratified `--limit`, per-family/qtype/label-class breakdowns, majority baselines. Rebuilt batched+stratified for §3x (superseded the first-500-rows §3w numbers, see the preview card's Errata) | `uv run python scripts/eval_wf.py --run runs/<name> --mode native --files data_wf/eval/*.jsonl data_wh/eval/*.jsonl data_u/eval/*.jsonl --limit 0 --out runs/<name>/eval_wf.json` | — |
-| `scripts/decisionmix_v2.py` | PLAN7 Track D: `data_wh` (hard rule-engine curriculum, 12 domains × 6 boolean conditions, levels 1–7, 100% counterfactual rubric groups) + `data_u` (soft-target uncertainty corpus: UNLI-val, `metaeval/ambient`, `metaeval/chaos-mnli-ambiguity` eval-only, four synthetic closed-form generators); reuses `workflow_corpus.py`'s `flip_pairs`/`shuffled_rubric`/`leak_check` unmodified. Full build notes in `PLAN7.md`'s "Track D" section | `uv run scripts/decisionmix_v2.py --corpus wh\|u\|both [--limit N]` | `tests/test_decisionmix_v2.py` (10 tests) |
+| `scripts/decisionmix_v2.py` | PLAN7 Track D: `data_wh` (hard rule-engine curriculum, 12 domains × 6 boolean conditions, levels 1–7, 100% counterfactual rubric groups) + `data_u` (soft-target uncertainty corpus: UNLI-val, `metaeval/ambient`, `metaeval/chaos-mnli-ambiguity` eval-only, four synthetic closed-form generators); reuses `workflow_corpus.py`'s `flip_pairs`/`shuffled_rubric`/`leak_check` unmodified. Full build notes in `docs/plan/PLAN7.md`'s "Track D" section | `uv run scripts/decisionmix_v2.py --corpus wh\|u\|both [--limit N]` | `tests/test_decisionmix_v2.py` (10 tests) |
 | `scripts/workflow_corpus.py` | rubric-conditioned typed-workflow generator (`data_wf`); `--long_share TARGET` (PLAN7 Track B) raises the combined `train.jsonl`+`train_long.jsonl` long-state (1–2.6k-token) row share to TARGET, used for the long-state capacity test (`long_e45`) and later the facts-first `train_long_v2.jsonl` regeneration (§3ag fix) | `uv run scripts/workflow_corpus.py --long_share 0.25` | — |
 | `scripts/jev_hf_datasets.py` | streams Jev-shaped HF datasets (`cua-s1-forms`, `systemone-lite-general`, `jev-4b-distill-data`) into the training row schema → `data_wf_hf/{train,eval}` | `uv run scripts/jev_hf_datasets.py [--limit N]` | — |
 | `scripts/gate_experts.py` | PLAN6 item 3: learned per-input expert gate over the energy/native score mixture — tested, **rejected** (a global-g mixture captures almost none of the oracle envelope; REPORT §3u) | `uv run scripts/gate_experts.py` | — |
@@ -127,11 +127,11 @@ CPU, tiny random-weight Qwen3 from `conftest.py`).
 | `inference/typical/{backbone,native,core}.py` | the public, training-repo-independent port of the serving path: `backbone.py` (frozen truncated Qwen3/Qwen3.5 trunk + LoRA), `native.py` (`NativeHead` + `native_kv_decide`, same renderers/heads as the training module minus `n2`/`n2n3`), `core.py` (`Typical.from_pretrained` + `choice`/`noul`/`score`/`decide`) | `from typical import Typical; Typical.from_pretrained("OzLabs/typical-small")` | `inference/test_parity.py` (`RUN_SLOW=1`; max abs prob diff 0.0 vs `PCDMDecider` on CPU/MPS) |
 | `demo/app.py` | local Gradio release page: model selector (lazy-load, one resident model), Playground (single decision, probability bar chart incl. ∅), Batch (`native_kv_decide` single-KV-encode over several queries), static release-page tables from `releases/*.md` + REPORT §3ab's latency ladder | `uv run --no-sync python demo/app.py` → http://127.0.0.1:7860 | — |
 | `conftest.py` | tiny Qwen3 backbone / cache fixtures | — | — |
-| `costguard.sh` | every 10 min: stop a RunPod pod idle (no train/baselines/bench process, GPU < 5 %, no waiter) for 2 checks; pod ids hard-coded in `PODS` | `./costguard.sh &` (log `/tmp/costguard.log`) | — |
-| `watchdog.sh` | v0 Mac helper: rerun a command if its log stops growing for 5 min (MPS stream hang) | `./watchdog.sh LOG CMD...` | — |
-| `run_gpu.sh` / `run_gpu2.sh` / `run_gpu3.sh` / `run_gpu3b.sh` | idempotent pod schedules for phases 1 / diag / 3 (pod 1) / 3 (pod 2); skip a run if `runs/<name>/results.json` exists; `timeout Nh` + `runpodctl pod stop` | `tmux new -d 'bash run_gpu3.sh'` on the pod | — |
-| `run_rest.sh` | v0 Mac schedule (B, cache, F/G/D/E eval, bench, seeds) | historical | — |
-| `pod_setup.sh` | fresh-pod bootstrap: env dirs on `/workspace`, uv, tmux, `hf download` data, 300-step GPU smoke | `bash pod_setup.sh` | — |
+| `scripts/costguard.sh` | every 10 min: stop a RunPod pod idle (no train/baselines/bench process, GPU < 5 %, no waiter) for 2 checks; pod ids hard-coded in `PODS` | `./scripts/costguard.sh &` (log `/tmp/costguard.log`) | — |
+| `scripts/watchdog.sh` | v0 Mac helper: rerun a command if its log stops growing for 5 min (MPS stream hang) | `./scripts/watchdog.sh LOG CMD...` | — |
+| `scripts/run_gpu.sh` / `scripts/run_gpu2.sh` / `scripts/run_gpu3.sh` / `scripts/run_gpu3b.sh` | idempotent pod schedules for phases 1 / diag / 3 (pod 1) / 3 (pod 2); skip a run if `runs/<name>/results.json` exists; `timeout Nh` + `runpodctl pod stop` | `tmux new -d 'bash scripts/run_gpu3.sh'` on the pod | — |
+| `scripts/run_rest.sh` | v0 Mac schedule (B, cache, F/G/D/E eval, bench, seeds) | historical | — |
+| `scripts/pod_setup.sh` | fresh-pod bootstrap: env dirs on `/workspace`, uv, tmux, `hf download` data, 300-step GPU smoke | `bash scripts/pod_setup.sh` | — |
 
 Phase-2 schedules (joint_v1, tower_big, joint_emb_lw, joint_emb_s1, dump) were one-off scripts sent to the pods
 (`/tmp/pod{1,2,3}_*.sh` on the Mac, not in the repo); their exact commands are reproduced below.
@@ -182,7 +182,7 @@ Every `runs/<name>/results.json` (local); `best.pt` for GPU runs lives only on H
 the pod volume. W&B: `guy-na8/pcdm`. "REPORT" = section of `REPORT.md`. Data: v1 = v0 Mac mix (44k), v2 = PLAN2 mix
 (758k), v3 = v2 with fixed null synthesis (PLAN2 revision), v4 = K-decoupled nulls + cse/ksweep/null-slice eval sets.
 
-### v0 — Mac, frozen Qwen3-0.6B-Base layer-20 features, 9M tower (RESULTS.md, README.md, REPORT §2.1–2.3, §7)
+### v0 — Mac, frozen Qwen3-0.6B-Base layer-20 features, 9M tower (docs/research/RESULTS.md, README.md, REPORT §2.1–2.3, §7)
 
 | run | config | data | seed | question | outcome |
 |---|---|---|---|---|---|
@@ -215,7 +215,7 @@ the pod volume. W&B: `guy-na8/pcdm`. "REPORT" = section of `REPORT.md`. Data: v1
 | `joint_v1_s1` | same | v3 | 1 | clean seed pair | .908; NLI ±0.7, held-out spaces ±3–5 |
 | `abl_notower` | joint, `--tower_layers 0` | v3 | 0 | is the slot needed | NLI equal, CLINC +10, OOS recall +33 → tower removed (REPORT §5) |
 
-### phase 2 — after REVIEW.md (REPORT §3c, §3d; REVIEW §5b)
+### phase 2 — after docs/research/REVIEW.md (REPORT §3c, §3d; REVIEW §5b)
 
 | run | config | data | seed | question | outcome |
 |---|---|---|---|---|---|
@@ -392,7 +392,7 @@ cuda`) → `scripts/eval_wf.py --run runs/<run> --mode native --limit 0 --max_st
 `guychuk/pcdm-data` (v3 at root, `v4/`/`v5/`/`wf/`/`wh/`/`u/` subdirs); HF `guychuk/pcdm-runs` (every run's
 `best.pt` + eval jsons, private) plus the three public `OzLabs/typical-*` repos. Secrets in `.env` (never print).
 
-**Cost guard.** `costguard.sh` reads pods from `/tmp/PODS_ACTIVE` (workers append `<id>|<sshfile>|<waiter>`) and
+**Cost guard.** `scripts/costguard.sh` reads pods from `/tmp/PODS_ACTIVE` (workers append `<id>|<sshfile>|<waiter>`) and
 stops one idle (no trainer process, GPU util < 5%, no waiter) for 2 checks running every 10 min.
 
 **Older pitfalls, still true** (REPORT §2.9; PLAN2 "RunPod mechanics"; user memory notes `remote-job-hygiene.md`,
@@ -400,7 +400,7 @@ stops one idle (no trainer process, GPU util < 5%, no waiter) for 2 checks runni
 - `tmux kill-session` does not kill `timeout`-wrapped schedule children → ghost schedule trains a second model on
   the same GPU; kill the `timeout`/`bash -c schedule` pids first.
 - `runpodctl --env` variables do not reach SSH sessions; source `/workspace/.env` in the script.
-- Mac/MPS: boolean indexing / per-item `.item()` hangs under GPU contention; `watchdog.sh` restarts a stalled log.
+- Mac/MPS: boolean indexing / per-item `.item()` hangs under GPU contention; `scripts/watchdog.sh` restarts a stalled log.
 - `--eval_only` takes architecture flags from `best.pt`, not the CLI; `--readout mcq` rejects `--zscore/--joint/--listwise`.
 - `runs/dump_*/` and `*.pt` are gitignored; `best.pt` for GPU runs is on HF only.
 
@@ -484,22 +484,22 @@ stops one idle (no trainer process, GPU util < 5%, no waiter) for 2 checks runni
 4. `REPORT.md` §1 says 16 tests; `tests/test_pipeline.py` has 29. §1 says "H100 ×2"; three pods were used.
 5. `REPORT.md` §1/§7 cost lines ($35 / $37) are per-phase; no running total anywhere (≈ $68 by this file's estimate).
 6. `REPORT.md` §6 "a second joint seed" is done (`joint_v1_s1`, `joint_emb_s1`).
-7. `REVIEW.md` §5 item 8 says `--dump_probs` not implemented; `train.py --dump_logits` now exists (REPORT §3d). The
+7. `docs/research/REVIEW.md` §5 item 8 says `--dump_probs` not implemented; `train.py --dump_logits` now exists (REPORT §3d). The
    utility evaluation itself is still not run.
-8. `REVIEW.md` §4 lists IDEA2 wording changes ("reusable neural memory" → "prefix KV cache", H2 "strongly supported" →
-   "unmeasured") — `IDEA2.md` §20 still says H2 "already strongly supported by v1" (now actually measured by `bench_fair`).
-9. `REVIEW.md` §6 label-name overlap audit (train intents vs Banking77) is still open and not tracked elsewhere.
+8. `docs/research/REVIEW.md` §4 lists IDEA2 wording changes ("reusable neural memory" → "prefix KV cache", H2 "strongly supported" →
+   "unmeasured") — `docs/plan/IDEA2.md` §20 still says H2 "already strongly supported by v1" (now actually measured by `bench_fair`).
+9. `docs/research/REVIEW.md` §6 label-name overlap audit (train intents vs Banking77) is still open and not tracked elsewhere.
 10. `README.md` run commands are v0: `uv run encode.py` cache build, `train.py --cand_null` (flag is now the default;
     the ablation is `--no_cand_null`), `bench.py --model runs/F/model.pt` (now a run dir). README/RESULTS H1 "holds"
     and H4 K-dependence numbers (0.98 → 0.61 at K=50) are superseded by REPORT §3c/§3d.
-11. `PLAN2.md` interface block says `--steps 24000` default; `train.py` default is 12000 (`main_v3` used 24k explicitly).
+11. `docs/plan/PLAN2.md` interface block says `--steps 24000` default; `train.py` default is 12000 (`main_v3` used 24k explicitly).
     PLAN2's "lower 20 frozen / LoRA top 8" is superseded by the revision (tap 20, LoRA 13–20) in the same file.
 12. `data.py` docstring points to PLAN2 "Data" for the spec, but the v4 scheme (K-decoupled nulls, cse/ksweep/null
     slices) is only specified in REVIEW §5 item 6 and in `data.py` docstrings.
 13. `runs/*/results.json` do not store `args`; run configs are recoverable only from `best.pt` (HF), W&B config, or the
     one-off pod scripts in `/tmp` (reproduced in §3/§4 here). `runs/bench/` has only `bench.log` (no `results.json`).
 14. `main_v3` vs `main_v3_s1` is presented as a seed pair in REPORT §3 but differ in epochs (24k vs 12k steps).
-15. `costguard.sh` hard-codes the pod id / ssh file of pod 3; `pod_setup.sh` downloads data v3 only (no `v4/`).
+15. `scripts/costguard.sh` hard-codes the pod id / ssh file of pod 3; `scripts/pod_setup.sh` downloads data v3 only (no `v4/`).
 16. Item 10 (README.md stale) is resolved by this pass — `README.md` is now a current front page, not the v0
     Mac-PoC document; if it drifts again, the v0 content is recoverable from git history, not from this file.
 17. `releases/MANIFEST.json` has provenance entries for `typical-small-preview` and `typical-small` only —
@@ -508,10 +508,10 @@ stops one idle (no trainer process, GPU util < 5%, no waiter) for 2 checks runni
 18. No release card exists yet for `tl1b` (documented in REPORT §3ah and this file's run registry, but not
     released — correctly no card) or for `tm2` (trained and evaluated, not a frozen release decision yet — also
     correctly no card). If either is frozen as a release, `releases/*.md` + `MANIFEST.json` need a new entry each.
-19. `PLAN7.md`'s pass rule for `typical-large` (hard ≥ .559 or Brier ≤ .65, long_policy ≥ .35) is stated once at
+19. `docs/plan/PLAN7.md`'s pass rule for `typical-large` (hard ≥ .559 or Brier ≤ .65, long_policy ≥ .35) is stated once at
     the top of §3ag's "In flight" paragraph; REPORT §3ah's verdict ("missed narrowly on Brier, .656") is not
-    reflected back into PLAN7.md itself — PLAN7.md is a plan document and this pass leaves it as originally
-    written, per the instruction not to rewrite the lead's planning doc, but a reader diffing PLAN7.md against
+    reflected back into docs/plan/PLAN7.md itself — docs/plan/PLAN7.md is a plan document and this pass leaves it as originally
+    written, per the instruction not to rewrite the lead's planning doc, but a reader diffing docs/plan/PLAN7.md against
     REPORT §3ah should know the rule as *evaluated* lives only in REPORT.md.
 20. Three checkpoints exist on `guychuk/pcdm-runs` with no `results.json` at all yet: `tl1b_nokd`, `tl2`, `ts1c`
     (base, not the tap-sweep variants, which are evaluated). Every table in this pass marks their cells "–"; there

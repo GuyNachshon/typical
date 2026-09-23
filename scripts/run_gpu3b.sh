@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Pod 2 half of phase 3 (shared /workspace volume with pod 1).
 set -x
+cd "$(dirname "$0")/.."   # repo-root relative (runs/, logs/, *.py)
 export PYTHONUNBUFFERED=1
 export HF_REPO=guychuk/pcdm-runs
 mkdir -p logs runs

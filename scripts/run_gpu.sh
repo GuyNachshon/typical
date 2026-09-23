@@ -3,6 +3,7 @@
 # run is skipped if runs/<name>/results.json already exists, so a crashed/restarted
 # pod just continues. No `set -e` -- one run failing must not block the rest.
 set -x
+cd "$(dirname "$0")/.."   # repo-root relative (runs/, logs/, *.py)
 export PYTHONUNBUFFERED=1
 
 mkdir -p logs runs

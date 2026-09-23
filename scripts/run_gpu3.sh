@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Phase 3 (after the tap-20 diagnostics). LORA_FLAGS is decided from diag_tap20 vs diag_tap20_frozen.
 set -x
+cd "$(dirname "$0")/.."   # repo-root relative (runs/, logs/, *.py)
 export PYTHONUNBUFFERED=1
 export HF_REPO=guychuk/pcdm-runs
 export LORA_FLAGS="${LORA_FLAGS:---lora_r 16}"  # explicit; empty would fall through to the default
