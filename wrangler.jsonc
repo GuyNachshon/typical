@@ -1,0 +1,15 @@
+{
+  "name": "typical",
+  "compatibility_date": "2026-09-24",
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./site"
+  },
+  "routes": [
+    {
+      "pattern": "typical.ozlabs.ai",
+      "custom_domain": true
+    }
+  ]
+}

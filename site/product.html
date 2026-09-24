@@ -3,8 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/png" href="/favicon.png">
 <title>Typical — models that decide, not generate</title>
 <meta name="description" content="Typical: open 1.7B and 4B decision models. One pass over the text, a probability for every option, and an explicit abstain. Results with controls, real demos.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Typical">
+<meta property="og:title" content="Typical — models that decide, not generate">
+<meta property="og:description" content="Typed decisions, read straight out of a language model.">
+<meta property="og:url" content="https://typical.ozlabs.ai/product.html">
+<meta property="og:image" content="https://typical.ozlabs.ai/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Typical — typed decisions, read straight out of a language model.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://typical.ozlabs.ai/og.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Geist+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -14,7 +26,8 @@
 <nav class="nav"><a class="brand" href="index.html">Typical</a><a class="lab" href="https://ozlabs.ai" target="_blank" rel="noopener">Oz Labs</a><span class="links"><a href="index.html#field">Results</a><a href="index.html#watch">Demos</a><a href="research.html">Research</a><a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">Weights</a></span><a class="cta" href="index.html#tryit">Try it live</a></nav>
 
 <div class="stage-track"><header class="stage" id="top">
-  <iframe class="stage-film" id="film" src="games/doom/index.html?film=1" title="DOOM, played by the model" loading="eager"></iframe>
+  <iframe class="stage-film doom-frame" id="film" data-doom-src="games/doom/index.html?film=1" title="DOOM, played by the model" loading="eager"></iframe>
+  <video class="stage-film doom-video" data-doom-video data-doom-src="media/doom-mobile.mp4" data-doom-poster="media/doom-mobile-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Recorded DOOM gameplay by Typical"></video>
   <div class="stage-shade"></div>
   <div class="stage-copy">
     <ul class="t-eyebrow hero brow">
@@ -143,7 +156,7 @@
     <figure class="fig">
     <div class="media dark">
       <p class="media-label t-eyebrow">DOOM · E1M1 · live</p>
-      <div class="media-scene" style="min-height:520px"><iframe class="card-film" id="film-card" src="games/doom/index.html?film=1" title="DOOM played by typical-small" loading="lazy"></iframe></div>
+      <div class="media-scene" style="min-height:520px"><iframe class="card-film doom-frame" id="film-card" data-doom-src="games/doom/index.html?film=1" title="DOOM played by typical-small" loading="lazy"></iframe><video class="card-film doom-video" data-doom-video data-doom-src="media/doom-mobile.mp4" data-doom-poster="media/doom-mobile-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Recorded DOOM gameplay by Typical"></video></div>
       <div class="card-hud t-mono"><p class="rec"><i></i><span id="card-rec">REC · typical-small · E1M1</span></p><p class="rec-sub" id="card-rec2">booting</p><div id="card-rows"></div><p class="sentence" id="card-sentence"></p></div>
     </div>
     <figcaption><b>Fig. 8.</b> Two facts per tick, badly hurt or not and an enemy in sight or not, decide retreat, engage or explore, straight from the text state, never a pixel.</figcaption>
@@ -202,6 +215,11 @@
   </div>
   <div class="code"><pre >pip install typical-ai</pre></div>
   <p class="note mt-18">The three calls themselves are the six lines shown above under <a href="#runtime">Your program keeps its logic</a>: <code>choice</code>, <code>noul</code>, <code>score</code>, each taking the same state.</p>
+</section>
+
+<section class="contact page" aria-labelledby="contact-title">
+  <div><p class="t-eyebrow">Piqued your interest—or raised questions?</p><h2 class="t-section" id="contact-title">Talk to us.</h2></div>
+  <a class="btn dark" href="mailto:hi@ozlabs.ai">Contact us</a>
 </section>
 
 <footer class="footer"><div class="page">

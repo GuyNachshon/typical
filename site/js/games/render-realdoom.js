@@ -4,7 +4,7 @@
 // demo-spec-v2.md #5 found the model says "shoot" 29/30 times regardless of state on that
 // engine, and this card lets the same failure play out against id's actual E1M1.
 import { TOKENS, mountChrome, paintDecision, watchVisibility, createTicker, createHumanOverride, bindKeys, modelPolicy, loadJSON, scoreboardLine } from './loop.js';
-import { candidatesFor, describeDoom, scriptedPolicy, resolveIntent, resetNav, keyPress } from './realdoom-logic.js';
+import { candidatesFor, describeDoom, scriptedPolicy, resolveIntent, resetNav, keyPress, replayIndex, recordedDecision } from './realdoom-logic.js';
 import { QUESTION } from './doom.js';
 
 const TICK_MS = 400;
@@ -84,6 +84,7 @@ export async function mount(el, { decide, mode } = {}) {
   refs.stage.appendChild(iframe);
 
   const replayDoc = await loadJSON('data/replays/realdoom.json').catch(() => null);
+  const replay = replayIndex(replayDoc);
 
   const ready = await waitForDoom(iframe, WASM_TIMEOUT_MS);
   if (!ready) return mountFallback(el, { decide, mode }, 'WASM module did not reach the level within 10s');
@@ -143,7 +144,7 @@ export async function mount(el, { decide, mode } = {}) {
     }
     const s = replayDoc?.summary;
     const recorded = s ? ` Last recorded model run: ${s.decisions} decisions · ${s.rule_agreement} matched the rule list · shots ${s.shots} · kills ${s.kills} · health end ${s.health_end}.` : '';
-    offlineEl.textContent = `model offline — scripted policy; run the local server to let Typical play.${recorded}`;
+    offlineEl.textContent = `model offline — replaying recorded model decisions; unrecorded states use the scripted policy.${recorded}`;
   }
 
   async function tick() {
@@ -164,9 +165,17 @@ export async function mount(el, { decide, mode } = {}) {
       if (humanTurn) {
         move = human.move; // a raw key action; resolveIntent() passes it through
         decision = { candidates: legal, probs: { [move]: 1 }, p_null: 0, sentence };
-      } else if (offline || policyName === 'scripted') {
+      } else if (policyName === 'scripted') {
         move = gold;
         decision = { candidates: legal, probs: { [move]: 1 }, p_null: 0, sentence };
+      } else if (offline) {
+        const hit = recordedDecision(replay, sentence, legal);
+        move = hit?.move ?? gold;
+        decision = { candidates: legal, probs: hit?.probs ?? { [move]: 1 }, p_null: hit?.p_null ?? 0, sentence };
+        if (hit) {
+          decisions += 1;
+          if (move === gold) agreed += 1;
+        }
       } else {
         const r = await modelPolicy({ decide, engine: { candidates: () => legal, describe: () => sentence }, question: QUESTION });
         move = r?.move ?? gold;

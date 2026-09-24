@@ -6,7 +6,7 @@
 import { decide, mode, probeHealth } from './api.js';
 import { bars, inkBars, rowsFromResult } from './bars.js';
 import { glueSeparators, glued, bindWidows } from './typography.js';
-import { describeDoom, candidatesFor, resolveIntent, keyPress, scriptedPolicy, resetNav } from './games/realdoom-logic.js';
+import { describeDoom, candidatesFor, resolveIntent, keyPress, scriptedPolicy, resetNav, replayIndex, recordedDecision } from './games/realdoom-logic.js';
 import { QUESTION as DOOM_QUESTION } from './games/doom.js';
 import { hashKey } from './api.js';
 import { costBar } from './charts.js';
@@ -452,6 +452,18 @@ function mountFilmFxOn(film, onReady) {
 }
 
 // ---- the film: real DOOM in the hero, driven by the model (live) or the rule list (recorded) ----
+function prepareDoomMedia() {
+  const mobile = matchMedia('(max-width: 48rem)').matches;
+  const media = document.querySelectorAll(mobile ? '[data-doom-video]' : '.doom-frame');
+  media.forEach((el) => {
+    el.src = el.dataset.doomSrc;
+    if (el.dataset.doomPoster) el.poster = el.dataset.doomPoster;
+    if (mobile) el.play().catch(() => {});
+  });
+  if (mobile) document.documentElement.classList.remove('booting');
+  return mobile;
+}
+
 function mountFilm(ctx, ids = {}) {
   const film = document.getElementById(ids.film || 'film');
   // The treatment is the hero's alone: the card in chapter 04 shows the frame untouched.
@@ -471,6 +483,7 @@ function mountFilm(ctx, ids = {}) {
   // Each film owns its own navigator state; two instances sharing the module-level route counter
   // would walk each other's waypoints.
   const labels = ['retreat', 'shoot', 'turn left', 'turn right', 'explore'];
+  const replay = loadJSON('data/replays/realdoom.json').then(replayIndex).catch(() => new Map());
   let stopped = false;
   const io = new IntersectionObserver((es) => { stopped = !es[0].isIntersecting; });
   io.observe(film);
@@ -540,6 +553,13 @@ function mountFilm(ctx, ids = {}) {
         const r = res?.results?.[0];
         if (r) { probs = r.probs; move = cands.reduce((a, c) => ((r.probs[c] ?? 0) > (r.probs[a] ?? 0) ? c : a), cands[0]); source = `model · ${Math.round(res.ms)} ms on ${res.device || 'mps'}`; }
       } catch {}
+    } else {
+      const hit = recordedDecision(await replay, sentence, cands);
+      if (hit) {
+        move = hit.move;
+        probs = hit.probs;
+        source = `recorded model · ${Math.round(hit.ms)} ms`;
+      }
     }
     // Two lines by construction: one wrapped line used to start with a dangling separator.
     rec.textContent = `${source.startsWith('model') ? 'LIVE' : 'REC'} · typical-small · E1M1`;
@@ -593,6 +613,7 @@ function mountTryit(ctx) {
 // ---- boot -------------------------------------------------------------------------
 
 async function boot() {
+  const mobileDoom = prepareDoomMedia();
   import('./copycode.js').then((m) => m.mountCopyButtons()).catch(() => {});
   glueSeparators(); // static prose, before anything awaits
   bindWidows();
@@ -613,10 +634,10 @@ async function boot() {
   mountPrimitives(presets);
   // set before the film mounts; filmfx clears it the moment the cold start is over (or at once,
   // if it is skipped for a repeat visit or for reduced motion)
-  mountFilm(ctx, { fx: true });
+  if (!mobileDoom) mountFilm(ctx, { fx: true });
   // The same game again in chapter 04, plain: no bloom layer, so the card shows the frame exactly
   // as the engine draws it. Only one of the two runs at a time — each pauses when off screen.
-  mountFilm(ctx, { film: 'film-card', rows: 'card-rows', sentence: 'card-sentence', rec: 'card-rec' });
+  if (!mobileDoom) mountFilm(ctx, { film: 'film-card', rows: 'card-rows', sentence: 'card-sentence', rec: 'card-rec' });
   import('./motion.js').then((m) => {
     const go = () => {
       if (!document.documentElement.classList.contains('booting')) {

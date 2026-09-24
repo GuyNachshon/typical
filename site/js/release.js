@@ -229,7 +229,8 @@ function mountSizeScore(host, doc) {
     //
     // Each label keeps its dot's x, so the leader only has to say "up/down from here": a stub out
     // of the dot, a vertical run in the gutter just left of the text, a stub into the text.
-    const items = pts.map((p) => {
+    const compact = w < 520;
+    const items = (compact ? pts.filter((p) => p.ours) : pts).map((p) => {
       const cx = x(sizeOfRow(p)), cy = y(p.std);
       // measure the box the text will actually occupy (11px mono is ~6.6px a character, our own
       // rows are set at 12px bold) rather than assuming a fixed window
@@ -267,6 +268,12 @@ function mountSizeScore(host, doc) {
         ? svgEl('circle', { cx, cy, r: 6, fill: OURS })
         : svgEl('circle', { cx, cy, r: 4.5, fill: '#f0eeeb', stroke: MID, 'stroke-width': 1.4 }));
     };
+    if (compact) pts.filter((p) => !p.ours).forEach((p) => {
+      const mark = svgEl('g', { class: 'jev-mark' });
+      mark.dataset.model = p.name;
+      mark.appendChild(svgEl('circle', { cx: x(sizeOfRow(p)), cy: y(p.std), r: 4.5, fill: '#f0eeeb', stroke: MID, 'stroke-width': 1.4 }));
+      g.appendChild(mark);
+    });
     items.filter((it) => !it.p.ours).forEach(draw);
     items.filter((it) => it.p.ours).forEach(draw);
     host.appendChild(svg);
