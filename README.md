@@ -1,5 +1,7 @@
 # Typical
 
+[![Typical — open decision models](site/og.png)](https://typical.ozlabs.ai)
+
 Typical turns a pretrained language model into a direct probabilistic decision engine. Give it a state once —
 a support ticket, a policy document, an agent trace, any block of text — and it answers many independent,
 runtime-defined questions against that state in parallel, as calibrated probability distributions, with an
