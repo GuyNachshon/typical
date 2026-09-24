@@ -1,91 +1,51 @@
 \section{Introduction}
 \label{sec:intro}
 
-A growing share of language-model calls in production software ask for a decision: which of forty queues a ticket belongs in, whether a transaction is fraud, how severe an
-alert is, which tool an agent should call next. The caller needs a probability distribution over a
-label set it defines at request time, and it needs to know when none of the labels fit. The usual
-route to that distribution goes through text. The model generates an answer symbol or a JSON object,
-or the caller constrains decoding, or it compares candidate log-probabilities. Each of these inherits
-the costs of the generative interface: decoding latency, parsing, and a well-documented sensitivity to
-how the answer is written, including option-order and option-symbol biases
-\citep{zheng2024selectionbias,pezeshkpour2024optionorder} and first-token probabilities that disagree
-with the text the model goes on to produce \citep{wang2024firsttoken}.
+Many language-model calls in production software ask for a decision: which of forty queues a ticket
+belongs in, whether a transaction is fraud, how severe an alert is, which tool an agent should call
+next. The caller needs a probability for each option it defines at request time, and it needs to know
+when none of them fit. Today that distribution is recovered from text, by generating an answer symbol or
+a JSON object, constraining decoding, or comparing candidate log-probabilities. All of these pay for
+decoding and parsing, and all inherit the generative interface's sensitivity to how the answer is
+written \citep{zheng2024selectionbias,pezeshkpour2024optionorder,wang2024firsttoken}.
 
 When a causal language model reads a question followed by a list of options, the winning option is
-already decodable from its hidden states before the model binds the answer symbol
-\citep{wong2026models}. Typical makes that internal decision the deployed interface. A call has the signature
+already decodable from its hidden states before the model writes an answer symbol \citep{wong2026models}.
+Typical turns that internal decision into the interface. A call maps
 \[
-  (\text{state},\ \text{typed question},\ \text{runtime candidate set}) \;\longmapsto\;
-  \big(P(\cand{1}),\dots,P(\cand{\numcands}),\ \pnull\big),
+  (\text{state},\ \text{typed question},\ \text{candidates}) \;\longmapsto\;
+  \big(P(\cand{1}),\dots,P(\cand{\numcands}),\ \pnull\big)
 \]
-and nothing is generated or parsed. Typical encodes the state (a ticket, a policy document, an agent
-trace) once into a key-value cache. Each question against it is a short causal suffix containing the question
-and its candidates, and a head at 71\% of the backbone's depth reads the terminal decision state against
-each candidate's own contextual hidden state. The output type is a contract on the returned
-distribution: categorical \emph{Choice}, ordinal \emph{Score}, a Bernoulli yes/no decision we call
-\emph{Noul}, and an abstention event $\nullsym$ computed by a gate outside the candidate softmax
-(\Cref{fig:architecture}).
+with nothing generated or parsed. The state (a ticket, a policy, an agent trace) is encoded once into a
+key-value cache. Each question is a short causal suffix holding the question and its candidates, and a
+head at 71\% of the backbone's depth scores the decision state against each candidate's contextual
+hidden state (\Cref{fig:architecture}). The output type is a contract on the distribution: categorical
+\emph{Choice}, ordinal \emph{Score}, a Bernoulli yes/no decision we call \emph{Noul}, and an abstention
+probability $\pnull$ computed by a gate outside the candidate softmax.
 
-We settled three design choices by measurement. First, the head reads each candidate's contextual
-state. Scoring the decision state against the candidates' contextual hidden states keeps the question-conditioned signal of the standard
-letter-logit interface ($\dqsh$ .106 vs.\ .109, within seed noise across two seeds), reduces the shift
-in pairwise log-odds under candidate-set edits to a quarter, and adds 2--7 points on natural language
-inference. Scoring the same decision state against an independent embedding of each option's text
-loses 12 points of knowledge accuracy (\Cref{sec:analysis:readout}).
-
-Second, question-conditioned capability lives in computation over the candidates. We measure it with
-$\dq$, the accuracy lost when the real question is replaced by a shuffled one while the
-state and candidate set stay fixed, which extends the choices-only control of
-\citet{balepur2024artifacts}. It separates question-conditioned capability from candidate-set priors,
-a distinction that accuracy and calibration both miss. In every configuration we tested (six
-factorizations and objectives, two backbone depths), a decision state computed before the candidates
-are seen stays within .03 of zero, while readouts that process the candidates in context retain
-.09--.12, matching their listwise teacher (\Cref{sec:analysis:deltaq}). Reading at 71\% of depth yields
-one model that is strong on both evidence and knowledge; reading the final layer produces a model at the
-SNLI hypothesis-only baseline (\Cref{sec:analysis:depth}).
-
-Third, each output type is a contract that the head and the training target enforce. Abstention is a
-gate and never a rendered ``none of the above'' candidate; removing the rendered option removes its
-degenerate endpoints (never abstaining at 5 candidates, always abstaining at 150) and lowers MMLU-Pro
-false abstention from .692 to .003 (\Cref{sec:analysis:null}). An ordinal target cuts Score's held-out
-NLL from 2.07 to 1.23 at unchanged accuracy, and the Bernoulli head makes yes/no decisions invariant to
-label order by construction (\Cref{sec:results:typed}).
-
-Training data is as strong a lever as architecture. DecisionMix v2, a rule-engine
-curriculum in which every state and candidate set appears under several rubrics with different gold
-answers, makes the rubric the only way to fit the data; training on it lifts held-out families,
-grammars and rubric styles by 35--40 points. Balancing decision types and adding null-target copies of
-workflow rows each move a measurable axis, and at 14B the full recipe cuts held-out ordinal NLL from
-2.87 to 0.95 (\Cref{sec:results:mixture,sec:results:calibration}). The cost stays low across scale: in a
-single-stream research harness a decision takes 45, 56 and 60\,ms at 1.7B, 4B and 14B, so an $8\times$
-larger backbone is $1.3\times$ slower, and the optimized serving path decides in 15.5--17\,ms warm at
-1.7B. The 14B model reaches .931 on the JevBench standard tier (\Cref{sec:results:scaling,sec:results:cost}).
-
-We also treat rendering, the way the state and options are laid out as text, as an experimental
-variable. A $2\times2$ design that crosses training render with evaluation render on 605 held-out long
-documents measures a data effect that a 19-item benchmark cell could not resolve: with training states
-right-truncated at 1{,}024 tokens, placing the evidence first adds 11.2 points
-($p = 5\times10^{-10}$), reproduces at a second seed, and is corroborated at 14B
-(\Cref{sec:results:long}). The corrected checkpoints are the current public releases, at .947 (1.7B)
-and .950 (4B) on those documents.
+We fixed each part of this design by measurement. We introduce $\dq$, the accuracy lost when the real
+question is replaced by a shuffled one, which separates question-dependent knowledge from priors over
+the candidate set. In every configuration we tested, a decision state computed before the candidates are
+seen stays within .03 of zero on $\dq$, while readouts over the candidates retain .09--.12
+(\Cref{sec:analysis:deltaq}). Scoring each candidate's contextual state matches the standard
+answer-letter readout on $\dq$ (.106 vs.\ .109) with a quarter of its log-odds shift under option edits
+(\Cref{sec:analysis:readout}). Abstention works as a gate and fails as a rendered ``none of the above''
+option, which raises MMLU-Pro false abstention from .003 to .692 (\Cref{sec:analysis:null}). Training
+data matters as much: counterfactual rubric groups, where only the rubric decides the answer, add
+35--40 points on held-out rule families, and a render-crossed design shows that placing evidence first
+in long training documents adds 11.2 points ($p = 5\times10^{-10}$; \Cref{sec:results}).
 
 \textbf{Contributions.}
 \begin{enumerate}
-  \item A direct decision interface for pretrained causal language models: a cached-state
-  decision pass with a contextual-candidate readout at mid-depth, typed output contracts and a factored
-  abstention gate with exact structural properties, returning distributions over runtime candidates
-  without generating tokens (\Cref{sec:method}).
-  \item An account of where the decision lives, built on $\dq$: matched comparisons of readouts,
-  decision-state factorizations, depths and abstention designs that fix each component of the interface
-  (\Cref{sec:analysis}).
-  \item A training recipe for decision models: counterfactual rubric groups, decision-type
-  balancing, a soft-target uncertainty corpus, null augmentation, evidence-first long states and
-  likelihood-based checkpoint selection (\Cref{sec:train,sec:results}).
-  \item Render-crossed evaluation, which separates data effects from interface compatibility and
-  measures how far rendering alone moves a benchmark score (\Cref{sec:results:long,sec:results:rendering}).
-  \item Open models and code: \texttt{typical-small} (Qwen3-1.7B) and \texttt{typical-medium}
-  (Qwen3.5-4B), with a self-contained inference package (\texttt{pip install typical-ai}) whose outputs
-  match the training-time decider exactly.
+  \item A direct decision interface for pretrained causal language models, with typed outputs and a
+  factored abstention gate, that returns distributions over runtime candidates without generating text
+  (\Cref{sec:method}).
+  \item $\dq$ and the matched comparisons it enables, which locate the decision in the candidates'
+  contextual states at mid-depth (\Cref{sec:analysis}).
+  \item A training recipe for decision models and a render-crossed evaluation that separates data
+  effects from interface effects (\Cref{sec:train,sec:results}).
+  \item Open models, \texttt{typical-small} (1.7B) and \texttt{typical-medium} (4B), with an
+  inference package (\texttt{pip install typical-ai}).
 \end{enumerate}
 
 \begin{figure}[t]

@@ -1,20 +1,14 @@
-Software that asks a language model to route a ticket or rate an alert needs a
-probability distribution over options it names at request time, plus a usable way to
-say that none of them fit. Typical reads that distribution directly out of a pretrained causal
-language model, without generating a token. It encodes the state once into a key-value cache and
-renders each question with its runtime candidates as a short causal suffix, where a head at 71\% of
-backbone depth scores the terminal decision state against each candidate's own contextual hidden state. Output types are
-contracts on the distribution: categorical Choice, ordinal Score, a Bernoulli yes/no head (Noul), and an
-abstention gate outside the candidate softmax. The contextual readout keeps the question-conditioned
-signal of the standard letter-logit interface ($\dqsh$ .106 vs.\ .109) with a quarter of its log-odds
-shift under candidate-set edits. We measure that signal with $\dq$, a shuffled-question control that
-separates question-conditioned capability from candidate-set priors, and use it to show that the
-capability lives in computation over the candidates: in all six configurations we tested, a decision
-state computed before the candidates are seen stays within .03 of zero, against .09--.12 for readouts
-over them. Training on counterfactual rubric groups, where only the rubric determines the answer, lifts
-held-out rule families by 35--40 points, and the full recipe cuts held-out ordinal NLL threefold at 14B.
-A decision costs 45\,ms at 1.7B and 60\,ms at 14B in a research harness, and 15.5--17\,ms on the
-optimized 1.7B serving path; the 14B model reaches .931 on the standard tier of JevBench, a third-party
-typed-decision benchmark. A train-render $\times$ eval-render design on 605 held-out long documents
-shows that placing the evidence first in training states adds 11.2 points ($p = 5\times10^{-10}$),
-reproduced at a second seed. We release 1.7B and 4B models and an inference package.
+Software that asks a language model for a decision needs a probability for each option it supplies,
+and a way to say that none of them fit. Typical reads that distribution directly from a pretrained
+language model's hidden states, without generating any text. The model encodes the input document once
+into a key-value cache, reads each question with its candidate options in a short suffix, and scores
+every candidate with a small head at 71\% of the network's depth. Outputs are typed: a choice among
+options, an ordinal score, a yes/no probability, and a separate probability of abstaining. Three
+measurements fix the design. In every configuration we tested, the model's question-dependent knowledge
+appeared only when the candidates were read inside the forward pass. Scoring each candidate's in-context
+representation matches the standard answer-letter readout on that knowledge, with a quarter of its
+sensitivity to option edits. Abstention belongs in a separate gate:
+also listing ``none of the above'' among the options raises MMLU-Pro false abstention from .003 to .692. Training on
+counterfactual rubrics, where only the rule decides the answer, improves held-out rule families by
+35--40 points. A decision takes 45\,ms at 1.7B and 60\,ms at 14B parameters, and the 14B model reaches
+.931 on the JevBench standard tier. We release 1.7B and 4B models and an inference package.

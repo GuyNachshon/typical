@@ -1,10 +1,10 @@
-\section{Typical: the decision pass}
+\section{Typical}
 \label{sec:method}
 
 Typical turns a pretrained causal language model into a decision function whose output is read from hidden
 states in one pass over a short suffix.
 
-\subsection{Typed decisions}
+\subsection{The decision pass}
 \label{sec:method:task}
 
 \begin{definition}[Typed decision]
@@ -23,27 +23,19 @@ $\dtype \in \{\textsc{Choice}, \textsc{Score}, \textsc{Noul}\}$. The model retur
 and emits no token.
 \end{definition}
 
-The type is a contract on the returned distribution, enforced by the head and the training target.
-\emph{Choice} is categorical over $\cands$. \emph{Score} is categorical over ordered levels, where near
-misses cost less than distant ones. \emph{Noul} is a yes/no decision: a Bernoulli probability for one proposition, with
-$\cands = \{\text{yes}, \text{no}\}$, invariant to the order in which the caller lists the two labels. The
-abstention event $\nullsym$ is available under every type and is never one of the candidates. Because
-$\cands$ is text supplied per call, the model has no output index for any label and must read the
+The abstention event $\nullsym$ is available under every type and is never one of the candidates.
+Because $\cands$ is text supplied per call, the model has no output index for any label and must read the
 candidates to score them.
 
-\subsection{Cached state and causal suffix}
+\paragraph{Cached state and causal suffix.}
 \label{sec:method:pass}
-
 Typical encodes the state once as an ordinary causal prefix and retains its key-value cache. Each question
-against it is a short causal suffix: the question text, the candidates rendered as lettered lines, an
-answer cue, and a terminal decision token. The suffix attends to the cached state, and a batch of
-suffixes against one state runs in chunks without attending to one another. A decision is therefore a
-forward pass on $\mathrm{concat}(\state, \query, \cands)$ with the state half read from cache, which an
-equivalence test on the real model confirms (\Cref{app:cache-equivalence}).
+is a short causal suffix: the question text, the candidates rendered as lettered lines, an answer cue, and
+a terminal decision token. A decision is therefore a forward pass on $\mathrm{concat}(\state, \query,
+\cands)$ with the state half read from cache (\Cref{app:cache-equivalence}).
 
-\subsection{The contextual-candidate readout}
+\paragraph{Contextual-candidate readout.}
 \label{sec:method:readout}
-
 At the tap layer the suffix pass yields the terminal decision state $\hD$, the hidden state at the
 decision token, and for each candidate a contextual state $\hctx{j}$, the mean hidden state over the
 tokens of candidate $j$'s rendered span. Candidate $j$ receives the score
@@ -53,86 +45,119 @@ tokens of candidate $j$'s rendered span. Candidate $j$ receives the score
   \label{eq:readout}
 \end{equation}
 where $W_h$ and $W_c$ are layer-normalized linear projections to width $d_v$, $w$ is a vector and $g$ a
-two-layer MLP: a bilinear form with a small learned correction on the elementwise product. The option
-letters stay in the rendered text and are never read out. Because the candidates are tokens in the same
-causal computation as the state and the question, $\hctx{j}$ carries the candidate's meaning together
-with its slot and its set, and $\hD$ has attended to all of them.
+two-layer MLP. The option letters stay in the rendered text and are never read out. Because the
+candidates are tokens in the same causal computation as the state and the question, $\hctx{j}$ carries the
+candidate's meaning together with its slot and its set, and $\hD$ has attended to all of them.
+\Cref{sec:analysis:readout} compares \emph{N1}, the letter-logit readout (the next-token logits of the
+option letters at $\hD$, with a softmax null), \emph{N2}, the candidate-blind semantic readout
+(\Cref{eq:readout} on a frozen text embedding of each candidate), and \emph{N3}, the contextual-candidate
+readout Typical deploys (\Cref{eq:readout} on $\hctx{j}$); \Cref{app:method-detail} lists what each pair
+shares.
 
-\Cref{sec:analysis:readout} compares three readouts. \emph{N1}, the letter-logit readout, scores $\hD$
-against the output embeddings of the option letters (their next-token logits, with a softmax null),
-the standard multiple-choice interface read without generating. \emph{N2}, the candidate-blind semantic readout, applies \Cref{eq:readout} to an embedding of
-the candidate text from a frozen text-embedding model, which carries meaning and no slot identity.
-\emph{N3}, the contextual-candidate readout Typical deploys, applies \Cref{eq:readout} to $\hctx{j}$.
-N2 and N3 share the scorer, the factored null and the feature normalization and differ only in the
-candidate vector. N1 and N3 differ in the readout and in the null form native to each; option shuffling
-during training is shared by all three.
-
-\subsection{Mid-depth tap}
+\paragraph{Mid-depth tap.}
 \label{sec:method:depth}
-
 We truncate the backbone at about 71\% of its depth: the readout taps layer 20 of 28 at 1.7B, 26 of 36 at
 4B and 8B, and 28 of 40 at 14B, and the layers above the tap are never computed. LoRA \citep{hu2022lora}
-at rank 16 adapts the top eight kept layers, and everything below is frozen. We chose the tap for what
-the representation holds: our first full-scale model read the final layer and scored 58.6 on SNLI, the
-hypothesis-only baseline, because it ignored the premise. The mid-depth tap carries evidence and
-question-conditioned knowledge in one model (\Cref{sec:analysis:depth}), and every released and ladder
-model uses it.
+at rank 16 adapts the top eight kept layers, and everything below is frozen. The tap carries evidence and
+question-conditioned knowledge in one model, where the final layer does not (\Cref{sec:analysis:depth}),
+and every released and ladder model uses it.
 
-\subsection{Typed heads}
+\paragraph{Cost.}
+\label{sec:method:cost}
+$M$ decisions against one state cost $O(|\state|) + M \cdot O(|\query| + |\cands|)$ token positions, where
+$|\cands|$ counts the rendered candidate tokens, and every position runs through only the kept 71\% of the
+layers. The state term is paid once; the per-decision term grows with the question and the candidate text
+and is independent of the other questions. At large $\numcands$ the rendered candidates dominate it, and
+in throughput mode a candidate-blind scorer is cheaper per query by a margin that grows with $\numcands$
+(\Cref{sec:results:cost}).
+
+\subsection{Typed outputs and abstention}
 \label{sec:method:typed}
 
-The three types share the backbone and the tap and differ in the training target and, for Noul, the
-terminal head. \emph{Choice} is the $\numcands$-way readout of \Cref{eq:readout}, trained with
-cross-entropy against the gold distribution over $\cands \cup \{\nullsym\}$ through the gate of
-\Cref{sec:method:null}. \emph{Score} uses the Choice readout over the rendered levels with an
-ordinal-smoothed target $\tilde{t}_j \propto \exp(-|j - y|/\tauord)$ for gold level $y$, normalized over
-the valid levels, with $\tauord = 0.7$; $\tauord \to 0$ recovers the one-hot Choice target, and the change
-adds no parameters. \emph{Noul} uses a dedicated Bernoulli head, $P(\text{yes}) = \sigma(w_n^{\top}
-\hD)$, on a query-only suffix that renders no candidate text, with the complement assigned to ``no''.
-Abstention on this path uses a gate of the form of \Cref{eq:factored-null} with its own parameters, whose
-score statistics come from $\log P(\text{yes})$ and $\log P(\text{no})$ and whose state input is $\hD$,
-since no candidate span is rendered. Every gate input is symmetric in the two labels, so for rows routed
-to the Bernoulli head the returned yes, no and $\nullsym$ probabilities are exactly invariant to label
-order.
+The type is a contract on the returned distribution, enforced by the head and the training target. All
+three types share the backbone and the tap. \emph{Choice} is categorical over $\cands$: the
+$\numcands$-way readout of \Cref{eq:readout}, trained with cross-entropy against the gold distribution
+over $\cands \cup \{\nullsym\}$ through the gate below. \emph{Score} is categorical over ordered levels,
+where near misses cost less than distant ones: it uses the Choice readout with an ordinal-smoothed target
+$\tilde{t}_j \propto \exp(-|j - y|/\tauord)$ for gold level $y$, normalized over the valid levels, with
+$\tauord = 0.7$; $\tauord \to 0$ recovers the one-hot Choice target, and the change adds no parameters.
+\emph{Noul} is a yes/no decision with $\cands = \{\text{yes}, \text{no}\}$: a dedicated Bernoulli head,
+$P(\text{yes}) = \sigma(w_n^{\top} \hD)$, on a query-only suffix that renders no candidate text, with the
+complement assigned to ``no'' and its own label-symmetric gate, so the returned yes, no and $\nullsym$
+probabilities are exactly invariant to label order. Routing is per row, because a batch mixes types; rows
+that are not Noul or Score are scored by the Choice path, bit-identical to a model with the typed heads
+disabled (\Cref{app:method-detail,app:typed-primitives}).
 
-Routing is per row, because a batch mixes types. A row takes the Bernoulli path if and only if its
-candidate set is exactly $\{\text{yes}, \text{no}\}$, Score rows take the ordinal target, and every other
-row is scored by the Choice path, bit-identical to a model with the typed heads disabled
-(\Cref{app:typed-primitives}).
-
-\subsection{Factored abstention gate}
+\paragraph{Factored abstention gate.}
 \label{sec:method:null}
-
-Abstention is a separate gate outside the candidate softmax. Given the scores $s_j$ of
-\Cref{eq:readout}, the gate reads a vector $z$ of permutation-invariant statistics over the valid
-candidates (maximum score, top-2 margin, mean score, log-mean-exp of the scores), the projected decision
-state, and the mean and variance of the projected candidate states $v_j$, and computes
-$r = \sigma(g_\nullsym(z))$. The returned distribution is
+Abstention is a separate gate outside the candidate softmax. The gate reads permutation-invariant
+statistics of the scores $s_j$, the projected decision state and the moments of the projected candidate
+states $v_j$ (\Cref{app:method-detail}), and computes $r = \sigma(g_\nullsym(z))$. The returned
+distribution is
 \begin{equation}
   \label{eq:factored-null}
   P(\cand{j} \mid \state, \query, \cands) = (1-r)\,\frac{\exp(s_j/T)}{\sum_{k=1}^{\numcands}\exp(s_k/T)},
   \qquad
   \pnull = r,
 \end{equation}
-implemented as logits $\ell_j = \log \mathrm{softmax}(s/T)_j + \log(1-r)$ and $\ell_\nullsym = \log r$,
-so one cross-entropy over $\numcands + 1$ outcomes trains both parts. Two properties follow exactly.
+trained by one cross-entropy over $\numcands + 1$ outcomes. Two properties follow exactly.
 (i)~\emph{Pairwise non-null odds are invariant to abstention}: for fixed scores
-$P(\cand{j})/P(\cand{k}) = \exp((s_j - s_k)/T)$, independent of $r$, because $(1-r)$ multiplies every
-non-null candidate; the contextual scores themselves remain set-dependent. (ii)~\emph{The gate is
-temperature-invariant}: $T$ enters only the candidate softmax and $r$ reads untempered statistics, so
-recalibrating $T$ never moves $\pnull$. The gate is symmetric in the pairs $(s_j, v_j)$, so it adds
-no order dependence, while $r$ depends on what was offered by design. We never render the null as a candidate line, because a rendered line competes
-for softmax mass that dilutes as $\numcands$ grows; \Cref{sec:analysis:null} removes that line from a model
-that already has the gate and measures the difference.
+$P(\cand{j})/P(\cand{k}) = \exp((s_j - s_k)/T)$, independent of $r$; the contextual scores themselves
+remain set-dependent. (ii)~\emph{The gate is temperature-invariant}: $T$ enters only the candidate softmax
+and $r$ reads untempered statistics, so recalibrating $T$ never moves $\pnull$. The gate adds no order
+dependence, while $r$ depends on what was offered by design. We never render the null as a candidate
+line; \Cref{sec:analysis:null} removes that line from a model that already has the gate and measures the
+difference.
 
-\subsection{Cost model}
-\label{sec:method:cost}
+\subsection{Training}
+\label{sec:train}
 
-$M$ decisions against one state cost $O(|\state|) + M \cdot O(|\query| + |\cands|)$ token positions, where
-$|\cands|$ counts the rendered candidate tokens, and every position runs through only the kept 71\% of the
-layers. The state term is paid once and amortized over every question asked of it; the per-decision term
-grows with the question and the candidate text and is independent of the other questions. In our research harness on one H100
-at $\numcands = 2$, a decision takes 45, 56 and 60\,ms at 1.7B, 4B and 14B, so an $8\times$ larger backbone
-is $1.3\times$ slower. At large $\numcands$ the rendered candidates dominate the per-decision term, and in
-throughput mode a candidate-blind scorer, whose cost does not grow with the rendered set, is cheaper per
-query by a margin that grows with $\numcands$ (\Cref{sec:results:cost}).
+Every row is a typed decision rendered as above and trained with cross-entropy against a hard or soft
+gold distribution over $\cands \cup \{\nullsym\}$, plus distillation at 14B, using AdamW in bf16 at batch
+size 64 for 8{,}000--12{,}000 steps (\Cref{app:hyperparams}). \Cref{tab:corpora} lists the seven corpora,
+and \Cref{sec:results} measures the six recipe choices below.
+
+\paragraph{Family-balanced mixture.}
+\label{sec:train:mixture}
+We draw batches by decision family, so no large corpus dominates by row count: $E$ is evidence and
+wide-vocabulary classification, $K$ closed-book multiple-choice knowledge, $W$ rubric-conditioned
+workflow decisions, and $U$ soft-target uncertainty (sources in \Cref{app:method-detail}). The released
+recipe samples $E{:}0.40$, $K{:}0.15$, $W{:}0.35$, $U{:}0.10$.
+
+\paragraph{Counterfactual rubric groups.}
+\label{sec:train:rubric}
+DecisionMix v2 (\texttt{data\_wh}) is a programmatic rule-engine corpus in which every row belongs to a
+\emph{counterfactual rubric group}: the same state and candidate set under at least two rubrics with
+distinct gold answers. A predictor that ignores the rubric assigns one distribution to every member of a
+group, so on a two-member group with golds $y_1 \neq y_2$ it incurs an average cross-entropy of at least
+$\log 2$ nats, and the loss falls below that floor only by reading the rubric. Held-out compositions,
+domains, styles and grammars are evaluation-only (\Cref{app:corpora}).
+
+\paragraph{Soft-target uncertainty.}
+\label{sec:train:uncertainty}
+Decisions with a single correct answer cannot teach a model how much probability to spread. The
+uncertainty corpus \texttt{data\_u} draws on UNLI \citep{chen2020unli}, the ambiguous rows of AmbiEnt,
+and four synthetic generators with exact closed-form posteriors (\Cref{tab:app-u}); ChaosNLI
+\citep{nie2020chaosnli} is evaluation-only.
+
+\paragraph{Null augmentation.}
+\label{sec:train:nullaug}
+A copy of 20\% of $W$ rows drops the gold candidate and any rendered catch-all option and takes $\nullsym$
+as its target. Under 1\% of $W$ rows carry a null target against over 20\% of $E$ rows, so a model trained
+on both learns two operating points that no single post-hoc temperature and null offset can serve.
+
+\paragraph{Evidence-first long states.}
+\label{sec:train:long}
+Training right-truncates states at the window, so rendering the case facts after the policy body in the
+long-state corpus \texttt{data\_wf\_long} lost the facts from most rows (\Cref{app:long-state-stats}). The
+fixed recipe renders facts first and drops any row longer than the window. The v2 releases train at a
+2{,}048-token window and the 14B model at 3{,}072.
+
+\paragraph{Selection on held-out likelihood.}
+\label{sec:train:selection}
+Selection on in-distribution loss favors the hard-label majority of the mixture over the soft and ordinal
+minority, so the v2 releases and the 14B model select checkpoints on held-out negative log-likelihood over
+the uncertainty and curriculum validation sets; the v1 releases do not. The 14B model also distills from
+its own frozen backbone (\Cref{app:hyperparams}). Selection enters the 14B recipe together with
+evidence-first long states, the 3{,}072-token window, DecisionMix v2, the uncertainty corpus and the typed
+heads, and is never isolated.

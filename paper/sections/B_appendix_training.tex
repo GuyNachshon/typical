@@ -30,6 +30,55 @@ construction.
 DecisionMix v2 spreads its 60{,}605 training rows evenly over levels 1--6. A leak check against the public
 JevBench ids finds 0 of 231 hits.
 
+\subsection{Method and recipe detail}
+\label{app:method-detail}
+
+\paragraph{Suffix batching.} A batch of suffixes against one cached state runs in chunks, and the suffixes
+do not attend to one another.
+
+\paragraph{Readouts.} \Cref{eq:readout} is a bilinear form with a small learned correction on the
+elementwise product. N1, the standard multiple-choice interface read without generating, scores $\hD$
+against the output embeddings of the option letters. N2 embeds the candidate text with a frozen
+text-embedding model, which carries meaning and no slot identity. N2 and N3 share the scorer, the
+factored null and the feature normalization and differ only in the candidate vector. N1 and N3 differ in
+the readout and in the null form native to each; option shuffling during training is shared by all three.
+
+\paragraph{Gate inputs.} The Choice gate reads a vector $z$ of permutation-invariant statistics over the
+valid candidates (maximum score, top-2 margin, mean score, log-mean-exp of the scores), the projected
+decision state, and the mean and variance of the projected candidate states $v_j$. It is symmetric in the
+pairs $(s_j, v_j)$. \Cref{eq:factored-null} is implemented as logits $\ell_j = \log
+\mathrm{softmax}(s/T)_j + \log(1-r)$ and $\ell_\nullsym = \log r$, so one cross-entropy over
+$\numcands + 1$ outcomes trains both parts, and property (i) holds because $(1-r)$ multiplies every
+non-null candidate. A null rendered as a candidate line would compete for softmax mass that dilutes as
+$\numcands$ grows. The Noul gate has the form of \Cref{eq:factored-null} with its own parameters; its
+score statistics come from $\log P(\text{yes})$ and $\log P(\text{no})$ and its state input is $\hD$,
+since no candidate span is rendered. Every Noul gate input is symmetric in the two labels.
+
+\paragraph{Routing.} A row takes the Bernoulli path if and only if its candidate set is exactly
+$\{\text{yes}, \text{no}\}$, Score rows take the ordinal target, and every other row is scored by the
+Choice path.
+
+\paragraph{Cost.} The candidate-blind scorer's per-decision cost does not grow with the rendered candidate
+set.
+
+\paragraph{Mixture sources.} $E$ is SNLI \citep{bowman2015snli}, MNLI \citep{williams2018mnli}, ANLI
+\citep{nie2020anli}, BoolQ \citep{clark2019boolq}, and wide-vocabulary intent and topic sets including
+CLINC-150, Banking77 and HWU64 \citep{larson2019clinc,casanueva2020banking77}, spanning many label
+vocabularies at few rows per source so that the model must read the rendered candidates. $K$ draws on nine
+sources, with TruthfulQA-MC1 \citep{lin2022truthfulqa} held out and a leakage audit against MMLU-Pro
+\citep{wang2024mmlupro,hendrycks2021mmlu}. $W$ covers routing, eligibility, extraction, urgency, tool
+selection and long policy documents. The sampler weights and the sweep behind them are in
+\Cref{sec:results:mixture}.
+
+\paragraph{Recipe corpora.} DecisionMix v2 has 60{,}605 rows over 12 domains and six boolean conditions at
+compositional depths 1--6; depth-7 compositions, three whole domains, two rubric styles and one grammar
+per level are evaluation-only. \texttt{data\_u} has 31{,}029 rows, all soft targets, uses the UNLI
+validation split, and each of its four generators holds out a parameter range. \texttt{data\_wf\_long}
+has 23{,}318 multi-paragraph policy documents (\Cref{app:long-state-stats}); \Cref{sec:results:long}
+isolates the evidence-first render with a render-crossed design. Null augmentation and the mixture act on
+the operating points measured in \Cref{sec:results:mixture,sec:results:calibration}, and
+\Cref{sec:results:calibration} reports what the 14B selection bundle does.
+
 \subsection{Cached-state equivalence}
 \label{app:cache-equivalence}
 

@@ -1,29 +1,20 @@
 \section{Evaluation protocol}
 \label{sec:setup}
 
-\subsection{Evaluation sets}
+\paragraph{Evaluation sets.}
 \label{sec:setup:data}
-
 Training corpora are in \Cref{tab:corpora}. We evaluate on SNLI \citep{bowman2015snli}, MNLI
 \citep{williams2018mnli}, ANLI \citep{nie2020anli}, BoolQ \citep{clark2019boolq}, CLINC-150
-\citep{larson2019clinc}, TREC-fine, HWU64, 20 Newsgroups and Banking77 \citep{casanueva2020banking77}
-against all 77 labels; a fixed 1{,}200-item MMLU-Pro probe \citep{wang2024mmlupro} scored among the
-rendered options (two leakage-matched items excluded) and TruthfulQA-MC1 \citep{lin2022truthfulqa};
-held-out generator splits, including the never-trained DecisionMix level~7 (880 items, guess rate .441),
-and ChaosNLI \citep{nie2020chaosnli}; and 605 held-out long states (\texttt{policy\_permit},
-$\numcands{=}2$, floor .612; \texttt{action\_select}, $\numcands{=}4$, floor .233). Evaluation-only
-external sets are PagerDuty (alert triage, yes/no, majority floor .792), jevlogs (log
-triage, floor .697), Mind2Web (web-agent actions, floor .427), tree-choice (taxonomy
-routing, $\numcands \le 320$), typed-decisions (400 cases of all three types, probabilistic
-gold) and JevBench.
-
-\subsection{What ``held out'' means}
+\citep{larson2019clinc}, TREC-fine, HWU64, 20 Newsgroups and Banking77 \citep{casanueva2020banking77};
+a fixed 1{,}200-item MMLU-Pro probe \citep{wang2024mmlupro} and TruthfulQA-MC1 \citep{lin2022truthfulqa};
+held-out generator splits and ChaosNLI \citep{nie2020chaosnli}; 605 held-out long states; and the
+evaluation-only external sets PagerDuty, jevlogs, Mind2Web, tree-choice, typed-decisions and JevBench.
 \label{sec:setup:heldout}
-
 Each held-out split excludes a whole family, domain, rubric style, grammar or parameter range from
-training; none is a random validation split (axes in \Cref{tab:generalization}).
+training; none is a random validation split (\Cref{tab:generalization}). Set sizes and floors, metric
+definitions and the latency protocol are in \Cref{app:protocol}.
 
-\subsection{\texorpdfstring{$\dq$}{Delta-q}: question dependence separated from candidate priors}
+\paragraph{\texorpdfstring{$\dq$}{Delta-q}: question dependence separated from candidate priors.}
 \label{sec:setup:deltaq}
 
 \begin{definition}[Question-dependence gap]
@@ -38,37 +29,14 @@ $\dq$ extends the choices-only control of \citet{balepur2024artifacts} to a shuf
 is stricter: a placeholder can leak candidate priors through the rendering (on one candidate-blind model
 choices-only reads $+.017$ where $\dqsh$ reads $.000$). High accuracy with $\dqsh \approx 0$ means that
 candidate-set priors explain the score. The reference is the listwise teacher, a fine-tuned decoder
-reading the options in context, at $\dqsh = .102$ on the MMLU-Pro probe. $|\dqsh| < .02$ (about 1.4 standard
-errors at $n{=}1{,}200$, $p \approx .15$) counts as zero.
+reading the options in context, at $\dqsh = .102$ on the MMLU-Pro probe. $|\dqsh| < .02$ (about 1.4
+standard errors at $n{=}1{,}200$, $p \approx .15$) counts as zero.
 
-\subsection{Metrics}
-\label{sec:setup:metrics}
-
-We report accuracy, Brier score, expected calibration error (ECE) and negative log-likelihood (NLL),
-with NLL and Brier primary on soft-gold sets. \emph{Among-$\numcands$ accuracy} takes the argmax over
-candidates and ignores $\pnull$; the \emph{false-abstain rate} is the fraction of gold-present items on
-which $\nullsym$ wins. \emph{Rubric-flip} pairs share a state and candidate set under two rubrics with
-different gold. On MMLU-Pro, \emph{reorder $\Delta p$} is the largest change in any candidate's
-probability under reordering, and \emph{pairwise $\Delta$log-odds} the shift in log-odds between the two
-top candidates when three unrelated options are added; both are zero for a set-invariant scorer.
-
-\subsection{JevBench protocol}
+\paragraph{JevBench protocol.}
 \label{sec:setup:jevbench}
-
 JevBench (\texttt{fstandhartinger/jevbench} v1.2.1) is a third-party benchmark of yes/no, choice
-($\numcands{=}2$--6) and ordinal decisions, each with a state, a rubric and an exact label set, in three
-tiers: \emph{standard} (72 items), \emph{easy} (48) and \emph{hard} (111, eight families including long
-policies, multi-hop, temporal, probability and trade-off). Its 146 judge-scored items are private and the
-harness ranks only submissions covering 95\% of all items, so every JevBench number here is on the 231
-public ids and unranked; no training corpus contains a public id. The 72 standard items are 36 states in
-two paraphrases sharing a \texttt{group}, so intervals are cluster bootstraps over \texttt{group}
-(20{,}000 resamples): $\pm6$--13 points on standard, $\pm9$ on hard. Comparisons between our models use
-paired per-item bootstraps; scoring details and leaderboard context are in \Cref{app:leaderboard}.
-
-\subsection{Hardware and latency}
-\label{sec:setup:hardware}
-
-Models train on single H100 GPUs (\Cref{app:hyperparams}). The \emph{research harness} times one in-process decision on a 256-token state, state encode included, for
-$\numcands$ from 2 to 256, all sizes on one pod and PyTorch/CUDA build. The \emph{serving path} is the
-released inference package, timed as warm p50 against an already-cached 256-token state at
-$\numcands{=}2$.
+($\numcands{=}2$--6) and ordinal decisions in three tiers: \emph{standard} (72 items), \emph{easy} (48)
+and \emph{hard} (111). Every JevBench number here is on the 231 public ids and unranked; no training
+corpus contains a public id. The 72 standard items are 36 states in two paraphrases, so intervals are
+cluster bootstraps over the paraphrase group (20{,}000 resamples): $\pm6$--13 points on standard, $\pm9$
+on hard. Comparisons between our models use paired per-item bootstraps (\Cref{app:protocol,app:leaderboard}).
