@@ -218,11 +218,19 @@
   .nav { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 14px; border-radius: var(--radius-card); background: rgba(232, 227, 216, 0.72); -webkit-backdrop-filter: blur(57px); backdrop-filter: blur(57px); color: var(--color-off); font-size: var(--text-nav); letter-spacing: -0.14px; max-width: calc(100vw - 28px); }
   .nav a { padding: 8px 10px; white-space: nowrap; border-radius: var(--radius-btn); }
   .nav a:hover { background: rgba(41, 40, 39, 0.08); }
-  .nav .brand { font-weight: 700; padding-right: 14px; }
+  .nav .brand { font-weight: 700; }
+  /* Every gap in the bar is the same 24px: 10px of one link's padding, the 4px flex gap, 10px of
+     the next. .links was an inline span, so its anchors sat 20px apart while the brand's extra
+     padding-right pushed the first one to 28 -- three different gaps in one 6-item bar. */
+  .nav .links { display: flex; align-items: center; gap: 4px; }
+  /* The lab credit is the one deliberate exception: no left padding, so it sits 10px from the
+     wordmark and reads as "Typical, by Oz Labs" rather than as a sixth destination. */
+  .nav .lab { padding-left: 0; color: var(--color-slate); }
+  .nav .lab:hover { color: var(--color-off); background: none; }
   .nav .cta { background: var(--color-off); color: var(--color-warm); }
   .nav .cta:hover { background: var(--color-charcoal); }
   /* on a phone the bar keeps the three that matter: the numbers, the paper, the weights */
-  @media (max-width: 48rem) { .nav .links a { display: none; } .nav .links a[href='#results'], .nav .links a[href='research.html'], .nav .links a[href^='https://huggingface.co'] { display: inline; padding: 8px 6px; } }
+  @media (max-width: 48rem) { .nav .lab { display: none; } .nav .links a { display: none; } .nav .links a[href='#results'], .nav .links a[href='research.html'], .nav .links a[href^='https://huggingface.co'] { display: inline; padding: 8px 6px; } }
 
   /* ---- buttons ---- */
   .btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 15px; border-radius: var(--radius-btn); background: var(--color-warm); color: var(--color-off); font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; line-height: 1; white-space: nowrap; transition: background var(--duration-tap) var(--ease-out); }

@@ -5,6 +5,7 @@
 // paper on branch main; nothing here recomputes a result.
 
 import { mountFlow } from './arch.js';
+import { mountDecisionFlow } from './decisionflow.js';
 import { mountDeltaQ, mountReadouts, mountLadder, mountDepth, mountRender } from './paperfigs.js';
 import { costBar } from './charts.js';
 
@@ -27,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   numberFigures();
   import('./copycode.js').then((m) => m.mountCopyButtons()).catch(() => {});
   mountFlow(document.getElementById('chart-arch'));
+  mountDecisionFlow(document.getElementById('chart-decisionflow'));
 
   const [dq, ro, lad, lat, dep, ren] = await Promise.all([
     load('data/paper-deltaq.json'),

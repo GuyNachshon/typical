@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="exhibits.css">
 </head>
 <body class="post">
-<nav class="nav"><a class="brand" href="#top">Typical</a><span class="links"><a href="#field">Results</a><a href="#watch">Demos</a><a href="research.html">Research</a><a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">Weights</a></span><a class="cta" href="#tryit">Try it live</a></nav>
+<nav class="nav"><a class="brand" href="#top">Typical</a><a class="lab" href="https://ozlabs.ai" target="_blank" rel="noopener">Oz Labs</a><span class="links"><a href="#field">Results</a><a href="#watch">Demos</a><a href="research.html">Research</a><a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">Weights</a></span><a class="cta" href="#tryit">Try it live</a></nav>
 
 <div class="stage-track"><header class="stage" id="top">
   <iframe class="stage-film" id="film" src="games/doom/index.html?film=1" title="DOOM, played by the model" loading="eager"></iframe>
@@ -39,7 +39,7 @@
   <h1>Introducing Typical</h1>
   <p class="masthead-sub">Open decision models. Generate an answer, or read a decision.</p>
   <div class="masthead-meta t-mono">
-    <span>Oz Labs</span>
+    <span><a href="https://ozlabs.ai" target="_blank" rel="noopener">Oz Labs</a></span>
     <span>24 September 2026</span>
     <a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">Weights</a>
     <a href="https://github.com/GuyNachshon/typical" target="_blank" rel="noopener">Source</a>
@@ -235,7 +235,7 @@
 <section class="page chapter" id="how">
   <div class="claim">
     <h2>They worked for two years. How did this take a week?</h2>
-    <p>It is the fair question, and the answer is not that we are fast. It is that we did not build the hard part.</p>
+    <p>It is the fair question, and the answer is not that we are fast. It is that the two years are already in the backbone, and we did not have to spend them again.</p>
     <p>Almost everything a decision model needs to know already sits inside a pretrained backbone: what a refund is, what a termination clause looks like, that &ldquo;charged twice&rdquo; and &ldquo;duplicate charge&rdquo; are the same complaint. Somebody spent those two years and a great deal of money putting it there. We took <code>Qwen3-1.7B-Base</code> and <code>Qwen3.5-4B-Base</code> frozen, cut the stack at about 71% of its depth, and trained a head to read what was already in the hidden states.</p>
     <p>LoRA at rank 16 on the top eight kept layers. Everything below is frozen and everything above is never computed at all. There is no pretraining here, no reward model, no preference data, no reinforcement learning. The thing being learned is a readout, and a readout is small.</p>
   </div>
