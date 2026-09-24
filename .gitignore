@@ -36,3 +36,4 @@ vendor/doom/doom-wasm/
 vendor/doom/doom1.wad
 vendor/doom/build.log
 node_modules/
+evals/longcomp_scored*.jsonl
