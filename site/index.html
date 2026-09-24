@@ -77,7 +77,7 @@
     <h2>Forty answers, two ways</h2>
     <p>A generative model produces answers in an order, because each one is conditioned on the last. A decision model does not have an order to produce them in. The state is read once into a cache and every question is a short suffix scored against it in the same forward pass, so the fortieth answer does not wait behind the thirty-ninth. It is computed alongside it.</p>
   </div>
-  <figure class="fig fignarrow">
+  <figure class="fig onmeasure">
     <div class="chart" id="chart-parallel"></div>
     <figcaption>Schematic. Cell shade is arrival order. The measured version is <a class="figref" href="#head-to-head">the figure below</a>.</figcaption>
   </figure>
@@ -239,7 +239,7 @@
     <p>Almost everything a decision model needs to know already sits inside a pretrained backbone: what a refund is, what a termination clause looks like, that &ldquo;charged twice&rdquo; and &ldquo;duplicate charge&rdquo; are the same complaint. Somebody spent those two years and a great deal of money putting it there. We took <code>Qwen3-1.7B-Base</code> and <code>Qwen3.5-4B-Base</code> frozen, cut the stack at about 71% of its depth, and trained a head to read what was already in the hidden states.</p>
     <p>LoRA at rank 16 on the top eight kept layers. Everything below is frozen and everything above is never computed at all. There is no pretraining here, no reward model, no preference data, no reinforcement learning. The thing being learned is a readout, and a readout is small.</p>
   </div>
-  <div class="figband">
+  <div class="figband onmeasure">
     <div class="figband-row">
       <div><p class="t-figure">$12<i></i></p><em>1.7B, H100 time</em></div>
       <div><p class="t-figure">$15<i></i></p><em>4B, H100 time</em></div>

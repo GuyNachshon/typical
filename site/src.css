@@ -630,9 +630,10 @@
   /* one figure on the page is a pair of terminals printing real response objects; it gets the
      page, because the thing being shown is exactly the part that a narrower column cuts off */
   .post .fig.figfull { max-width: none; }
-  /* a schematic that fits the measure should sit on the measure: at 1080 its two small grids sat
-     in the left half of their own box and lined up with nothing */
-  .post .fig.fignarrow { max-width: 680px; }
+  /* Anything narrow enough to belong to the sentence above it sits on the prose measure rather
+     than the figure measure. A schematic whose content only fills 600px, or a band of three
+     figures, lines up with nothing at 1080: both edges land where no other edge on the page is. */
+  .post .onmeasure { max-width: 680px; }
   /* the steps are a numbered list and were rendering unnumbered: preflight strips the marker, so
      the numerals are drawn in the gutter where an editorial list puts them anyway */
   .steps { counter-reset: step; list-style: none; padding-left: 0; }

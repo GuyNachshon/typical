@@ -125,7 +125,7 @@
     <p>We truncate the backbone at about 71% of its depth and never compute the layers above. That was not an efficiency decision.</p>
     <p>Our first full-scale model read the final layer and scored <strong>58.6 on SNLI</strong>. That is the hypothesis-only baseline: the number you get by ignoring the premise and guessing from the sentence you are asked about. The last layer had specialised into predicting the next token and had stopped carrying the evidence.</p>
   </div>
-  <figure class="fig fignarrow">
+  <figure class="fig onmeasure">
     <div class="chart" id="chart-depth"></div>
     <figcaption>Matched 1.7B runs differing only in where the head reads. Validation NLL falls .430 to .341; &Delta;q is unchanged at .117 and .118.</figcaption>
   </figure>
@@ -150,7 +150,7 @@
     <p>Training truncates long states from the right. We rendered the supporting facts at the end of every row of our long-policy corpus, so most of those rows lost their evidence before the model ever saw it. We were training the model to answer long policies from states that no longer contained the answer. It learned to expect the case block at the end, and learned not to look anywhere else.</p>
     <p>Two arms with byte-identical flags, same 23,318 rows, rendered facts-first or facts-last, scored on 605 held-out long states with nothing truncated at evaluation time. Facts-first adds <strong>11.2 points</strong>, <em>p</em> = 5&times;10<sup>&minus;10</sup>, and the gap replicates at a second seed.</p>
   </div>
-  <figure class="fig fignarrow">
+  <figure class="fig onmeasure">
     <div class="chart" id="chart-render"></div>
     <figcaption>Training render against evaluation render, 605 held-out long states. The diagonal is the matched comparison; the off-diagonal holds the evaluation render fixed. Shade is accuracy above the .413 floor.</figcaption>
   </figure>
