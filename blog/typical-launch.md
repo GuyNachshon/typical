@@ -85,14 +85,16 @@ We train on four kinds of decision: evidence (NLI-style), knowledge (multiple ch
 
 | model | size | JevBench standard\* | JevBench hard\* | CLINC-150 | warm p50 |
 |---|---|---|---|---|---|
-| `typical-small` v2 | 1.7B | .708 | .432 | .797 | 15.5–17 ms |
+| `typical-small` v3 | 1.7B | .792 | .441 | .832 | 15.5–17 ms |
 | `typical-medium` v2 | 4B (Qwen3.5) | .861 | .495 | .795 | 19–21 ms |
 
 \* Public-subset run against JevBench v1.2.1 (72 standard / 111 hard public ids), not a ranked leaderboard entry. Majority baselines on this split are .311 standard and .336 hard, and at n_eff ≈ 36 on standard, small gaps are noise. Latency is warm p50 per decision on one H100 through the public inference package.
 
 Medium is the better model for a small latency increase, and consistently so: it leads Small by 5 points on CLINC-150, 11 on MMLU-Pro among-K, 10 on held-out yes/no decisions and 5 on the composition curriculum. The JevBench standard gap (.694 to .806) points the same way, though at 36 independent states that tier alone would not settle it. Neither released model solves the hard compositional tier: long-policy, multi-step, temporal, unit and trade-off decisions sit far below the standard tier for both.
 
-We also trained a 14B research candidate. Before training it we wrote down a release bar (hard-tier accuracy ≥ .559 or hard-tier Brier ≤ .65, and long-document policy accuracy ≥ .35). It reached .931 on the standard tier, the best number this project has produced, and still missed the bar on both counts, narrowly on Brier (.656) and by a wide margin on long-document policy (.158). So it isn't shipping.
+We also trained 14B candidates. Before training them we wrote down a release bar: hard-tier accuracy ≥ .559 or hard-tier Brier ≤ .65, and long-document policy accuracy ≥ .35. None of the four cleared it.
+
+The strongest of them is published anyway, as [`typical-large-preview`](https://huggingface.co/OzLabs/typical-large-preview), with its failing numbers on the card. It clears the calibration term (hard Brier .634) and fails the long-document term on a 19-item benchmark family we have since shown flips between seeds. On a 605-item test we built for that exact capability it scores .974. We did not rewrite the bar after seeing the result, so it ships as a preview rather than a release. It is the best model in the project on most measures, and a frozen Qwen3-14B with three examples still beats it on the hardest tier.
 
 ## Rules are part of the input
 

@@ -348,12 +348,17 @@ A quarter to a third of serving latency, for a change that removes code. We trie
 
 ## 10. Releases
 
-Both v2 releases shipped on 2026-09-23, and both are trades. The model cards name the regressions:
+Everything shipped is a trade, and every card names its regressions:
 
 | release | checkpoint | backbone | gains | losses |
 |---|---|---|---|---|
-| `typical-small` v2 | `ts1c` | Qwen3-1.7B-Base | +34.9 long-state facts-first | −6.5 held-out Noul, −4.8 BoolQ, −3.7 uncertainty, −3.4 Score, −2.8 style |
+| `typical-small` **v3** | `ts1b_semif` | Qwen3-1.7B-Base | +8.4 JevBench standard over v2; long-state .952/.846; recovers v2's Noul and BoolQ losses | −3.3 held-out hard family, −2.5 level-7, −5.8 320-way choice |
 | `typical-medium` v2 | `tm2` | Qwen3.5-4B-Base | +33.8 long-state, +7.2 JevBench hard, +5.6 standard | −5.5 CLINC-150, −5.3 HWU64 |
+| `typical-large-preview` | `tl1b_semif` | Qwen3-14B-Base | best in the project on 10 of 16 axes; 320-way choice .858 vs .529 | fails the pass rule; frozen 14B beats it on hard |
+
+`typical-small` went through two weight changes in two days. v2 fixed the long-document ordering bias; v3 kept that
+fix and recovered most of what v2 traded away. The cause of the churn was ranking candidates on the wrong axis the
+first time, which is the same mistake this post is about.
 
 `typical-large` is withheld. The 14B candidate reached .931 on JevBench standard, the best number this project has produced, and missed its own pre-registered pass rule on the hard tier and on long-document policy. It would also be wrong to ship it against that rule now, because as section 7 argues the rule itself needs restating on metrics with power.
 
