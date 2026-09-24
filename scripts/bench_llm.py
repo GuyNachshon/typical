@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import statistics
 import time
 from pathlib import Path
@@ -52,9 +53,9 @@ PROVIDERS = {
 }
 
 
-def load_case() -> tuple[str, dict, list[dict]]:
+def load_case(preset: str = "playground") -> tuple[str, dict, list[dict]]:
     """The ticket and questions the site already uses, so the benchmark and the page agree."""
-    pg = json.loads((ROOT / "site/data/presets.json").read_text())["playground"]
+    pg = json.loads((ROOT / "site/data/presets.json").read_text())[preset]
     queries = pg["queries"]
     choice = next(q for q in queries if q["type"] == "choice")
     return pg["state"], choice, queries
@@ -89,7 +90,7 @@ def prompt_for(state: str, questions: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def call_llm(client: httpx.Client, provider: str, model: str, state: str, questions: list[dict], effort: str = "low") -> float:
+def call_llm(client: httpx.Client, provider: str, model: str, state: str, questions: list[dict], effort: str = "low") -> tuple[float, dict]:
     """One request, timed from just before the send to just after the answer parses."""
     url, key_env = PROVIDERS[provider]
     key = os.environ[key_env]
@@ -145,7 +146,7 @@ def call_llm(client: httpx.Client, provider: str, model: str, state: str, questi
     missing = [k for k in schema["required"] if k not in answer]
     if missing:
         raise RuntimeError(f"{provider}/{model} left {len(missing)} field(s) unanswered: {missing[:3]}")
-    return ms
+    return ms, answer
 
 
 def extract(provider: str, data: dict) -> dict:
@@ -174,7 +175,7 @@ def extract(provider: str, data: dict) -> dict:
     raise RuntimeError(f"no answer in {json.dumps(data)[:400]}")
 
 
-def call_typical(client: httpx.Client, state: str, questions: list[dict]) -> float:
+def call_typical(client: httpx.Client, state: str, questions: list[dict]) -> tuple[float, list[dict]]:
     t0 = time.perf_counter()
     res = client.post(
         TYPICAL_URL,
@@ -186,7 +187,7 @@ def call_typical(client: httpx.Client, state: str, questions: list[dict]) -> flo
     ms = (time.perf_counter() - t0) * 1000
     if len(data.get("results", [])) != len(questions):
         raise RuntimeError("typical returned the wrong number of results")
-    return ms
+    return ms, data["results"]
 
 
 def summarise(samples: list[float]) -> dict:
@@ -200,11 +201,12 @@ def summarise(samples: list[float]) -> dict:
 
 
 def run(label: str, fn, trials: int, warmup: int) -> dict:
+    """fn returns (ms, answer); only the timing is kept here -- answers are captured separately."""
     for _ in range(warmup):
         fn()
     samples = []
     for i in range(trials):
-        samples.append(fn())
+        samples.append(fn()[0])
         print(f"  {label}: {i + 1}/{trials}  {samples[-1]:.0f} ms", end="\r", flush=True)
     print(f"  {label}: {summarise(samples)}          ")
     return summarise(samples)
@@ -218,13 +220,15 @@ def main() -> None:
     ap.add_argument("--warmup", type=int, default=3)
     ap.add_argument("--many", type=int, default=8, help="questions in the batched arm")
     ap.add_argument("--reasoning", default="low", choices=["low", "high"], help="reasoning effort asked of the hosted model")
+    ap.add_argument("--capture", action="store_true", help="record the answers of one batched call instead of timing many")
+    ap.add_argument("--preset", default="playground", help="which block of site/data/presets.json to ask about")
     args = ap.parse_args()
 
     key_env = PROVIDERS[args.provider][1]
     if not os.environ.get(key_env):
         raise SystemExit(f"{key_env} is not set. Put it in the environment (not in a tracked file) and re-run.")
 
-    state, choice, queries = load_case()
+    state, choice, queries = load_case(args.preset)
     # The batched arm repeats the four real questions up to --many, so every question is one a
     # reader can see on the page rather than filler invented to pad a benchmark.
     many = [queries[i % len(queries)] for i in range(args.many)]
@@ -236,6 +240,10 @@ def main() -> None:
             device = client.get(HEALTH_URL, timeout=10).json().get("device") or "unknown"
         except Exception:
             raise SystemExit("the local Typical server is not answering on :8787 -- start it first")
+
+        if args.capture:
+            capture(client, args, state, queries, device)
+            return
 
         print(f"typical ({device}) vs {args.provider}/{args.model} @ {args.reasoning} reasoning, {args.trials} trials")
         out = {
@@ -262,7 +270,7 @@ def main() -> None:
         # and the case the cached prefix is actually for: questions arriving one at a time
         out["arms"][f"llm_{args.many}_serial"] = run(
             f"llm      ×{args.many} serial ",
-            lambda: sum(call_llm(client, args.provider, args.model, state, [q], args.reasoning) for q in many),
+            lambda: (sum(call_llm(client, args.provider, args.model, state, [q], args.reasoning)[0] for q in many), None),
             max(4, args.trials // 4),
             1,
         )
@@ -275,6 +283,114 @@ def main() -> None:
     doc.setdefault("runs", {})[f'{out["llm"]} ({args.reasoning} reasoning)'] = {k: out[k] for k in ("trials", "reasoning", "measured_utc", "arms")}
     OUT.write_text(json.dumps(doc, indent=2) + "\n")
     print(f"wrote {OUT.relative_to(ROOT)} ({len(doc['runs'])} hosted model(s))")
+
+
+def stream_llm(client: httpx.Client, provider: str, model: str, state: str, questions: list[dict], effort: str) -> tuple[dict, list[dict], float, dict]:
+    """The same call as call_llm, streamed, timestamping the moment each answer finishes arriving.
+
+    The side-by-side on the page replays a hosted model filling in its answers one at a time. That
+    replay is only worth showing if the pacing is recorded rather than invented, so this watches the
+    raw token stream and notes, for every qN, the first instant its value is complete in the buffer.
+    A line on the page appears exactly when the model finished writing it.
+    """
+    url, key_env = PROVIDERS[provider]
+    schema = schema_for(questions)
+    body = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt_for(state, questions)}],
+        "response_format": {"type": "json_schema", "json_schema": {"name": "answer", "strict": True, "schema": schema}},
+        "reasoning": {"effort": effort},
+        "stream": True,
+        # the provider bills this call and knows what it charged; asking it beats multiplying our
+        # own token count by a price list that changes without telling us
+        "usage": {"include": True},
+    }
+    headers = {"Authorization": f"Bearer {os.environ[key_env]}"}
+    # a value counts as arrived once the token after it has landed, which is what the closing comma
+    # or brace is: until then the model could still be writing digits
+    done_re = re.compile(r'"q(\d+)"\s*:\s*(?:"[^"]*"|-?[\d.]+)\s*[,}]')
+    buf, seen, timeline, usage = "", set(), [], {}
+    t0 = time.perf_counter()
+    with client.stream("POST", url, json=body, headers=headers, timeout=600) as res:
+        res.raise_for_status()
+        for line in res.iter_lines():
+            if not line.startswith("data: "):
+                continue
+            payload = line[6:]
+            if payload.strip() == "[DONE]":
+                break
+            chunk = json.loads(payload)
+            if chunk.get("usage"):
+                usage = chunk["usage"]
+            delta = ((chunk.get("choices") or [{}])[0].get("delta") or {})
+            buf += delta.get("content") or ""
+            now = (time.perf_counter() - t0) * 1000
+            for m in done_re.finditer(buf):
+                i = int(m.group(1))
+                if i not in seen:
+                    seen.add(i)
+                    timeline.append({"q": i, "t_ms": round(now, 1)})
+    total = (time.perf_counter() - t0) * 1000
+    return json.loads(buf), timeline, total, usage
+
+
+def capture(client: httpx.Client, args, state: str, queries: list[dict], device: str) -> None:
+    """What each model said, not how long it took -- written to site/data/showdown.json.
+
+    The latency file holds medians and never recorded a single answer, so a side-by-side of the
+    responses had nothing to read from. Both arms here run the identical call the timings were
+    taken with: one request, every question, the same options pinned by the same schema. Typical's
+    numbers are its head's probabilities; the hosted model's confidence is a field we asked it to
+    fill in, which is a different kind of number and the page has to say so rather than hide it.
+    """
+    key = f"{args.provider}/{args.model} ({args.reasoning} reasoning)"
+    out = ROOT / "site/data/showdown.json"
+    doc = json.loads(out.read_text()) if out.exists() else {}
+    doc["state"] = state
+    doc["questions"] = [{"type": q["type"], "question": q["question"], "labels": q.get("labels") or ["no", "yes"]} for q in queries]
+    doc["method"] = (
+        "One request per model, every question in it, the same options pinned by the same JSON "
+        "schema. Wall clock from a client process. The hosted arm is streamed and each answer is "
+        "timestamped the moment its value finished arriving, so the replay on the page runs at the "
+        f"pace the model actually wrote at. Typical runs locally on {device}."
+    )
+    models = doc.setdefault("models", {})
+
+    ms, results = call_typical(client, state, queries)
+    for _ in range(max(0, args.trials - 1)):  # keep the fastest: a local server's slow runs are contention
+        ms = min(ms, call_typical(client, state, queries)[0])
+    models["typical-small"] = {
+        "ours": True,
+        "device": device,
+        "ms": round(ms, 1),
+        "measured_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "answers": [
+            {"pick": r["argmax"], "probs": {k: round(v, 3) for k, v in r["probs"].items()}, "p_null": round(r["p_null"], 3)}
+            for r in results
+        ],
+    }
+    print(f"  typical: {ms:.0f} ms, {len(results)} answers")
+
+    hosted, timeline, total, usage = stream_llm(client, args.provider, args.model, state, queries, args.reasoning)
+    missing = [i for i in range(len(queries)) if f"q{i}" not in hosted]
+    if missing:
+        raise RuntimeError(f"{key} left {len(missing)} answer(s) unwritten: {missing[:3]}")
+    models[key] = {
+        "ms": round(total, 1),
+        "cost_usd": usage.get("cost"),
+        "tokens_in": usage.get("prompt_tokens"),
+        "tokens_out": usage.get("completion_tokens"),
+        "first_token_ms": timeline[0]["t_ms"] if timeline else None,
+        "measured_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "timeline": timeline,
+        "answers": [
+            {"pick": hosted[f"q{i}"], "stated_confidence": hosted.get(f"q{i}_confidence")}
+            for i in range(len(queries))
+        ],
+    }
+    print(f"  {key}: {total:.0f} ms, first answer at {timeline[0]['t_ms'] if timeline else '?'} ms, cost {usage.get('cost')}")
+    out.write_text(json.dumps(doc, indent=1) + "\n")
+    print(f"wrote {out.relative_to(ROOT)} ({len(models)} model(s))")
 
 
 def demo() -> None:

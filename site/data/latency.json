@@ -33,7 +33,7 @@
         "k2": 6.4,
         "k256": 9.3
       },
-      "source": "buffalo:RESULTS.md#6-single-decision-latency (Qwen3-1.7B row, labelled \"ts1b-shape recipe\") = REPORT.md#3ab apples-to-apples. Recipe-shape row, not a checkpoint row: ts1c is the same backbone, tap 20 and tower as ts1b. runs/bench_ts1c/bench.json (ts1c's own bench) reads 60.6 ms at K=2 on a different pod/harness and is not comparable to the other rows."
+      "source": "buffalo:RESULTS.md#6-single-decision-latency (Qwen3-1.7B row, labelled \"ts1b-shape recipe\") = REPORT.md#3ab apples-to-apples. Recipe-shape row, not a checkpoint row -- and typical-small v3 (ts1b_semif) IS this recipe: same backbone, tap 20, same tower, and the same max_state 1,024 / 12k-step schedule the row was measured on, so it describes v3 more directly than it described ts1c. v3's own bench (bench_ts1b_semif/bench.json) reads 58.5 ms at K=2 but is partial (L_s=256 only) and on a different pod/harness, so it is not substituted here."
     },
     "typical-medium": {
       "single_ms": null,

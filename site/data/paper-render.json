@@ -1,0 +1,43 @@
+{
+ "note": "Training render against evaluation render on 605 held-out long states, nothing truncated at evaluation. Transcribed from paper/sections/7_results.tex (tab:twobytwo). The diagonal is the matched comparison; the off-diagonal holds the evaluation render fixed.",
+ "axes": {
+  "row": "trained on",
+  "col": "evaluated on"
+ },
+ "labels": [
+  "facts first",
+  "facts last"
+ ],
+ "models": {
+  "1.7B": [
+   [
+    0.942,
+    0.797
+   ],
+   [
+    0.64,
+    0.83
+   ]
+  ],
+  "14B": [
+   [
+    0.997,
+    0.921
+   ],
+   [
+    0.851,
+    0.919
+   ]
+  ]
+ },
+ "floor": 0.4132,
+ "gap": {
+  "value": 0.112,
+  "ci": [
+   0.077,
+   0.147
+  ],
+  "p": "5\u00d710\u207b\u00b9\u2070",
+  "n": 605
+ }
+}

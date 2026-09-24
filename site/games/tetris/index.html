@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tetris — you against typical-small</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Geist+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* This frame sits inside .media.dark on the launch page, next to the Doom demo, so it is built
+     to that panel's language rather than to the prose page's: #0b0b0b, warm text, mono micro-labels
+     in caps, and a faint phosphor glow. The tokens below mirror site/src.css — the frame is a
+     separate document and cannot inherit them. */
+  :root {
+    color-scheme: dark;
+    --warm: #f0eeeb;
+    --mid: #938f89;
+    --steel: #c2bfba;
+    --panel: #0b0b0b;
+    --well: #121213;
+    --grid: #1c1c1d;
+    /* Our #2f5d50 is a paper colour; on near-black it reads as a hole. This is the same hue lifted
+       to the phosphor the Doom HUD already glows with. */
+    --live: #8fd9b6;
+    --rule: rgba(240, 238, 235, 0.12);
+    --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    margin: 0;
+    background: var(--panel);
+    color: var(--warm);
+    font: 400 13px/1.5 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  main { display: flex; flex-direction: column; height: 100%; padding: 18px 20px 16px; gap: 12px; }
+
+  /* micro-labels: the house eyebrow, same weight/tracking as .rec on the Doom card */
+  .eyebrow {
+    font: 700 11px/1.5 var(--mono);
+    letter-spacing: 0.72px;
+    text-transform: uppercase;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--live); display: inline-block; }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex: none; }
+  header .eyebrow { display: inline-flex; align-items: center; gap: 8px; }
+  header .who { color: var(--mid); font: 400 11px/1.5 var(--mono); letter-spacing: 0.36px; }
+
+  /* ---- the two boards ---------------------------------------------------------------------- */
+  .arena { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: auto auto; gap: clamp(18px, 4vw, 60px); justify-content: center; align-content: center; }
+  .side { display: flex; flex-direction: column; min-width: 0; width: clamp(132px, 24vw, 252px); }
+  .cap { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .cap b { font: 700 11px/1.5 var(--mono); letter-spacing: 0.72px; text-transform: uppercase; }
+  .cap .next { color: var(--mid); font: 400 11px/1.5 var(--mono); letter-spacing: 0.36px; }
+  .side.model .cap b { color: var(--live); }
+
+  .board {
+    width: 100%;
+    aspect-ratio: 1 / 2;
+    max-height: 100%;
+    margin-inline: auto;
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    grid-template-rows: repeat(20, 1fr);
+    gap: 1px;
+    padding: 5px;
+    border-radius: 6px;
+    background: var(--well);
+    box-shadow: inset 0 0 0 1px var(--rule);
+  }
+  .cell { background: var(--grid); border-radius: 1px; }
+  .cell.lock { background: var(--c); }
+  .cell.fall { background: var(--c); }
+  /* The ghost is where the piece lands, so it is drawn as an outline of the destination rather
+     than as a dimmer copy of the piece -- a dimmer copy reads as another locked block. */
+  .cell.ghost { background: color-mix(in srgb, var(--c) 8%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 62%, transparent); }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-top: 10px; }
+  .stats span { color: var(--mid); font: 400 10px/1.5 var(--mono); letter-spacing: 0.6px; text-transform: uppercase; }
+  .stats b { display: block; margin-top: 2px; color: var(--warm); font: 400 15px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+  .side.model .stats b { color: var(--live); }
+
+  /* ---- the readout ------------------------------------------------------------------------- */
+  .hud {
+    flex: none;
+    display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(9, 9, 10, 0.86);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    color: var(--mid);
+    font: 400 11px/1.5 var(--mono);
+    letter-spacing: 0.36px;
+  }
+  .hud .sep { opacity: 0.35; }
+  #timer { color: var(--warm); font-variant-numeric: tabular-nums; }
+  #state { color: var(--warm); }
+  /* MODEL or POLICY per turn -- the figcaption on the page promises this marker, so it is the one
+     thing in the readout that is allowed to be loud. */
+  #aiThought b { color: var(--live); font-weight: 700; letter-spacing: 0.72px; }
+  #aiThought.guard b { color: #d9b48f; }
+
+  .controls { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .keys { color: var(--mid); font: 400 11px/1.8 var(--mono); letter-spacing: 0.36px; }
+  kbd {
+    display: inline-block; min-width: 20px; padding: 2px 5px; margin-right: 2px;
+    border-radius: 4px; background: rgba(240, 238, 235, 0.08);
+    color: var(--steel); font: 400 11px/1.4 var(--mono); text-align: center;
+  }
+  button {
+    padding: 8px 14px; border: 0; border-radius: 6px; cursor: pointer;
+    background: rgba(240, 238, 235, 0.1); color: var(--warm);
+    font: 700 11px/1.3 var(--mono); letter-spacing: 0.72px; text-transform: uppercase;
+    transition: background 160ms cubic-bezier(0.16, 1, 0.3, 1), transform 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  button:hover { background: rgba(240, 238, 235, 0.18); }
+  button:active { transform: scale(0.97); }
+  button:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+
+  /* A d-pad has to sit where thumbs expect it, so each key is placed by name. Flowing them in
+     source order with only the 1st and 5th nudged to the middle column -- which is what this had --
+     scatters left/down/right across two rows. */
+  .touch { display: none; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 34px); gap: 5px; }
+  .touch button { height: 34px; padding: 0; font-size: 13px; }
+  .touch button[data-key='rotate'] { grid-area: 1 / 2; }
+  .touch button[data-key='left']   { grid-area: 2 / 1; }
+  .touch button[data-key='down']   { grid-area: 2 / 2; }
+  .touch button[data-key='right']  { grid-area: 2 / 3; }
+  .touch button[data-key='drop']   { grid-area: 3 / 2; }
+
+  /* ---- the start card ---------------------------------------------------------------------- */
+  .start {
+    position: fixed; inset: 0; z-index: 4;
+    display: grid; place-items: center; padding: 24px;
+    background: rgba(11, 11, 11, 0.92);
+    opacity: 0; visibility: hidden;
+    transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1), visibility 220ms;
+  }
+  body.is-ready .start { opacity: 1; visibility: visible; }
+  .card {
+    width: min(420px, 100%); padding: 26px 28px;
+    border-radius: 12px; background: #131314;
+    box-shadow: inset 0 0 0 1px var(--rule);
+  }
+  .card h2 { margin: 10px 0 8px; font: 600 26px/1.15 var(--sans); letter-spacing: -0.5px; }
+  .card p { margin: 0; color: var(--mid); font: 400 12px/1.6 var(--mono); letter-spacing: 0.36px; }
+  .card .go { margin: 20px 0 12px; background: var(--live); color: #0b0b0b; }
+  .card .go:hover { background: #a6e6c8; }
+
+  .pulse { animation: pulse 900ms cubic-bezier(0.16, 1, 0.3, 1) 2; }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+
+  @media (max-width: 560px) {
+    main { padding: 14px 12px 12px; }
+    header .who { display: none; }
+    .arena { gap: 10px; }
+    .cap .next { display: none; }
+    .touch { display: grid; }
+    .keys { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .start, button { transition: none; }
+    .pulse { animation: none; }
+  }
+</style>
+</head>
+<body><main>
+  <header>
+    <p class="eyebrow" style="margin:0"><i class="dot"></i><span>Tetris · you against typical-small</span></p>
+    <span class="who">you left · model right</span>
+  </header>
+
+  <section class="arena" aria-label="Tetris, two boards">
+    <div class="side">
+      <div class="cap"><b>You</b><span class="next" id="youNext">next —</span></div>
+      <div class="board" id="youBoard" aria-label="Your board"></div>
+      <div class="stats">
+        <span>Score<b id="youScore">000000</b></span>
+        <span>Lines<b id="youLines">00</b></span>
+      </div>
+    </div>
+    <div class="side model">
+      <div class="cap"><b>typical-small</b><span class="next" id="aiNext">next —</span></div>
+      <div class="board" id="aiBoard" aria-label="The model's board"></div>
+      <div class="stats">
+        <span>Score<b id="aiScore">000000</b></span>
+        <span>Lines<b id="aiLines">00</b></span>
+      </div>
+    </div>
+  </section>
+
+  <div class="hud">
+    <span id="timer">01:30</span>
+    <span class="sep">·</span>
+    <span id="state">first board to stack out loses</span>
+    <span class="sep">·</span>
+    <span id="aiThought"><b>MODEL</b> warming up</span>
+  </div>
+
+  <div class="controls">
+    <p class="keys" style="margin:0"><kbd>←</kbd><kbd>→</kbd> move · <kbd>↑</kbd> rotate · <kbd>↓</kbd> soft drop · <kbd>space</kbd> hard drop</p>
+    <div class="touch" aria-label="Touch controls">
+      <button data-key="rotate" aria-label="Rotate">↻</button>
+      <button data-key="left" aria-label="Left">←</button>
+      <button data-key="down" aria-label="Down">↓</button>
+      <button data-key="right" aria-label="Right">→</button>
+      <button data-key="drop" aria-label="Hard drop">⇩</button>
+    </div>
+    <button id="restart">New game</button>
+  </div>
+
+  <section class="start" id="startMenu" role="dialog" aria-modal="true" aria-labelledby="readyTitle">
+    <div class="card">
+      <p class="eyebrow" style="margin:0;color:var(--live)">Tetris</p>
+      <h2 id="readyTitle">Ready when you are.</h2>
+      <p>You take the left board. <span style="color:var(--steel)">typical-small</span> plays the right.</p>
+      <button class="go" id="start">Start</button>
+      <p>Arrows move and rotate · space hard-drops</p>
+    </div>
+  </section>
+</main>
+<script type="module">
+import { Tetris, greedyPolicy, QUESTION } from '../../js/games/tetris.js';
+import { decide, mode, probeHealth } from '../../js/api.js';
+(() => {
+  const W=10,H=20;
+  // Muted against #0b0b0b rather than the arcade neon: each piece still has its own hue so shapes
+  // stay readable, but none of them out-shouts the phosphor the readout uses.
+  const COLORS={I:'#7fd0d6',O:'#d7c286',T:'#b3a0d2',S:'#8fd2a3',Z:'#d69aa0',J:'#93a9d4',L:'#d6ae8c'};
+  const BASE={I:[[0,1],[1,1],[2,1],[3,1]],O:[[1,0],[2,0],[1,1],[2,1]],T:[[0,0],[1,0],[2,0],[1,1]],S:[[1,0],[2,0],[0,1],[1,1]],Z:[[0,0],[1,0],[1,1],[2,1]],J:[[0,0],[0,1],[1,1],[2,1]],L:[[2,0],[0,1],[1,1],[2,1]]};
+  const types=Object.keys(BASE), $=id=>document.getElementById(id); let running=false, endAt=0, last=0, aiLast=0, aiBusy=false, aiTurn=0;
+  const rotate=c=>c.map(([x,y])=>[y,-x]); const normal=c=>{const mx=Math.min(...c.map(p=>p[0])),my=Math.min(...c.map(p=>p[1])); return c.map(([x,y])=>[x-mx,y-my]).sort((a,b)=>a[1]-b[1]||a[0]-b[0])};
+  const SHAPES=Object.fromEntries(types.map(t=>{let c=BASE[t],seen=new Set(),r=[]; for(let i=0;i<4;i++){let n=normal(c),k=JSON.stringify(n);if(!seen.has(k)){seen.add(k);r.push(n)}c=rotate(c)} return[t,r]}));
+  function rand(i){ let x=(i+1)*1103515245+12345; x^=x>>>16; return (x>>>0)/4294967296 }
+  function pieceAt(i){const bag=Math.floor(i/7), pos=i%7; let a=[...types]; for(let j=a.length-1;j;j--){let k=Math.floor(rand(bag*17+j)* (j+1));[a[j],a[k]]=[a[k],a[j]]}return a[pos]}
+  function empty(){return Array.from({length:H},()=>Array(W).fill(''))}
+  function valid(board,c,x,y){return c.every(([dx,dy])=>x+dx>=0&&x+dx<W&&y+dy>=0&&y+dy<H&&!board[y+dy][x+dx])}
+  function landing(board,c,x){let y=0;if(!valid(board,c,x,y))return -1;while(valid(board,c,x,y+1))y++;return y}
+  function newPlayer(name){return {name,board:empty(),n:0,score:0,lines:0,dead:false, piece:null, next:pieceAt(0)}}
+  let you, ai;
+  function spawn(p){p.piece={type:pieceAt(p.n++),r:0,x:3,y:0}; p.next=pieceAt(p.n); if(!valid(p.board,cells(p),p.piece.x,0)){p.dead=true;finish(p===you?'typical-small wins':'you win')} }
+  function cells(p,r=p.piece.r){return SHAPES[p.piece.type][r]}
+  function score(c){return [0,100,300,500,800][c]||800}
+  function lock(p){let q=p.piece,c=cells(p); c.forEach(([dx,dy])=>p.board[q.y+dy][q.x+dx]=q.type);let kept=p.board.filter(row=>!row.every(Boolean)), cleared=H-kept.length;while(kept.length<H)kept.unshift(Array(W).fill(''));p.board=kept;p.lines+=cleared;p.score+=score(cleared);spawn(p)}
+  function move(p,dx,dy){if(!p||p.dead)return false;let q=p.piece,c=cells(p);if(valid(p.board,c,q.x+dx,q.y+dy)){q.x+=dx;q.y+=dy;return true}if(dy)lock(p);return false}
+  function turn(p){if(!p||p.dead)return;let q=p.piece,n=(q.r+1)%SHAPES[q.type].length,c=cells(p,n);for(const kick of [0,-1,1,-2,2])if(valid(p.board,c,q.x+kick,q.y)){q.r=n;q.x+=kick;return}}
+  function drop(p){if(!p||p.dead)return;while(move(p,0,1));}
+  // Marks the turn MODEL when a live answer was used, POLICY when the engine's guard overrode it.
+  function mark(kind,text){const el=$('aiThought');el.classList.toggle('guard',kind==='POLICY');el.innerHTML='';const b=document.createElement('b');b.textContent=kind;el.append(b,' '+text);}
+  // The model sees an exact board map and post-drop outcomes; the policy remains a safety guard
+  // when a live answer is materially worse than the engine's best legal placement.
+  async function aiMove(){if(ai.dead||aiBusy)return;aiBusy=true;const engine=ai,turn=++aiTurn,options=engine.candidateDetails(),labels=options.map(o=>o.label),fallback=greedyPolicy(engine),baseline=options.find(o=>o.label===fallback),snap=engine.state();let move=fallback,live=false,guarded=false;mark('MODEL','deciding');if(mode()==='live'&&labels.length>1){const state=`Competitive Tetris. Board is 10 columns by 20 rows, top to bottom; # is filled and . is empty:\n${engine.boardMap()}\n\nFalling piece: ${snap.current?.type}. Next: ${snap.next}. Every option is a legal hard drop and reports the board AFTER it lands. Prefer clearing lines, then fewer holes, then a lower peak and smoother stack. ${engine.describe()}`;const result=await decide(state,[{type:'choice',question:QUESTION,labels}]);const picked=options.find(o=>o.label===result?.results?.[0]?.argmax);if(picked){if(!baseline||picked.score>=baseline.score-4){move=picked.label;live=true}else guarded=true;}}if(ai===engine&&turn===aiTurn&&!engine.dead)engine.step(move);mark(live?'MODEL':'POLICY',live?'placed':guarded?'guard held':'placed');aiBusy=false;}
+  function render(p, prefix){let s=prefix==='ai'?p.state():p,b=s.board.map(r=>r.slice()),ghost=null;if(!s.dead){let q=s.current??s.piece,c=q.cells??cells(s),x=q.col??q.x,y=q.y??0;ghost=landing(b,c,x);c.forEach(([dx,dy])=>{if(ghost>=0&&!b[ghost+dy][x+dx])b[ghost+dy][x+dx]='ghost-'+q.type});c.forEach(([dx,dy])=>b[y+dy][x+dx]='fall-'+q.type)}let root=$(prefix+'Board');root.replaceChildren(...b.flatMap(row=>row.map(v=>{let e=document.createElement('i');e.className='cell '+(v?' '+(v.startsWith('ghost')?'ghost':v.startsWith('fall')?'fall':'lock'):'' );let t=v?.split('-').pop()||v;if(v)e.style.setProperty('--c',COLORS[t]);return e})));$(prefix+'Score').textContent=String(s.score).padStart(6,'0');$(prefix+'Lines').textContent=String(s.lines).padStart(2,'0');$(prefix+'Next').textContent='next '+s.next;}
+  function renderAll(){render(you,'you');render(ai,'ai')}
+  function finish(msg){if(!running)return;running=false;$('state').textContent=msg+' — new game?';$('state').classList.add('pulse')}
+  function reset(start=true){aiTurn++;you=newPlayer('you');spawn(you);ai=new Tetris({w:W,h:H,seed:11});running=start;endAt=start?Date.now()+90000:0;last=performance.now();aiLast=last;$('state').textContent=start?'first board to stack out loses':'ready';mark('MODEL',start?'warming up':'standing by');document.body.classList.toggle('is-ready',!start);$('startMenu').setAttribute('aria-hidden',String(start));$('state').classList.remove('pulse');renderAll()}
+  function frame(now){if(running){if(Date.now()>=endAt){finish(you.score===ai.score?'tie':you.score>ai.score?'you win':'typical-small wins')}if(now-last>680){move(you,0,1);last=now}if(now-aiLast>720){aiMove();aiLast=now}let sec=Math.max(0,Math.ceil((endAt-Date.now())/1000)),min=Math.floor(sec/60);$('timer').textContent=String(min).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');renderAll()}requestAnimationFrame(frame)}
+  const actions={left:()=>move(you,-1,0),right:()=>move(you,1,0),down:()=>move(you,0,1),rotate:()=>turn(you),drop:()=>drop(you)};
+  addEventListener('keydown',e=>{let key={ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down',ArrowUp:'rotate',' ':'drop'}[e.key];if(key){e.preventDefault();if(running){actions[key]();renderAll()}}if(e.key==='r')reset()});document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>{actions[b.dataset.key]();renderAll()});$('start').onclick=()=>reset(true);$('restart').onclick=reset;
+  // Small executable engine check: a horizontal I piece must have four blocks and land on an empty board.
+  console.assert(SHAPES.I[0].length===4&&landing(empty(),SHAPES.I[0],0)===19,'Tetris board invariant failed');
+  probeHealth();reset(false);requestAnimationFrame(frame);
+})();
+</script></body></html>

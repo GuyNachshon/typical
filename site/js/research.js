@@ -70,11 +70,16 @@ async function mountJevFamily() {
   if (!el) return;
   const d = await loadJSON('data/research-jevbench-family.json');
   if (!d) return;
-  const fam = d['typical-small'];
+  // the file carries one released checkpoint's per-family breakdown, so read the model key rather
+  // than hard-coding one. (It said "ts1c has none" until 2026-09-24: ts1c does have a JevBench run,
+  // it was just missing from the local mirror. Only the per-family split is still medium-only.)
+  const id = Object.keys(d).find((k) => k !== 'source');
+  const fam = id ? d[id] : null;
+  if (!fam) return;
   barChart(el, {
-    series: [{ label: 'typical-small', values: Object.entries(fam).map(([k, v]) => ({ x: k, y: v.acc })) }],
+    series: [{ label: id, values: Object.entries(fam).map(([k, v]) => ({ x: k, y: v.acc })) }],
     yLabel: 'JevBench standard accuracy',
-    title: 'JevBench standard, per family (typical-small)',
+    title: `JevBench standard, per family (${id})`,
     fmt: fmtPct,
   });
   sourceNote(el, d.source);

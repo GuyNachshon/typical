@@ -4,10 +4,9 @@
 // Demo-spec v4 grammar, adapted: the model does not press keys, it picks ONE candidate
 // placement (rotation+column) per piece - the decision that matters, not the keystrokes that
 // execute it (Snake picks a direction per tick, not a lookahead path; this is the same idea one
-// level up). Candidates are legal (rotation, column) hard-drop pairs, capped at 6 and spread
-// across the board features that make one placement different from another (a well, a notch, a
-// clear), never raw coordinates. The state sentence lists only the board situations that apply,
-// pre-computed, fixed order, no numbers to compare.
+// level up). Candidates are legal hard-drop pairs, capped at 6 and spread across the board
+// features that make one placement different from another; each carries its exact post-drop
+// outcome so a small model can make an informed comparison.
 
 function mulberry32(seed) {
   return function () {
@@ -135,39 +134,31 @@ function lockAndClear(board, W, H, cells, col, row, type) {
     return !full;
   });
   while (kept.length < H) kept.unshift(new Array(W).fill(null));
-  const holesCreated = Math.max(0, countHoles(kept, W, H) - countHoles(board, W, H));
+  const holes = countHoles(kept, W, H);
+  const holesCreated = Math.max(0, holes - countHoles(board, W, H));
   const heights = colHeights(kept, W, H);
   const maxHeight = Math.max(0, ...heights);
   let bumpiness = 0;
   for (let c = 0; c < W - 1; c++) bumpiness += Math.abs(heights[c] - heights[c + 1]);
-  return { board: kept, linesCleared: cleared, holesCreated, bumpiness, maxHeight };
+  return { board: kept, linesCleared: cleared, holes, holesCreated, bumpiness, maxHeight };
 }
 
 // Classifies one candidate placement against the board it would land on (pre-lock, for the well/
-// notch geometry) - the same precedence order as RULES/greedyPolicy. Every placement gets
-// exactly one label; label text never carries a raw distance, only an identifying column number
-// or a qualitative side (demo-spec v4: numbers the model would have to compare leak into the
-// decision, but an identifier like "column 4" does not ask for a comparison).
-function classify(p, wells, W) {
+// notch geometry) - the same precedence order as RULES/greedyPolicy.
+function classify(p, wells) {
   if (p.linesCleared > 0) {
-    return { category: 'clear_line', label: `clear the row by filling column ${p.col + 1}` };
+    return { category: 'clear_line' };
   }
   const pc0 = p.col;
   const pc1 = p.col + p.w - 1;
   const region = wells.find((w) => pc0 >= w.c0 && pc1 <= w.c1);
   if (region && region.width === 1) {
-    return { category: 'fill_notch', label: `fill the notch in column ${pc0 + 1}` };
+    return { category: 'fill_notch' };
   }
   if (region) {
-    const side = region.c0 === 0 ? 'left' : region.c1 === W - 1 ? 'right' : (region.c0 + region.c1) / 2 < W / 2 ? 'left' : 'right';
-    const edge = region.c0 === 0 || region.c1 === W - 1;
-    const upright = p.h > p.w;
-    if (edge && upright) return { category: 'settle_well', label: `stand it up against the ${side} wall` };
-    return { category: 'settle_well', label: upright ? `stand it up in the ${side} well` : `lay it flat in the ${side} well` };
+    return { category: 'settle_well' };
   }
-  const mid = (pc0 + pc1) / 2;
-  const side = mid < W / 3 ? 'left' : mid > (2 * W) / 3 ? 'right' : 'middle';
-  return { category: 'default', label: `set it down on the ${side} of the stack` };
+  return { category: 'default' };
 }
 
 const CATEGORY_ORDER = ['clear_line', 'fill_notch', 'settle_well', 'default'];
@@ -222,26 +213,22 @@ export class Tetris {
     const { type } = this.current;
     const wells = wellRegions(this.board, this.W, this.H);
     const raw = [];
-    SHAPES[type].forEach((state) => {
+    SHAPES[type].forEach((state, rotation) => {
       for (let col = 0; col <= this.W - state.w; col++) {
         const row = dropRow(this.board, state.cells, col, this.W, this.H);
         if (row === null) continue;
         const lock = lockAndClear(this.board, this.W, this.H, state.cells, col, row, type);
-        const p = { col, row, w: state.w, h: state.h, cells: state.cells, ...lock };
+        const p = { col, row, w: state.w, h: state.h, cells: state.cells, rotation, ...lock };
         p.score = p.linesCleared * 100 - p.holesCreated * 15 - p.bumpiness * 2 - p.maxHeight;
-        const { category, label } = classify(p, wells, this.W);
+        const { category } = classify(p, wells);
         p.category = category;
-        p.label = label;
+        const clear = p.linesCleared ? `clear ${p.linesCleared} line${p.linesCleared === 1 ? '' : 's'}` : 'no clear';
+        p.label = `rotate ${rotation + 1}, drop column ${col + 1} — ${clear}; ${p.holes} holes; peak ${p.maxHeight}; roughness ${p.bumpiness}`;
         raw.push(p);
       }
     });
-    const byLabel = new Map();
-    for (const p of raw) {
-      const cur = byLabel.get(p.label);
-      if (!cur || p.score > cur.score) byLabel.set(p.label, p);
-    }
     const byCat = new Map();
-    for (const p of byLabel.values()) {
+    for (const p of raw) {
       const arr = byCat.get(p.category) ?? [];
       arr.push(p);
       byCat.set(p.category, arr);
@@ -257,6 +244,12 @@ export class Tetris {
 
   candidates() {
     return this._candidates().map((p) => p.label);
+  }
+
+  // The UI sends these measurements alongside the wording above. They are all computed after
+  // the hard drop, so a live model can compare actual consequences instead of vague positions.
+  candidateDetails() {
+    return this._candidates().map(({ label, score, linesCleared, holes, maxHeight, bumpiness }) => ({ label, score, linesCleared, holes, maxHeight, bumpiness }));
   }
 
   // Copies the board (like Snake/Doom/Drive's state()) rather than handing out live references.
@@ -297,6 +290,10 @@ export class Tetris {
     const bottom = '└' + '─'.repeat(this.W) + '┘';
     const rows = grid.map((row) => '│' + row.join('') + '│');
     return [top, ...rows, bottom].join('\n');
+  }
+
+  boardMap() {
+    return this.board.map((row) => row.map((cell) => (cell ? '#' : '.')).join('')).join('\n');
   }
 
   // Situations-only grammar (demo-spec v4, extended to a placement game): only the board
@@ -395,7 +392,7 @@ function selfTest() {
   // candidate generation: a spread of legal placements, gold is always one of the offered labels
   const cands = t.candidates();
   console.assert(cands.length >= 1 && cands.length <= 6, 'offers between 1 and 6 candidates');
-  console.assert(new Set(cands).size === cands.length, 'candidate labels are unique');
+  console.assert(new Set(cands).size === cands.length && cands.every((label) => label.includes('holes') && label.includes('peak')), 'candidate labels are unique and describe their outcomes');
   const gold = greedyPolicy(t);
   console.assert(cands.includes(gold), 'greedyPolicy picks one of the offered candidates');
 

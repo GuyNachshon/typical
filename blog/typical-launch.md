@@ -106,7 +106,7 @@ The fix is upstream, not a rendering convention we wanted to keep. The corpus wa
 
 | model | size | JevBench standard\* | JevBench hard\* | CLINC-150 | warm p50 |
 |---|---|---|---|---|---|
-| `typical-small` v2 | 1.7B | .708 | .432 | .797 | 15.5–17 ms |
+| `typical-small` v3 | 1.7B | .792 | .441 | .832 | 15.5–17 ms |
 | `typical-medium` v2 | 4B (Qwen3.5) | .861 | .495 | .795 | 19–21 ms |
 
 \* Public-subset run against JevBench v1.2.1 (72 standard / 111 hard public ids), not a ranked leaderboard entry. The standard tier's 72 items come from only 36 independent states, so a 95% cluster bootstrap over the paraphrase group is ±6–13 points there and ±9 points on hard. Majority baselines are .311 standard and .336 hard. Latency is warm p50 for a single K = 2 decision over a 256-token state, one stream, in process on one H100 through the public inference package, model load excluded — not a hosted-endpoint number and not comparable to one measured over a network.
@@ -122,8 +122,7 @@ Neither released model solves the hard compositional tier: long-policy, multi-st
 
 One more thing about that hard tier: our probabilities there are not usable. A uniform predictor over that tier's candidate sets scores a Brier of .66; `typical-small` scores .79 and `typical-medium` .77 — worse than guessing evenly. On the standard tier the same comparison runs the other way by a distance (.40 and .30 against .69), which is where the abstention threshold below is worth using. If your decisions look like the hard tier, take the argmax if you like it, but don't threshold on the confidence.
 
-We also trained a 14B research candidate against a release bar written down before training (hard-tier accuracy ≥ .559 or hard-tier Brier ≤ .65, and long-document policy accuracy ≥ .35). It reached .931 on the standard tier, the best number this project has produced, and missed the bar on both counts — Brier .66, long-document policy .158. So it isn't shipping. A note for anyone writing a gate like that one: ours was a point threshold on a quantity with a ±9-point interval, which is not a decidable rule. Next time it goes on a lower confidence bound.
-
+We also trained four 14B candidates against a release bar written down before training: hard-tier accuracy ≥ .559 or hard-tier Brier ≤ .65, and long-document policy accuracy ≥ .35. None of them cleared it. The strongest is published anyway as [`typical-large-preview`](https://huggingface.co/OzLabs/typical-large-preview), with its failing numbers on the card: it clears the calibration term at Brier .634 and fails the long-document term on a 19-item benchmark family we have since shown flips between seeds, while scoring .974 on a 605-item test we built for that same capability. We did not rewrite the bar after seeing the result, so it ships as a preview rather than a release. A note for anyone writing a gate like that one: ours was a point threshold on a quantity with a ±9-point interval, which is not a decidable rule. Next time it goes on a lower confidence bound.
 ## Rules are part of the input
 
 A decision model that memorises "this kind of ticket gets that label" is useless the moment your policy changes. So much of the workflow training is counterfactual: the same state and options appear under different rubrics with different correct answers, forcing the model to read the rule instead of pattern-matching the state.

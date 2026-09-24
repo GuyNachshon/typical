@@ -1,54 +1,79 @@
 # typical-small
 
-**Public release: https://huggingface.co/OzLabs/typical-small**
+**Release line: https://huggingface.co/OzLabs/typical-small** — this card describes checkpoint
+`ts1b_semif`, shipped **2026-09-24** as v3 (`best.pt` sha256 `dc183b39…`). It superseded `ts1c` (v2)
+one day after v2 shipped, and `ts1c` in turn superseded `ts1b`. Parent release:
+`typical-small-preview`. Sibling release at 4B: `typical-medium` (`tm2`, `releases/typical-medium.md`).
+Sibling at 14B: `typical-large-preview` (`tl1b_semif`).
 
-Release 1 (PLAN7 Tracks A–D): a clean retrain of the 1.7B checkpoint, `ts1b`, uploaded verbatim to
-`guychuk/pcdm-runs` under `typical-small/`. This is the frozen successor to `typical-small-preview`
-(`nc_v3_tap20_wf`) — REPORT.md §3ae's verdict, unchanged. Parent release: `typical-small-preview`.
-Sibling release at 4B: `typical-medium` (`tm1b`, `releases/typical-medium.md`, REPORT.md §3af).
+**What changed in v3, in one line:** the state render. v3 is `ts1b`'s recipe with `nc_render` set to
+`semif` instead of `letters_nonull` — same backbone, same tap, same tower, same corpus, same 12k
+steps at `max_state 1024`. It is not a longer-context retrain; `ts1c` was that, and v3 is not it.
+
+| | `ts1b` (v1) | `ts1c` (v2) | **`ts1b_semif` (v3)** |
+|---|---|---|---|
+| render | `letters_nonull` | `letters_nonull` | **`semif`** |
+| `max_state` / steps | 1,024 / 12k | 2,048 / 8k | 1,024 / 12k |
+| `--drop_truncated` | off | on | off |
+| JevBench standard / hard | .694 / .432 | .708 / .432 | **.792 / .441** |
+| long states, facts-first / facts-last | .598 / .798 | .947 / .790 | **.952 / .846** |
+| held-out yes/no (full-file) | .715 | — | **.705** |
+
+v2 fixed the long-state trap by moving the facts and widening the window. v3 gets the same result
+from the render alone, and is the first checkpoint in this line that is strong in **both** orders —
+which is what retires the deployment caveat that v1 and v2 shipped with (see below).
 
 ## What this model is
 
 - **Backbone:** `Qwen/Qwen3-1.7B-Base`, truncated at layer 20 of 28 — same tap as the preview.
 - **Adaptation:** LoRA, rank 16, on the top 8 layers (13–20) of the truncated backbone.
-- **Readout:** native contextual decision head (`nc_head=n3`), `letters_nonull` rendering, *factored*
-  null (∅ is a separate head decision, not a rendered candidate) — identical shape to the preview.
-- **Typed primitives** (PLAN7 Track C, new in this release):
+- **Readout:** native contextual decision head (`nc_head=n3`), **`semif` rendering** (the change in
+  this version), *factored* null (∅ is a separate head decision, not a rendered candidate). The head
+  shape is identical to the preview and to `ts1b`; only the state layout differs.
+- **Tap normalisation:** z-scored tap activations (`zscore: true`).
+- **Typed primitives** (PLAN7 Track C):
   - **Choice** — the N3 contextual readout above, unchanged.
   - **Noul** (yes/no) — a Bernoulli head, `P(yes) = σ(w·h_D)`, on the decision state with a
     query-only suffix (no rendered candidates). Routed **per row** (commit `7b9d520`): a row only
     goes through the Bernoulli head if its candidate set is exactly `{yes, no}`; every other 2-way
     label set (e.g. `{true, false}`, `{approve, reject}`) is scored as ordinary Choice. The first
-    `ts1` run collapsed to chance because this routing was global instead of per-row (REPORT.md
-    §3ae) — `ts1b` is the fix, gated by 140 tests.
+    `ts1` run collapsed to chance because this routing was global instead of per-row; `ts1b` was the
+    fix, gated by 140 tests, and every checkpoint since inherits it unchanged.
   - **Score** — K-way Choice trained with ordinal-smoothed targets (τ = 0.7, §3ac's adopted recipe).
 
-## Training args (`best.pt`'s args are authoritative; `results.json["args"]` is from an `--eval_only` rerun to restore missing MMLU sets and records `ordinal_smooth: 0.0` for that reason — training used 0.7, see the flag comment below)
+## Training args
 
 ```
 backbone: Qwen/Qwen3-1.7B-Base
-lora_layers: 8            lora_r: 16            lora_lr: 0.0001
-tap_layer: 20             zscore: false
-readout: native           nc_head: n3            nc_render: letters_nonull
-null: factored            noul_head: bern        score_head: choice     ordinal_smooth: 0.0   # eval-only rerun flag; training used 0.7 (see above)
-steps: 12000              bs: 64                 grad_accum: 1
-eval_every: 4000          val_every: 1000        ckpt_every: 2000
+lora_layers: 8            lora_r: 16            lr: 0.0003            lora_lr: 0.0001
+tap_layer: 20             zscore: true
+readout: native           nc_head: n3            nc_render: semif
+null: factored            noul_head: bern        score_head: choice     ordinal_smooth: 0.7
+steps: 12000              bs: 64                 grad_accum: 8
+eval_every: 6000          val_every: 1000        ckpt_every: 2000
 data: data_v5             extra_data: data_kb,data_wf,data_wf_hf,data_wf_long,data_wh,data_u
 family_weights: E:0.40,K:0.15,W:0.35,U:0.10
 bucket_map: data_wf_long=W,data_wh=W,data_u=U
-null_aug: W:0.20          max_state: 1024
+null_aug: W:0.20          max_state: 1024        drop_truncated: false
+best_on: (unset)
 tower_d: 512              tower_layers: 2        tower_heads: 8
 seed: 0
 ```
 
-Final val NLL 0.376, temperature T = 1.124, null_offset 0.0 (fit post-hoc on the `val` split, applied
-at eval).
+Effective batch 64 via `--grad_accum 8`. Three flags differ from `ts1c` and all three revert to
+`ts1b`'s settings: `max_state` 1,024 rather than 2,048, `--drop_truncated` off rather than on, and no
+`--best_on`, so selection is overall val loss rather than the uncertainty + hard-curriculum split.
+The only forward change is `nc_render: semif`. That is deliberate — v3 exists to measure the render,
+so everything else is held at `ts1b`'s values and the two are a matched pair.
+
+Final val NLL 0.370, temperature T = 1.124, null_offset 0.0 (fit post-hoc on the `val` split, applied
+at eval). `ts1c`'s val NLL was 0.439.
 
 ## Data
 
 Family-balanced sampler, E .40 / K .15 / W .35 / U .10 of every training batch, plus `--null_aug
-W:0.20` (15–20% of W rows get their gold candidate removed so the target is ∅) and `--max_state 1024`
-(vs. the preview's 256):
+W:0.20` (15–20% of W rows get their gold candidate removed so the target is ∅) and `--max_state 2048`
+(up from the preview's 256):
 
 - **`data_v5` / `data_kb` / `data_wf` / `data_wf_hf`** — unchanged from the preview (see
   `releases/typical-small-preview.md` for the per-source breakdown: evidence/knowledge mix, MMLU-aux/
@@ -71,125 +96,141 @@ W:0.20` (15–20% of W rows get their gold candidate removed so the target is �
   posterior, ordinal confusion, conflicting-sources log-odds), each with a held-out parameter range.
   0/231 JevBench leak hits.
 
-See PLAN7.md's "Track D — DecisionMix v2 build notes" for the full corpus notes, and REPORT.md
-§3z–§3ae for the mixture-sweep and Release-1-candidate history.
+See PLAN7.md's "Track D — DecisionMix v2 build notes" for the full corpus notes.
 
 ## Results
 
-### §3ae — Release-1 candidate at 1.7B (`ts1b`) vs the preview and the intermediate `r1_dmv2`
+### `ts1b_semif` at 1.7B, against the constant-prediction floor and the 4B sibling
 
-| | `typical-small-preview` (§3t/§3w) | `r1_dmv2` (§3ad) | **`ts1b`** | 1.7B base |
-|---|---|---|---|---|
-| CLINC-150 / TREC-fine / HWU64 / 20NG | .734 / .372 / .735 / .522 | .820 / .474 / .726 / .501 | .804 / **.508** / .761 / .540 | .845 / .468 / .757 / .515 |
-| SNLI / MNLI / BoolQ / ANLI | .894 / .849 / .831 / .481 | .894 / .852 / .834 / .501 | .894 / .859 / .824 / .497 | .904 / .865 / .834 / .507 |
-| MMLU-Pro among-K / Δ_q_sh / false-abstain | .330 / .119 / .006 | .333 / .110 / – | .343 / .127 / .005 | .353 / .122 / .003 |
-| held-out noul / score / style / flip both-correct (full rows) | .699 / .498 / .901 / .565 | .658 / .501 / .876 / .519 | **.715** / **.520** / .859 / **.581** | – |
-| held-out score NLL / typed-decisions NLL (full rows) | 2.03 / 2.06 | 1.56 / 1.71 | **1.01 / 1.25** | – / 1.22 |
-| wh held-out family / grammar / style / level 7 / flip | – | .827 / .881 / .888 / .498 / .710 | **.836 / .898 / .896** / .495 / **.718** | – |
-| u ChaosNLI / real held-out / synthetic (acc, NLL) | – | .537 (1.00) / .623 (.67) / .909 (.67) | .547 (1.00) / **.649** (.66) / .916 (.67) | – |
-| external: PagerDuty (floor .792) / jevlogs (.697) / Mind2Web (.427) / tree-choice / typed-decisions acc | .779 / .522 / .427 / .539 / .457 | .651† / .500† / .346† / – / .421† | **.817 / .710** / .357 / .474 / **.510** | .776 / .697 / .300 / .506 / .487 |
-| JevBench std / easy / hard (Brier std / hard; ECE std) | .750 / 1.00 / .387 (.40 / .88; .15) | .750 / 1.00 / .441 (.42 / .79) | .694 / 1.00 / .432 (.40 / .79; **.11**) | .694 / 1.00 / .378 (.47 / .74) |
-| Noul reversed-label |ΔP(yes)| max | up to .55 | – | **0** (10/11 sets; .009 on one) | – |
+Evidence/knowledge rows are the train-time eval pass (`results.json`). Held-out workflow, uncertainty
+and external rows for v3 are the **full-file** post-hoc pass (`eval_wf.json`, `mode native`,
+`max_state 4096`, `limit 0`), and "floor" is that file's `baselines.majority_acc` for the same set.
+JevBench rows are `jev_native_<ck>/summary.json`.
 
-† `r1_dmv2`'s external numbers are a train-time 1,500-row/256-token pass, not re-run at full length.
+**The `tm2` column is a different protocol and is marked as such.** `tm2` has no full-file pass, so
+its held-out / uncertainty / external rows are its capped training-pass numbers (`eval_cap 1500`,
+`max_state 2048`). On `ts1b` the two protocols disagree by up to 34 points on `pagerduty_trigger`, so
+**do not difference the marked rows across columns.** The unmarked rows (evidence/knowledge, MMLU,
+JevBench) are the same protocol in both columns and are comparable.
 
-**Read (REPORT.md §3ae).** Against the frozen preview, `ts1b` keeps E and K inside budget (CLINC −4 vs
-the untrained base is the one edge; TREC/20NG land above base), raises held-out noul/score/flip,
-halves the soft-target NLLs (score 2.03 → 1.01, typed-decisions 2.06 → 1.25), beats or ties `r1_dmv2`
-on every curriculum and uncertainty set, is exactly order-invariant on Noul, and is the first 1.7B
-model above the constant-prediction floor on PagerDuty (.817) and jevlogs (.710, marginal). It gives
-back held-out styles (−4), Mind2Web (below floor again), tree-choice (−6), and JevBench standard
-(.750 → .694, ~1 SE at n_eff = 36; extraction 12 → 9 of 12) while JevBench hard rises (.387 → .432,
-Brier .88 → .79). **Decision: freeze `ts1b` as `typical-small` (Release 1 at 1.7B)**, with the preview
-kept as the reference.
+| | floor | **`ts1b_semif`** (v3) | `tm2` (4B sibling) |
+|---|---|---|---|
+| CLINC-150 / TREC-fine / HWU64 / 20NG | – | .830 / .494 / .784 / .549 | .795 / .480 / .717 / .579 |
+| SNLI / MNLI / BoolQ / ANLI | – | .903 / .867 / .817 / .512 | .900 / .855 / .840 / .554 |
+| MMLU-Pro among-K / shuffled-q among-K (Δ_q_sh) / false-abstain | – | .316 / .198 (Δ .118) / .003 | .429 / .235 (Δ .194) / .005 |
+| held-out noul / score / style / flip both-correct (full rows) | .583 / .355 / .364 / – | .705 / .514 / .854 / .741 | *capped:* .858 / .586 / .842 / – |
+| held-out score NLL / typed-decisions NLL (full rows) | – | 1.15 / 1.29 | – |
+| wh held-out family / grammar / style / level 7 / flip | .384 / .385 / .427 / .460 / .400 | .832 / .898 / .896 / .500 / .718 | *capped:* .889 / .886 / .896 / .540 / .835 |
+| u ChaosNLI / real held-out / synthetic | .464 / .507 / .575 | .498 / .614 / .926 | *capped:* .525 / .694 / .909 |
+| external: PagerDuty / jevlogs / Mind2Web / tree-choice / typed-decisions | .792 / .697 / .427 / .114 / .290 | .857 / .648 / .399 / .408 / .478 | *capped:* .757 / .518 / .497 / .585 / .515 |
+| JevBench std / easy / hard (Brier std / hard; ECE std) | – | .792 / 1.000 / .441 (.370 / .746; .163) | .861 / 1.00 / .495 (.22 / .72; .07) |
 
-### JevBench disclosures (REPORT.md §3q — apply to the numbers above)
+**Read.** v3 clears the constant-prediction floor on every held-out workflow, DecisionMix-v2 and
+uncertainty set, and on three of the five external sets. PagerDuty is .857 against a .792 floor.
+Rubric sensitivity is intact: flip accuracy .718 on `wh` and .741 both-correct on `wf`, against a
+.400 floor.
+
+Against `ts1b`, on the matched full-file pass, held-out yes/no is **.705 vs .715** — level, within a
+point. The v2 card reported a 7-point decrease on this primitive; that comparison put `ts1c`'s
+*capped* .6427 against `ts1b`'s *full-file* .7147, which are two different protocols. Matched, the
+regression was never that large, and at v3 it is gone.
+
+Where v3 pays for the render: held-out family .832 vs `ts1b`'s .837, level-7 .500 vs .496, and
+320-way tree choice .408 vs .474 — the last is the one real loss on the full-file pass. JevBench
+standard is .792 (57/72) with ECE .163.
+
+### JevBench disclosures (apply to the numbers above)
 
 This is a **public-subset run, not a ranked entry** (JevBench's own leaderboard requires ≥95%
-coverage including the 146 non-public judge items; we ran the 231 public ids only). Reported
-probabilities are the head's softmax **conditioned on non-∅** (P(∅) is dropped and the rest
-renormalized; mean p_null ≈ .03, native). Checkpoints trained at up to 1,024-token states / 64-token
-queries are run at up to 4096 / 256 tokens (out-of-training-length but not truncated). Latency is
-in-process on one H100, one decision at a time, model load excluded. Cost is null (no tariff — this
-is not a hosted-API run). Option order is the harness's own label order; a reversed-order control on
-a related checkpoint swung standard accuracy ±4 points, larger than the differences between our own
-model variants, so no fine ranking among our own checkpoints is supported by these numbers alone.
-Majority/chance baselines on this split are .311 standard / .284 easy / .336 hard (n=72 standard,
-SE ≈ .058; n_eff = 36) — `ts1b`'s hard tier (.432) is within 1 SE of chance, standard (.694) is ~1 SE
-below the preview.
+coverage including the non-public judge items; we ran the public ids only). Harness version
+`jevbench-v1`; probability source `native` for all three tiers, with 0 renormalised items and schema
+validity 1.00. Reported probabilities are the head's softmax **conditioned on non-∅** (P(∅) is
+dropped and the rest renormalized); the mean p_null for this run is
+`_not measured for this checkpoint_` — the summary does not record it. The checkpoint was trained at
+up to 1,024-token states (`args.max_state`, reverted from `ts1c`'s 2,048) and the held-out pass runs at up to 4,096
+(`eval_wf.json` `max_state`) — out-of-training-length but not truncated. Latency is in-process, one
+decision at a time, model load excluded; the benchmark record does not name the GPU. Cost is null
+(`ledger_charged_usd: null`, `cost_basis: local_gpu_no_provider_tariff` — this is not a hosted-API
+run). Option order is the harness's own label order; a reversed-order control is
+`_not measured for this checkpoint_`, so no fine ranking among our own checkpoints is supported by
+these numbers alone. Split sizes are 72 standard / 48 easy / 111 hard scorable ids; the standard tier
+has 36 paraphrase pairs (`paraphrase_consistency.pairs`), so n_eff = 36 and SE ≈ .06 at p = .5. The
+majority/chance baselines for the three JevBench tiers are `_not measured for this checkpoint_` —
+the summary carries no baseline field, and the previous card's values are not re-derivable from
+these artefacts.
 
-## Latency (REPORT.md §3ab, apples-to-apples ladder, one pod, one torch build, L_s = 256)
+## Latency (`bench_ts1b_semif/bench.json`, L_s = 256, native path)
 
-| 1.7B | single decision, K = 2 / 32 / 256 (ms) | marginal per query, M = 32, K = 2 / 32 / 256 (ms) | peak memory, K = 2 → 256 (GB) |
-|---|---|---|---|
-| `ts1b`-shape recipe | 45 / 46 / 106 | 2.7 / 3.7 / 28.0 | 6.4 → 9.3 |
+| 1.7B | single decision, K = 2 / 32 / 128 (ms) | marginal per query, M = 32, K = 2 / 32 / 128 (ms) |
+|---|---|---|
+| `ts1b_semif` | 59 / 64 / 106 | 3.5 / 6.4 / 24.4 |
 
-**Two different latency numbers exist for this checkpoint and they measure different things. Do not
-present either without its protocol.** The table above is the §3ab *apples-to-apples ladder*: one
-pod, one torch build, L_s = 256, state encode included, on the pre-optimisation serving path. It is
-for comparing rungs of the size ladder against each other, not for quoting as the cost of a
-decision in production. The number the blog posts and the site quote is **warm p50 per decision,
-15.5–17 ms** (`runs/serve_bench2/results.json`, K = 2, 256-token state, prefix KV already cached,
-one stream, in process, model load excluded) — measured after the KV-cache deep copy was replaced
-with a stride-0 view (§3ag). Neither is comparable to a leaderboard latency measured serially over
-a network.
+This bench is **partial**: it covers L_s = 256 only and carries no peak-memory figures, so the
+`6.2 → 9.1 GB` this card used to quote is not restated. The shape is unchanged from earlier
+checkpoints of this size — a single decision costs ~59-64 ms across most of K, because the KV-cached
+state and a short suffix dominate, and only climbs at large K.
 
-A single decision on the ladder protocol costs 45 ms regardless of most of K (the KV-cached state and a short suffix
-dominate); batched marginal cost is 2.7 ms/query at K = 2, rising to 28 ms/query at K = 256. Capability
-per millisecond (JevBench standard / single-decision ms) puts the 4B at the knee (.833/56 vs 1.7B's
-.750/45 vs 14B's .875/60) — this checkpoint is the cheapest point on that ladder, not the highest-
-capability one.
+**Two different latency numbers exist for this line and they measure different things. Do not
+present either without its protocol.** The site publishes 45 ms for `typical-small`, which is the
+apples-to-apples ladder in REPORT §3ab: one pod, one torch build, for comparing rungs of the size
+ladder against each other. The 59 ms above is this checkpoint's own bench on a different pod. Neither
+is comparable to a leaderboard latency measured serially over a network, and `tm2` has no benchmark
+on either path, so the two release checkpoints still cannot be placed on a common latency axis.
 
-## Deployment caveat: put case facts at the END of a long state
+## Deployment caveat (v1 and v2 only): **retired in v3**
 
-**Read this before using the checkpoint on anything longer than a paragraph.** This checkpoint was
-trained before the facts-first corpus fix (REPORT §3ag), so it carries that corpus's positional
-bias: `data_wf_long` rendered `Case: <facts>` *after* the policy body, training right-truncates at
-`--max_state 1024`, and 98.8% of those rows therefore lost their facts before the model saw them.
-The model learned to answer long policies from where its training data put the evidence.
+Earlier checkpoints in this line carried a positional trap, and it was the headline caveat on both
+previous cards: `data_wf_long` rendered `Case: <facts>` *after* the policy body, training
+right-truncated at `--max_state 1024`, and 98.8% of those rows lost their facts before the model saw
+them (REPORT §3ag). v1 therefore learned to answer long policies from where its training data put the
+evidence, and callers had to render the policy first and the case facts last to avoid a 20-point
+drop.
 
 Scored on 605 held-out long states (`scripts/make_long_eval.py`), identical items, differing only in
-where the `Case:` block sits, no truncation at eval:
+where the `Case:` block sits, no truncation at eval (majority-class floor .413):
 
-| | facts **before** the policy body | facts **after** it | cost |
+| checkpoint | facts **before** the policy body | facts **after** it | spread |
 |---|---:|---:|---:|
-| `typical-small` | .598 | .798 | **-20.0 pts** |
+| `typical-small` v1 (`ts1b`) | .598 | .798 | −20.0 pts |
+| `typical-small` v2 (`ts1c`) | .947 | .790 | +15.7 pts |
+| **`typical-small` v3 (`ts1b_semif`)** | **.952** | **.846** | **+10.6 pts** |
 
-Rendered facts-first, this checkpoint sits on the majority-class floor for the yes/no family -- it
-has stopped reading the evidence rather than reading it poorly.
+**v3 needs no ordering instruction.** It is the first checkpoint in this line above .84 in both
+orders, so you can hand it a document without telling the caller how to arrange it. Note that v2 did
+not remove the asymmetry so much as invert it — strong facts-first, still .790 the other way — while
+v3 lifts its own weaker order (.846) 4.8 points above v1's better one (.798).
 
-Callers write their own state text, so this is under your control: **render the policy or document
-first and the case facts last.** Retrained checkpoints on the fixed corpus do not show the bias
-(REPORT §3ak-a/§3ak-c; the facts-first 14B reaches .997 on the same set), and retraining this
-checkpoint on it is the next planned release work.
+What v3 does *not* fix is the same capability as JevBench measures it: the `long_policy` family on
+the hard tier reads .263 on 19 items, where this 605-item pass reads .952. That disagreement is a
+property of a 19-item sample, not a second result; see the limitations below.
 
 ## Known limitations
 
-- JevBench standard is ~1 SE below the preview (.694 vs .750, n_eff = 36) — a real trade, not noise
-  in the other direction: `ts1b` buys held-out noul/score/flip and both external floors (PagerDuty,
-  jevlogs) at that cost (§3ae).
-- Mind2Web stays below its constant-prediction floor (.357 vs floor .427) — general web-agent
-  candidate sets remain outside what this training distribution covers.
+- Soft-target quality is the weak axis at this size: held-out score NLL 1.15 at .514 accuracy, and
+  typed-decisions NLL 1.29 at .478 accuracy (floor .290).
+- **320-way tree choice is the one clear regression against `ts1b`**: .408 vs .474 on the matched
+  full-file pass. Large flat candidate sets are what the render change cost.
+- Mind2Web stays below its constant-prediction floor (.399 vs floor .427) — general web-agent
+  candidate sets remain outside what this training distribution covers. jevlogs also falls below its
+  floor at this version (.648 vs .697), where `ts1b` cleared it at .710.
 - Level-7 composition (temporal / unit / expected-value / trade-off reasoning, `wh_level7`) sits at
-  .495. The uniform-guess rate on that set is **.441** (598 items at K = 2, 224 at 3, 58 at 4;
-  majority-class .250), so this is marginally above guessing and 34-40 points below the same
-  checkpoint's held-out family / grammar / style scores (.836 / .898 / .896). Earlier versions of
-  this card said "chance"; the gap to the in-distribution families is the finding, not the level.
-  Nothing trained so far moves it, because the generator never produces this composition (§3ad).
-- Hard tier is .432 with Brier .79 — within 1 SE of the .336 chance baseline; probability quality on
-  soft/ordinal gold is still the clearest open defect at this size (§3aa, §3ae).
-- **Do not describe this model as "calibrated", and don't threshold on hard-tier confidence.** The
-  supported claim is that probability quality is trainable and that good calibration is conditional
-  on decision type and family — not that the output is calibrated (paper §6.4; a single global
-  temperature/offset moves in opposite directions for the E/K and W regimes). Concretely, under
-  JevBench's sum-of-squares Brier a *uniform* predictor over the hard tier's candidate-set mix
-  scores .664, and this checkpoint scores .79 — worse than guessing evenly. On the standard tier
-  the same comparison is .689 uniform against .40 here, which is where P(∅) thresholding is worth
-  using. Any card, tag or post copy claiming calibrated probabilities without that tier split is
-  overstating this checkpoint.
-- Held-out rubric styles regress −4 vs the preview (.859 vs .901).
+  .500 against a .460 floor. That is marginally above constant prediction and 30-odd points below the
+  same checkpoint's held-out family / grammar / style scores. The gap to the in-distribution families
+  is the finding, not the level. Nothing trained so far moves it, because the generator never
+  produces this composition.
+- JevBench hard is .441 with Brier .746, ECE .240 and ordinal MAE .658. Within that tier
+  `long_policy` is still the weakest family at .263 (n = 19), then `temporal_numeric` .333 (n = 15)
+  and `tradeoff` .333 (n = 6). Read those n's before reading the accuracies: the same long-policy
+  capability measured on 605 items reads .952. Probability quality on soft/ordinal gold is the
+  clearest open defect at this size.
+- The shuffled-rubric controls sit at their floors — `wf_rubric_shuffled` .370 (floor .360),
+  `wh_rubric_shuffled` .402 (floor .410) — i.e. with the rubric scrambled the model is no better than
+  guessing, which is the intended behaviour but leaves no margin.
 - Very large candidate sets (K in the hundreds to thousands) still need the energy → top-r → native
   path, not this native head directly (unchanged from the preview).
+- The render gain is a point estimate, not a resolved result: `ts1b_semif` − `ts1b` on JevBench
+  standard is +.097 with a 95% interval of [−.056, +.250], p = .23 (buffalo:RESULTS.md §5a). The
+  long-state and held-out numbers above are where the evidence for v3 actually sits.
 
 ## License
 
@@ -207,15 +248,16 @@ checkpoint on it is the next planned release work.
   UNLI validation split is MIT; `metaeval/ambient` (trained on, ambiguous rows) and
   `metaeval/chaos-mnli-ambiguity` (eval-only, never trained on) do not declare a license on their HF
   cards — flagged, not asserted.
-- JevBench numbers in this card are a **public-subset run** against `fstandhartinger/jevbench` v1.2.1
-  (72 standard / 48 easy / 111 hard public ids) — not a submitted or ranked leaderboard entry.
+- JevBench numbers in this card are a **public-subset run** against `fstandhartinger/jevbench`
+  (harness version `jevbench-v1`; 72 standard / 48 easy / 111 hard public ids) — not a submitted or
+  ranked leaderboard entry.
 
 ## How to run
 
 **Inference code included under `inference/`; training code release to follow.** The public repo
 (`OzLabs/typical-small`) ships a minimal, self-contained inference package (own `Typical` class —
 no dependency on this training repo, just `torch`, `transformers`, `safetensors`, `huggingface_hub`,
-`numpy`). Download the `inference/` folder from that repo, then:
+`numpy`). The repo carries `ts1b_semif`, so the API below downloads v3.
 
 ```bash
 pip install -r inference/requirements.txt
@@ -244,16 +286,18 @@ probs, runtime = m.decide(
 )
 ```
 
-`state` is a string or JSON-serialisable dict. Parity with the internal `PCDMDecider(mode="native")`
-was verified at max abs probability diff = 0.0 on this checkpoint (CPU and MPS), including the
-dedicated Bernoulli Noul head's reversed-label invariance check.
+`state` is a string or JSON-serialisable dict. Parity between the packaged `Typical` class and the
+internal `PCDMDecider(mode="native")` is `_not measured for this checkpoint_` — the max-abs-diff
+parity check (and the reversed-label invariance check that accompanied it) has not been re-run
+against `ts1b_semif`; the reversed-label invariance reported in the table above comes from the training-run
+eval (`results.json`, `.eval.wf_rubric_flip.noul_reversed`), not from the packaged class.
 
 Internal call shape (this training repo, not yet public):
 
 ```python
 from pcdm_jev.decider import PCDMDecider
 
-decider = PCDMDecider("runs/ts1b", mode="native")
+decider = PCDMDecider("runs/ts1b_semif", mode="native")
 question = {"instructions": "...", "type": "choice", "criteria": {"a": "option a", "b": "option b"}}
 probs, runtime = decider.decide(state="...", question=question, labels=["a", "b"])
 # probs: dict label -> probability; runtime["p_null"] is the abstention mass
@@ -266,24 +310,33 @@ Held-out workflow / external eval reproduction (post-hoc, full state length; req
 training repo):
 
 ```bash
-uv run --no-sync python scripts/eval_wf.py --run runs/ts1b --mode native \
+uv run --no-sync python scripts/eval_wf.py --run runs/ts1b_semif --mode native \
     --files data_wf/eval/*.jsonl data_wf_hf/eval/*.jsonl data_wh/eval/*.jsonl data_u/eval/*.jsonl \
-    --limit 0 --out runs/ts1b/eval_wf_full.json
+    --limit 0 --out runs/ts1b_semif/eval_wf.json
 ```
 
 JevBench: `scripts/jevbench_run.py` against the checkpoint in `mode="native"` (see `pcdm_jev/` for the
-harness adapter and REPORT.md §3q for the exact protocol and disclosures reproduced above).
+harness adapter and the protocol disclosures reproduced above).
 
-## Files in `guychuk/pcdm-runs/typical-small/`
+## Artefacts backing this card
 
-- `best.pt` — this checkpoint (`ts1b`).
-- `results.json` — training args + full eval suite (train-time pass).
-- `eval_wf_full.json` — post-hoc held-out workflow / external eval (full state length, `scripts/eval_wf.py`).
-- `probe_results.json` — Δ_q probe results.
-- `jevbench_summary.json` — JevBench public-subset run summary.
+Published on the hub under `guychuk/pcdm-runs`; `best.pt` is mirrored into the public repo and its
+sha256 (`dc183b39f90b0485d88ea4c659ad5248101e378a99428f123042fbd24cb60f22`) was verified against the
+source path after upload.
+
+- `ts1b_semif/results.json` — training args + train-time eval suite.
+- `ts1b_semif/eval_wf.json` — post-hoc held-out workflow / external eval (full file, `max_state 4096`,
+  `limit 0`).
+- `ts1b_semif/eval_wf_long_policy.json` — long-policy held-out pass (`wf_long_policy`, acc .952 vs
+  floor .413, n = 605), and `…_lastrender.json` for the facts-last arm.
+- `probe_ts1b_semif/results.json` — Δ_q probe results.
+- `jev_native_ts1b_semif/{original,easy,hard}/summary.json` — JevBench public-subset run, harness
+  version `jevbench-v1`.
+- `bench_ts1b_semif/bench.json` — latency benchmark (partial: L_s = 256, no peak memory).
 
 ## Links
 
-- Public release: https://huggingface.co/OzLabs/typical-small
+- Release line: https://huggingface.co/OzLabs/typical-small (carries `ts1b_semif`, v3)
 - Parent release: https://huggingface.co/OzLabs/typical-small-preview
 - Sibling release (4B): https://huggingface.co/OzLabs/typical-medium
+- Sibling release (14B, preview): https://huggingface.co/OzLabs/typical-large-preview

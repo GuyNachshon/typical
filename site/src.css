@@ -14,6 +14,8 @@
   --color-mid: #938f89;       /* secondary copy, numerals, hairlines */
   --color-steel: #c2bfba;     /* borders, outlines */
   --color-slate: #595855;     /* secondary copy: #938f89 on canvas is 2.78:1, under AA-large */
+  --color-ours: #2f5d50;      /* figures only: our side of a comparison (6.47:1 on canvas) */
+  --color-other: #9a5b3d;     /* figures only: the other side (4.61:1 on canvas) */
 
   --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -26,6 +28,16 @@
   --text-section: 36px;   /* section heading, 400, -1.08px, lh 1 */
   --text-hero: 62px;      /* hero heading, 400, -1.86px, lh .93 */
   --text-figure: 120px;   /* big figures, 400, -4.8px */
+
+  /* One vertical scale for the post. Before this the gaps in play were 0, 10, 18, 22, 30, 104,
+     122, 126 and 134 -- nine values, none of them chosen against the others. */
+  --v-1: 8px;
+  --v-2: 14px;
+  --v-3: 22px;    /* paragraph to paragraph */
+  --v-4: 36px;    /* heading block to body */
+  --v-5: 56px;    /* prose to figure, figure to prose */
+  --v-6: 88px;
+  --v-7: 128px;   /* chapter to chapter */
 
   --spacing: 1px;         /* raw px spacing utilities: p-18, gap-30, py-55, py-88, py-143 */
 
@@ -94,6 +106,22 @@
      nothing; the page gets shorter and heavier at the same time. */
   .chapter { padding-block: 104px 0; }
   @media (max-width: 64rem) { .chapter { padding-block: 96px 0; } }
+
+  /* ---- the post's vertical rhythm ---- */
+  /* A chapter had 104-134px of air above it and nothing to say a chapter had started, so the
+     break read as a long paragraph gap. One distance, and a rule on the measure to mark it. */
+  .post .chapter { padding-block: var(--v-6) 0; }
+  .post .chapter::before { content: ''; display: block; max-width: 680px; margin: 0 auto var(--v-5); height: 1px; background: var(--color-steel); transform-origin: left center; }
+  /* The rule draws itself before the chapter's title rises: the mark that says a section started
+     is the thing that should arrive first. CSS rather than JS because it is predetermined, so it
+     runs off the main thread and survives the page still loading charts underneath it.
+     .will-reveal is only ever applied to a chapter that is still below the fold, so a section the
+     reader has already reached is never hidden in order to be shown again. */
+  .post .chapter.will-reveal::before { transform: scaleX(0); }
+  .post .chapter.is-revealed::before { transform: scaleX(1); transition: transform var(--duration-reveal) var(--ease-out-expo); }
+  .post .chapter:first-of-type { padding-top: var(--v-6); }
+  .post .chapter:first-of-type::before { display: none; }
+  @media (max-width: 64rem) { .post .chapter { padding-block: var(--v-6) 0; } .post .chapter::before { margin-bottom: var(--v-5); } }
   #results { padding-block: 120px 0; }
   /* The side rail is gone. It put every h2 at x=330 while every panel below it started at x=80, so
      the two dominant objects in a section never shared an edge, and it left a 250px column empty in
@@ -117,15 +145,15 @@
      then a full-width piece of evidence, repeated. Those pages are 40-70% media by height; this
      one was a stack of 58px pronouncements over 640px charts. So the heading stops shouting, the
      rule and the eyebrow go, and the evidence gets the room they were taking. */
-  .claim { max-width: 64ch; margin-bottom: 30px; }
-  .claim h2 { font-size: clamp(25px, 2.3vw, 33px); line-height: 1.12; letter-spacing: -0.7px; margin-bottom: 12px; }
-  .claim p { font-size: 17px; line-height: 1.55; color: var(--color-slate); }
-  .claim p + p { margin-top: 10px; }
+  .claim { max-width: 64ch; margin-bottom: var(--v-4); }
+  .claim h2 { font-size: clamp(27px, 2.6vw, 38px); line-height: 1.06; letter-spacing: -1.3px; font-weight: 700; margin-bottom: var(--v-2); }
+  .claim p { font-size: 17px; line-height: 1.45; color: var(--color-slate); }
+  .claim p + p { margin-top: var(--v-3); }
   .claim .tag { vertical-align: 2px; margin-left: 6px; }
 
   /* a figure: full width, on paper, numbered, captioned under a hairline. No frame on the page's
      own live panels — a dark game screen is already a bounded object. */
-  .fig { margin: 0 0 22px; }
+  .fig { margin: 0 0 var(--v-5); }
   .fig > figcaption { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-steel); font-family: var(--font-mono); font-size: 12px; line-height: 1.6; color: var(--color-slate); max-width: 88ch; }
   .fig > figcaption b { font-weight: 700; color: var(--color-off); }
 
@@ -165,33 +193,49 @@
   /* full-bleed out of the .page column it is nested in: a band spans the viewport by definition */
   /* was a charcoal full-bleed band. Every reference the client chose is light end to end, and
      dark on this page now means only one thing: a screen with something running on it. */
+  .post .figband { margin: 30px 0 54px; }
   .figband { padding-block: 34px 6px; border-top: 1px solid var(--color-off); border-bottom: 1px solid var(--color-steel); }
   .figband-row { display: grid; grid-template-columns: repeat(3, 1fr); }
   .figband-row p { border-left: 1px solid var(--color-steel); padding-left: 28px; }
   .figband-row p:first-child { border-left: 0; padding-left: 0; }
   .figband .t-figure { color: var(--color-off); }
+  /* --text-figure is drawn for a 1080px band. On the prose measure each column is 227px and a
+     three-glyph numeral at 120px fills it exactly, so the three run together with no air between
+     them. Two thirds of the size leaves the column its gutters back. */
+  .post .figband.onmeasure .t-figure { font-size: 78px; letter-spacing: -3.1px; }
+  @media (max-width: 48rem) { .post .figband.onmeasure .t-figure { font-size: 54px; letter-spacing: -2px; } }
   .figband i { font-family: var(--font-mono); font-size: 22px; font-style: normal; margin-left: 8px; color: var(--color-mid); }
   .figband em { display: block; margin-top: 16px; font: 700 12px/1.3 var(--font-mono); letter-spacing: 0.72px; text-transform: uppercase; font-style: normal; color: var(--color-mid); }
   @media (max-width: 64rem) {
-    .figband { padding-block: 56px; }
+    .post .figband { margin: 30px 0 54px; }
+  .figband { padding-block: 56px; }
     .figband-row { grid-template-columns: 1fr; gap: 34px; }
     .figband-row p { border-left: 0; padding-left: 0; }
     .figband em { margin-top: 12px; }
   }
 
   /* ---- floating translucent nav ---- */
-  .nav { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 14px; border-radius: var(--radius-card); background: rgba(232, 227, 216, 0.72); backdrop-filter: blur(57px); -webkit-backdrop-filter: blur(57px); color: var(--color-off); font-size: var(--text-nav); letter-spacing: -0.14px; max-width: calc(100vw - 28px); }
+  .nav { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 14px; border-radius: var(--radius-card); background: rgba(232, 227, 216, 0.72); -webkit-backdrop-filter: blur(57px); backdrop-filter: blur(57px); color: var(--color-off); font-size: var(--text-nav); letter-spacing: -0.14px; max-width: calc(100vw - 28px); }
   .nav a { padding: 8px 10px; white-space: nowrap; border-radius: var(--radius-btn); }
   .nav a:hover { background: rgba(41, 40, 39, 0.08); }
-  .nav .brand { font-weight: 700; padding-right: 14px; }
+  .nav .brand { font-weight: 700; }
+  /* Every gap in the bar is the same 24px: 10px of one link's padding, the 4px flex gap, 10px of
+     the next. .links was an inline span, so its anchors sat 20px apart while the brand's extra
+     padding-right pushed the first one to 28 -- three different gaps in one 6-item bar. */
+  .nav .links { display: flex; align-items: center; gap: 4px; }
+  /* The lab credit is the one deliberate exception: no left padding, so it sits 10px from the
+     wordmark and reads as "Typical, by Oz Labs" rather than as a sixth destination. */
+  .nav .lab { padding-left: 0; color: var(--color-slate); }
+  .nav .lab:hover { color: var(--color-off); background: none; }
   .nav .cta { background: var(--color-off); color: var(--color-warm); }
   .nav .cta:hover { background: var(--color-charcoal); }
   /* on a phone the bar keeps the three that matter: the numbers, the paper, the weights */
-  @media (max-width: 48rem) { .nav .links a { display: none; } .nav .links a[href='#results'], .nav .links a[href='research.html'], .nav .links a[href^='https://huggingface.co'] { display: inline; padding: 8px 6px; } }
+  @media (max-width: 48rem) { .nav .lab { display: none; } .nav .links a { display: none; } .nav .links a[href='#results'], .nav .links a[href='research.html'], .nav .links a[href^='https://huggingface.co'] { display: inline; padding: 8px 6px; } }
 
   /* ---- buttons ---- */
   .btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 15px; border-radius: var(--radius-btn); background: var(--color-warm); color: var(--color-off); font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; line-height: 1; white-space: nowrap; transition: background var(--duration-tap) var(--ease-out); }
   .btn:hover { background: var(--color-white); }
+  .btn:active { transform: scale(0.97); }
   .btn.outline { background: rgba(0, 0, 0, 0.8); color: var(--color-warm); border: 1px solid var(--color-warm); padding: 12px 15px; }
   .btn.outline:hover { background: var(--color-black); }
   .btn.dark { background: var(--color-off); color: var(--color-warm); }
@@ -492,7 +536,22 @@
   .register { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
   .register th { white-space: nowrap; /* "ECE std", "ms K2→K256": short pairs, never split */ text-align: left; font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--color-off); }
   .register td { padding: 12px 12px 12px 0; border-bottom: 1px solid var(--color-steel); vertical-align: top; }
-  .register td:first-child { font-weight: 700; } /* no nowrap here: it set the grid track's min-content width and pushed the research page sideways — model ids are kept whole with non-breaking hyphens instead (js/typography.js) */
+  .runreq .is-unstated { color: var(--color-steel); }
+  .runreq tr.is-ours td { color: var(--color-ours); }
+  .runreq td { font-size: 13px; }
+  .register td:first-child { font-weight: 700; }
+  .register.field td:first-child { font-weight: 400; }
+  .register.field tr.is-ours td { font-weight: 700; }
+
+  /* ---- table and scatter, pointing at each other ---- */
+  .register.field tbody tr { transition: background var(--duration-tap) var(--ease-out); }
+  #field.is-linking .register.field tbody tr.is-lit { background: rgba(47, 93, 80, 0.09); }
+  .jev-mark { transition: opacity var(--duration-state) var(--ease-out); }
+  /* the rest recede rather than vanish: the point of the chart is still the shape of the field */
+  #field.is-linking .jev-mark:not(.is-lit) { opacity: 0.28; }
+  #field.is-linking .jev-mark.is-lit circle { r: 7; }
+  #field.is-linking .jev-mark.is-lit text { font-weight: 700; fill: var(--color-off); }
+  @media (hover: none) { #field.is-linking .jev-mark:not(.is-lit) { opacity: 1; } }
   @media (max-width: 40rem) {
     .register thead { display: none; }
     .register tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--color-steel); }
@@ -509,6 +568,22 @@
   .code { background: var(--color-off); color: var(--color-warm); border-radius: var(--radius-card); padding: 30px; }
   .code pre { margin: 0; font-family: var(--font-mono); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; }
   .code + .code { margin-top: 18px; }
+  /* ---- copy button ---- */
+  .code { position: relative; }
+  .code-copy {
+    position: absolute; top: 12px; right: 12px; appearance: none; cursor: pointer;
+    padding: 6px 10px; border: 1px solid rgba(240, 238, 235, 0.22); border-radius: var(--radius-btn);
+    background: transparent; color: rgba(240, 238, 235, 0.55);
+    font-size: 11px; letter-spacing: 0.36px; line-height: 1;
+    opacity: 0; transition: opacity var(--duration-state) var(--ease-out), color var(--duration-tap) var(--ease-out), border-color var(--duration-tap) var(--ease-out), transform var(--duration-tap) var(--ease-out);
+  }
+  /* it appears when the block is approached, and is always there for a keyboard */
+  .code:hover .code-copy, .code-copy:focus-visible { opacity: 1; }
+  .code-copy:hover { color: var(--color-warm); border-color: rgba(240, 238, 235, 0.45); }
+  .code-copy:active { transform: scale(0.97); }
+  .code-copy.is-done { opacity: 1; color: var(--color-warm); border-color: rgba(240, 238, 235, 0.45); }
+  /* no hover on a touch screen, so the button simply stays */
+  @media (hover: none) { .code-copy { opacity: 1; } }
 
 
   .exlist { border-bottom: 1px solid var(--color-steel); }
@@ -522,6 +597,31 @@
 
   /* ---- footer ---- */
   .footer { background: var(--color-off); color: var(--color-warm); padding: 88px 0 55px; }
+  /* On the post the last paragraph of the FAQ used to butt straight into the dark slab, so the
+     footer read as the page breaking rather than ending. An end-mark on paper, then air, then the
+     dark: the transition is the same one, it is just deliberate now. */
+  .post .footer { margin-top: 0; }
+  .post .chapter:last-of-type { padding-bottom: 130px; }
+
+  /* ---- the FAQ, as disclosures ---- */
+  .faq-item { border-bottom: 1px solid var(--color-steel); }
+  .faq-item:first-of-type { border-top: 1px solid var(--color-steel); }
+  .faq-item > summary {
+    list-style: none; cursor: pointer; padding: 18px 34px 18px 0; position: relative;
+    font-size: 17px; line-height: 1.4; color: var(--color-off);
+  }
+  .faq-item > summary::-webkit-details-marker { display: none; }
+  /* a plus that becomes a minus: two rules, the vertical one rotated away when the item is open */
+  .faq-item > summary::after,
+  .faq-item > summary::before {
+    content: ''; position: absolute; right: 2px; top: 50%; width: 13px; height: 1px;
+    background: var(--color-slate); transition: transform var(--duration-tap) var(--ease-out);
+  }
+  .faq-item > summary::before { transform: rotate(90deg); }
+  .faq-item[open] > summary::before { transform: rotate(0deg); }
+  .faq-item[open] > summary { color: var(--color-off); font-weight: 700; }
+  .faq-item > p { padding: 0 34px 22px 0; font-size: 17px; line-height: 1.55; color: var(--color-slate); }
+  .faq-item > summary:hover { color: var(--color-ours); }
   .footer .cols { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 30px; }
   @media (max-width: 48rem) { .footer .cols { grid-template-columns: 1fr; } }
   .footer a:hover { text-decoration: underline; text-underline-offset: 4px; }
@@ -551,8 +651,188 @@
   .post .chapter > *, .post .masthead > * { max-width: 680px; margin-inline: auto; }
   .post .fig, .post .figband, .post .chapter > table, .post .gamepair { max-width: 1080px; margin-inline: auto; }
   .post .figband-row { max-width: 1080px; padding-inline: 0; }
-  .post .claim { max-width: 680px; }
+  .post .claim { max-width: 680px; margin-bottom: 0; }
+  /* one distance between a chapter's blocks, whatever they happen to be, instead of a rule for
+     every pair of element types that could sit next to each other */
+  .post .chapter > * + * { margin-top: var(--v-5); }
+  .post .fig { margin-bottom: 0; }
+  /* one figure on the page is a pair of terminals printing real response objects; it gets the
+     page, because the thing being shown is exactly the part that a narrower column cuts off */
+  .post .fig.figfull { max-width: none; }
+  /* Anything narrow enough to belong to the sentence above it sits on the prose measure rather
+     than the figure measure. A schematic whose content only fills 600px, or a band of three
+     figures, lines up with nothing at 1080: both edges land where no other edge on the page is. */
+  .post .onmeasure { max-width: 680px; }
+  /* the steps are a numbered list and were rendering unnumbered: preflight strips the marker, so
+     the numerals are drawn in the gutter where an editorial list puts them anyway */
+  .steps { counter-reset: step; list-style: none; padding-left: 0; }
+  .steps > li { position: relative; padding-left: 38px; line-height: 1.55; }
+  .steps > li + li { margin-top: 10px; }
+  .steps > li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 0.15em; font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--color-mid); }
   @media (max-width: 64rem) { .post .fig, .post .figband, .post .gamepair { max-width: none; } }
 
+  /* ours marked in a table where we are mid-field: weight, not colour, and the chance row set
+     apart because it is the one row nobody may sit below */
+  .field tr.is-ours td { font-weight: 700; color: var(--color-off); }
+  .field tr.is-ours td:first-child::before { content: '\2192\00a0'; color: var(--color-mid); }
+  .field tr.is-chance td { color: var(--color-mid); border-top: 1px solid var(--color-off); }
+
+  .field th.is-sortable { cursor: pointer; user-select: none; }
+  .field th.is-sortable:hover { color: var(--color-off); }
+  .field th[aria-sort="descending"]::after { content: ' \2193'; }
+  .field th[aria-sort="ascending"]::after { content: ' \2191'; }
+
+  /* the race: lanes fill in real time, ours finishes while the others are still going */
+  /* the explicit column is load-bearing: with none, this grid sizes its implicit column to
+     max-content, and a row's 1fr track resolves to zero inside that measurement, so the whole
+     component collapsed to the width of its label and value columns */
+  /* ---- types: each panel keeps its own heading and paragraph under it ---- */
+  .typegrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 44px 40px; }
+  .typecard > .chart { margin-bottom: 16px; }
+
+  /* ---- the grids: a cell flashes as it lands, and is flat once it has ---- */
+  /* A standing bloom on every lit cell made the resting figure look smudged, which is the one
+     thing a schematic cannot afford. The light belongs to the moment of arrival instead: a cell
+     glows as it lands and settles flat, so the serial lane reads as forty separate arrivals and
+     the parallel lane as one. Nothing glows once the figure is at rest. */
+  @keyframes cellArrive {
+    from { filter: drop-shadow(0 0 7px currentColor) brightness(1.25); }
+    to { filter: none; }
+  }
+  .par-cell.is-new { animation: cellArrive 620ms var(--ease-out-expo) both; }
+  @media (prefers-reduced-motion: reduce) { .par-cell.is-new { animation: none; } }
+
+  .typecard > h3 { font-size: 17px; }
+  .typecard > p { margin-top: 8px; font-size: 15px; line-height: 1.55; color: var(--color-slate); }
+  @media (max-width: 48rem) { .typegrid { grid-template-columns: minmax(0, 1fr); gap: 34px; } }
+
+  /* ---- math, set natively: MathML rather than a 300KB typesetting library for nine equations ---- */
+  /* The horizontal scroll for a wide equation lives on the <math>, not on the block. Setting
+     overflow-x on the block forced overflow-y to auto as well -- the two axes cannot differ -- and
+     that clipped the explanation panel, which is absolutely positioned above it. */
+  .mathblock { max-width: 680px; margin-inline: auto; padding: var(--v-3) 0; border-top: 1px solid var(--color-steel); border-bottom: 1px solid var(--color-steel); }
+  /* line-height: normal, because the inherited body line-height gives MathML a line box a few px
+     shorter than the glyphs it actually renders -- big delimiters and summations overshoot it. The
+     box then reported vertical overflow, and since overflow-x: auto forces overflow-y to auto, that
+     surfaced as a scrollbar on an equation that fits perfectly well. overflow-y is pinned to hidden
+     so the pair can never resurrect it; the horizontal scroll is still there for narrow screens. */
+  .mathblock math { font-size: 19px; color: var(--color-off); display: block; line-height: normal; padding-block: 6px; overflow-x: auto; overflow-y: hidden; }
+  .mathnote { margin-top: var(--v-2); font-size: 12px; line-height: 1.6; color: var(--color-slate); }
+  /* a proof is a different kind of paragraph and should look like one */
+  .proof { max-width: 680px; margin-inline: auto; padding: var(--v-4); background: color-mix(in oklab, var(--color-steel) 16%, transparent); }
+  .proof-head { font-size: 11px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-ours); margin-bottom: var(--v-2); }
+  .proof-head + p { margin-top: 0; }
+  .proof p { font-size: 15px; line-height: 1.5; color: var(--color-slate); }
+  .proof p + .proof-head { margin-top: var(--v-4); }
+  .proof math { font-size: 17px; color: var(--color-off); display: block; line-height: normal; padding-block: 6px; margin: var(--v-3) 0; overflow-x: auto; overflow-y: hidden; }
+  @media (max-width: 48rem) { .mathblock math { font-size: 16px; } .proof { padding: var(--v-3); } .proof math { font-size: 15px; } }
+
+  /* An equation you can ask to say itself in words. Two faces, one shown at a time, swapped on
+     click -- not on hover, because an explanation that appears unasked and covers the paragraph
+     above it is something done to the reader rather than for them. */
+  .eq { position: relative; cursor: pointer; border-radius: 8px; padding: 8px 12px; margin: -8px -12px; overflow: hidden; transition: background var(--duration-state) var(--ease-out-expo); }
+  .eq:hover, .eq:focus-visible { background: color-mix(in oklab, var(--color-ours) 6%, transparent); outline: none; }
+  .eq:focus-visible { box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-ours) 45%, transparent); }
+  .eq-plain p { margin: 0; max-width: 60ch; margin-inline: auto; font-size: 15px; line-height: 1.6; color: var(--color-slate); text-align: left; }
+
+  /* The tip is the only thing announcing that the equation is a control, so it says what the click
+     does rather than just pointing at itself. */
+  .eq-tip {
+    position: absolute; top: 8px; right: 10px;
+    font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
+    color: var(--color-ours); background: color-mix(in oklab, var(--color-ours) 12%, var(--color-warm));
+    padding: 4px 9px; border-radius: 999px;
+    opacity: 0; transform: translateY(-3px);
+    pointer-events: none;
+    transition: opacity 150ms var(--ease-out-expo), transform 150ms var(--ease-out-expo);
+  }
+  .eq:hover .eq-tip, .eq:focus-visible .eq-tip { opacity: 1; transform: none; }
+  /* Once simplified the tip is the only way back, so it stops being a hover affordance and stays
+     put -- and it moves below the prose, which it would otherwise sit on top of. */
+  .eq[aria-expanded='true'] { padding-bottom: 36px; }
+  .eq[aria-expanded='true'] .eq-tip { top: auto; bottom: 8px; opacity: 1; transform: none; }
+  /* No hover on touch, so the affordance has to be permanent or the control is invisible. */
+  @media (hover: none) { .eq-tip { opacity: 1; transform: none; } }
+
+  /* Selected text was the browser default, which is the one colour on the page nobody chose. */
+  ::selection { background: var(--color-ours); color: var(--color-warm); }
+  ::-moz-selection { background: var(--color-ours); color: var(--color-warm); }
+
+  /* ---- the research page's control figure ---- */
+  /* It opens flat, every model on one line ranked by accuracy, because that is the view a
+     leaderboard gives you. Pressing the button drops in the axis a leaderboard does not have, and
+     six variants that looked like a gradient land on zero. The movement is the argument, so it is
+     slower than a UI animation would be and staggered left to right along the ranking. */
+  .dq .dq-pt { transform: translateY(var(--dy)); transition: transform 820ms var(--ease-out-expo); transition-delay: calc(var(--i) * 34ms); }
+  .dq.is-open .dq-pt { transform: translateY(0); }
+  .dq .dq-pt text, .dq .dq-pt polyline { transition: opacity 260ms var(--ease-out) 260ms; }
+  .dq:not(.is-open) .dq-pt text, .dq:not(.is-open) .dq-pt polyline { opacity: 0; transition-delay: 0ms; }
+  .dq .dq-band { opacity: 0; transition: opacity 420ms var(--ease-out) 300ms; }
+  .dq.is-open .dq-band { opacity: 1; }
+  /* Reduced motion drops the animation, not the control. Pinning the points to their open state
+     left the button changing its own label with nothing happening behind it -- a dead control is
+     worse than an instant one. Both states still work; they just arrive rather than travel. */
+  @media (prefers-reduced-motion: reduce) {
+    .dq .dq-pt { transition: none; }
+    .dq .dq-band { transition: none; }
+  }
+
+  /* ---- the readout table: a bar behind each number, so a row has a shape ---- */
+  .readouts td { position: relative; }
+  .readout-cell { text-align: right; font-family: var(--font-mono); font-size: var(--text-nav); padding-right: 14px; }
+  .readout-cell i { position: absolute; left: 0; right: 14px; bottom: 6px; height: 3px; background: var(--color-steel); max-width: calc(100% - 14px); }
+  .readout-cell.is-ours i { background: var(--color-ours); opacity: 0.45; }
+  .readout-cell.is-best span { font-weight: 700; color: var(--color-off); }
+  .readouts th.is-ours { color: var(--color-ours); }
+  @media (max-width: 48rem) { .readout-cell i { display: none; } .readout-cell { padding-right: 0; } }
+  .readouts tbody th { text-align: left; text-transform: none; letter-spacing: 0; font-weight: 400; font-family: var(--font-mono); font-size: var(--text-nav); white-space: nowrap; padding: 12px 12px 12px 0; border-bottom: 1px solid var(--color-steel); vertical-align: top; }
+
+  /* ---- the showdown: two terminals, started together, each printing what it actually returned ---- */
+  .show { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .show-head { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; padding-bottom: 18px; }
+  .show-stat { margin-right: auto; font-size: 11px; letter-spacing: 0.36px; color: var(--color-off); font-weight: 700; }
+  .pane-cost { padding: 0 22px; margin-top: 14px; font-family: var(--font-mono); font-size: 11.5px; color: var(--color-mid); }
+  .pane.is-ours .pane-cost { color: var(--color-slate); }
+  .pane-foot { margin-top: 2px; }
+  .show-eyebrow { flex: 1 1 100%; font-size: var(--text-eyebrow); letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-slate); }
+  .show-pick { display: flex; gap: 1px; margin-left: auto; background: var(--color-steel); border: 1px solid var(--color-steel); }
+  .show-pick-btn { appearance: none; border: 0; background: var(--color-warm); padding: 8px 12px; cursor: pointer; font-size: 11px; letter-spacing: 0.36px; color: var(--color-slate); transition: background var(--duration-tap) var(--ease-out), color var(--duration-tap) var(--ease-out); }
+  .show-pick-btn:hover { color: var(--color-off); }
+  .show-pick-btn.is-on { background: var(--color-off); color: var(--color-warm); }
+
+  /* equal halves: the two panes are being compared line for line, and a split that gives one of
+     them more room reads as the figure taking a side before the reader has */
+  .show-panes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .pane { position: relative; min-width: 0; padding: 26px 0 30px; border: 1px solid var(--color-steel); }
+  /* the label sits on the border the way a fieldset legend does, which is what the frame is for */
+  .pane-tag { position: absolute; top: -7px; left: 22px; padding: 0 8px; background: var(--color-warm); font-size: 10px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); }
+  .pane.is-ours .pane-tag { color: var(--color-off); }
+  .pane::after { content: attr(data-model); position: absolute; bottom: -7px; right: 22px; padding: 0 8px; background: var(--color-warm); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.36px; color: var(--color-mid); }
+  .pane-body { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.7; color: var(--color-off); padding: 0 22px; }
+  .pane-cmd { color: var(--color-slate); white-space: pre; overflow: hidden; text-overflow: ellipsis; margin-bottom: 14px; }
+  /* every line is laid out from the start and only revealed, so a landing answer never reflows.
+     One line per answer, both panes, so the two read line for line -- a wrapped line would put the
+     same answer on different rows in each pane. What runs past the edge is the tail of the probs
+     object, after the decision, its mass and its abstention have all been printed. */
+  .pane-line { white-space: pre; overflow: hidden; text-overflow: ellipsis; padding-left: 2ch; color: transparent; }
+  .pane-line.is-brace { padding-left: 0; }
+  .pane-line b { font-weight: 700; color: inherit; }
+  .pane-line.is-in { color: inherit; }
+  /* the brace row carries the waiting message, so the message needs no position of its own */
+  .pane-line.is-wait.is-in { color: var(--color-mid); }
+  .pane.is-ours .pane-line.is-in { color: var(--color-off); }
+  .pane-foot { min-height: 1.7em; padding: 0 22px; font-family: var(--font-mono); font-size: 11.5px; color: var(--color-mid); }
+  .pane.is-done.is-ours .pane-foot { color: var(--color-off); font-weight: 700; }
+
+  @media (max-width: 64rem) {
+    .show-panes { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+    .pane-body, .pane-cmd, .pane-foot { font-size: 10.5px; }
+    /* stacked, the panes are not being compared at a glance, so holding a screen of empty height
+       for lines that have not arrived costs more than the reflow it was reserved to prevent */
+    .pane-line { display: none; }
+    .pane-line.is-in { display: block; }
+  }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
   .todo { background: var(--color-lgray); color: var(--color-off); padding: 1px 6px; border-radius: 2px; font-family: var(--font-mono); font-size: 12px; }
 }

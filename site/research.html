@@ -3,572 +3,221 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Research — Typical</title>
-<meta name="description" content="Architecture, data, pipeline, findings, and limitations behind Typical.">
+<title>How Typical works &mdash; reading a decision out of a language model</title>
+<meta name="description" content="The research behind Typical: a typed decision read from a pretrained language model in one pass, the control that says whether a model read the question at all, and what we could not fix.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Geist+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="research.css">
+<link rel="stylesheet" href="exhibits.css">
 </head>
-<body>
-<nav class="nav"><a class="brand" href="index.html">Typical</a><span class="links"><a href="index.html#results">Results</a><a href="index.html#how">How it works</a><a href="index.html#demos">Demos</a><a href="research.html" aria-current="page">Research</a><a href="https://huggingface.co/OzLabs/typical-small">Weights</a></span><a class="cta" href="index.html#tryit">Try it live</a></nav>
+<body class="post">
+<nav class="nav"><a class="brand" href="index.html">Typical</a><a class="lab" href="https://ozlabs.ai" target="_blank" rel="noopener">Oz Labs</a><span class="links"><a href="index.html#field">Results</a><a href="index.html#watch">Demos</a><a href="research.html" aria-current="page">Research</a><a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">Weights</a></span><a class="cta" href="index.html#tryit">Try it live</a></nav>
 
-<header class="page chapter">
-  <div class="chapter-head">
-    <p class="t-eyebrow">RESEARCH</p>
-    <div>
-      <h1 class="t-hero">How it was built, what moved, what did not.</h1>
-      <p class="lede">Typical reads the decision out of the model before it emits a letter, instead of generating an
-answer and parsing it back. The matching negative result: a candidate-blind state carries priors and
-calibration, not question-conditioned knowledge (§3j, §3s). Below: architecture, data, pipeline, and
-the full result set, including the numbers that did not move.</p>
-      <p class="note mt-18">§ references point to the internal <code>REPORT.md</code> (not yet public); the Hugging Face model cards
-reproduce the tables cited here.</p>
-    </div>
+<header class="page masthead" id="top">
+  <h1>Typed decisions, read straight out of a language model</h1>
+  <p class="masthead-sub">How Typical works, what we measured, and the control that says whether a model read the question at all.</p>
+  <div class="masthead-meta t-mono">
+    <span>Guy Nachshon &middot; <a href="https://ozlabs.ai" target="_blank" rel="noopener">Oz Labs</a></span>
+    <span>24 September 2026</span>
+    <a href="paper.pdf">Paper (PDF)</a>
+    <a href="https://github.com/GuyNachshon/typical" target="_blank" rel="noopener">Source</a>
+    <a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">Weights</a>
   </div>
 </header>
 
-<section class="page chapter" id="one-trunk-read-at-71-depth">
-  <div class="chapter-head">
-    <p class="t-eyebrow">01 — ARCHITECTURE</p>
-    <div><h2 class="t-section">One trunk, read at 71% depth</h2></div>
+<section class="page chapter" id="what">
+  <div class="claim">
+    <h2>A decision is not a sentence</h2>
+    <p>Software that routes a ticket or rates an alert wants one thing from a model: a probability for each option it already knows about, and a way to say that none of them fit. What it usually gets is a sentence, which it then has to parse.</p>
+    <p>Typical reads the probability out of a pretrained causal language model. The state is encoded once. Each question is a short suffix carrying its own candidates. A head partway up the stack scores the end of that suffix against each candidate. No token is sampled, and the answer is one of the options you passed or an explicit abstention, by construction.</p>
+    <p>This page is the paper with the proofs left in and the notation taken out. Every number on it is transcribed from that paper; the paper says where each one was measured.</p>
   </div>
-  <div class="chapter-body"><div class="body">
-<div class="prose"><p>A frozen Qwen3 trunk, cut at roughly 71% depth, feeds a small contextual readout with LoRA on the
-top 8 kept layers and a factored ∅ head. The state is read once and cached; each query appends a
-short rendered suffix, and the label, the yes/no, and the level all come out of the same terminal
-decision state, with nothing generated.</p></div>
-<figure class="fig"><div class="chart" id="chart-arch"></div></figure>
-<div class="prose"><p><em>Fig. 1. Typical forward pass, state to probabilities.</em></p>
-<p>One support ticket runs through a recorded pass of typical-small below, from tokens to
-probabilities.</p></div>
-<div class="media" style="padding:30px"><div class="chart" id="chart-trace" data-chart="trace"></div></div>
-<div class="prose"><p>The state is encoded once, each question after it is a short suffix, and abstain sits inside the
-head as a gate rather than as a candidate in the list.</p>
-<h3 class="t-feature" id="a-why-mid-depth-not-the-last-layer">a) Why mid-depth, not the last layer</h3>
-<p>Tapping the trunk at layer 20 of 28 beats reading its last layer on every evidence task. The
-project's first version (a candidate-blind decision vector on a frozen 0.6B backbone) read the last
-layer and became a hypothesis-only model: SNLI 58.6%, what the hypothesis alone gives with the
-premise ignored (REPORT §2.4). Tap 20 plus LoRA fixed it: 65.3% frozen, 68.2% with LoRA.</p>
-<p>The same held for the candidate-aware readout. Matched runs (same N3 readout, data, and steps) put
-tap 20 ahead of full depth (28 of 28) on SNLI .906 vs. .863, MNLI .865 vs. .752, ANLI .519 vs. .431,
-and BoolQ .834 vs. .737 (REPORT §3r), with the question-dependent signal intact (Δ_q .118 vs. .117).</p>
-<h3 class="t-feature" id="b-why-theres-no-rendered-none-of-the-above-line">b) Why there's no rendered "none of the above" line</h3>
-<p>∅ is a separate head decision (<code>letters_nonull</code> plus a factored null). Rendered as a literal
-candidate, the way a multiple-choice prompt adds "E. none of the above", it broke abstention at both
-ends of K: always-abstain at large label sets (K=150 CLINC, K=77 Banking77), never-abstain at small
-ones (K=5), MMLU-Pro false-abstain .692. The factored head made the K-sweep smooth and monotone at every K: MMLU-Pro false-abstain .003,
-Banking77-77 accuracy .063 (unusable) → .579, Δ_q held at .122, NLI/BoolQ unchanged (REPORT §3t).
-The cost is 2–7 points on topic/intent label spaces (HWU64 .801 → .757, 20NG .589 → .515) and some
-AUROC on choice-set null probes.</p>
-<h3 class="t-feature" id="c-why-the-candidates-have-to-be-inside-the-computation">c) Why the candidates have to be inside the computation</h3>
-<p>Typical renders its candidates (Choice's label set, Score's levels) into the suffix and reads them
-in the same forward pass as the question, because a state computed before the candidates are known
-fails a basic control. The experiments behind this tried to compile a listwise teacher into a
-<em>candidate-blind</em> decision state Z(x, q), one state for any question. In a choices-only control
-(state = ".", labels only), every student tested (a single vector, 8 probes,
-8 probes with set-conditioning, under single-set and same-Z multi-set distillation with an explicit
-Δ-log-odds objective) scored the same or better with the real question replaced by a shuffled one.
-None of the above-chance accuracy was question-dependent; all of it was candidate-set priors and
-calibration, learned uniformly across every head shape (REPORT §3j). The same student at full
-depth (28 layers) gave Δ_q −0.008, within noise of zero, while evidence tasks regressed as the depth
-result predicts (REPORT §3s).</p>
-<h3 class="t-feature" id="d-what-reading-the-state-once-costs">d) What reading the state once costs</h3>
-<p>On one H100, the chart below times a single decision and each extra question on the same cached
-state, comparing the native head with prompting the same backbone.</p></div>
-<div class="media" style="padding:30px"><div class="chart" id="chart-latency" data-chart="latency"></div></div>
-<div class="prose"><p>One decision costs about 45 ms whatever K is, and each extra question costs a few
-milliseconds because the state is read once. The served path in the public package is faster
-still once the state is cached: the serving code used to deep-copy the whole prefix KV cache per
-decision, and replacing that with a zero-byte view brought the warm p50 to 15.5–17 ms at 1.7B and
-19–21 ms at 4B, unchanged from K = 2 to K = 32 (<code>runs/serve_bench2/results.json</code>, REPORT §3ag).
-No quantisation; <code>torch.compile</code> and CUDA graphs were tried and rejected because probabilities
-drifted by up to .1 across shape buckets.</p></div>
-</div></div>
 </section>
 
-<section class="page chapter" id="four-buckets-weighted-against-memorising">
-  <div class="chapter-head">
-    <p class="t-eyebrow">02 — DATA</p>
-    <div><h2 class="t-section">Four buckets, weighted against memorising</h2></div>
+<section class="page chapter" id="pass">
+  <div class="claim">
+    <h2>One pass, one state, many questions</h2>
+    <p>The state goes in once as an ordinary causal prefix and we keep its key-value cache. Every question after that is a short suffix: the question, the candidates rendered as lettered lines, and a terminal decision token. The suffix attends to the cached state; suffixes batched against one state do not attend to each other.</p>
+    <p>A decision is one forward pass over the state, the question and the candidates together. The expensive half comes from cache.</p>
   </div>
-  <div class="chapter-body"><div class="body">
-<div class="prose"><p>Four buckets per batch, E .40 / K .15 / W .35 / U .10. The workflow corpora are ours and
-programmatic; held-out families, grammars, styles, and an untrained level-7 tier measure transfer
-rather than memorisation.</p></div>
-<div class="media" style="padding:30px"><div class="chart" id="chart-mix-donut" data-chart="mix-donut"></div></div>
-<div class="media" style="padding:30px"><div class="chart" id="chart-mix-bars" data-chart="mix-bars"></div></div>
-<div class="prose"><p>Row counts (releases/typical-small.md): kb 147,446 (MMLU-aux/AQuA/MedMCQA/LogiQA-style
-distillation) · wf 72,000 / 12 families, our rubric-conditioned workflow corpus · wf_hf 86,600 from
-three HF-sourced workflow sets · wh 60,605, DecisionMix v2 · u 31,029, soft-target uncertainty
-corpus.</p>
-<h3 class="t-feature" id="decisionmix-v2-bucket-w-data_wh">DecisionMix v2 (bucket W, <code>data_wh</code>)</h3>
-<p>A programmatic rule engine (<code>scripts/decisionmix_v2.py</code>): 12 domains × 6 boolean conditions at
-levels 1–7, 100% of training rows drawn in counterfactual rubric groups (same state and candidates,
-at least two distinct golds), so the same facts under a different rule give a different answer.
-Held out entirely: one domain/level pair (<code>wh_heldout_grammar</code>), three whole domains
-(<code>wh_heldout_family</code>), two rubric styles (<code>wh_heldout_style</code>), and level 7 (temporal, numeric,
-probability, and trade-off composition), eval-only. Leak audit against JevBench's 231 public items:
-0/231 hits.</p>
-<h3 class="t-feature" id="the-uncertainty-corpus-bucket-u-data_u">The uncertainty corpus (bucket U, <code>data_u</code>)</h3>
-<p>31,029 soft-target rows from the same generator family. Real sources: UNLI's <em>validation</em> split
-(train/test are consumed elsewhere in the mix) and the ambiguous rows of <code>metaeval/ambient</code>
-(uniform target over the listed labels); <code>metaeval/chaos-mnli-ambiguity</code> is eval-only. The other
-~92% comes from four synthetic generators with exact closed-form targets (partial evidence,
-noisy-sensor Bayes posterior, ordinal confusion, conflicting-sources log-odds), each with a held-out
-parameter range. Also 0/231 JevBench leak hits.</p>
-<h3 class="t-feature" id="null-augmentation">Null augmentation</h3>
-<p><code>--null_aug W:0.20</code> removes the gold candidate from 15–20% of workflow rows at train time, so the
-target becomes ∅ on rows that would otherwise always have an answer. With the factored-∅ head, this
-keeps the null calibrated across K.</p></div>
-</div></div>
+  <figure class="fig">
+    <div class="chart" id="chart-arch"></div>
+    <figcaption>The read path. Nothing is decoded.</figcaption>
+  </figure>
 </section>
 
-<section class="page chapter" id="twelve-thousand-steps-under-20">
-  <div class="chapter-head">
-    <p class="t-eyebrow">03 — TRAINING</p>
-    <div><h2 class="t-section">Twelve thousand steps, under $20</h2></div>
+<section class="page chapter" id="formal">
+  <div class="claim">
+    <h2>The decision, written down</h2>
+    <p>A decision is a tuple: a state <em>S</em>, a question <em>Q</em>, a candidate set <em>C</em> supplied at request time, and a type. The model returns a probability for each candidate and one more for abstaining, and they sum to one.</p>
   </div>
-  <div class="chapter-body"><div class="body">
-<div class="code wide"><pre>backbone: Qwen/Qwen3-1.7B-Base
-lora_layers: 8            lora_r: 16            lora_lr: 0.0001
-tap_layer: 20             zscore: false
-readout: native           nc_head: n3            nc_render: letters_nonull
-null: factored            noul_head: bern        score_head: choice     ordinal_smooth: 0.0
-                          # ^ eval-only rerun flag; training used 0.7 (see above)
-steps: 12000              bs: 64                 grad_accum: 1
-eval_every: 4000          val_every: 1000        ckpt_every: 2000
-data: data_v5             extra_data: data_kb,data_wf,data_wf_hf,data_wf_long,data_wh,data_u
-family_weights: E:0.40,K:0.15,W:0.35,U:0.10
-bucket_map: data_wf_long=W,data_wh=W,data_u=U
-null_aug: W:0.20          max_state: 1024
-tower_d: 512              tower_layers: 2        tower_heads: 8
-seed: 0
-</pre></div>
-<div class="prose"><p><em>Specimen: typical-small training args.</em></p>
-<p>130 run directories sit under <code>runs/</code> on the source branch. Of those, 128 carry a dated commit;
-88 of the dated runs are training runs, baseline and ablation runs included, and the rest are
-probes, benches, and zero-shot controls. That spans six days (2026-09-16 → 09-21), most of it under
-$20 of H100 time. The line moves because of bugs found and controls run rather than scale (decision
-log below). typical-medium (4B) uses the same recipe on <code>Qwen3-4B-Base</code>, tap 26/36, effective batch 64 via
-<code>--grad_accum 4</code> (releases/typical-medium.md). Final val NLL 0.376, temperature T = 1.124,
-null_offset 0.0 (typical-small; fit post-hoc on the val split, applied at eval).</p>
-<h3 class="t-feature" id="training-curves">Training curves</h3>
-<p>Training loss and validation NLL against step, for every run logged to W&amp;B, are charted below,
-filterable by size and recipe.</p></div>
-<div class="media" style="padding:30px"><div class="chart" id="chart-curves" data-chart="curves"></div></div>
-<div class="prose"><p>Both released models trained for twelve thousand steps at batch 64, and the failed runs stay
-visible here as curves rather than disappearing into a footnote.</p>
-<h3 class="t-feature" id="cost-where-report-states-it">Cost, where REPORT states it</h3>
-<p>typical-small (<code>ts1b</code>): ~$12 of H100 time, plus ~$10 lost to a routing bug caught and fixed mid-run
-(<a href="https://huggingface.co/OzLabs/typical-small">REPORT §3ae</a>). typical-medium (<code>tm1b</code>): ~$15, plus ~$8
-lost to the same bug class (<a href="https://huggingface.co/OzLabs/typical-medium">REPORT §3af</a>). DecisionMix
-v2 dry run (<code>r1_dmv2</code>): ~$12 (REPORT §3ad). REPORT §3ab does not itemize the 4B/8B/14B scaling
-ladder, so it is left out rather than estimated.</p>
-<h3 class="t-feature" id="eval-suite">Eval suite</h3>
-<p>Evidence: SNLI, MNLI, ANLI, BoolQ. Topic/intent: CLINC-150, HWU64, 20 Newsgroups, TREC-fine.
-Knowledge: MMLU-Pro among-K, Δ_q (shuffled-question control), TruthfulQA-MC1. Typed/workflow,
-held-out: noul, score, style, and DecisionMix v2's family/grammar/style/level-7/rubric-flip.
-Uncertainty: ChaosNLI plus real and synthetic held-out sets from the U corpus. External, never
-trained on: PagerDuty, jevlogs, Mind2Web, tree-choice (K=320), typed-decisions. Public benchmark:
-JevBench (231-item public subset; see the D1 disclosure in Findings).</p></div>
-</div></div>
+  <figure class="fig">
+    <div id="chart-decisionflow"></div>
+    <figcaption>One decision, end to end. The candidate set enters as text, the pass stops at the tap, and the gate sits outside the softmax rather than inside the candidate list. Bar lengths at the right are shape, not measurements.</figcaption>
+  </figure>
+  <div class="mathblock">
+    <div class="eq" role="button" tabindex="0" aria-expanded="false"><div class="eq-face" data-face="math"><math display="block"><mrow><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>j</mi></msub><mo>&#8739;</mo><mi>S</mi><mo>,</mo><mi>Q</mi><mo>,</mo><mi>C</mi><mo>)</mo><mo>,</mo><mspace width="1em"/><msub><mi>p</mi><mi>&#8709;</mi></msub><mo>+</mo><munder><mo>&#8721;</mo><mi>j</mi></munder><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>j</mi></msub><mo>)</mo><mo>=</mo><mn>1</mn></mrow></math></div><div class="eq-face eq-plain" data-face="plain" hidden><p>Every candidate you hand in gets a probability, and so does refusing to answer. They add to exactly one, so the model always accounts for all of its confidence — none of it goes missing, and abstaining competes with the answers rather than sitting outside them.</p></div><span class="eq-tip t-mono" aria-hidden="true">click to simplify</span></div>
+    <p class="mathnote t-mono">No token is sampled. C is text, supplied per call, so the model has no output index for any label and has to read the candidates to score them.</p>
+  </div>
+  <div class="claim">
+    <p>At the tap layer the pass gives a terminal decision state <em>h</em><sub>D</sub> and, for each candidate, a contextual state <em>h</em><sub>j</sub>: the mean hidden state over the tokens where that option was rendered. Both are projected, and the score is a bilinear form with a small learned correction on the elementwise product.</p>
+  </div>
+  <div class="mathblock">
+    <div class="eq" role="button" tabindex="0" aria-expanded="false"><div class="eq-face" data-face="math"><math display="block"><mrow><mi>u</mi><mo>=</mo><msub><mi>W</mi><mi>h</mi></msub><msub><mi>h</mi><mi>D</mi></msub><mo>,</mo><mspace width="1.4em"/><msub><mi>v</mi><mi>j</mi></msub><mo>=</mo><msub><mi>W</mi><mi>c</mi></msub><msub><mi>h</mi><mi>j</mi></msub><mo>,</mo><mspace width="1.4em"/><msub><mi>s</mi><mi>j</mi></msub><mo>=</mo><mfrac><mrow><msup><mi>u</mi><mo>&#8868;</mo></msup><msub><mi>v</mi><mi>j</mi></msub></mrow><msqrt><msub><mi>d</mi><mi>v</mi></msub></msqrt></mfrac><mo>+</mo><msup><mi>w</mi><mo>&#8868;</mo></msup><mo>(</mo><mi>u</mi><mo>&#8857;</mo><msub><mi>v</mi><mi>j</mi></msub><mo>)</mo><mo>+</mo><mi>g</mi><mo>(</mo><mi>u</mi><mo>&#8857;</mo><msub><mi>v</mi><mi>j</mi></msub><mo>)</mo></mrow></math></div><div class="eq-face eq-plain" data-face="plain" hidden><p>The decision and each candidate are projected into the same small space, then compared three ways: how far they point in the same direction, a learned weighting of where they agree dimension by dimension, and a small network reading that same agreement. Adding the three gives one score for that candidate.</p></div><span class="eq-tip t-mono" aria-hidden="true">click to simplify</span></div>
+    <p class="mathnote t-mono">g is a two-layer MLP. The option letters stay in the rendered text and are never read out.</p>
+  </div>
+  <div class="claim">
+    <p>Abstention is a gate outside the candidate softmax, not a line in the list. It reads permutation-invariant statistics over the scores &mdash; maximum, top-two margin, mean, log-mean-exp &mdash; plus the projected decision state, and returns a single <em>r</em>.</p>
+  </div>
+  <div class="mathblock">
+    <div class="eq" role="button" tabindex="0" aria-expanded="false"><div class="eq-face" data-face="math"><math display="block"><mrow><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>j</mi></msub><mo>)</mo><mo>=</mo><mo>(</mo><mn>1</mn><mo>&#8722;</mo><mi>r</mi><mo>)</mo><mfrac><mrow><mi>exp</mi><mo>(</mo><msub><mi>s</mi><mi>j</mi></msub><mo>/</mo><mi>T</mi><mo>)</mo></mrow><mrow><munder><mo>&#8721;</mo><mi>k</mi></munder><mi>exp</mi><mo>(</mo><msub><mi>s</mi><mi>k</mi></msub><mo>/</mo><mi>T</mi><mo>)</mo></mrow></mfrac><mo>,</mo><mspace width="1.4em"/><msub><mi>p</mi><mi>&#8709;</mi></msub><mo>=</mo><mi>r</mi></mrow></math></div><div class="eq-face eq-plain" data-face="plain" hidden><p>Softmax turns raw scores into probabilities, and T sets how sharp: low T commits to a winner, high T spreads the mass. Then r is held back as the chance of not answering at all, and every candidate is scaled by whatever is left over.</p></div><span class="eq-tip t-mono" aria-hidden="true">click to simplify</span></div>
+  </div>
+  <div class="claim">
+    <p>Two properties fall straight out of that shape, and both are exact rather than measured.</p>
+  </div>
+  <div class="proof">
+    <p class="proof-head t-mono">Pairwise odds do not depend on abstention</p>
+    <p>Take any two candidates. The factor <em>(1&minus;r)</em> multiplies every non-null candidate, so it cancels:</p>
+    <div class="eq" role="button" tabindex="0" aria-expanded="false"><div class="eq-face" data-face="math"><math display="block"><mrow><mfrac><mrow><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>j</mi></msub><mo>)</mo></mrow><mrow><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>k</mi></msub><mo>)</mo></mrow></mfrac><mo>=</mo><mfrac><mrow><mo>(</mo><mn>1</mn><mo>&#8722;</mo><mi>r</mi><mo>)</mo><mi>exp</mi><mo>(</mo><msub><mi>s</mi><mi>j</mi></msub><mo>/</mo><mi>T</mi><mo>)</mo></mrow><mrow><mo>(</mo><mn>1</mn><mo>&#8722;</mo><mi>r</mi><mo>)</mo><mi>exp</mi><mo>(</mo><msub><mi>s</mi><mi>k</mi></msub><mo>/</mo><mi>T</mi><mo>)</mo></mrow></mfrac><mo>=</mo><mi>exp</mi><mo>(</mo><mo>(</mo><msub><mi>s</mi><mi>j</mi></msub><mo>&#8722;</mo><msub><mi>s</mi><mi>k</mi></msub><mo>)</mo><mo>/</mo><mi>T</mi><mo>)</mo></mrow></math></div><div class="eq-face eq-plain" data-face="plain" hidden><p>Put any two candidates over one another and the (1−r) sits on the top and the bottom, so it cancels. However likely the model is to abstain, it can never reorder the candidates — which is why you can drop the abstention and reuse the rest unchanged.</p></div><span class="eq-tip t-mono" aria-hidden="true">click to simplify</span></div>
+    <p>So how likely the model is to abstain never reorders the candidates, and a caller who has already decided not to abstain can use the renormalised distribution unchanged. The scores themselves stay set-dependent; that is the part the gate does not touch.</p>
+    <p class="proof-head t-mono">The gate is temperature-invariant</p>
+    <p><em>T</em> enters only the candidate softmax, and <em>r</em> reads untempered statistics. Recalibrating temperature therefore never moves <em>p</em><sub>&#8709;</sub> &mdash; you can tune the sharpness of the answer without disturbing the decision to answer at all.</p>
+  </div>
+  <div class="claim">
+    <p>The types are contracts on that distribution. Choice is the K-way readout. Score reuses it over ordered levels with a smoothed target, <em>t&#771;</em><sub>j</sub> &prop; exp(&minus;&#124;j&minus;y&#124;/&tau;) at &tau;&nbsp;=&nbsp;0.7, which adds no parameters and makes a near miss cost less than a distant one. Noul takes a dedicated Bernoulli head, P(yes)&nbsp;=&nbsp;&sigma;(<em>w</em><sub>n</sub><sup>&#8868;</sup><em>h</em><sub>D</sub>), on a suffix that renders no candidate text at all &mdash; which is why label order cannot enter its computation.</p>
+    <p>M decisions about one state cost <em>O</em>(&#124;S&#124;) once, plus <em>M</em>&middot;<em>O</em>(&#124;Q&#124;&nbsp;+&nbsp;&#124;C&#124;) for the suffixes, through only the kept 71% of layers. That is the whole reason the second question is cheap.</p>
+  </div>
 </section>
 
-<section class="page chapter" id="the-line-dips-before-it-climbs">
-  <div class="chapter-head">
-    <p class="t-eyebrow">04 — TIMELINE</p>
-    <div><h2 class="t-section">The line dips before it climbs</h2></div>
+<section class="page chapter" id="readout">
+  <div class="claim">
+    <h2>Three ways to read an answer out</h2>
+    <p>Once the pass is done there is more than one place to look. <strong>N1</strong> reads the next-token logits of the option letters. That is the standard multiple-choice interface, never sampled. <strong>N2</strong> scores the decision state against a frozen embedding of each label's text. <strong>N3</strong>, the one Typical ships, scores it against each candidate's own contextual state: the hidden state over the tokens where that option was rendered, inside the same pass.</p>
+    <p>All three arms train on the same data for the same steps with the same option shuffling. They differ in what the decision state is scored against.</p>
   </div>
-  <div class="chapter-body"><div class="body">
-<div class="prose"><p>JevBench-standard accuracy for the lineage that became typical-small and typical-medium, from the
-first energy checkpoint to the frozen releases, annotated with the bugs found on the way and each
-phase's verdict. Hover a marker for its number and REPORT section. Six days,
-<span id="timeline-run-count">90</span> runs, counted straight from the source branch's git tree
-rather than the local run index used in Pipeline above (<code>runs/</code> minus
-probe/jev/bench/zero-shot/smoke/dump/leak/kb-audit entries and result files, so baselines and
-ablations are included); the two counts disagree by a couple of runs because they filter by
-different rules.</p>
-<p>D1 — JevBench: public subset (231 ids), unranked, n = 72 standard (SE ≈ .058); probabilities
-conditioned on non-∅; hard tier at chance for both models.</p></div>
-<div class="media" style="padding:30px"><div class="chart" id="chart-timeline" data-chart="timeline"></div></div>
-<div class="prose"><p>Standard accuracy on this chart dips before it climbs, and its last point is not a release: the 14B
-ladder mark at .875 is an unreleased scaling-ladder probe, run once on the pre-DecisionMix-v2
-recipe as an upper-bound check rather than a shipped checkpoint (REPORT §3ab). The .750 → .694 drop
-at the typical-small step is a real trade (<a href="https://huggingface.co/OzLabs/typical-small">§3ae</a>):
-DecisionMix v2 and the typed heads raise held-out noul/score/flip and clear the PagerDuty floor for
-both models (.817 / .838 vs .792), at the cost of about 1 SE of JevBench standard. jevlogs
-(research-licensed, caveated) is marginal for small (.710 vs floor .697) and below floor for medium
-(.673).</p>
-<h3 class="t-feature" id="every-run-every-set">Every run, every set</h3>
-<p>Every evaluation set for each of the 128 dated runs in the project appears below, ordered by date
-against the constant-prediction floor where one exists.</p></div>
-<div class="media" style="padding:30px"><div class="chart" id="chart-runs" data-chart="runs"></div></div>
-<div class="prose"><p>A handful of fixes moved the numbers; most runs were controls that did not.</p></div>
-</div></div>
+  <figure class="fig">
+    <div id="chart-readouts"></div>
+    <figcaption>Three readouts of one decision pass, 1.7B backbone. Bars are relative to the best value in the row.</figcaption>
+  </figure>
+  <div class="claim">
+    <p>N2 is the informative failure. Give the model the label's meaning but not the slot it was rendered in and among-K accuracy drops 10 to 12 points, half the question-conditioned signal goes, and on Banking77 with 77 options it collapses to .012 against N3's .497. What the decision state has learned is partly <em>which rendered slot holds the answer</em>, and an independently embedded label cannot carry that.</p>
+    <p>N3 keeps N1's question-dependence (.106 against .109 across seeds) and is far steadier when the option set changes. Add three unrelated options and N1's pairwise log-odds move by .44 to .46; N3's move by .09 to .13, a quarter as much.</p>
+  </div>
 </section>
 
-<section class="page chapter" id="eight-results-each-with-a-control">
-  <div class="chapter-head">
-    <p class="t-eyebrow">05 — FINDINGS</p>
-    <div><h2 class="t-section">Eight results, each with a control</h2></div>
+<section class="page chapter" id="control">
+  <div class="claim">
+    <h2>The control that decides whether any of this is real</h2>
+    <p>A decision model can score well above chance on a benchmark without reading the question at all, by learning which option strings tend to be correct together. Accuracy will not tell you. Calibration will not tell you either: one of the variants below has an expected calibration error of .04.</p>
+    <p>So we measure &Delta;q: accuracy with the real question, minus accuracy with the question replaced by an unrelated one. A model that scores the same either way has not used the question. Below is every variant we tested, ranked by accuracy. That is the view a leaderboard gives you.</p>
   </div>
-  <div class="chapter-body"><div class="body">
-<div class="prose"><p>Eight results, each with a matched control and, where it mattered, a seed pair or a full-row
-re-evaluation (REPORT §6).</p>
-<p>D1 — JevBench: public subset (231 ids), unranked, n = 72 standard (SE ≈ .058); probabilities
-conditioned on non-∅; hard tier at chance for both models.</p></div>
-<div class="ucard-grid"><div class="ucard" style="padding-top:30px;min-height:0"><p class="t-eyebrow muted">01</p><p class="t-feature">A candidate-blind state carries priors and calibration, not question-dependent knowledge</p><p>at
-   tap 20 and at full depth. A candidate-aware suffix computation keeps the knowledge; so does a
-   direct contextual readout, with a quarter of the letter interface's order fragility.
-   (REPORT §3j, §3l, §3s, §3v)</p></div><div class="ucard" style="padding-top:30px;min-height:0"><p class="t-eyebrow muted">02</p><p class="t-feature">The evidence-vs-knowledge trade-off was two artifacts: the last-layer tap and a rendered "none
-   of the above" line.</p><p>Removing both gives one model (<code>nc_v3_tap20</code>, research checkpoint, not
-   released): evidence at energy level, Δ_q kept, null monotone in K, JevBench standard .694 with no
-   workflow training. (REPORT §3r, §3t)</p></div><div class="ucard" style="padding-top:30px;min-height:0"><p class="t-eyebrow muted">03</p><p class="t-feature">Rubric-conditioned workflow data teaches the decision shapes it contains, not general external
-   abstraction.</p><p>Held-out rubric styles +34, held-out families +9–14, rubric-flip both-correct .43
-   → .57. jevlogs, PagerDuty, and Mind2Web stayed at their constant-prediction floor for K-way
-   Choice until the typed heads and DecisionMix v2 (findings 6–7); of those, only PagerDuty is
-   cleared by both released models (.817 / .838 vs .792). jevlogs (research-licensed, caveated) is
-   marginal for small (.710 vs .697) and below floor for medium (.673). (REPORT §3w, §3x)</p></div><div class="ucard" style="padding-top:30px;min-height:0"><p class="t-eyebrow muted">04</p><p class="t-feature">The bucket mix (E/K/W/U) moves accuracy as much as an architecture change.</p><p>E .45–.50 restores evidence. ∅-augmented W rows fix
-   abstention and MMLU, which no single eval-time null threshold can do for E and W at once. The
-   exact W fraction in [.1, .2] does not matter once null augmentation is on.
-   (REPORT §3y, §3z, §3aa)</p></div><div class="ucard" style="padding-top:30px;min-height:0"><p class="t-eyebrow muted">05</p><p class="t-feature">Small batch under-fits: better hard-tier and soft-target numbers, worse everything
-   in-distribution.</p><p>At 1.7B the JevBench hard tier is a probability-quality problem, not a
-   data-volume one. (REPORT §3aa)</p></div><div class="ucard" style="padding-top:30px;min-height:0"><p class="t-eyebrow muted">06</p><p class="t-feature">Typed primitives win on probability quality at zero or negative decision-accuracy cost.</p><p>Ordinal smoothing (τ=0.7) changes no JevBench decision; held-out score NLL 2.07 → 1.23
-   (intermediate checkpoints, §3ac; released models 1.01 / 1.02). The Bernoulli Noul head is exactly
-   order-invariant by construction and was the first thing to clear an untouched external floor by
-   a margin: PagerDuty .602 → .886 (intermediate checkpoint, §3ac; released models .817 / .838 vs
-   floor .792). (REPORT §3ac)</p></div><div class="ucard" style="padding-top:30px;min-height:0"><p class="t-eyebrow muted">07</p><p class="t-feature">DecisionMix v2's hard curriculum transfers within its own rule grammar, not beyond it.</p><p>Held-out families/grammars +34–37, rubric-flip .48 → .71, JevBench adversarial .33 → .83
-   (intermediate checkpoints r1_cand → r1_dmv2, §3ad, not released; released models' wh_heldout,
-   charted below: typical-small .836/.898/.896, typical-medium .874/.893/.891). Level-7 composition (temporal, unit, expected-value, trade-off) sits at ~.50,
-   chance, for every checkpoint on the ladder. The U corpus improves likelihood without improving
-   top-1 accuracy. (REPORT §3ad)</p></div><div class="ucard" style="padding-top:30px;min-height:0"><p class="t-eyebrow muted">08</p><p class="t-feature">The same recipe at 1.7B → 4B → 14B lifts standard-tier accuracy, knowledge, and
-   in-distribution workflow decisions monotonically at roughly constant latency.</p><p>JevBench
-   standard .750 → .833 → .875, MMLU-Pro among-K .330 → .457 → .514, held-out noul .70 → .84 → .89,
-   at 45 → 56 → 60 ms per decision (scaling-ladder checkpoints, §3ab, same pre-DecisionMix-v2
-   recipe at every size, none released; typical-small/typical-medium use a later recipe and score
-   .694 / .806). 8B is a checkpoint outlier in both frozen and trained form.
-   Long-state families and soft-target calibration do not scale: the frozen 14B with three shots
-   beats the trained 14B on the hard tier (.559 vs. .468). The hard tier's failure comes from data
-   and objective at every size we tested, and model capacity does not fix it. (REPORT §3ab)</p></div></div>
-<div class="prose"><h3 class="t-feature" id="held-out-curriculum-vs-external-never-trained-sets">Held-out curriculum vs. external, never-trained sets</h3>
-<p>Two kinds of set: inside DecisionMix v2's own grammar (held out by family, style, or grammar, plus
-level 7, kept in as an untrained-composition control that sits at chance for every checkpoint), and
-never trained on at all (real logging, ticketing, and web-agent corpora, scored against a
-constant-prediction floor).</p></div>
-<div class="media" style="padding:30px"><div class="chart" id="chart-heldout" data-chart="heldout"></div></div>
-<div class="media" style="padding:30px"><div class="chart" id="chart-external" data-chart="external"></div></div>
-<div class="prose"><h3 class="t-feature" id="jevbench-per-family-typical-small">JevBench, per family (typical-small)</h3></div>
-<div class="media" style="padding:30px"><div class="chart" id="chart-jevfamily" data-chart="jevfamily"></div></div>
-<div class="ucard" style="padding-top:30px;min-height:0;max-width:72ch"><blockquote class="note"> <p><strong>D1 — JevBench disclosure (<a href="https://huggingface.co/OzLabs/typical-small">REPORT §3q</a>).</strong> JevBench numbers are a public-subset run against <code>fstandhartinger/jevbench</code> v1.2.1 (72 standard / 48 easy / 111 hard public ids), not a submitted or ranked leaderboard entry (the leaderboard requires ≥95% coverage including 146 non-public judge items). Probabilities are the head's softmax conditioned on non-∅ (mean p_null ≈ .03). Latency is in-process on one H100, one decision at a time, model load excluded. Option order is the harness's label order; a reversed-order control on a related checkpoint moved standard accuracy ±4 points, larger than the differences between our own checkpoints. Chance/majority baselines are .311 standard / .284 easy / .336 hard (n = 72 standard, SE ≈ .058) — the hard tier of both released models is within 1 SE of chance.</p> </blockquote></div>
-<div class="prose"><h3 class="t-feature" id="calibration-bin-by-bin">Calibration, bin by bin</h3>
-<p>The accuracy of each confidence bin on the JevBench public subset sits in the chart below, next to
-the weighted gap between them that makes up the ECE.</p></div>
-<div class="media" style="padding:30px"><div class="chart" id="chart-calibration" data-chart="calibration"></div></div>
-<div class="prose"><p>Calibration holds on the standard tier and breaks on the hard tier, where both models are also at
-chance.</p>
-<h3 class="t-feature" id="knowledge-retained-from-the-backbone">Knowledge retained from the backbone</h3>
-<p>MMLU-Pro among-K, Δ_q (shuffled-question control), and TruthfulQA-MC1 measure how much of the
-frozen backbone's knowledge survives the fine-tune; they are not a selling point. typical-small:
-among-K .343, Δ_q .127, TruthfulQA .257. typical-medium: among-K .458, Δ_q .193, TruthfulQA .408
-(<a href="https://huggingface.co/OzLabs/typical-medium">REPORT §3af table</a>). Level-7 composition, never in
-the training data, stays at chance at every size.</p></div>
-</div></div>
+  <figure class="fig">
+    <div class="show-head"><p class="show-eyebrow t-mono">12 variants &middot; MMLU-Pro, n = 1,200</p><button class="btn dark" type="button" id="dq-reveal">Add the control</button></div>
+    <div class="chart" id="chart-deltaq"></div>
+    <figcaption>Accuracy against &Delta;q. The band is the &plusmn;.02 spread 1,200 items allow. Hover a point for its configuration.</figcaption>
+  </figure>
+  <div class="claim">
+    <p>Six variants computed the decision state <em>before</em> seeing the candidates. All six sit at zero. Every readout that processes the candidates inside the forward pass carries .09 to .12, and so does the listwise teacher they were distilled from.</p>
+    <p>We tried to move it and could not. Cross-attention over every candidate token: &minus;.003. Supervising the change in the teacher's log-odds across seven candidate sets: exactly zero. Reading all 28 layers instead of a mid-depth tap: &minus;.008. Their accuracy of .12 to .17 sits well above the .10 chance rate and comes entirely from priors over which labels go together.</p>
+    <p>One alternative we cannot rule out is optimisation: the zero-initialised set-conditioning attention stayed inert through 4,000 steps of direct supervision. This may be hard to train rather than impossible to represent.</p>
+  </div>
 </section>
 
-<section class="page chapter" id="the-long-state-bug-and-what-comes-next">
-  <div class="chapter-head">
-    <p class="t-eyebrow">06 — IN FLIGHT</p>
-    <div><h2 class="t-section">The long-state bug and what comes next</h2></div>
+<section class="page chapter" id="depth">
+  <div class="claim">
+    <h2>Why the head is not on top</h2>
+    <p>We truncate the backbone at about 71% of its depth and never compute the layers above. That was not an efficiency decision.</p>
+    <p>Our first full-scale model read the final layer and scored <strong>58.6 on SNLI</strong>. That is the hypothesis-only baseline: the number you get by ignoring the premise and guessing from the sentence you are asked about. The last layer had specialised into predicting the next token and had stopped carrying the evidence.</p>
   </div>
-  <div class="chapter-body"><div class="body">
-<div class="prose"><p>The hard-tier collapse at scale had a specific cause, and the fix is training now (REPORT §3ag,
-2026-09-21/22; runs in flight).</p>
-<h3 class="t-feature" id="a-the-data-bug">a) The data bug</h3>
-<p><code>data_wf_long</code> (the 23k long-policy rows added in §3z) renders <code>Case: &lt;facts&gt; &lt;request&gt;</code> with the
-facts last. Measured state lengths are p10/p50/p90 = 1,190 / 1,845 / 2,490 tokens, and training
-right-truncates at <code>--max_state</code>: at 1,024 tokens (Release 1) that cut the facts off 98.8% of those
-rows, at 256 tokens (the scaling ladder) all of them. Every model since §3z learned to answer long
-policies confidently from states without the facts, which is the long_policy score: .05 for the
-14B (§3ab), .21 for typical-medium.</p>
-<p>Fixes (commit <code>2fad326</code>): facts-first regeneration (<code>wf/train_long_v2.jsonl</code>, case position under 8%
-of the text), <code>--drop_truncated</code> (rows longer than the window are dropped, never cut), <code>--grad_ckpt</code>,
-<code>--best_on</code> (checkpoint selection on the uncertainty and curriculum val NLL), and
-frozen-backbone teacher labels via <code>scripts/teacher_label.py --zero_shot --shots 3</code>.
-(Correction 2026-09-24: <code>--brier_lambda</code> was listed here but the run args record 0.0; no Brier term was trained.)</p>
-<h3 class="t-feature" id="b-the-mask-bug">b) The mask bug</h3>
-<p>The SDPA padding mask was built as <code>long</code>, which forces PyTorch's O(L²) math kernel and caused the
-14B OOMs at 3,072-token states and the scaling ladder's memory pain generally. Building it as
-<code>bool</code> fixed it (commit <code>6d0a7e3</code>).</p>
-<h3 class="t-feature" id="c-frozen-controls">c) Frozen controls</h3>
-<p>Frozen backbones, scored directly (letter logits over the rendered options, 3 exemplars, the same
-public 231 JevBench ids):</p></div>
-<table class="register">
-<thead>
-<tr>
-<th>frozen backbone</th>
-<th>standard</th>
-<th>easy</th>
-<th>hard</th>
-<th>Brier hard</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td data-label="frozen backbone">Qwen3-1.7B-Base</td>
-<td data-label="standard">.528</td>
-<td data-label="easy">1.00</td>
-<td data-label="hard">.369</td>
-<td data-label="Brier hard">.71</td>
-</tr>
-<tr>
-<td data-label="frozen backbone">Qwen3-4B-Base</td>
-<td data-label="standard">.778</td>
-<td data-label="easy">1.00</td>
-<td data-label="hard">.441</td>
-<td data-label="Brier hard">.67</td>
-</tr>
-<tr>
-<td data-label="frozen backbone">Qwen3-4B (instruct)</td>
-<td data-label="standard">.778</td>
-<td data-label="easy">1.00</td>
-<td data-label="hard">.423</td>
-<td data-label="Brier hard">.95</td>
-</tr>
-<tr>
-<td data-label="frozen backbone">Qwen3-8B-Base</td>
-<td data-label="standard">.556</td>
-<td data-label="easy">.958</td>
-<td data-label="hard">.369</td>
-<td data-label="Brier hard">.74</td>
-</tr>
-<tr>
-<td data-label="frozen backbone">Qwen3-14B-Base</td>
-<td data-label="standard">.819</td>
-<td data-label="easy">1.00</td>
-<td data-label="hard">.559</td>
-<td data-label="Brier hard">.60</td>
-</tr>
-<tr>
-<td data-label="frozen backbone"><strong>Qwen3.5-4B-Base</strong></td>
-<td data-label="standard">.764</td>
-<td data-label="easy">1.00</td>
-<td data-label="hard"><strong>.495</strong></td>
-<td data-label="Brier hard"><strong>.60</strong></td>
-</tr>
-</tbody>
-</table>
-<div class="prose"><p>Instruct-tuning of Qwen3 leaves standard accuracy unchanged (.778 both) while hard-tier calibration
-is much worse (Brier .95 vs .67). The Qwen3.5 generation buys +5 hard and gives
-a 4B model hard-tier calibration matching the frozen 14B's, but not standard accuracy. The
-leaderboard's .83–.99 standard on the same checkpoint (SemIf, open-alternative-jev) comes from their
-rendering and method, which we are now replicating as a probe.</p>
-<h3 class="t-feature" id="d-the-qwen35-port">d) The Qwen3.5 port</h3>
-<p>Qwen3.5 (commit <code>9b1ffac</code>) has base checkpoints at 0.8B / 2B / 4B / 9B / 27B / 35B-A3B, a complete
-replacement ladder. The port handles the VL wrapper config (<code>text_config</code>, <code>.language_model</code>
-unwrapped), the hybrid stack (3× Gated-DeltaNet + 1× full attention; a 71% tap keeps 4 of 6
-full-attention layers at 0.8B), LoRA targets (<code>in_proj_qkv/z/b/a</code> and <code>out_proj</code> on DeltaNet
-layers, q/k/v/o on attention layers, MLP everywhere), and a transformers-5.17 cache gap
-(<code>LinearAttentionLayer</code> lacks <code>batch_repeat_interleave</code>) patched in <code>native_kv_decide</code>.
-Cached-vs-full parity 1e-7, Qwen3 behavior unchanged (153 tests), public <code>inference/</code> mirrors the
-port.</p>
-<h3 class="t-feature" id="e-in-flight">e) In flight</h3>
-<p><code>tl1b</code> (Qwen3-14B, facts-first long rows, 3,072-token states, frozen-14B knowledge distillation, 8k
-steps, best-on calibration val) and its matched control <code>tl1b_nokd</code>; <code>tm2</code> (the Release-1 recipe on
-Qwen3.5-4B-Base, 2,048-token states); and the SemIf rendering probe. Pass rule for the 14B release candidate (not yet a release):
-hard ≥ .559 or hard Brier ≤ .65, long_policy ≥ .35, and CLINC-150 / MMLU among-K within 2 points of
-<code>ladder_14b</code>.</p></div>
-</div></div>
+  <figure class="fig onmeasure">
+    <div class="chart" id="chart-depth"></div>
+    <figcaption>Matched 1.7B runs differing only in where the head reads. Validation NLL falls .430 to .341; &Delta;q is unchanged at .117 and .118.</figcaption>
+  </figure>
+  <div class="claim">
+    <p>Mid-depth carries both the evidence and the question-conditioned knowledge in one model. Every released and ladder checkpoint taps there, and LoRA at rank 16 adapts the top eight kept layers while everything below stays frozen.</p>
+  </div>
 </section>
 
-<section class="page chapter" id="limitations">
-  <div class="chapter-head">
-    <p class="t-eyebrow">07 — SCOPE</p>
-    <div><h2 class="t-section">Limitations</h2></div>
+<section class="page chapter" id="rubrics">
+  <div class="claim">
+    <h2>Teaching a model to read the rule instead of the room</h2>
+    <p>A decision model that memorises &ldquo;this kind of ticket gets that label&rdquo; is worthless the moment the policy changes. So most of the workflow training is counterfactual: the same state and the same option list appear under different rubrics with different correct answers, and only the rubric decides.</p>
+    <p>Counterfactual training is the largest training-distribution effect we measured, larger than anything we changed in the architecture. Held-out families, grammars and rubric styles go from .481 / .507 / .491 to <strong>.827 / .881 / .888</strong>. Held-out rubric-flip accuracy goes from .477 to .710.</p>
+    <p>The control is the part worth reading. Accuracy under a <em>shuffled</em> rubric falls from .446 to .405. The model got worse at answering when we handed it the wrong rule, which is what depending on the rule looks like.</p>
+    <p>It works inside the grammar we generate and stops at its edge. Level-7 composition, which mixes temporal, unit and expected-value reasoning and which our generator never produces, moves from .477 to .498. The curriculum that moved every in-distribution family by thirty-odd points moved that one by two.</p>
   </div>
-  <div class="chapter-body"><div class="body">
-<div class="prose"><p>Re-derived for typical-small and typical-medium, not inherited from a prior write-up.</p>
-<ul>
-<li>We do not claim to be faster, better, or cheaper than Jev or any hosted system: no apples-to-apples
-  run exists, and JevBench is unranked for us.</li>
-<li>We do not do vision, audio, real-time control, game-playing skill, or planning/lookahead.
-  Text-only, one forward pass, no search.</li>
-<li>We are not a knowledge model and do not reason: MMLU-Pro .34 / .46 among-K; level-7 composition
-  (temporal, units, expected value, trade-off) at chance (.495 / .544, floor .46). No arithmetic,
-  timezones, or trade-offs.</li>
-<li>We do not handle long documents: trained at ≤1,024-token states, JevBench long_policy .26 / .21,
-  and the preview checkpoint's hard tier falls from .64 at ≤256 tokens to .23 above 1,024. Cause and
-  fix are in §3ag above; the fix is training now, not yet in a release.</li>
-<li>We do not claim "any label set, any domain": CLINC is −4 versus the untrained base, TREC-fine
-  .508 / .414 (typical-medium −10 versus its own untyped control), held-out rubric styles −4 / −6.</li>
-<li>We do not claim exact order-invariance for Choice or exact independence of irrelevant
-  alternatives. Choice is order-robust (mean-max Δp .01–.08); only Noul is exactly invariant. An
-  added irrelevant candidate moves Δlog-odds .09–.22.</li>
-<li>We do not claim out-of-distribution calibration or hard-tier competence: both released models are
-  at chance on the JevBench hard tier, Brier .79 / .77.</li>
-<li>We do not ship 3 open sizes: two backbone sizes (1.7B, 4B), three checkpoints
-  (typical-small-preview is also 1.7B). No typical-large; the 14B point is a scaling-ladder
-  measurement, not a release.</li>
-<li>Training code is not released. Only <code>inference/</code> is public today; training code release to
-  follow.</li>
-<li>We do not claim JevBench standard improved from the preview to typical-small: it went .750 →
-  .694 (~1 SE), traded for calibration and the typed heads.</li>
-<li>We do not natively serve very large candidate sets (hundreds to thousands) at this head; that
-  needs an energy → top-r → native path, not shipped. The native suffix budget is 1,024 tokens by
-  default.</li>
-<li>We do not claim to beat supervised classifiers on CLINC, Banking77, or TREC.</li>
-<li>jevlogs numbers are not for commercial use (research-licensed, block-level labels, held-out sanity
-  eval only). <code>metaeval/ambient</code> and <code>metaeval/chaos-mnli-ambiguity</code> have undeclared licenses on
-  their HF cards; flagged here, not asserted.</li>
-</ul>
-<h3 class="t-feature" id="license">License</h3>
-<p>The model card declares Apache-2.0 for the released artifact; its <a href="https://huggingface.co/OzLabs/typical-small#license">license
-section</a> is the authoritative statement and
-this page does not restate it. The training mix includes sources with non-commercial or undeclared
-licenses: <code>facebook/anli</code> (CC BY-NC 4.0, loaded for train_r1–r3), which an earlier launch memo
-flagged as a non-commercial blocker, and <code>metaeval/ambient</code> and <code>metaeval/chaos-mnli-ambiguity</code>,
-which declare no license on their HF cards.</p></div>
-</div></div>
 </section>
 
-<section class="page chapter" id="pip-install-three-lines-of-code">
-  <div class="chapter-head">
-    <p class="t-eyebrow">08 — INSTALL</p>
-    <div><h2 class="t-section">Pip install, three lines of code</h2></div>
+<section class="page chapter" id="long">
+  <div class="claim">
+    <h2>Where you put the evidence changes the answer</h2>
+    <p>Training truncates long states from the right. We rendered the supporting facts at the end of every row of our long-policy corpus, so most of those rows lost their evidence before the model ever saw it. We were training the model to answer long policies from states that no longer contained the answer. It learned to expect the case block at the end, and learned not to look anywhere else.</p>
+    <p>Two arms with byte-identical flags, same 23,318 rows, rendered facts-first or facts-last, scored on 605 held-out long states with nothing truncated at evaluation time. Facts-first adds <strong>11.2 points</strong>, <em>p</em> = 5&times;10<sup>&minus;10</sup>, and the gap replicates at a second seed.</p>
   </div>
-  <div class="chapter-body"><div class="body">
-<div class="prose"><p>The public inference package ships inside the model repos on Hugging Face; there is no separate
-GitHub repo yet.</p></div>
-<div class="code"><pre>pip install typical-ai
-</pre></div>
-<div class="code"><pre>from typical_ai import Typical  # pip install typical-ai
-
-m = Typical.from_pretrained(&quot;OzLabs/typical-small&quot;, device=&quot;auto&quot;)
-
-# K-way choice over a fixed label set -&gt; {label: p, ...} + p_null
-m.choice(state, &quot;What does the customer want?&quot;, [&quot;refund&quot;, &quot;replacement&quot;, &quot;repair&quot;])
-
-# Yes/no -&gt; P(yes)
-m.noul(state, &quot;Is the order still under warranty?&quot;)
-
-# Ordinal levels -&gt; {level: p, ...} + p_null + expected (E[index])
-m.score(state, &quot;How urgent is this ticket?&quot;, [&quot;0&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;])
-</pre></div>
-<div class="prose"><p>Inference code is public under
-<a href="https://huggingface.co/OzLabs/typical-small/tree/main/inference"><code>inference/</code></a>; training code
-release to follow. The commands below are verbatim from the release cards.</p>
-<h3 class="t-feature" id="held-out-workflow-external-eval-reproduction">Held-out workflow / external eval reproduction</h3>
-<p>Post-hoc, full state length; requires the private training repo.</p></div>
-<div class="code"><pre>uv run --no-sync python scripts/eval_wf.py --run runs/ts1b --mode native \
-    --files data_wf/eval/*.jsonl data_wf_hf/eval/*.jsonl data_wh/eval/*.jsonl data_u/eval/*.jsonl \
-    --limit 0 --out runs/ts1b/eval_wf_full.json
-</pre></div>
-<div class="prose"><p>JevBench: <code>scripts/jevbench_run.py</code> against the checkpoint in <code>mode="native"</code>. See <code>pcdm_jev/</code> for
-the harness adapter, and REPORT.md §3q for the exact protocol and disclosures, reproduced above in
-Findings.</p>
-<h3 class="t-feature" id="checkpoints">Checkpoints</h3>
-<ul>
-<li><a href="https://huggingface.co/OzLabs/typical-small">OzLabs/typical-small</a>: 1.7B, released.</li>
-<li><a href="https://huggingface.co/OzLabs/typical-medium">OzLabs/typical-medium</a>: 4B, released.</li>
-<li><a href="https://huggingface.co/OzLabs/typical-small-preview">OzLabs/typical-small-preview</a>: 1.7B, the
-  frozen parent of typical-small.</li>
-</ul>
-<h3 class="t-feature" id="jevbench-context-report-3q-same-231-public-ids">JevBench context (<a href="https://huggingface.co/OzLabs/typical-small">REPORT §3q</a>, same 231 public ids)</h3>
-<p>This table is a neutral, public-subset comparison against an unranked leaderboard — D1: 231 public
-ids, n = 72 standard (SE ≈ .058), probabilities conditioned on non-∅, hard tier at chance for both
-models — and not a comparison we draw any claim from.</p></div>
-<table class="register">
-<thead>
-<tr>
-<th>entry</th>
-<th>standard</th>
-<th>easy</th>
-<th>hard</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td data-label="entry">open-jev-deberta-v3-large (classifier, local CPU)</td>
-<td data-label="standard">.431</td>
-<td data-label="easy">1.00</td>
-<td data-label="hard">.378</td>
-</tr>
-<tr>
-<td data-label="entry">GLiNER2 / jeff (GLiFormer 400M) / Laya (ModernBERT)</td>
-<td data-label="standard">.639 / .750 / .694</td>
-<td data-label="easy">1.00</td>
-<td data-label="hard">.369 / .387 / .351</td>
-</tr>
-<tr>
-<td data-label="entry"><strong>typical-small</strong> (<code>ts1b</code>)</td>
-<td data-label="standard">.694</td>
-<td data-label="easy">1.00</td>
-<td data-label="hard">.432</td>
-</tr>
-<tr>
-<td data-label="entry"><strong>typical-medium</strong> (<code>tm1b</code>)</td>
-<td data-label="standard">.806</td>
-<td data-label="easy">1.00</td>
-<td data-label="hard">.423</td>
-</tr>
-<tr>
-<td data-label="entry">14B ladder point (not released)</td>
-<td data-label="standard">.875</td>
-<td data-label="easy">1.00</td>
-<td data-label="hard">.468</td>
-</tr>
-<tr>
-<td data-label="entry">open-alternative-jev (Qwen3.5-4B)</td>
-<td data-label="standard">.833</td>
-<td data-label="easy">1.00</td>
-<td data-label="hard">.568</td>
-</tr>
-<tr>
-<td data-label="entry">system-one-open (Gemma E2B LoRA) / system-one (Qwen3-8B)</td>
-<td data-label="standard">.931 / –</td>
-<td data-label="easy">1.00</td>
-<td data-label="hard">.486 / .486</td>
-</tr>
-<tr>
-<td data-label="entry">SemIf (Qwen3.5-4B) / OpenJev (26B-A4B) / djev</td>
-<td data-label="standard">.986 / .972 / .986</td>
-<td data-label="easy">1.00</td>
-<td data-label="hard">.613 / .640 / .676</td>
-</tr>
-<tr>
-<td data-label="entry">Jev 1.13.0 (closed)</td>
-<td data-label="standard">.986</td>
-<td data-label="easy">1.00</td>
-<td data-label="hard">.730</td>
-</tr>
-</tbody>
-</table>
-<div class="prose"><p>typical-small/-medium rows are the released checkpoints' own JevBench runs (<a href="https://huggingface.co/OzLabs/typical-small">REPORT
-§3ae</a>/<a href="https://huggingface.co/OzLabs/typical-medium">§3af</a>);
-the rest is <a href="https://huggingface.co/OzLabs/typical-small">REPORT §3q</a>'s original comparison and
-predates workflow training on our side. Chance/majority baselines are .311 standard / .284 easy /
-.336 hard.</p></div>
-</div></div>
+  <figure class="fig onmeasure">
+    <div class="chart" id="chart-render"></div>
+    <figcaption>Training render against evaluation render, 605 held-out long states. The diagonal is the matched comparison; the off-diagonal holds the evaluation render fixed. Shade is accuracy above the .413 floor.</figcaption>
+  </figure>
+  <div class="claim">
+    <p>That is a rendering choice, not a modelling one. It is the kind of thing that hides inside a data pipeline and reads as a capability limit for months.</p>
+  </div>
 </section>
 
-<section class="page chapter">
-  <div class="dest">
-    <a href="https://huggingface.co/OzLabs/typical-small"><span class="t-card">Get the weights: 1.7B and 4B, open.</span><span class="t-eyebrow">Hugging Face →</span></a>
-    <a href="index.html#results"><span class="t-card">Back to the results.</span><span class="t-eyebrow">Typical →</span></a>
+<section class="page chapter" id="scaling">
+  <div class="claim">
+    <h2>What size buys, and where it stops</h2>
+    <p>Every trained checkpoint against its own frozen control: the same backbone, no training, letter logits, three examples in the prompt.</p>
+  </div>
+  <figure class="fig">
+    <div class="chart" id="chart-ladder"></div>
+    <figcaption>JevBench standard tier, public subset, against backbone size. Bars are 95% intervals, cluster-bootstrapped over the paraphrase group. Hover any point.</figcaption>
+  </figure>
+  <div class="claim">
+    <p>Training is worth 15 to 20 points of standard-tier accuracy at every size we ran, and the 14B reaches .931. The shipped 4B reaches .861 against its frozen control's .764.</p>
+    <p>Read the intervals before reading the ranking. The standard tier is 72 items drawn from 36 states written two ways; adjacent rows on this chart are not separable, and we do not treat them as if they were.</p>
+    <p>And on the hard tier the ordering inverts. The frozen 14B scores .559 where our trained 14B scores .450. Training helps on the tier we built data for and hurts on the tier we did not. That is the clearest open problem in the project.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="cost">
+  <div class="claim">
+    <h2>What one decision costs</h2>
+    <p>In the research harness a single decision at two options takes 45&nbsp;ms at 1.7B and 60&nbsp;ms at 14B. On the optimised serving path a warm decision is <strong>15.5 to 17&nbsp;ms</strong> at 1.7B and 19 to 21&nbsp;ms for the Qwen3-4B model. The Qwen3.5-4B model measures 34 to 46&nbsp;ms, on reference DeltaNet kernels that nobody has tuned yet.</p>
+    <p>For a loop, what matters is the next decision. The state is already cached, so each further question about it is a short suffix and costs a few milliseconds.</p>
+  </div>
+  <figure class="fig">
+    <div class="media"><div class="chart" id="chart-latency"></div></div>
+    <figcaption>Cost of one decision and of each question after it, measured in process on one H100.</figcaption>
+  </figure>
+</section>
+
+<section class="page chapter" id="get">
+  <div class="claim">
+    <h2>Read it, run it, break it</h2>
+    <p>The paper has the derivations, the full tables and the appendices this page skips. The weights are on Hugging Face and the inference package needs torch, transformers, safetensors, huggingface_hub and numpy.</p>
+  </div>
+  <div class="code"><pre><code>pip install typical-ai</code></pre></div>
+  <div class="code"><pre><code>from typical_ai import Typical
+
+m = Typical.from_pretrained("OzLabs/typical-medium", device="auto")
+m.choice(state, "Which team should own this ticket?", ["billing", "shipping", "support"])</code></pre></div>
+  <div class="claim">
+    <p>If you find a decision it gets confidently wrong, that is the interesting case and we would like to see it.</p>
   </div>
 </section>
 
 <footer class="footer"><div class="page">
   <div class="cols">
-    <div><p class="t-card" style="max-width:20ch">Models that decide, not generate.</p><p class="t-eyebrow mt-30" style="color:var(--color-mid)">Weights and inference code on Hugging Face. Training code to follow.</p></div>
-    <div class="t-mono"><p class="t-eyebrow mb-18">Models</p><p><a href="https://huggingface.co/OzLabs/typical-small">typical-small</a></p><p><a href="https://huggingface.co/OzLabs/typical-medium">typical-medium</a></p><p><a href="https://huggingface.co/OzLabs/typical-small-preview">typical-small-preview</a></p></div>
-    <div class="t-mono"><p class="t-eyebrow mb-18">Site</p><p><a href="index.html#results">Results</a></p><p><a href="index.html#demos">Demos</a></p><p><a href="research.html">Research</a></p><p><a href="research.html#limitations">Limitations</a></p></div>
+    <div><p class="t-card" style="max-width:20ch">Models that decide, not generate.</p><p class="t-eyebrow mt-30" style="color:var(--color-mid)">Weights on Hugging Face, package on PyPI, source on GitHub.</p></div>
+    <div class="t-mono"><p class="t-eyebrow mb-18">Models</p><p><a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">typical-small</a></p><p><a href="https://huggingface.co/OzLabs/typical-medium" target="_blank" rel="noopener">typical-medium</a></p><p><a href="https://huggingface.co/OzLabs/typical-small-preview" target="_blank" rel="noopener">typical-small-preview</a></p></div>
+    <div class="t-mono"><p class="t-eyebrow mb-18">Site</p><p><a href="index.html#field">Results</a></p><p><a href="index.html#watch">Demos</a></p><p><a href="research.html">Research</a></p></div>
   </div>
-  <div class="rule t-eyebrow" style="color:var(--color-mid)">Every number on this page traces to a file under site/data</div>
+  <div class="rule t-eyebrow" style="color:var(--color-mid)">Every number on this page is transcribed from the paper</div>
 </div></footer>
 
 <script src="js/vendor/gsap.min.js" defer></script>
 <script src="js/vendor/ScrollTrigger.min.js" defer></script>
-<script type="module" src="js/research.js"></script>
+<script type="module" src="js/shell.js"></script>
+<script type="module" src="js/researchpage.js"></script>
 </body>
 </html>
