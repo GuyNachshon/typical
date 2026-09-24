@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tetris Race — You vs. Typical</title>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme:light; --field:#d7df4b; --ink:#15202a; --muted:#334018; --line:#8e963d; --signal:#962f32; --well:#123047; --cell:#244a60; --menu-ink:#edf0be; }
+  * { box-sizing:border-box } html,body { height:100%; overflow:hidden } body { margin:0; color:var(--ink); background:var(--field); font:500 14px/1.25 "Chakra Petch",ui-sans-serif,system-ui,sans-serif; }
+  main { position:relative; isolation:isolate; width:100%; height:100%; padding:20px 28px 16px; overflow:hidden; background:var(--field); } main>* { position:relative; z-index:1; }
+  header { display:flex; justify-content:space-between; align-items:end; gap:16px; margin-bottom:15px; } h1 { margin:0; letter-spacing:-.08em; font:700 clamp(30px,3.8vw,46px)/.84 "Chakra Petch",ui-sans-serif,sans-serif; text-transform:uppercase; } h1 i { color:var(--signal); font-style:normal; } .tag { color:var(--muted); font:500 12px/1.3 "DM Mono",ui-monospace,monospace; letter-spacing:.03em; white-space:nowrap; }
+  .arena { display:grid; grid-template-columns:1fr auto 1fr; justify-items:center; gap:clamp(16px,5vw,68px); align-items:start; } .player { width:min(100%,260px); min-width:0; } .cap { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin:0 0 7px; color:var(--muted); font:500 12px/1.3 "DM Mono",ui-monospace,monospace; letter-spacing:.03em; } .cap b { color:var(--ink); font-size:12px; } .ai .cap b { color:var(--signal); }
+  .board { width:100%; max-width:min(260px,calc((100vh - 296px)/2)); aspect-ratio:1/2; display:grid; grid-template-columns:repeat(10,1fr); grid-template-rows:repeat(20,1fr); gap:1px; padding:4px; margin-inline:auto; border:2px solid var(--ink); background:var(--well); } .cell { background:var(--cell); } .cell.lock { background:var(--c); box-shadow:inset 1px 1px #fff7; } .cell.ghost { background:color-mix(in srgb,var(--c) 14%,var(--cell)); outline:1px dashed color-mix(in srgb,var(--c) 65%,transparent); } .cell.fall { background:var(--c); box-shadow:inset 2px 2px #fff8; }
+  .stats { display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-top:8px; color:var(--muted); font:500 12px/1.3 "DM Mono",ui-monospace,monospace; } .stats b { display:block; margin-top:3px; color:var(--ink); font-size:15px; } .ai .stats b { color:var(--signal); }
+  .versus { align-self:center; color:var(--signal); font:700 22px/.8 "Chakra Petch",ui-sans-serif,sans-serif; letter-spacing:-.1em; }
+  .hud { display:flex; align-items:center; justify-content:center; gap:11px; margin:12px 0 10px; padding:8px; border-block:1px solid var(--line); color:var(--muted); font:500 12px/1.3 "DM Mono",ui-monospace,monospace; } .hud strong { color:var(--signal); } #state { color:var(--ink); } #aiThought { color:var(--muted); }
+  .controls { display:flex; align-items:center; justify-content:space-between; gap:10px; } .keys { color:var(--muted); font:500 12px/1.6 "DM Mono",ui-monospace,monospace; } kbd,button { border:1px solid var(--ink); background:transparent; color:var(--ink); border-radius:0; font:500 12px/1.3 "DM Mono",ui-monospace,monospace; padding:5px 7px; } button { cursor:pointer; } button:hover { background:var(--ink); color:var(--field); } button:active { transform:translateY(1px) }
+  .touch { display:none; grid-template-columns:repeat(3,42px); gap:5px; } .touch button { height:36px; padding:0; font-size:16px; } .touch button:nth-child(1),.touch button:nth-child(5) { grid-column:2 } .help { margin:9px 0 0; color:var(--muted); font:500 12px/1.3 "DM Mono",ui-monospace,monospace; text-align:center; } .pulse { animation:pulse .45s linear 2; }
+  .start-menu { position:absolute; z-index:4; inset:0; display:grid; place-items:center; padding:24px; background:#d7df4be8; opacity:0; visibility:hidden; transition:opacity .22s ease,visibility .22s; } body.is-ready .start-menu { opacity:1; visibility:visible; } .menu { width:min(390px,100%); padding:28px 30px 26px; border:2px solid var(--ink); background:var(--well); color:var(--menu-ink); text-align:left; } .menu h2 { margin:8px 0 10px; font:700 clamp(30px,5vw,46px)/.88 "Chakra Petch",ui-sans-serif,sans-serif; letter-spacing:-.08em; } .menu p { margin:0; color:var(--menu-ink); font:500 12px/1.55 "DM Mono",ui-monospace,monospace; } .menu button { margin:22px 0 14px; padding:11px 18px; border-color:var(--field); background:var(--field); color:var(--ink); font-size:12px; letter-spacing:.03em; } .menu button:hover { background:var(--signal); border-color:var(--signal); color:var(--menu-ink); } .menu .tag { color:var(--field); }
+  @keyframes pulse { 50% { filter:brightness(1.9) } }
+  @media (max-width:520px) { main { padding:15px 11px 12px } header { margin-bottom:10px } header>.tag,.cap span { display:none } .arena { gap:10px } .versus { font-size:15px } .board { padding:2px; gap:1px } .touch { display:grid } .keys { display:none } .menu { padding:24px 18px } }
+  @media (max-height:680px) { main { padding:10px 16px } header { margin-bottom:8px } .hud { margin:8px 0; padding:6px } .help { margin-top:7px } .board { max-width:min(190px,calc((100vh - 280px)/2)) } }
+  @media (prefers-reduced-motion:reduce) { .start-menu,.pulse { transition:none; animation:none } }
+</style>
+</head>
+<body><main>
+  <header><div><div class="tag">PLAYABLE 1V1 · TWO-BOARD RACE</div><h1>TETRIS <i>RACE</i></h1></div><div class="tag">YOU / LEFT · TYPICAL / RIGHT</div></header>
+  <section class="arena" aria-label="Tetris competition">
+    <div class="player"><div class="cap"><b>YOU · CONTROLLER</b><span id="youNext">NEXT: —</span></div><div class="board" id="youBoard" aria-label="Your Tetris board"></div><div class="stats"><span>SCORE<b id="youScore">000000</b></span><span>LINES<b id="youLines">00</b></span></div></div>
+    <div class="versus">VS</div>
+    <div class="player ai"><div class="cap"><b>AUTOPILOT</b><span id="aiNext">NEXT: —</span></div><div class="board" id="aiBoard" aria-label="AI Tetris board"></div><div class="stats"><span>SCORE<b id="aiScore">000000</b></span><span>LINES<b id="aiLines">00</b></span></div></div>
+  </section>
+  <div class="hud"><strong id="timer">01:30</strong><span>·</span><span id="state">first board to stack out loses</span><span>·</span><span id="aiThought">MODEL: warming up</span></div>
+  <div class="controls"><div class="keys"><kbd>←</kbd><kbd>→</kbd> move &nbsp; <kbd>↑</kbd> rotate &nbsp; <kbd>↓</kbd> soft drop &nbsp; <kbd>space</kbd> drop</div><button id="restart">↻ NEW RACE</button><div class="touch" aria-label="Touch controls"><button data-key="rotate">↻</button><button data-key="left">←</button><button data-key="down">↓</button><button data-key="right">→</button><button data-key="drop">⇩</button></div></div>
+  <p class="help">Click this game, then use arrows and space. Your board is left; Typical's board is right.</p>
+  <section class="start-menu" id="startMenu" role="dialog" aria-modal="true" aria-labelledby="readyTitle">
+    <div class="menu"><div class="tag">TETRIS / HUMAN VS MODEL</div><h2 id="readyTitle">READY TO COMPETE?</h2><p>You control the left board. Typical takes the right.</p><button id="start">▶ START THE RACE</button><p>Arrows to move and rotate · space to hard-drop</p></div>
+  </section>
+</main>
+<script type="module">
+import { Tetris, greedyPolicy, QUESTION } from '../../js/games/tetris.js';
+import { decide, mode, probeHealth } from '../../js/api.js';
+(() => {
+  const W=10,H=20, COLORS={I:'#48e7ff',O:'#ffe55c',T:'#bd77ff',S:'#68ed83',Z:'#ff6e92',J:'#5d91ff',L:'#ffab57'};
+  const BASE={I:[[0,1],[1,1],[2,1],[3,1]],O:[[1,0],[2,0],[1,1],[2,1]],T:[[0,0],[1,0],[2,0],[1,1]],S:[[1,0],[2,0],[0,1],[1,1]],Z:[[0,0],[1,0],[1,1],[2,1]],J:[[0,0],[0,1],[1,1],[2,1]],L:[[2,0],[0,1],[1,1],[2,1]]};
+  const types=Object.keys(BASE), $=id=>document.getElementById(id); let running=false, endAt=0, last=0, aiLast=0, aiBusy=false, aiTurn=0;
+  const rotate=c=>c.map(([x,y])=>[y,-x]); const normal=c=>{const mx=Math.min(...c.map(p=>p[0])),my=Math.min(...c.map(p=>p[1])); return c.map(([x,y])=>[x-mx,y-my]).sort((a,b)=>a[1]-b[1]||a[0]-b[0])};
+  const SHAPES=Object.fromEntries(types.map(t=>{let c=BASE[t],seen=new Set(),r=[]; for(let i=0;i<4;i++){let n=normal(c),k=JSON.stringify(n);if(!seen.has(k)){seen.add(k);r.push(n)}c=rotate(c)} return[t,r]}));
+  function rand(i){ let x=(i+1)*1103515245+12345; x^=x>>>16; return (x>>>0)/4294967296 }
+  function pieceAt(i){const bag=Math.floor(i/7), pos=i%7; let a=[...types]; for(let j=a.length-1;j;j--){let k=Math.floor(rand(bag*17+j)* (j+1));[a[j],a[k]]=[a[k],a[j]]}return a[pos]}
+  function empty(){return Array.from({length:H},()=>Array(W).fill(''))}
+  function valid(board,c,x,y){return c.every(([dx,dy])=>x+dx>=0&&x+dx<W&&y+dy>=0&&y+dy<H&&!board[y+dy][x+dx])}
+  function landing(board,c,x){let y=0;if(!valid(board,c,x,y))return -1;while(valid(board,c,x,y+1))y++;return y}
+  function newPlayer(name){return {name,board:empty(),n:0,score:0,lines:0,dead:false, piece:null, next:pieceAt(0)}}
+  let you, ai;
+  function spawn(p){p.piece={type:pieceAt(p.n++),r:0,x:3,y:0}; p.next=pieceAt(p.n); if(!valid(p.board,cells(p),p.piece.x,0)){p.dead=true;finish(p===you?'AUTOPILOT WINS':'YOU WIN')} }
+  function cells(p,r=p.piece.r){return SHAPES[p.piece.type][r]}
+  function score(c){return [0,100,300,500,800][c]||800}
+  function lock(p){let q=p.piece,c=cells(p); c.forEach(([dx,dy])=>p.board[q.y+dy][q.x+dx]=q.type);let kept=p.board.filter(row=>!row.every(Boolean)), cleared=H-kept.length;while(kept.length<H)kept.unshift(Array(W).fill(''));p.board=kept;p.lines+=cleared;p.score+=score(cleared);spawn(p)}
+  function move(p,dx,dy){if(!p||p.dead)return false;let q=p.piece,c=cells(p);if(valid(p.board,c,q.x+dx,q.y+dy)){q.x+=dx;q.y+=dy;return true}if(dy)lock(p);return false}
+  function turn(p){if(!p||p.dead)return;let q=p.piece,n=(q.r+1)%SHAPES[q.type].length,c=cells(p,n);for(const kick of [0,-1,1,-2,2])if(valid(p.board,c,q.x+kick,q.y)){q.r=n;q.x+=kick;return}}
+  function drop(p){if(!p||p.dead)return;while(move(p,0,1));}
+  // The model sees an exact board map and post-drop outcomes; the policy remains a safety guard
+  // when a live answer is materially worse than the engine's best legal placement.
+  async function aiMove(){if(ai.dead||aiBusy)return;aiBusy=true;const engine=ai,turn=++aiTurn,options=engine.candidateDetails(),labels=options.map(o=>o.label),fallback=greedyPolicy(engine),baseline=options.find(o=>o.label===fallback),snap=engine.state();let move=fallback,live=false,guarded=false;$('aiThought').textContent='MODEL: deciding…';if(mode()==='live'&&labels.length>1){const state=`Competitive Tetris. Board is 10 columns by 20 rows, top to bottom; # is filled and . is empty:\n${engine.boardMap()}\n\nFalling piece: ${snap.current?.type}. Next: ${snap.next}. Every option is a legal hard drop and reports the board AFTER it lands. Prefer clearing lines, then fewer holes, then a lower peak and smoother stack. ${engine.describe()}`;const result=await decide(state,[{type:'choice',question:QUESTION,labels}]);const picked=options.find(o=>o.label===result?.results?.[0]?.argmax);if(picked){if(!baseline||picked.score>=baseline.score-4){move=picked.label;live=true}else guarded=true;}}if(ai===engine&&turn===aiTurn&&!engine.dead)engine.step(move);$('aiThought').textContent=live?'MODEL: placed':guarded?'POLICY: safety guard':'POLICY: placed';aiBusy=false;}
+  function render(p, prefix){let s=prefix==='ai'?p.state():p,b=s.board.map(r=>r.slice()),ghost=null;if(!s.dead){let q=s.current??s.piece,c=q.cells??cells(s),x=q.col??q.x,y=q.y??0;ghost=landing(b,c,x);c.forEach(([dx,dy])=>{if(ghost>=0&&!b[ghost+dy][x+dx])b[ghost+dy][x+dx]='ghost-'+q.type});c.forEach(([dx,dy])=>b[y+dy][x+dx]='fall-'+q.type)}let root=$(prefix+'Board');root.replaceChildren(...b.flatMap(row=>row.map(v=>{let e=document.createElement('i');e.className='cell '+(v?' '+(v.startsWith('ghost')?'ghost':v.startsWith('fall')?'fall':'lock'):'' );let t=v?.split('-').pop()||v;if(v)e.style.setProperty('--c',COLORS[t]);return e})));$(prefix+'Score').textContent=String(s.score).padStart(6,'0');$(prefix+'Lines').textContent=String(s.lines).padStart(2,'0');$(prefix+'Next').textContent='NEXT: '+s.next;}
+  function renderAll(){render(you,'you');render(ai,'ai')}
+  function finish(msg){if(!running)return;running=false;$('state').textContent=msg+' — NEW RACE?';$('state').classList.add('pulse')}
+  function reset(start=true){aiTurn++;you=newPlayer('you');spawn(you);ai=new Tetris({w:W,h:H,seed:11});running=start;endAt=start?Date.now()+90000:0;last=performance.now();aiLast=last;$('state').textContent=start?'first to stack out loses':'race armed';$('aiThought').textContent=start?'MODEL: warming up':'TYPICAL: standing by';document.body.classList.toggle('is-ready',!start);$('startMenu').setAttribute('aria-hidden',String(start));$('state').classList.remove('pulse');renderAll()}
+  function frame(now){if(running){if(Date.now()>=endAt){finish(you.score===ai.score?'TIE RACE':you.score>ai.score?'YOU WIN':'AUTOPILOT WINS')}if(now-last>680){move(you,0,1);last=now}if(now-aiLast>720){aiMove();aiLast=now}let sec=Math.max(0,Math.ceil((endAt-Date.now())/1000)),min=Math.floor(sec/60);$('timer').textContent=String(min).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');renderAll()}requestAnimationFrame(frame)}
+  const actions={left:()=>move(you,-1,0),right:()=>move(you,1,0),down:()=>move(you,0,1),rotate:()=>turn(you),drop:()=>drop(you)};
+  addEventListener('keydown',e=>{let key={ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down',ArrowUp:'rotate',' ':'drop'}[e.key];if(key){e.preventDefault();if(running){actions[key]();renderAll()}}if(e.key==='r')reset()});document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>{actions[b.dataset.key]();renderAll()});$('start').onclick=()=>reset(true);$('restart').onclick=reset;
+  // Small executable engine check: a horizontal I piece must have four blocks and land on an empty board.
+  console.assert(SHAPES.I[0].length===4&&landing(empty(),SHAPES.I[0],0)===19,'Tetris board invariant failed');
+  probeHealth();reset(false);requestAnimationFrame(frame);
+})();
+</script></body></html>
