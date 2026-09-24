@@ -247,10 +247,11 @@
     </div>
   </div>
   <div class="claim">
-    <p>Those are the figures our report itemises for the two checkpoints it costs out, plus roughly $10 and $8 more lost to one bug class it names. It does not itemise the 4B, 8B and 14B scaling ladder, so that is not in the total and we are not going to estimate it. The six days span 2026-09-16 to 09-21 and 130 run directories, 88 of them training runs.</p>
-    <p>What cost real money was not compute. It was being wrong in ways that take a while to notice.</p>
-    <p>A routing bug sent every two-way question down the yes/no head, including the ones whose labels were <em>approve</em> and <em>reject</em>, and the first run collapsed to chance. That is the ~$18. A rendering defect put the supporting facts at the end of every long training row, and training truncates from the right, so 98.8% of those rows lost their evidence before the model ever saw it &mdash; we spent weeks reading that as a reasoning limit. And an entire architecture, the one that computed a decision state before it had seen the candidates, worked well enough to keep until a control showed it was not reading the question at all.</p>
-    <p>That last one is the honest summary of the week. The speed did not come from training quickly. It came from a cheap control that could tell us, in an afternoon, that a fortnight of work was measuring the wrong thing.</p>
+    <p>Compute was never the expensive part. Being wrong was.</p>
+    <p>The first run came out at chance, and it took a while to see why. Every two-way question was going down the yes/no head &mdash; including the ones whose two options were <em>approve</em> and <em>reject</em>. A head built to answer yes or no, handed approve and reject, has nothing to hold onto. That one mistake burned more GPU time than the 1.7B model cost to train.</p>
+    <p>Then the long documents. We had been putting the supporting facts at the end of each training row, and training cuts long rows off at the right, so the facts were sliced away before the model ever saw them. On 98.8% of them. We spent weeks reading the result as a limit on reasoning. It was a formatting choice.</p>
+    <p>The third one we kept longest, because it worked. An earlier design computed its decision before it had seen the options &mdash; faster, and it reuses more &mdash; and it scored well enough to build on. Then somebody replaced each question with an unrelated one and ran it again. The scores barely moved. It had never been reading the question; it had learned which answers tend to look right.</p>
+    <p>That is where the week came from. Not from training quickly. From a control cheap enough to run on a hunch, which could tell us in an afternoon that a fortnight had gone into measuring the wrong thing.</p>
   </div>
 </section>
 
