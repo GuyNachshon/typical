@@ -83,10 +83,12 @@ function connector(x1, x2, y) {
 export function mountDecisionFlow(container) {
   if (!container) return;
   let tl = null;
+  let ants = null;
   let io = null;
 
   const draw = () => {
     if (tl) { tl.kill(); tl = null; }
+    if (ants) { ants.kill(); ants = null; }
     if (io) { io.disconnect(); io = null; }
     container.innerHTML = '';
     const w = fitWidth(container, W);
@@ -268,8 +270,11 @@ export function mountDecisionFlow(container) {
       .set(conns.map((c) => c.head), { opacity: 0, fill: STEEL })
       .set(conns.map((c) => c.line), { stroke: STEEL, 'stroke-dasharray': (i) => `${conns[i].len}`, 'stroke-dashoffset': (i) => conns[i].len });
 
-    // the tap is always carrying something: the prefix cache is reused by every later question
-    tl.to(tapLine, { 'stroke-dashoffset': -36, duration: 2.2, repeat: -1, ease: 'none' }, 0);
+    // The tap is always carrying something -- the prefix cache is reused by every later question --
+    // so its dashes march forever. That tween must NOT live on the timeline: a child with
+    // repeat: -1 gives its parent an infinite duration, so the parent's own repeat/repeatDelay can
+    // never fire. That is exactly why this figure ran once and stopped.
+    ants = g.to(tapLine, { 'stroke-dashoffset': -36, duration: 2.2, repeat: -1, ease: 'none', paused: true });
 
     // 1. the request lights row by row
     chips.forEach((c, i) => light(c, 0.3 + i * 0.16));
@@ -309,7 +314,7 @@ export function mountDecisionFlow(container) {
       .to(conns.map((c) => c.line), { stroke: STEEL, 'stroke-dashoffset': (i) => conns[i].len, duration: 0.55 }, RESET);
 
     io = new IntersectionObserver((entries) => {
-      entries.forEach((e) => (e.isIntersecting ? tl.play() : tl.pause()));
+      entries.forEach((e) => { if (e.isIntersecting) { tl.play(); ants.play(); } else { tl.pause(); ants.pause(); } });
     }, { threshold: 0.2 });
     io.observe(container);
   };

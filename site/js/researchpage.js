@@ -6,6 +6,7 @@
 
 import { mountFlow } from './arch.js';
 import { mountDecisionFlow } from './decisionflow.js';
+import { mountEqToggles } from './eqtoggle.js';
 import { mountDeltaQ, mountReadouts, mountLadder, mountDepth, mountRender } from './paperfigs.js';
 import { costBar } from './charts.js';
 
@@ -29,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   import('./copycode.js').then((m) => m.mountCopyButtons()).catch(() => {});
   mountFlow(document.getElementById('chart-arch'));
   mountDecisionFlow(document.getElementById('chart-decisionflow'));
+  mountEqToggles();
 
   const [dq, ro, lad, lat, dep, ren] = await Promise.all([
     load('data/paper-deltaq.json'),

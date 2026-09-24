@@ -711,7 +711,12 @@
      overflow-x on the block forced overflow-y to auto as well -- the two axes cannot differ -- and
      that clipped the explanation panel, which is absolutely positioned above it. */
   .mathblock { max-width: 680px; margin-inline: auto; padding: var(--v-3) 0; border-top: 1px solid var(--color-steel); border-bottom: 1px solid var(--color-steel); }
-  .mathblock math { font-size: 19px; color: var(--color-off); display: block; overflow-x: auto; }
+  /* line-height: normal, because the inherited body line-height gives MathML a line box a few px
+     shorter than the glyphs it actually renders -- big delimiters and summations overshoot it. The
+     box then reported vertical overflow, and since overflow-x: auto forces overflow-y to auto, that
+     surfaced as a scrollbar on an equation that fits perfectly well. overflow-y is pinned to hidden
+     so the pair can never resurrect it; the horizontal scroll is still there for narrow screens. */
+  .mathblock math { font-size: 19px; color: var(--color-off); display: block; line-height: normal; padding-block: 6px; overflow-x: auto; overflow-y: hidden; }
   .mathnote { margin-top: var(--v-2); font-size: 12px; line-height: 1.6; color: var(--color-slate); }
   /* a proof is a different kind of paragraph and should look like one */
   .proof { max-width: 680px; margin-inline: auto; padding: var(--v-4); background: color-mix(in oklab, var(--color-steel) 16%, transparent); }
@@ -719,40 +724,35 @@
   .proof-head + p { margin-top: 0; }
   .proof p { font-size: 15px; line-height: 1.5; color: var(--color-slate); }
   .proof p + .proof-head { margin-top: var(--v-4); }
-  .proof math { font-size: 17px; color: var(--color-off); display: block; margin: var(--v-3) 0; overflow-x: auto; }
+  .proof math { font-size: 17px; color: var(--color-off); display: block; line-height: normal; padding-block: 6px; margin: var(--v-3) 0; overflow-x: auto; overflow-y: hidden; }
   @media (max-width: 48rem) { .mathblock math { font-size: 16px; } .proof { padding: var(--v-3); } .proof math { font-size: 15px; } }
 
-  /* Hover an equation and it explains itself in words. The maths is the claim; this is the
-     sentence a reader would otherwise have to reconstruct. Focusable, so it is reachable by
-     keyboard and not only by pointer, and the panel is absolutely positioned so nothing on the
-     page moves when it opens. */
-  .eq { position: relative; border-radius: 7px; padding: 6px 8px; margin: -6px -8px; transition: background var(--duration-state) var(--ease-out-expo); }
+  /* An equation you can ask to say itself in words. Two faces, one shown at a time, swapped on
+     click -- not on hover, because an explanation that appears unasked and covers the paragraph
+     above it is something done to the reader rather than for them. */
+  .eq { position: relative; cursor: pointer; border-radius: 8px; padding: 8px 12px; margin: -8px -12px; overflow: hidden; transition: background var(--duration-state) var(--ease-out-expo); }
   .eq:hover, .eq:focus-visible { background: color-mix(in oklab, var(--color-ours) 6%, transparent); outline: none; }
   .eq:focus-visible { box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-ours) 45%, transparent); }
-  .eq-hint { position: absolute; top: 4px; right: 8px; font-size: 11px; font-weight: 700; color: var(--color-steel); transition: color var(--duration-state) var(--ease-out-expo); }
-  .eq:hover .eq-hint, .eq:focus-visible .eq-hint { color: var(--color-ours); }
-  .mathwhy {
-    position: absolute; left: 0; right: 0; bottom: calc(100% + 10px); z-index: 5;
-    margin: 0; padding: 14px 16px; border-radius: 10px;
-    background: var(--color-off); color: var(--color-warm);
-    font-size: 14px; line-height: 1.55; text-align: left;
-    box-shadow: 0 12px 28px -12px rgba(41, 40, 39, 0.5);
-    opacity: 0; pointer-events: none;
-    /* scales from its bottom edge, the side nearest the equation it belongs to */
-    transform: translateY(4px) scale(0.97); transform-origin: 50% 100%;
-    transition: opacity 160ms var(--ease-out-expo), transform 160ms var(--ease-out-expo);
+  .eq-plain p { margin: 0; max-width: 60ch; margin-inline: auto; font-size: 15px; line-height: 1.6; color: var(--color-slate); text-align: left; }
+
+  /* The tip is the only thing announcing that the equation is a control, so it says what the click
+     does rather than just pointing at itself. */
+  .eq-tip {
+    position: absolute; top: 8px; right: 10px;
+    font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
+    color: var(--color-ours); background: color-mix(in oklab, var(--color-ours) 12%, var(--color-warm));
+    padding: 4px 9px; border-radius: 999px;
+    opacity: 0; transform: translateY(-3px);
+    pointer-events: none;
+    transition: opacity 150ms var(--ease-out-expo), transform 150ms var(--ease-out-expo);
   }
-  /* the little nib that ties the panel to the equation */
-  .mathwhy::after { content: ''; position: absolute; top: 100%; left: 50%; margin-left: -6px; border: 6px solid transparent; border-top-color: var(--color-off); }
-  .eq:hover .mathwhy, .eq:focus-visible .mathwhy, .eq:focus-within .mathwhy { opacity: 1; transform: none; }
-  @media (prefers-reduced-motion: reduce) { .mathwhy { transition-duration: 1ms; transform: none; } }
-  /* Touch has no hover: the panel would need a tap to open and a tap to close, which is a
-     different component. There it simply sits under the equation, always readable. */
-  @media (hover: none) {
-    .mathwhy { position: static; opacity: 1; transform: none; margin-top: var(--v-2); box-shadow: none; }
-    .mathwhy::after { display: none; }
-    .eq-hint { display: none; }
-  }
+  .eq:hover .eq-tip, .eq:focus-visible .eq-tip { opacity: 1; transform: none; }
+  /* Once simplified the tip is the only way back, so it stops being a hover affordance and stays
+     put -- and it moves below the prose, which it would otherwise sit on top of. */
+  .eq[aria-expanded='true'] { padding-bottom: 36px; }
+  .eq[aria-expanded='true'] .eq-tip { top: auto; bottom: 8px; opacity: 1; transform: none; }
+  /* No hover on touch, so the affordance has to be permanent or the control is invisible. */
+  @media (hover: none) { .eq-tip { opacity: 1; transform: none; } }
 
   /* Selected text was the browser default, which is the one colour on the page nobody chose. */
   ::selection { background: var(--color-ours); color: var(--color-warm); }
