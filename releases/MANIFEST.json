@@ -68,5 +68,31 @@
         "requires": "inference/typical/backbone.py published 2026-09-23; 60 of 124 LoRA tensors need Qwen3.5 module names"
       }
     ]
+  },
+  {
+    "release": "2026-09-24",
+    "note": "typical-small v3 and the withheld 14B published as a preview.",
+    "entries": [
+      {
+        "public_repo": "OzLabs/typical-small",
+        "source_checkpoint": "ts1b_semif",
+        "supersedes": "ts1c (v2)",
+        "backbone": "Qwen/Qwen3-1.7B-Base",
+        "render": "semif",
+        "best_pt_sha256": "dc183b39f90b0485",
+        "gain": "JevBench std .708->.792; long-state facts-first .947->.952, facts-last .790->.846; recovers v2's Noul (.645->.705) and BoolQ (.776->.817) regressions",
+        "regressions": "hard-curriculum held-out family -3.3, level-7 -2.5, 320-way tree choice -5.8"
+      },
+      {
+        "public_repo": "OzLabs/typical-large-preview",
+        "source_checkpoint": "tl1b_semif",
+        "backbone": "Qwen/Qwen3-14B-Base",
+        "best_pt_sha256": "d67d6d20b66367a1",
+        "status": "PREVIEW - fails the pre-registered pass rule",
+        "pass_rule": "(hard >= .559 OR hard Brier <= .65) AND long_policy >= .35",
+        "verdict": "term 1 PASS via Brier .634; term 2 FAIL on long_policy .053 (n=19). The powered measurement of that same capability is .974 on n=605.",
+        "note": "Only 14B run to pass any term: tl1b Brier .656, tl1b_nokd .682, ladder_14b .849 all fail term 1."
+      }
+    ]
   }
 ]

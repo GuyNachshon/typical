@@ -122,12 +122,14 @@ the `Case:` block sits. No truncation at eval (window 4,096; state p50 1,965 tok
 
 | checkpoint | recipe | facts-**first** | facts-**last** | policy_permit (first) |
 |---|---|---:|---:|---:|
-| `typical-small` (**released**) | pre-fix | **.598** | .798 | .536 |
-| `ts1c` (1.7B) | post-fix | **.947** | .790 | .948 |
+| `typical-small` v1 | pre-fix | .598 | .798 | .536 |
+| `ts1c` = `typical-small` v2 | post-fix | .947 | .790 | .948 |
+| **`ts1b_semif` = `typical-small` v3 (current)** | post-fix, semif render | **.952** | **.846** | .948 |
 | `typical-medium` (**released**) | pre-fix | **.612** | .866 | .555 |
 | `tm2` (Qwen3.5-4B) | post-fix | **.950** | .879 | .967 |
 | `ladder_14b` | pre-fix | .851 | .919 | .839 |
-| `tl1b_nokd` (14B) | post-fix | **.997** | .921 | .997 |
+| `tl1b_nokd` (14B, unreleased) | post-fix | **.997** | .921 | .997 |
+| **`tl1b_semif` = `typical-large-preview`** | post-fix, semif render | .974 | .917 | – |
 
 **Both public checkpoints carry a 20–25 point deployment trap, and both already have a fixed replacement.**
 Callers write their own state text; if the case facts go *before* the policy body — the natural ordering — the
@@ -179,8 +181,9 @@ comparable to the in-process numbers above, which use a different harness.
 | release | HF repo | backbone | JevBench std/hard | inference package | demo |
 |---|---|---|---|---|---|
 | `typical-small-preview` | `OzLabs/typical-small-preview` | Qwen3-1.7B-Base | .750 / .387 | `inference/` | `demo/app.py` |
-| `typical-small` **v2** (`ts1c`) | `OzLabs/typical-small` | Qwen3-1.7B-Base | .708 / .432 | `inference/` | `demo/app.py` |
-| `typical-medium` **v2** (`tm2`) | `OzLabs/typical-medium` | **Qwen3.5-4B-Base** | .861 / .495 | `inference/` | `demo/app.py` |
+| `typical-small` **v3** (`ts1b_semif`) | `OzLabs/typical-small` | Qwen3-1.7B-Base | .792 / .441 | `inference/` | `demo/app.py` |
+| `typical-medium` **v2** (`tm2`) | `OzLabs/typical-medium` | **Qwen3.5-4B-Base** | .861 / .495 |
+| `typical-large-preview` (`tl1b_semif`) | `OzLabs/typical-large-preview` | Qwen3-14B-Base | .903 / .468 | `inference/` | `demo/app.py` |
 
 **Superseded 2026-09-23 — both public checkpoints now carry the fixed-corpus weights (§5b).** They lose 20–25
 points on long states when the caller puts case facts before the policy body. Drop-in replacements already exist

@@ -21,8 +21,9 @@ cost barely moves as the candidate set K grows from 2 to 256 (REPORT.md §3ab).
 | model | backbone | JevBench standard / hard (public subset) | link |
 |---|---|---|---|
 | `typical-small-preview` | Qwen3-1.7B-Base | .750 / .387 | https://huggingface.co/OzLabs/typical-small-preview |
-| `typical-small` (v2) | Qwen3-1.7B-Base | .708 / .432 | https://huggingface.co/OzLabs/typical-small |
+| `typical-small` (v3) | Qwen3-1.7B-Base | .792 / .441 | https://huggingface.co/OzLabs/typical-small |
 | `typical-medium` (v2) | **Qwen3.5-4B-Base** | .861 / .495 | https://huggingface.co/OzLabs/typical-medium |
+| `typical-large-preview` | Qwen3-14B-Base | .903 / .468 | https://huggingface.co/OzLabs/typical-large-preview |
 
 `typical-small` and `typical-medium` are Release 1: DecisionMix v2's hard curriculum, ordinal-smoothed Score,
 a per-row Bernoulli Noul head, and 1,024-token decision states. `typical-small-preview` is the earlier Phase-6A
