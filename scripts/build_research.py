@@ -16,6 +16,24 @@ for (the 64ch prose column, the h1's mobile size).
 
 Usage: uv run --with markdown python scripts/build_research.py
 """
+
+# --------------------------------------------------------------------------------------------
+# SUPERSEDED, 2026-09-24. site/research.html is no longer generated from site/research.md: it is
+# hand-authored from the paper on main (paper/sections/*.tex), with its figures drawn live from
+# site/data/paper-*.json. Running this would silently replace that page with the old generated one,
+# which is the kind of trap that costs an afternoon to notice, so it refuses instead.
+#
+# To resurrect the generated page, point OUT at a different file and delete this block.
+import sys as _sys
+
+print(
+    "build_research.py is superseded: site/research.html is hand-authored from the paper and this\n"
+    "generator would overwrite it. Nothing was written. See the note at the top of this file.",
+    file=_sys.stderr,
+)
+raise SystemExit(2)
+# --------------------------------------------------------------------------------------------
+
 import re
 from pathlib import Path
 
