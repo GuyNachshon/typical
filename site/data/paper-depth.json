@@ -1,0 +1,54 @@
+{
+ "note": "Matched 1.7B runs differing only in where the head reads: the full 28 layers against a tap at layer 20. Head, data and steps fixed. Transcribed from paper/sections/6_analysis.tex.",
+ "arms": [
+  "all 28 layers",
+  "tap at layer 20"
+ ],
+ "rows": [
+  {
+   "k": "SNLI",
+   "v": [
+    0.863,
+    0.906
+   ]
+  },
+  {
+   "k": "MNLI",
+   "v": [
+    0.752,
+    0.865
+   ]
+  },
+  {
+   "k": "ANLI",
+   "v": [
+    0.431,
+    0.519
+   ]
+  },
+  {
+   "k": "BoolQ",
+   "v": [
+    0.737,
+    0.834
+   ]
+  },
+  {
+   "k": "CLINC-150",
+   "v": [
+    0.74,
+    0.862
+   ]
+  }
+ ],
+ "also": {
+  "validation NLL": [
+   0.43,
+   0.341
+  ],
+  "\u0394q": [
+   0.117,
+   0.118
+  ]
+ }
+}

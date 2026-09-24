@@ -5,7 +5,7 @@
 // paper on branch main; nothing here recomputes a result.
 
 import { mountFlow } from './arch.js';
-import { mountDeltaQ, mountReadouts, mountLadder } from './paperfigs.js';
+import { mountDeltaQ, mountReadouts, mountLadder, mountDepth, mountRender } from './paperfigs.js';
 import { costBar } from './charts.js';
 
 const load = (p) => fetch(p).then((r) => (r.ok ? r.json() : null)).catch(() => null);
@@ -27,15 +27,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   numberFigures();
   mountFlow(document.getElementById('chart-arch'));
 
-  const [dq, ro, lad, lat] = await Promise.all([
+  const [dq, ro, lad, lat, dep, ren] = await Promise.all([
     load('data/paper-deltaq.json'),
     load('data/paper-readouts.json'),
     load('data/paper-ladder.json'),
     load('data/latency.json'),
+    load('data/paper-depth.json'),
+    load('data/paper-render.json'),
   ]);
 
   if (ro) mountReadouts(document.getElementById('chart-readouts'), ro);
   if (lad) mountLadder(document.getElementById('chart-ladder'), lad, 'std');
+  if (dep) mountDepth(document.getElementById('chart-depth'), dep);
+  if (ren) mountRender(document.getElementById('chart-render'), ren);
 
   if (dq) {
     const host = document.getElementById('chart-deltaq');

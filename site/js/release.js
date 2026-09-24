@@ -87,8 +87,8 @@ async function mountField() {
   note.className = 'note mt-18';
   note.textContent = `${doc.what} ${doc.caveats.join(' ')} `;
   const more = document.createElement('a');
-  more.href = 'research.html#limitations';
-  more.textContent = 'Full method and limits.';
+  more.href = 'research.html#scaling';
+  more.textContent = 'How to read these intervals.';
   note.appendChild(more);
   host.appendChild(note);
 }

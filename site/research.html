@@ -46,6 +46,45 @@
   </figure>
 </section>
 
+<section class="page chapter" id="formal">
+  <div class="claim">
+    <h2>The decision, written down</h2>
+    <p>A decision is a tuple: a state <em>S</em>, a question <em>Q</em>, a candidate set <em>C</em> supplied at request time, and a type. The model returns a probability for each candidate and one more for abstaining, and they sum to one.</p>
+  </div>
+  <div class="mathblock">
+    <math display="block"><mrow><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>j</mi></msub><mo>&#8739;</mo><mi>S</mi><mo>,</mo><mi>Q</mi><mo>,</mo><mi>C</mi><mo>)</mo><mo>,</mo><mspace width="1em"/><msub><mi>p</mi><mi>&#8709;</mi></msub><mo>+</mo><munder><mo>&#8721;</mo><mi>j</mi></munder><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>j</mi></msub><mo>)</mo><mo>=</mo><mn>1</mn></mrow></math>
+    <p class="mathnote t-mono">No token is sampled. C is text, supplied per call, so the model has no output index for any label and has to read the candidates to score them.</p>
+  </div>
+  <div class="claim">
+    <p>At the tap layer the pass gives a terminal decision state <em>h</em><sub>D</sub> and, for each candidate, a contextual state <em>h</em><sub>j</sub>: the mean hidden state over the tokens where that option was rendered. Both are projected, and the score is a bilinear form with a small learned correction on the elementwise product.</p>
+  </div>
+  <div class="mathblock">
+    <math display="block"><mrow><mi>u</mi><mo>=</mo><msub><mi>W</mi><mi>h</mi></msub><msub><mi>h</mi><mi>D</mi></msub><mo>,</mo><mspace width="1.4em"/><msub><mi>v</mi><mi>j</mi></msub><mo>=</mo><msub><mi>W</mi><mi>c</mi></msub><msub><mi>h</mi><mi>j</mi></msub><mo>,</mo><mspace width="1.4em"/><msub><mi>s</mi><mi>j</mi></msub><mo>=</mo><mfrac><mrow><msup><mi>u</mi><mo>&#8868;</mo></msup><msub><mi>v</mi><mi>j</mi></msub></mrow><msqrt><msub><mi>d</mi><mi>v</mi></msub></msqrt></mfrac><mo>+</mo><msup><mi>w</mi><mo>&#8868;</mo></msup><mo>(</mo><mi>u</mi><mo>&#8857;</mo><msub><mi>v</mi><mi>j</mi></msub><mo>)</mo><mo>+</mo><mi>g</mi><mo>(</mo><mi>u</mi><mo>&#8857;</mo><msub><mi>v</mi><mi>j</mi></msub><mo>)</mo></mrow></math>
+    <p class="mathnote t-mono">g is a two-layer MLP. The option letters stay in the rendered text and are never read out.</p>
+  </div>
+  <div class="claim">
+    <p>Abstention is a gate outside the candidate softmax, not a line in the list. It reads permutation-invariant statistics over the scores &mdash; maximum, top-two margin, mean, log-mean-exp &mdash; plus the projected decision state, and returns a single <em>r</em>.</p>
+  </div>
+  <div class="mathblock">
+    <math display="block"><mrow><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>j</mi></msub><mo>)</mo><mo>=</mo><mo>(</mo><mn>1</mn><mo>&#8722;</mo><mi>r</mi><mo>)</mo><mfrac><mrow><mi>exp</mi><mo>(</mo><msub><mi>s</mi><mi>j</mi></msub><mo>/</mo><mi>T</mi><mo>)</mo></mrow><mrow><munder><mo>&#8721;</mo><mi>k</mi></munder><mi>exp</mi><mo>(</mo><msub><mi>s</mi><mi>k</mi></msub><mo>/</mo><mi>T</mi><mo>)</mo></mrow></mfrac><mo>,</mo><mspace width="1.4em"/><msub><mi>p</mi><mi>&#8709;</mi></msub><mo>=</mo><mi>r</mi></mrow></math>
+  </div>
+  <div class="claim">
+    <p>Two properties fall straight out of that shape, and both are exact rather than measured.</p>
+  </div>
+  <div class="proof">
+    <p class="proof-head t-mono">Pairwise odds do not depend on abstention</p>
+    <p>Take any two candidates. The factor <em>(1&minus;r)</em> multiplies every non-null candidate, so it cancels:</p>
+    <math display="block"><mrow><mfrac><mrow><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>j</mi></msub><mo>)</mo></mrow><mrow><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>k</mi></msub><mo>)</mo></mrow></mfrac><mo>=</mo><mfrac><mrow><mo>(</mo><mn>1</mn><mo>&#8722;</mo><mi>r</mi><mo>)</mo><mi>exp</mi><mo>(</mo><msub><mi>s</mi><mi>j</mi></msub><mo>/</mo><mi>T</mi><mo>)</mo></mrow><mrow><mo>(</mo><mn>1</mn><mo>&#8722;</mo><mi>r</mi><mo>)</mo><mi>exp</mi><mo>(</mo><msub><mi>s</mi><mi>k</mi></msub><mo>/</mo><mi>T</mi><mo>)</mo></mrow></mfrac><mo>=</mo><mi>exp</mi><mo>(</mo><mo>(</mo><msub><mi>s</mi><mi>j</mi></msub><mo>&#8722;</mo><msub><mi>s</mi><mi>k</mi></msub><mo>)</mo><mo>/</mo><mi>T</mi><mo>)</mo></mrow></math>
+    <p>So how likely the model is to abstain never reorders the candidates, and a caller who has already decided not to abstain can use the renormalised distribution unchanged. The scores themselves stay set-dependent; that is the part the gate does not touch.</p>
+    <p class="proof-head t-mono">The gate is temperature-invariant</p>
+    <p><em>T</em> enters only the candidate softmax, and <em>r</em> reads untempered statistics. Recalibrating temperature therefore never moves <em>p</em><sub>&#8709;</sub> &mdash; you can tune the sharpness of the answer without disturbing the decision to answer at all.</p>
+  </div>
+  <div class="claim">
+    <p>The types are contracts on that distribution. Choice is the K-way readout. Score reuses it over ordered levels with a smoothed target, <em>t&#771;</em><sub>j</sub> &prop; exp(&minus;&#124;j&minus;y&#124;/&tau;) at &tau;&nbsp;=&nbsp;0.7, which adds no parameters and makes a near miss cost less than a distant one. Noul takes a dedicated Bernoulli head, P(yes)&nbsp;=&nbsp;&sigma;(<em>w</em><sub>n</sub><sup>&#8868;</sup><em>h</em><sub>D</sub>), on a suffix that renders no candidate text at all &mdash; which is why label order cannot enter its computation.</p>
+    <p>M decisions about one state cost <em>O</em>(&#124;S&#124;) once, plus <em>M</em>&middot;<em>O</em>(&#124;Q&#124;&nbsp;+&nbsp;&#124;C&#124;) for the suffixes, through only the kept 71% of layers. That is the whole reason the second question is cheap.</p>
+  </div>
+</section>
+
 <section class="page chapter" id="readout">
   <div class="claim">
     <h2>Three ways to read an answer out</h2>
@@ -85,6 +124,12 @@
     <h2>Why the head is not on top</h2>
     <p>We truncate the backbone at about 71% of its depth and never compute the layers above. That was not an efficiency decision.</p>
     <p>Our first full-scale model read the final layer and scored <strong>58.6 on SNLI</strong>. That is the hypothesis-only baseline: the number you get by ignoring the premise and guessing from the sentence you are asked about. The last layer had specialised into predicting the next token and had stopped carrying the evidence.</p>
+  </div>
+  <figure class="fig fignarrow">
+    <div class="chart" id="chart-depth"></div>
+    <figcaption>Matched 1.7B runs differing only in where the head reads. Validation NLL falls .430 to .341; &Delta;q is unchanged at .117 and .118.</figcaption>
+  </figure>
+  <div class="claim">
     <p>Mid-depth carries both the evidence and the question-conditioned knowledge in one model. Every released and ladder checkpoint taps there, and LoRA at rank 16 adapts the top eight kept layers while everything below stays frozen.</p>
   </div>
 </section>
@@ -104,6 +149,12 @@
     <h2>Where you put the evidence changes the answer</h2>
     <p>Training truncates long states from the right. We rendered the supporting facts at the end of every row of our long-policy corpus, so most of those rows lost their evidence before the model ever saw it. We were training the model to answer long policies from states that no longer contained the answer. It learned to expect the case block at the end, and learned not to look anywhere else.</p>
     <p>Two arms with byte-identical flags, same 23,318 rows, rendered facts-first or facts-last, scored on 605 held-out long states with nothing truncated at evaluation time. Facts-first adds <strong>11.2 points</strong>, <em>p</em> = 5&times;10<sup>&minus;10</sup>, and the gap replicates at a second seed.</p>
+  </div>
+  <figure class="fig fignarrow">
+    <div class="chart" id="chart-render"></div>
+    <figcaption>Training render against evaluation render, 605 held-out long states. The diagonal is the matched comparison; the off-diagonal holds the evaluation render fixed. Shade is accuracy above the .413 floor.</figcaption>
+  </figure>
+  <div class="claim">
     <p>That is a rendering choice, not a modelling one. It is the kind of thing that hides inside a data pipeline and reads as a capability limit for months.</p>
   </div>
 </section>
@@ -136,15 +187,6 @@
   </figure>
 </section>
 
-<section class="page chapter" id="limitations">
-  <div class="claim">
-    <h2>What we did not fix</h2>
-    <p>The hard tier is the honest answer to &ldquo;where does this break&rdquo;. Both shipped checkpoints sit within about one standard error of chance on it, and their probabilities there are worse than a uniform predictor. If your decisions look like that tier, take the argmax if you want, but do not threshold on the confidence.</p>
-    <p>The frozen-backbone result above says the usual explanation is wrong. We had been telling ourselves the hard tier fails because our generators never produce temporal arithmetic or trade-offs. That story predicts a frozen backbone fails those families too. It does not. The question is narrower and more awkward: what is our fine-tuning removing?</p>
-    <p>Two smaller ones, stated because they are true. Level-7 composition moved two points against a curriculum that moved everything else by thirty. And <code>typical-small</code>'s held-out yes/no accuracy went <em>down</em> between checkpoints, to .643 against a .583 floor. That is the one number in the release that went backwards.</p>
-  </div>
-</section>
-
 <section class="page chapter" id="get">
   <div class="claim">
     <h2>Read it, run it, break it</h2>
@@ -164,7 +206,7 @@ m.choice(state, "Which team should own this ticket?", ["billing", "shipping", "s
   <div class="cols">
     <div><p class="t-card" style="max-width:20ch">Models that decide, not generate.</p><p class="t-eyebrow mt-30" style="color:var(--color-mid)">Weights on Hugging Face, package on PyPI, source on GitHub.</p></div>
     <div class="t-mono"><p class="t-eyebrow mb-18">Models</p><p><a href="https://huggingface.co/OzLabs/typical-small">typical-small</a></p><p><a href="https://huggingface.co/OzLabs/typical-medium">typical-medium</a></p><p><a href="https://huggingface.co/OzLabs/typical-small-preview">typical-small-preview</a></p></div>
-    <div class="t-mono"><p class="t-eyebrow mb-18">Site</p><p><a href="index.html#field">Results</a></p><p><a href="index.html#watch">Demos</a></p><p><a href="research.html">Research</a></p><p><a href="#limitations">Limitations</a></p></div>
+    <div class="t-mono"><p class="t-eyebrow mb-18">Site</p><p><a href="index.html#field">Results</a></p><p><a href="index.html#watch">Demos</a></p><p><a href="research.html">Research</a></p></div>
   </div>
   <div class="rule t-eyebrow" style="color:var(--color-mid)">Every number on this page is transcribed from the paper</div>
 </div></footer>

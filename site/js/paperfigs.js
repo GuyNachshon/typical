@@ -241,3 +241,77 @@ export function selfTest() {
 }
 
 if (typeof process !== 'undefined' && typeof window === 'undefined' && import.meta.url === `file://${process.argv[1]}`) selfTest();
+
+// ---------------------------------------------------------------------------------------------
+// Depth. Two arms that differ only in where the head reads, on five sets. A paired dumbbell rather
+// than grouped bars: the quantity the section is about is the move, not either endpoint.
+export function mountDepth(host, doc) {
+  if (!host || !doc?.rows?.length) return;
+  const draw = () => {
+    const w = fitWidth(host, 680);
+    const M = { l: 108, r: 64, t: 30, b: 34 };
+    const rowH = 38;
+    const h = M.t + doc.rows.length * rowH + M.b;
+    const iw = w - M.l - M.r;
+    const svg = frame(host, w, h, 'Reading at layer 20 instead of all 28 moves every evidence set up.');
+    const g = svgEl('g', { transform: `translate(${M.l},${M.t})` });
+    svg.appendChild(g);
+    const lo = Math.min(...doc.rows.flatMap((r) => r.v)) - 0.06;
+    const x = scale([lo, 1], [0, iw]);
+
+    doc.arms.forEach((a, i) => {
+      g.appendChild(svgEl('circle', { cx: i ? 130 : 0, cy: -14, r: i ? 5 : 4, fill: i ? OURS : '#f0eeeb', stroke: i ? OURS : MID, 'stroke-width': 1.4 }));
+      g.appendChild(svgText((i ? 130 : 0) + 11, -10, a, { 'font-size': 11, fill: MID, 'font-family': FONT_MONO }));
+    });
+
+    doc.rows.forEach((r, i) => {
+      const y = i * rowH + 12;
+      const [a, b] = r.v;
+      g.appendChild(svgText(-12, y + 4, r.k, { 'font-size': 12, fill: INK, 'text-anchor': 'end', 'font-family': FONT_MONO }));
+      g.appendChild(svgEl('line', { x1: x(a), y1: y, x2: x(b), y2: y, stroke: OURS, 'stroke-width': 1.5, opacity: 0.35 }));
+      g.appendChild(svgEl('circle', { cx: x(a), cy: y, r: 4, fill: '#f0eeeb', stroke: MID, 'stroke-width': 1.4 }));
+      g.appendChild(svgEl('circle', { cx: x(b), cy: y, r: 5, fill: OURS }));
+      g.appendChild(svgText(x(b) + 11, y + 4, `+${Math.round((b - a) * 1000) / 10}`, { 'font-size': 11, fill: OURS, 'font-family': FONT_MONO }));
+    });
+  };
+  draw();
+  registerChart(host, draw);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Training render x evaluation render. A 2x2 per model: the diagonal is the matched comparison and
+// the off-diagonal holds the evaluation render fixed, which is what makes it a factor and not a
+// preference. Cell shade is accuracy above the floor.
+export function mountRender(host, doc) {
+  if (!host || !doc?.models) return;
+  const draw = () => {
+    const w = fitWidth(host, 680);
+    const models = Object.entries(doc.models);
+    const cell = Math.min(96, (w - 150) / (models.length * 2 + 0.6));
+    const M = { l: 96, t: 54 };
+    const h = M.t + 2 * cell + 56;
+    const svg = frame(host, w, h, 'Training render against evaluation render on 605 held-out long states.');
+    const g = svgEl('g', { transform: `translate(${M.l},${M.t})` });
+    svg.appendChild(g);
+
+    models.forEach(([name, grid], mi) => {
+      const ox = mi * (2 * cell + 58);
+      g.appendChild(svgText(ox + cell, -34, name, { 'font-size': 12, fill: INK, 'font-weight': 700, 'text-anchor': 'middle', 'font-family': FONT_MONO }));
+      doc.labels.forEach((l, c) => g.appendChild(svgText(ox + c * cell + cell / 2, -12, l.replace('facts ', ''), { 'font-size': 10, fill: MID, 'text-anchor': 'middle', 'font-family': FONT_MONO })));
+      if (mi === 0) g.appendChild(svgText(-12, -12, doc.axes.col, { 'font-size': 10, fill: STEEL, 'text-anchor': 'end', 'font-family': FONT_MONO }));
+      grid.forEach((row, ri) => {
+        if (mi === 0) g.appendChild(svgText(-12, ri * cell + cell / 2 + 4, doc.labels[ri], { 'font-size': 11, fill: MID, 'text-anchor': 'end', 'font-family': FONT_MONO }));
+        row.forEach((v, ci) => {
+          const t = Math.max(0, (v - doc.floor) / (1 - doc.floor));
+          g.appendChild(svgEl('rect', { x: ox + ci * cell, y: ri * cell, width: cell - 3, height: cell - 3, fill: OURS, opacity: 0.12 + 0.82 * t }));
+          g.appendChild(svgText(ox + ci * cell + (cell - 3) / 2, ri * cell + cell / 2 + 4, num(v, 3), {
+            'font-size': 12, fill: t > 0.55 ? '#f0eeeb' : INK, 'text-anchor': 'middle', 'font-family': FONT_MONO, 'font-weight': ri === ci ? 700 : 400,
+          }));
+        });
+      });
+    });
+    g.appendChild(svgText(-12, 2 * cell + 26, doc.axes.row, { 'font-size': 10, fill: STEEL, 'text-anchor': 'end', 'font-family': FONT_MONO }));
+  };
+  draw();
+  registerChart(host, draw);
+}
