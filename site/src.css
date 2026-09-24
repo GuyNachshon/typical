@@ -199,6 +199,11 @@
   .figband-row p { border-left: 1px solid var(--color-steel); padding-left: 28px; }
   .figband-row p:first-child { border-left: 0; padding-left: 0; }
   .figband .t-figure { color: var(--color-off); }
+  /* --text-figure is drawn for a 1080px band. On the prose measure each column is 227px and a
+     three-glyph numeral at 120px fills it exactly, so the three run together with no air between
+     them. Two thirds of the size leaves the column its gutters back. */
+  .post .figband.onmeasure .t-figure { font-size: 78px; letter-spacing: -3.1px; }
+  @media (max-width: 48rem) { .post .figband.onmeasure .t-figure { font-size: 54px; letter-spacing: -2px; } }
   .figband i { font-family: var(--font-mono); font-size: 22px; font-style: normal; margin-left: 8px; color: var(--color-mid); }
   .figband em { display: block; margin-top: 16px; font: 700 12px/1.3 var(--font-mono); letter-spacing: 0.72px; text-transform: uppercase; font-style: normal; color: var(--color-mid); }
   @media (max-width: 64rem) {
