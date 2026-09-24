@@ -1,183 +1,92 @@
-\section{Results}
+\section{What the decision should not depend on}
+\label{sec:invariant}
 \label{sec:results}
 
-All checkpoints share the architecture fixed in \Cref{sec:analysis}.
+A decision should stay put when the order of the labels, the number of options offered or the layout of
+the input changes. Each subsection gives the failure a natural design shows, the perturbation that
+exposed it and the change that removed or bounded it.
 
-\subsection{Typed output contracts}
+\subsection{Label order}
 \label{sec:results:typed}
 
-Each output type delivers the property its contract names. Matched fine-tunes from one parent
-checkpoint, each trained for 3k steps on the rows of its own type, are compared against a control that
-treats the same rows as plain Choice (\Cref{app:typed-primitives}).
+The decision should not change when the same labels appear in a different order. A yes/no decision
+rendered as a two-way Choice fails this test. ``Yes'' and ``no'' occupy two different suffix positions
+with two different contextual states, so the rendering carries order into the scores, and reversing the
+labels of a two-way Choice over \{no, yes\} moves $P(\text{yes})$ by up to .55, and by .01--.15 on
+average across sets (\Cref{app:typed-primitives}). Order invariance alone is easy to obtain: the candidate-blind variants of
+\Cref{sec:analysis:deltaq} are exactly set-stable and carry no question dependence
+(\Cref{app:extra-figures}).
 
-\paragraph{Score.} The ordinal-smoothed target ($\tauord = 0.7$) adds no parameters and improves every
-probability-quality measure on held-out urgency at flat accuracy (.505 $\to$ .508): NLL 2.07 $\to$ 1.23,
-Brier .79 $\to$ .68, ECE .35 $\to$ .19, ordinal MAE .58 $\to$ .55. On JevBench's 12 ordinal items the two
-models make identical per-item predictions, so the gain is in how mass is spread over adjacent levels.
+Each output type delivers the property its contract names. Matched fine-tunes compare each type
+against a control that treats the same rows as plain Choice (\Cref{app:typed-primitives}). The Noul
+Bernoulli head renders no candidates (\Cref{sec:method:typed}), so label order cannot enter its
+computation. For rows routed to it, reversing the labels
+moves $P(\text{yes})$ by exactly zero on all nine test sets. The head is better or equal on six of seven
+yes/no sets and clears the untouched PagerDuty floor by a wide margin: accuracy .602 $\to$ .886 against a
+.792 majority floor, NLL 1.04 $\to$ .28. The contract holds only under per-row routing (\Cref{app:typed-primitives}).
 
-\paragraph{Noul.} The Bernoulli head renders no candidates, so label order cannot enter its computation.
-Reversing the labels of a two-way Choice over \{no, yes\} moves $P(\text{yes})$ by up to .55; for rows
-routed to the Bernoulli head it moves by exactly zero on all nine test sets. The head is better or
-equal on six of seven yes/no sets and clears the untouched PagerDuty floor by a wide margin: accuracy
-.602 $\to$ .886 against a .792 majority floor, NLL 1.04 $\to$ .28.
+Choice has no output index for any label and must read the candidates to score them
+(\Cref{sec:method:task}), so the readout controls how much the order and the rest of the set move the
+scores (\Cref{tab:n1n3}). N3 is far less sensitive to the
+candidate set than the letter-logit readout. Adding three unrelated options shifts N3's pairwise
+log-odds by .09--.13 against .44--.46 for N1, below the teacher's .179, and reordering moves its
+probabilities by .10--.11 against .165. The difference comes from the readout together with its null
+form; exact order invariance is the Bernoulli head's contract.
 
-\subsection{The training distribution}
-\label{sec:results:mixture}
+\subsection{How many options are offered}
+\label{sec:analysis:null}
 
-Decision-type balance, counterfactual rubric groups and null targets each move a separate axis. All
-comparisons here are matched 1.7B runs that differ only in data or sampler.
+Whether the model abstains should depend on whether any offered candidate fits, and not on how many
+candidates are offered. Abstention belongs in the gate alone. A rendered ``none of the above'' line
+competes for softmax mass with the real candidates, so its share depends on how many there are. The
+$\numcands$-sweep with the gold label absent exposes this. With the line, abstention has degenerate
+endpoints: the model almost never abstains on CLINC-150 at $\numcands{=}5$ ($P(\nullsym \mid
+\text{absent}) = .02$) and always abstains at $\numcands{=}150$ (1.00) and on Banking77 at
+$\numcands{=}77$.
 
-\paragraph{Family balance.} Adding workflow data at family weights E .35 / K .25 / W .40 cost 11 points on
-CLINC-150 and 10 on TREC-fine, almost all of it false abstention (CLINC-150 .05 $\to$ .17). The release
-sampler, E .40 with U .10, keeps every evidence set within about 1 point of the evidence-only base
-(\Cref{app:mixture}).
+A matched pair tests the fix: both arms are N3 at layer 20 with the factored gate of
+\Cref{eq:factored-null}, and the treatment removes the rendered $\nullsym$ line. Removing the line
+removes both endpoints (null AUROC by $\numcands$ in \Cref{app:extra-figures}). MMLU-Pro false
+abstention falls from .692 to .003 (far outside its seed-to-seed variation of .05--.10) and accuracy
+rises from .133 to .353, Banking77 with all 77 labels rises from .063 to .579, and CLINC out-of-scope
+accuracy from .639 to .798, with $\dqsh$ unchanged (.118 vs.\ .122) and evidence tasks level
+(\Cref{tab:app-null-fix}). The price is 2--7 points on intent and
+topic label spaces (HWU64 .801 $\to$ .757, 20NG .589 $\to$ .515) and a rise in reorder $\Delta p$ from
+.077 to .123. This configuration, contextual readout at 71\% depth with a gate and no rendered
+$\nullsym$ line, is the architecture of every checkpoint in this section and \Cref{sec:scale}.
+The gate still has to learn when to fire, and the training distribution sets that. Decision-type
+balance and null targets each move a separate axis from the rubric groups of \Cref{sec:results:mixture}.
+Duplicating 20\% of workflow rows with the gold candidate removed and target $\nullsym$ lowers false
+abstention on CLINC-150 from .10 to .08 and on TREC-fine from .27 to .12, and raises accuracy by 2.6,
+3.6, 4.3 and 6.0 points on CLINC-150, TREC-fine, HWU64 and 20NG (\Cref{tab:app-mixture}). The model now spends mass
+on $\nullsym$ where soft gold has none, so held-out Noul drops 4 points and held-out Score NLL rises
+(1.52 $\to$ 2.04).
 
-\paragraph{Counterfactual rubric groups.} Training on DecisionMix v2 (\Cref{sec:train:rubric}) lifts
-held-out families, grammars and rubric styles by 35--40 points over a model never trained on the
-generator (.481/.507/.491 $\to$ .827/.881/.888, together with the uncertainty corpus), and accuracy on
-held-out rubric-flip pairs from .477 to .710; the model now depends on the rubric it is given
-(\Cref{app:decisionmix}).
+Family balance acts on false abstention as well. Adding workflow data at family weights E .35 /
+K .25 / W .40 cost 11 points on CLINC-150 and 10 on TREC-fine, almost all of it false abstention
+(CLINC-150 .05 $\to$ .17). In the mixture sweep, which ran without the uncertainty corpus or null
+augmentation, $E \ge .45$ recovers CLINC-150 to .779 with false abstention .10 (\Cref{tab:app-mixture}). The release sampler, E .40 with
+U .10, keeps every evidence set within about 1 point of the evidence-only base (\Cref{app:mixture}).
 
-\paragraph{Null augmentation.} Duplicating 20\% of workflow rows with the gold candidate removed and target
-$\nullsym$ lowers false abstention on CLINC-150 from .10 to .08 and on TREC-fine from .27 to .12, and
-raises accuracy by 2.6, 3.6, 4.3 and 6.0 points on CLINC-150, TREC-fine, HWU64 and 20NG. MMLU-Pro
-among-$\numcands$ returns to the evidence-only base (.353), with the highest $\dqsh$ of any mixture
-(.143). The model now spends mass on $\nullsym$ where soft gold has none, so held-out Noul drops 4 points
-and held-out Score NLL rises (1.52 $\to$ 2.04).
-
-\paragraph{Probability quality.}
-\label{sec:results:calibration}
-Probability quality is indexed by decision type, so the training data, the target and checkpoint
-selection set it; a global temperature and null-logit offset fit on held-out soft-target rows want
-opposite corrections for an evidence-and-knowledge and a workflow-trained checkpoint
-(\Cref{app:calibration-fit}). On the 14B backbone the recipe bundle (facts-first long states with
-truncated rows dropped, a 3{,}072-token window, DecisionMix v2 and the uncertainty corpus, typed heads
-with the ordinal target, checkpoint selection on held-out uncertainty and curriculum NLL, and
-frozen-teacher distillation) takes held-out Score NLL from 2.87 under the earlier workflow recipe to 0.95,
-typed-decisions NLL from 1.96 to 1.04, and JevBench hard-tier Brier from .85 to .66
-(\Cref{fig:calibration}). No component is isolated except distillation, and the arm without it reaches
-the same Score NLL. The v1 1.7B and 4B checkpoints, which have the ordinal target and the uncertainty
-corpus but no likelihood-based selection, already reach 1.01 and 1.03; all 1.7B and 4B checkpoints with
-typed heads and DecisionMix sit at 0.97--1.08.
-
-\subsection{Scaling and cost}
-\label{sec:results:scaling}
-
-\Cref{tab:headline} pairs each trained checkpoint with a frozen control: the same base model, untrained,
-reading next-token letter logits over the rendered options with three exemplars. The rows are not one
-recipe; \Cref{fig:ladder} plots them against backbone size.
-
-\begin{table}[t]
-  \centering
-  \caption{Trained checkpoints with frozen controls. Recipe: \emph{v1} = v1 release recipe (1{,}024-token
-  window, no likelihood-based selection); \emph{wf} = earlier workflow recipe (no DecisionMix, uncertainty
-  corpus or typed heads); \emph{fixed} = facts-first long states, truncated rows dropped, likelihood-based
-  selection (+KD at 14B). JevBench (public subset); 95\% cluster-bootstrap intervals
-  (\Cref{sec:setup:jevbench}). MMLU-$\numcands$: MMLU-Pro among-$\numcands$. NLL: held-out Score. ms:
-  research-harness single decision at $\numcands{=}2$, one pod and build (the 8B was not on that pod).
-  Checkpoints top to bottom: \texttt{ts1b},
-  \texttt{ts1c}, \texttt{tm1b}, \texttt{ladder\_8b}, \texttt{tl1b}, \texttt{tm2}.}
-  \label{tab:headline}
-  \footnotesize
-  \setlength{\tabcolsep}{2.5pt}
-  \begin{tabular}{llccrrrr}
-    \toprule
-    & & \multicolumn{2}{c}{JevBench} & & & & \\
-    Model & Recipe & std [95\% CI] & hard [95\% CI] & MMLU-$\numcands$ & $\dqsh$ & NLL & ms \\
-    \midrule
-    Qwen3-1.7B (small v1) & v1 & .694 [.569, .819] & .432 [.342, .523] & .343 & .127 & 1.01 & 45 \\
-    % small v2 (ts1c): MMLU/dqsh/NLL read from runs/ts1c/results.json; its CIs and the frozen Qwen3.5-4B CIs
-    % recomputed with scripts/jev_ci.py's procedure on guychuk/pcdm-runs artefacts (not in prose sources).
-    \quad small v2 & fixed & .708 [.569, .833] & .432 [.342, .523] & .338 & .127 & 1.08 & -- \\
-    \quad frozen, 3-shot & -- & .528 [.389, .667] & .369 [.279, .459] & -- & -- & -- & -- \\
-    Qwen3-4B (medium v1) & v1 & .806 [.694, .903] & .423 [.333, .514] & .458 & .193 & 1.03 & 56 \\
-    \quad frozen, 3-shot & -- & .778 [.667, .889] & .441 [.351, .532] & -- & -- & -- & -- \\
-    Qwen3-8B & wf & .667 [.528, .792] & .396 [.306, .486] & .302 & .093 & 1.67 & -- \\
-    \quad frozen, 3-shot & -- & .556 [.417, .694] & .369 [.279, .459] & -- & -- & -- & -- \\
-    Qwen3-14B & fixed & \textbf{.931} [.861, .986] & .450 [.360, .541] & \textbf{.498} & \textbf{.235} & \textbf{0.95} & 60 \\
-    \quad frozen, 3-shot & -- & .819 [.708, .917] & .559 [.468, .649] & -- & -- & -- & -- \\
-    Qwen3.5-4B (medium v2) & fixed & .861 [.778, .944] & .495 [.405, .586] & .429 & .194 & 0.97 & -- \\
-    \quad frozen, 3-shot & -- & .764 [.639, .875] & .495 [.405, .586] & -- & -- & -- & -- \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-Every trained checkpoint beats its frozen backbone on the standard tier, by 16.7, 2.8, 11.1 and
-11.1 points at 1.7B (v1), 4B, 8B and 14B; each gap on its own sits inside its interval (paired test at
-14B, frozen minus trained: $-.111$ $[-.250, +.014]$, $p = .10$). Question-conditioned
-knowledge grows with the backbone: $\dqsh$ rises from .127 at 1.7B to .235 at 14B, 2.3 times the 1.7B
-teacher's; the 8B checkpoint is the exception (.093), and sits below the 4B and 14B under one
-matched recipe as well (\Cref{app:extra-figures}). Qwen3.5-4B (\texttt{typical-medium} v2) is the strongest point per parameter: .861
-standard and .495 hard, above every Qwen3 checkpoint we trained on the hard tier and 9.7 standard-tier
-points above its frozen control. \Cref{sec:limitations} discusses the hard tier, where the frozen 14B leads.
-
-\paragraph{Cost.}
-\label{sec:results:cost}
-Decision latency is nearly flat in backbone size. On the research harness a single decision at
-$\numcands{=}2$ costs 45, 56 and 60\,ms at 1.7B, 4B and 14B: an $8\times$ larger backbone is
-$1.3\times$ slower, because the cached state and a short suffix dominate (\Cref{app:latency-sweep}). On the serving path a warm decision takes
-15.5--17\,ms at 1.7B and 19--21\,ms for the Qwen3-4B model (warm p50, $\numcands{=}2$,
-\Cref{fig:serving}); the Qwen3.5-4B model measures 34--46\,ms with reference DeltaNet kernels
-(\Cref{app:serving}).
-
-\subsection{Evidence placement and rendering}
-\label{sec:results:long}
-
-Training with the evidence placed first adds 11.2 points on held-out long states when training
-right-truncates states at 1{,}024 tokens, where facts placed after the policy text were lost in 98.8\% of
-long-policy rows (\Cref{sec:train:long}); the gap replicates at a second seed. Two 1.7B arms with byte-identical flags train on the same 23{,}318 rows,
-rendered facts-first or facts-last, with truncation active as at release, and are scored under both
-renders (\Cref{tab:twobytwo}, \Cref{app:truncation}). The comparison is a \emph{matched-configuration
-gap}: each model is scored in the render it was trained on, so the evaluation render changes along with
-training.
-
-\begin{table}[t]
-  \centering
-  \caption{Training render $\times$ evaluation render on 605 held-out long states, no truncation at
-  evaluation. Diagonal (matched) cells score each model in its training render; off-diagonal cells hold
-  the evaluation render fixed across the two models. Majority floors: \texttt{policy\_permit}
-  (permit) .612 ($\numcands{=}2$, $n{=}330$), \texttt{action\_select} (select) .233 ($\numcands{=}4$,
-  $n{=}275$). 14B arms:
-  \texttt{tl1b\_nokd} (facts-first) and \texttt{ladder\_14b} (facts-last).}
-  \label{tab:twobytwo}
-  \small
-  \setlength{\tabcolsep}{4pt}
-  \begin{tabular}{llrrrrrr}
-    \toprule
-    & & \multicolumn{3}{c}{1.7B, single-variable (seed 0)} & \multicolumn{3}{c}{14B corroboration} \\
-    \cmidrule(lr){3-5}\cmidrule(lr){6-8}
-    Trained on & Scored on & overall & permit & select & overall & permit & select \\
-    \midrule
-    facts-first & facts-first \emph{(matched)} & \textbf{.942} & \textbf{.933} & \textbf{.953} & \textbf{.997} & .997 & .996 \\
-    facts-first & facts-last & .797 & .788 & .807 & .921 & .933 & .905 \\
-    facts-last & facts-first & .640 & .615 & .669 & .851 & .839 & .865 \\
-    facts-last & facts-last \emph{(matched)} & .830 & .842 & .815 & .919 & .930 & .905 \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-At 1.7B the matched-configuration gap is $+.112$ $[+.077, +.147]$, $p = 5\times10^{-10}$, and a second
-seed of the whole pair gives $+.111$ (.937 vs.\ .826), with every cell within two points of seed 0. At
-14B the gap is $+.078$ $[+.055, +.100]$, $p = 7\times10^{-12}$, smaller because the facts-first model is
-at ceiling (.997). The two 14B checkpoints differ in the rest of the recipe bundle as well, so the 14B
-pair corroborates the direction at scale and the 1.7B pair is the single-variable test. The v2 releases
-carry the fix: on facts-first long states they score .947 (1.7B) and .950 (4B) against .598 and .612 for
-v1, and hold their facts-last accuracy (\Cref{tab:app-long-release}). JevBench does not register the
-change: \texttt{typical-small} v2 and v1 read .708 and .694 on its standard tier, and its 19-item
-\texttt{long\_policy} family gives 6/19 against 2/19 ($p = .232$) at one seed and 5/19 against 5/19 at
-the other (\Cref{app:hard-tier}).
-
-\paragraph{Rendering.}
+\subsection{Formatting}
 \label{sec:results:rendering}
-Changing only the rendering moves a frozen 9B model 12.5 points: with identical JevBench items,
-frozen Qwen3.5 checkpoints and letter-logit readout, a replication of another published system's state
-and option layout lifts the standard tier by 1.4, 8.3 and 12.5 points at 2B, 4B and 9B, surviving a paired
-per-item test at 4B ($p = .048$) and 9B ($p < .001$); no hard-tier change separates (\Cref{tab:rendering}).
-At 1.7B, render mismatch inside one trained model costs more than the training defect: in the
-off-diagonal cells of \Cref{tab:twobytwo}, switching the evaluation render costs 14.5 points for the
-facts-first model and 19.0 for the facts-last one, which lands on its \texttt{policy\_permit} floor (.615
-against .612); at 14B it costs 7.6 and 6.8 points, so the larger backbone tolerates render mismatch
-better. Crossing training render with evaluation render separates data effects from compatibility
-effects, and the purpose-built 605-item set resolved at $p < 10^{-9}$ what a 19-item benchmark cell could
-not. The frozen controls of \Cref{tab:headline} use a letter-logit rendering we did not sweep, so
-frozen-versus-trained comparisons carry a rendering factor of the size shown here.
+
+The decision should not change when the same content is laid out differently. Frozen models fail this
+test at 4B and 9B. With identical
+JevBench items, frozen Qwen3.5 checkpoints and letter-logit readout, a replication of another published
+system's state and option layout lifts the standard tier by 1.4, 8.3 and 12.5 points at 2B, 4B and 9B,
+surviving a paired per-item test at 4B ($p = .048$) and 9B ($p < .001$); no hard-tier change separates
+(\Cref{tab:rendering}); the effect exceeds most of the spread between public JevBench entries
+(\Cref{app:leaderboard}).
+
+A trained model depends on the render it was trained in. At 1.7B,
+render mismatch inside one trained model costs more than the training defect. In the off-diagonal cells
+of \Cref{tab:twobytwo}, switching the evaluation render costs 14.5 points for the facts-first model and
+19.0 for the facts-last one, which lands on its \texttt{policy\_permit} floor (.615 against .612). At
+14B it costs 7.6 and 6.8 points, so the larger backbone tolerates render mismatch better.
+
+Typical fixes the layout of the question and options in the suffix (\Cref{sec:method:pass}), but the
+caller writes the state, and the render crossing of \Cref{sec:results:long}, which separates data
+effects from compatibility effects, measures what a change of state layout costs. The frozen controls of \Cref{tab:headline} use a
+letter-logit rendering we did not sweep, so frozen-versus-trained comparisons carry a rendering factor of
+the size shown here.

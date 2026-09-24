@@ -23,27 +23,59 @@ hidden state (\Cref{fig:architecture}). The output type is a contract on the dis
 \emph{Choice}, ordinal \emph{Score}, a Bernoulli yes/no decision we call \emph{Noul}, and an abstention
 probability $\pnull$ computed by a gate outside the candidate softmax.
 
-We fixed each part of this design by measurement. We introduce $\dq$, the accuracy lost when the real
-question is replaced by a shuffled one, which separates question-dependent knowledge from priors over
-the candidate set. In every configuration we tested, a decision state computed before the candidates are
-seen stays within .03 of zero on $\dq$, while readouts over the candidates retain .09--.12
-(\Cref{sec:analysis:deltaq}). Scoring each candidate's contextual state matches the standard
-answer-letter readout on $\dq$ (.106 vs.\ .109) with a quarter of its log-odds shift under option edits
-(\Cref{sec:analysis:readout}). Abstention works as a gate and fails as a rendered ``none of the above''
-option, which raises MMLU-Pro false abstention from .003 to .692 (\Cref{sec:analysis:null}). Training
-data matters as much: counterfactual rubric groups, where only the rubric decides the answer, add
-35--40 points on held-out rule families, and a render-crossed design shows that placing evidence first
-in long training documents adds 11.2 points ($p = 5\times10^{-10}$; \Cref{sec:results}).
+Reading the decision out turned out to be the easy part. The hard part is making it depend on the right
+inputs. A decision model can reach high accuracy while answering from which options usually go
+together instead of from the question, from the hypothesis instead of the evidence, or from the state
+instead of the rubric. It can also shift when the labels are reordered, when more options are offered,
+or when the same content is laid out differently. Accuracy shows none of this, because a model that
+leans on the wrong input is often right anyway.
+
+We therefore built Typical around tests of what its decisions depend on. For each input that should
+decide the answer we use a control that removes it, and for each factor that should not we use a
+perturbation that varies it (\Cref{sec:tests}). \Cref{tab:dependence} lists what each test found in a
+naive design and what Typical's design does instead. Six design choices trace to its rows: reading candidates inside the forward pass, the 71\% tap,
+counterfactual rubric training, evidence-first long documents, the Bernoulli head and the abstention
+gate. \Cref{sec:scale} covers probability quality and cost.
+
+\begin{table}[t]
+  \centering
+  \caption{What a decision should and should not depend on. Each row pairs a test with the failure it
+  exposed in a naive design and the result with Typical's design. Section numbers point to the evidence.}
+  \label{tab:dependence}
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.1cm}>{\raggedright\arraybackslash}p{2.9cm}>{\raggedright\arraybackslash}p{3.7cm}>{\raggedright\arraybackslash}p{3.6cm}@{}}
+    \toprule
+    Input or factor & Test & Naive design & Typical \\
+    \midrule
+    \multicolumn{4}{@{}l}{\emph{The decision should depend on}} \\
+    the question & shuffled question, $\dq$ & state computed before the candidates: $|\dq| < .03$ & candidates read in the forward pass: .09--.12 (\S\ref{sec:analysis:deltaq}) \\
+    the evidence & same head, last layer vs.\ 71\% depth & last layer: MNLI .752, ANLI .431 & 71\% tap: .865, .519 (\S\ref{sec:analysis:depth}) \\
+    evidence in long documents & training $\times$ evaluation render & facts truncated in training: .830 & evidence first: .942 (\S\ref{sec:results:long}) \\
+    the rubric & held-out rubric-flip pairs & never trained on rubric groups: .477 & counterfactual rubric groups: .710 (\S\ref{sec:results:mixture}) \\
+    \midrule
+    \multicolumn{4}{@{}l}{\emph{The decision should not depend on}} \\
+    label order & reverse the yes/no labels & two-way Choice: $\Delta P(\text{yes})$ up to .55 & Bernoulli Noul: 0 (\S\ref{sec:results:typed}) \\
+    options offered & vary $\numcands$ with gold absent & rendered ``none of the above'': MMLU-Pro false abstention .692 & gate only: .003 (\S\ref{sec:analysis:null}) \\
+    formatting & swap the layout & frozen 9B: 12.5 points from layout alone & trained 1.7B: 14.5--19.0 on mismatch; 14B: 6.8--7.6 (\S\ref{sec:results:rendering}) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The resulting models are fast. A decision takes 45\,ms at 1.7B and 60\,ms at 14B in a research harness,
+because the cached state and a short suffix dominate its cost, and the 14B model reaches .931 on the
+JevBench standard tier (\Cref{sec:scale}).
 
 \textbf{Contributions.}
 \begin{enumerate}
   \item A direct decision interface for pretrained causal language models, with typed outputs and a
   factored abstention gate, that returns distributions over runtime candidates without generating text
   (\Cref{sec:method}).
-  \item $\dq$ and the matched comparisons it enables, which locate the decision in the candidates'
-  contextual states at mid-depth (\Cref{sec:analysis}).
-  \item A training recipe for decision models and a render-crossed evaluation that separates data
-  effects from interface effects (\Cref{sec:train,sec:results}).
+  \item A protocol for testing what a decision model depends on, built on $\dq$ and render-crossed
+  evaluation, which applies to any architecture that scores candidates (\Cref{sec:tests}).
+  \item Design and training choices each tied to a failure that protocol exposed
+  (\Cref{sec:depends,sec:invariant}).
   \item Open models, \texttt{typical-small} (1.7B) and \texttt{typical-medium} (4B), with an
   inference package (\texttt{pip install typical-ai}).
 \end{enumerate}

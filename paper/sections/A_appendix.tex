@@ -3,20 +3,38 @@
 \subsection{Evaluation protocol details}
 \label{app:protocol}
 
-\paragraph{Evaluation sets.} Banking77 is scored against all 77 labels. The MMLU-Pro probe is scored among
+\paragraph{Question-dependence gap.} On one candidate-blind model the choices-only variant of
+\Cref{def:deltaq} reads $+.017$ where $\dqsh$ reads $.000$, which is why the shuffled question is
+primary. High accuracy with $\dqsh \approx 0$ means that candidate-set priors explain the score. The
+reference is the listwise teacher, a fine-tuned decoder reading the options in context. The zero band
+$|\dqsh| < .02$ is about 1.4 standard errors at $n{=}1{,}200$ ($p \approx .15$).
+
+\paragraph{Evaluation sets.} We evaluate on SNLI \citep{bowman2015snli}, MNLI
+\citep{williams2018mnli}, ANLI \citep{nie2020anli}, BoolQ \citep{clark2019boolq}, CLINC-150
+\citep{larson2019clinc}, TREC-fine, HWU64, 20 Newsgroups and Banking77 \citep{casanueva2020banking77};
+a fixed 1{,}200-item MMLU-Pro probe \citep{wang2024mmlupro} and TruthfulQA-MC1 \citep{lin2022truthfulqa};
+held-out generator splits and ChaosNLI \citep{nie2020chaosnli}; 605 held-out long states; and the
+evaluation-only external sets PagerDuty, jevlogs, Mind2Web, tree-choice, typed-decisions and JevBench.
+\label{sec:setup:heldout}
+Each held-out split excludes a whole family, domain, rubric style, grammar or parameter range from
+training; none is a random validation split (\Cref{tab:generalization}). Banking77 is scored against all 77 labels. The MMLU-Pro probe is scored among
 the rendered options, with two leakage-matched items excluded. The held-out generator splits include the
 never-trained DecisionMix level~7 (880 items, guess rate .441). The 605 held-out long states split into
-\texttt{policy\_permit} ($\numcands{=}2$, floor .612) and \texttt{action\_select} ($\numcands{=}4$, floor
-.233). The evaluation-only external sets are PagerDuty (alert triage, yes/no, majority floor .792),
+\texttt{policy\_permit} ($\numcands{=}2$, $n{=}330$, floor .612) and \texttt{action\_select}
+($\numcands{=}4$, $n{=}275$, floor .233). The evaluation-only external sets are PagerDuty (alert triage, yes/no, majority floor .792),
 jevlogs (log triage, floor .697), Mind2Web (web-agent actions, floor .427), tree-choice (taxonomy
 routing, $\numcands \le 320$), typed-decisions (400 cases of all three types, probabilistic gold) and
 JevBench.
 
-\paragraph{JevBench.} Each item carries a state, a rubric and an exact label set. The hard tier spans
+\paragraph{JevBench.} JevBench v1.2.1 has yes/no, choice ($\numcands{=}2$--6) and ordinal decisions in
+three tiers: \emph{standard} (72 items), \emph{easy} (48) and \emph{hard} (111). No training corpus
+contains a public id. Each item carries a state, a rubric and an exact label set. The hard tier spans
 eight families, including long policies, multi-hop, temporal, probability and trade-off. Its 146
 judge-scored items are private and the harness ranks only submissions covering 95\% of all items, which
-is why every number here is on the 231 public ids and unranked. The paraphrase pairs share a
-\texttt{group} field, over which the cluster bootstrap resamples.
+is why every number here is on the 231 public ids and unranked. The 72 standard items are 36 states in
+two paraphrases, so intervals are cluster bootstraps over the paraphrase group (20{,}000 resamples):
+$\pm6$--13 points on standard, $\pm9$ on hard. The paraphrase pairs share a \texttt{group} field, over
+which the cluster bootstrap resamples. Comparisons between our models use paired per-item bootstraps.
 
 \paragraph{Metrics.}
 \label{sec:setup:metrics}
@@ -38,7 +56,7 @@ warm p50 against an already-cached 256-token state at $\numcands{=}2$.
 \subsection{Additional tables and figures}
 \label{app:extra-figures}
 
-\Cref{tab:generalization} lists the held-out axes of \Cref{sec:setup:heldout}.
+\Cref{tab:generalization} lists the held-out axes of \Cref{app:protocol}.
 \Cref{tab:blind,tab:app-blind-closure} give the per-variant numbers for the candidate-blind states of
 \Cref{sec:analysis:deltaq}, and \Cref{tab:app-null-fix} the rendered-null-line ablation of
 \Cref{sec:analysis:null}. \Cref{fig:ladder} plots \Cref{tab:headline} against backbone size. Under one matched recipe (the
@@ -94,6 +112,14 @@ serving-path engineering behind \Cref{sec:results:cost}, with \Cref{fig:serving}
   \end{tabular}
 \end{table}
 
+Candidate-blind states learn calibration as well as priors: ECE on the knowledge probe falls from .39
+for an earlier baseline to .04. The hypothesis-only SNLI baseline behind \Cref{sec:analysis:depth}
+scores 65.3 frozen and 68.2 with LoRA at layer 20; at layer 20 the N3 readout's evidence accuracy trails
+the candidate-blind energy-scoring baseline most on ANLI, by 3.6. For the N3 readout, moving the tap from layer 28 to layer 20 also raises CLINC-150 from .740 to .862
+and lowers validation NLL from .430 to .341 (\Cref{sec:analysis:depth}). Decision features below the
+final, next-token-specialized layers agree with work on layer pruning and probing
+\citep{gromov2024deeperlayers,men2024shortgpt,tenney2019pipeline,belrose2023tunedlens}.
+
 We compare the multi-set variant (\texttt{ms\_zr\_set}, $\dqsh$ exactly zero) against its steps-matched
 single-set control (\texttt{ms\_ctrl}, $-.023$). Reading the full 28 layers lowers among-$\numcands$
 accuracy to .147 and regresses SNLI/MNLI/ANLI/BoolQ to .881/.807/.462/.712 from .905/.873/.541/.826 at
@@ -104,7 +130,8 @@ No lever we varied moves $\dqsh$ (\Cref{sec:analysis:deltaq}). Cross-attention f
 candidate tokens leaves it at $-.003$ while improving null quality (CLINC out-of-scope .568 $\to$ .727);
 supervising the change in the teacher's log-odds across seven candidate sets gives exactly zero; reading
 all 28 layers gives $-.008$. Two variants fall outside the $\pm.02$ band in opposite directions
-($+.023$, $-.026$), the spread 1{,}200 items allow.
+($+.023$, $-.026$), the spread 1{,}200 items allow. We cannot exclude optimization: the zero-initialized set-conditioning
+cross-attention stayed inert through 4k steps of direct supervision.
 
 \begin{figure}[h]
   \centering
@@ -300,9 +327,11 @@ in data and objective instead, through null augmentation and per-type targets
 
 In this sweep, which ran without the uncertainty corpus or null augmentation, $E \ge .45$ brings NLI and
 BoolQ back within 1 point of the evidence-only base and intent and topic sets within 3--4, with workflow
-metrics within 1--4 (\Cref{sec:results:mixture}). Before the facts-first fix (\Cref{sec:train:long}), the long-state row (long$_{e45}$, 1{,}024 tokens,
+metrics within 1--4 (\Cref{sec:results:mixture}); CLINC-150 recovers to .779 with false abstention .10,
+and to .805 and .08 once null augmentation is added. With null augmentation, MMLU-Pro among-$\numcands$
+returns to the evidence-only base (.353), with the highest $\dqsh$ of any mixture (.143). Before the facts-first fix (\Cref{sec:train:long}), the long-state row (long$_{e45}$, 1{,}024 tokens,
 25\% long-policy rows) alone raised \texttt{long\_policy} from .16 to .37 and \texttt{multi\_hop} from .17
-to .28 relative to 6A, and gave the best held-out Score NLL of the sweep (1.26). Null-augmentation
+to .28 relative to 6A, and gave the best held-out Score NLL of the sweep (1.26). Benchmark gains and the long-state defect therefore coexisted (\Cref{sec:results:long}). Null-augmentation
 fractions in [.10, .20] give the same model within noise.
 
 \subsection{Typed primitives: parameterization, routing, and full results}
@@ -336,6 +365,9 @@ disabled. The type is a contract on the input. An early release candidate broke 
 applying the Bernoulli head at the \emph{model} level, so it scored Choice- and Score-typed rows in the
 same batch with no candidate text, and its accuracy collapsed to chance. Routing per row, which 140 unit
 tests verify, restored it.
+
+The matched fine-tunes of \Cref{sec:results:typed} start from one parent checkpoint, and each trains
+for 3k steps on the rows of its own type.
 
 \begin{table}[h]
   \centering
