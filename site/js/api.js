@@ -1,6 +1,6 @@
 // decide() talks to the local FastAPI server when live, and falls back to a
-// precomputed replay (or null) everywhere else - including window.TYPICAL_STATIC
-// pages served with no backend at all.
+// precomputed replay (or null) everywhere else - including the deployed site,
+// which is served with no backend at all.
 let replaysPromise = null;
 let _mode = 'static';
 let healthPromise = null;
@@ -45,9 +45,8 @@ function queued(fn) {
 }
 
 export async function decide(state, queries, { model = 'typical-small' } = {}) {
-  const isStatic = typeof window !== 'undefined' && window.TYPICAL_STATIC;
   if (healthPromise) await healthPromise; // first decide() may race the health probe
-  if (!isStatic && _mode === 'live') {
+  if (_mode === 'live') {
     try {
       const res = await queued(() =>
         fetch('/api/decide', {
@@ -71,16 +70,24 @@ export function mode() {
 }
 
 export function probeHealth() {
-  healthPromise = _probeHealth();
+  // Two callers race on boot (the listener below and shell.js). One probe answers both.
+  healthPromise ??= _probeHealth();
   return healthPromise;
 }
 
 async function _probeHealth() {
-  try {
-    const res = await fetch('/api/health');
-    _mode = res.ok ? 'live' : 'static';
-  } catch {
-    _mode = 'static';
+  // ponytail: /api/health belongs to the local dev server, so only a local origin can
+  // answer it. Anywhere else is a static deploy by construction, and asking anyway just
+  // prints a 404 in the reader's console. Widen this test the day the API is deployed.
+  const local =
+    typeof location !== 'undefined' && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  if (local) {
+    try {
+      const res = await fetch('/api/health');
+      _mode = res.ok ? 'live' : 'static';
+    } catch {
+      _mode = 'static';
+    }
   }
   if (typeof document !== 'undefined') {
     document.querySelectorAll('[data-mode-pill]').forEach((pill) => {
