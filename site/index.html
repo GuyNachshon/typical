@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="exhibits.css">
 </head>
 <body class="post">
-<nav class="nav"><a class="brand" href="#top">Typical</a><span class="links"><a href="#field">Results</a><a href="#watch">Demos</a><a href="research.html">Research</a><a href="https://huggingface.co/OzLabs/typical-small">Weights</a></span><a class="cta" href="#tryit">Try it live</a></nav>
+<nav class="nav"><a class="brand" href="#top">Typical</a><span class="links"><a href="#field">Results</a><a href="#watch">Demos</a><a href="research.html">Research</a><a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">Weights</a></span><a class="cta" href="#tryit">Try it live</a></nav>
 
 <div class="stage-track"><header class="stage" id="top">
   <iframe class="stage-film" id="film" src="games/doom/index.html?film=1" title="DOOM, played by the model" loading="eager"></iframe>
@@ -41,8 +41,8 @@
   <div class="masthead-meta t-mono">
     <span>Oz Labs</span>
     <span>23 September 2026</span>
-    <a href="https://huggingface.co/OzLabs/typical-small">Weights</a>
-    <a href="https://github.com/GuyNachshon/typical">Source</a>
+    <a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">Weights</a>
+    <a href="https://github.com/GuyNachshon/typical" target="_blank" rel="noopener">Source</a>
     <a href="paper.pdf">Paper (PDF)</a>
     <a href="research.html">Research</a>
   </div>
@@ -52,7 +52,7 @@
   <div class="claim">
     <h2>Why decision models</h2>
     <p>A week ago TypeSafe launched Jev and made a strong case for a different interface between models and software. Instead of generating a string that code then has to parse, the model returns typed probabilities over outcomes the program already knows. TypeSafe calls this a System One model. We think <em>decision model</em> is the more useful name for the category.</p>
-    <p>The reaction was quick and concrete. Within a week Cloudflare was serving it on Workers AI as <a class="ul" href="https://developers.cloudflare.com/ai/models/typesafe/jev/"><code>typesafe/jev</code></a>, Vercel had wired it into <a class="ul" href="https://vercel.com/i/what-is-jev">AI Gateway</a> behind the AI SDK’s evaluation API, and an independent write-up had <a class="ul" href="https://archerhume.com/posts/jevs-architecture-unmasked">reconstructed the architecture</a> from the published interface alone. A month ago the category had no name. It now has two clouds serving it and people reverse-engineering it in public.</p>
+    <p>The reaction was quick and concrete. Within a week Cloudflare was serving it on Workers AI as <a class="ul" href="https://developers.cloudflare.com/ai/models/typesafe/jev/" target="_blank" rel="noopener"><code>typesafe/jev</code></a>, Vercel had wired it into <a class="ul" href="https://vercel.com/i/what-is-jev" target="_blank" rel="noopener">AI Gateway</a> behind the AI SDK’s evaluation API, and an independent write-up had <a class="ul" href="https://archerhume.com/posts/jevs-architecture-unmasked" target="_blank" rel="noopener">reconstructed the architecture</a> from the published interface alone. A month ago the category had no name. It now has two clouds serving it and people reverse-engineering it in public.</p>
     <p>The idea deserves an open implementation: weights you can inspect, run on your own hardware, adapt to your domain, and keep next to your own data. Today we're releasing <strong>Typical</strong>, two open-weight decision models: <code>typical-small</code> (1.7B) and <code>typical-medium</code> (4B).</p>
     <p>You give Typical a state once. That can be a support ticket, a policy document, an agent trace, or a game frame rendered as text. You can then ask it as many questions as you like, each with options you define at call time. Every answer is a probability distribution over those options, plus an explicit "none of the above." Nothing is generated and nothing needs parsing. A decision takes tens of milliseconds on a single GPU, and each further question about the same state costs a few more.</p>
   </div>
@@ -284,7 +284,7 @@ m.choice(state, "What does the customer want?", ["refund", "replacement", "repai
 m.noul(state, "Is the order still under warranty?")
 m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
   <p class="note mt-18"><code>state</code> is a string or any JSON-serialisable dict. The package is <code>typical‑ai</code> on PyPI, Apache‑2.0, Python 3.11 or newer. The import is <code>typical_ai</code>: PyPI’s bare <code>typical</code> is an established typing toolkit and is not us.</p>
-  <p class="note mt-18">The source is on <a class="ul" href="https://github.com/GuyNachshon/typical">GitHub</a>. Both checkpoints are Apache‑2.0 over Apache‑2.0 Qwen3 base models. The training mix is not uniformly permissive and we are not going to imply it is: ANLI is CC BY‑NC 4.0, SciQ is CC BY‑NC 3.0, and two portions of the uncertainty corpus declare no licence at all. Whether non‑commercially‑licensed training data constrains the use of the resulting weights is unsettled, and a launch post is not the place it gets resolved. The whole per‑source table is in each model card so your own counsel has something to read.</p>
+  <p class="note mt-18">The source is on <a class="ul" href="https://github.com/GuyNachshon/typical" target="_blank" rel="noopener">GitHub</a>. Both checkpoints are Apache‑2.0 over Apache‑2.0 Qwen3 base models. The training mix is not uniformly permissive and we are not going to imply it is: ANLI is CC BY‑NC 4.0, SciQ is CC BY‑NC 3.0, and two portions of the uncertainty corpus declare no licence at all. Whether non‑commercially‑licensed training data constrains the use of the resulting weights is unsettled, and a launch post is not the place it gets resolved. The whole per‑source table is in each model card so your own counsel has something to read.</p>
 </section>
 
 <section class="page chapter" id="next">
@@ -306,14 +306,14 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
     <details class="faq-item"><summary>Does it reason?</summary><p>For bounded decisions it can apply evidence from the state and rules given at runtime. Hard multi-step composition is still weak. For genuinely serial reasoning, use a generative reasoning model.</p></details>
     <details class="faq-item"><summary>Does it see the game in Doom?</summary><p>No. The demo supplies a text description of the game state.</p></details>
     <details class="faq-item"><summary>Why Qwen?</summary><p>Good open base models at the sizes we wanted, in one family we could test consistently. <code>typical-medium</code> uses Qwen3.5-4B.</p></details>
-    <details class="faq-item"><summary>What was it trained on, and under what license?</summary><p>The per‑source training table and the exact flags are on each model card: <a class="ul" href="https://huggingface.co/OzLabs/typical-small">typical‑small</a> and <a class="ul" href="https://huggingface.co/OzLabs/typical-medium">typical‑medium</a>.</p></details>
+    <details class="faq-item"><summary>What was it trained on, and under what license?</summary><p>The per‑source training table and the exact flags are on each model card: <a class="ul" href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">typical‑small</a> and <a class="ul" href="https://huggingface.co/OzLabs/typical-medium" target="_blank" rel="noopener">typical‑medium</a>.</p></details>
   </div>
 </section>
 
 <footer class="footer"><div class="page">
   <div class="cols">
     <div><p class="t-card" style="max-width:20ch">Models that decide, not generate.</p><p class="t-eyebrow mt-30" style="color:var(--color-mid)">Weights on Hugging Face, package on PyPI, source on GitHub.</p></div>
-    <div class="t-mono"><p class="t-eyebrow mb-18">Models</p><p><a href="https://huggingface.co/OzLabs/typical-small">typical-small</a></p><p><a href="https://huggingface.co/OzLabs/typical-medium">typical-medium</a></p><p><a href="https://huggingface.co/OzLabs/typical-small-preview">typical-small-preview</a></p></div>
+    <div class="t-mono"><p class="t-eyebrow mb-18">Models</p><p><a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">typical-small</a></p><p><a href="https://huggingface.co/OzLabs/typical-medium" target="_blank" rel="noopener">typical-medium</a></p><p><a href="https://huggingface.co/OzLabs/typical-small-preview" target="_blank" rel="noopener">typical-small-preview</a></p></div>
     <div class="t-mono"><p class="t-eyebrow mb-18">Site</p><p><a href="#field">Results</a></p><p><a href="#watch">Demos</a></p><p><a href="research.html">Research</a></p></div>
   </div>
   <div class="rule t-eyebrow" style="color:var(--color-mid)">Every number on this page traces to a file under site/data</div>

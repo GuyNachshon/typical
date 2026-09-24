@@ -14,11 +14,17 @@ function heroEnter() {
   const hud = document.querySelector('.stage-hud');
   if (reduced() || sessionStorage.getItem('typical_hero')) return;
   sessionStorage.setItem('typical_hero', '1');
+  // The HUD used to arrive on opacity alone -- it materialised out of nothing, which is the one
+  // entrance nothing in the world makes. Both cards now come from slightly below and slightly
+  // small, so they read as arriving rather than appearing. Transform and opacity only: both are
+  // composited, so a 60fps entrance survives the wasm build booting underneath it.
   g.set([...parts, hud].filter(Boolean), { opacity: 0 });
-  g.set(parts, { y: 18 });
+  g.set(parts, { y: 12 });
+  g.set(hud, { y: 14, scale: 0.985, transformOrigin: '100% 100%' }); // anchored to its own corner
   const tl = g.timeline({ defaults: { ease: 'expo.out' } });
-  tl.to(parts, { opacity: 1, y: 0, duration: 0.7, stagger: 0.08 }, 0.15)
-    .to(hud, { opacity: 1, duration: 0.5 }, 0.7);
+  // 50ms between lines: enough to read as a cascade, short enough not to feel like a queue
+  tl.to(parts, { opacity: 1, y: 0, duration: 0.52, stagger: 0.05 }, 0.15)
+    .to(hud, { opacity: 1, y: 0, scale: 1, duration: 0.46 }, 0.42);
 }
 
 // The hero insets as you leave it: the full-bleed film scales down a little and its corners
