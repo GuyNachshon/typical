@@ -29,7 +29,7 @@ m.score(state,  "How urgent is this ticket?", ["0", "1", "2", "3"])
 
 Models and their cards, including the measured trade-offs of each release, are at
 <https://huggingface.co/OzLabs>. Source and the full experimental record:
-<https://github.com/GuyNachshon/typical>.
+<https://github.com/ozlabsai/typical>.
 
 (Or just copy the `typical/` directory next to your code -- it's a plain Python package,
 no build step.)

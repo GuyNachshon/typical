@@ -20,7 +20,7 @@ Check the cited section before changing a number, not just the number.
 
 This is the part that goes stale first, so read it before editing.
 
-- **The GitHub repo is public as of 2026-09-23** (`github.com/GuyNachshon/typical`, all branches
+- **The GitHub repo is public as of 2026-09-23** (`github.com/ozlabsai/typical`, all branches
   consolidated into `main`), alongside the Hugging Face model repos (`OzLabs/typical-small`,
   `OzLabs/typical-medium`, `OzLabs/typical-small-preview`). Both posts were written while it was
   private, so they cite report section numbers as provenance rather than linking them, and they

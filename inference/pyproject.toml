@@ -29,8 +29,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/GuyNachshon/typical"
-Source = "https://github.com/GuyNachshon/typical"
+Homepage = "https://github.com/ozlabsai/typical"
+Source = "https://github.com/ozlabsai/typical"
 Models = "https://huggingface.co/OzLabs"
 
 # Source directory is `typical/`; installed import name is `typical_ai`. PyPI's
