@@ -63,6 +63,17 @@
    "params_active": 2.0
   },
   {
+   "name": "typical-large-preview",
+   "kind": "decision model",
+   "size": "14B",
+   "std": 0.9027777777777778,
+   "hard": 0.46846846846846846,
+   "ours": true,
+   "params_total": 14.0,
+   "params_active": 14.0,
+   "note": "preview"
+  },
+  {
    "name": "typical-medium",
    "kind": "decision model",
    "size": "4B",

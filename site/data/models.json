@@ -223,6 +223,82 @@
   "note": "ships as OzLabs/typical-medium v2, in-place supersede of tm1b on 2026-09-23 (releases/MANIFEST.json, best.pt sha256 4564b3b1...). Backbone CHANGED: Qwen3.5-4B-Base, 32 layers, tap 23 (runs/tm2/results.json .args). Requires the 2026-09-23 inference/typical/backbone.py -- a Qwen3.5 checkpoint will not load on the earlier package. Long-state facts-first .950 vs tm1b's .612 (+33.8, n=605, buffalo:RESULTS.md#5b)."
  },
  {
+  "id": "typical-large-preview",
+  "backbone": "Qwen3-14B-Base",
+  "params": "14B",
+  "tap": "28/40",
+  "released": true,
+  "hf_url": "https://huggingface.co/OzLabs/typical-large-preview",
+  "jevbench": {
+   "std": {
+    "acc": 0.9027777777777778,
+    "brier": 0.1620536782288424,
+    "ece": 0.11695341600312129,
+    "n": 72
+   },
+   "easy": {
+    "acc": 1.0,
+    "brier": 0.004068359415105625,
+    "ece": 0.03529723857839901,
+    "n": 48
+   },
+   "hard": {
+    "acc": 0.46846846846846846,
+    "brier": 0.6335911746616877,
+    "ece": 0.17934644692115959,
+    "n": 111
+   }
+  },
+  "latency": {
+   "single_ms": {
+    "k2": 60,
+    "k32": 70,
+    "k256": 281
+   },
+   "marginal_ms_m32": {
+    "k2": 4.8,
+    "k32": 22.8,
+    "k256": 237.6
+   },
+   "peak_gb": null,
+   "note": "own bench (bench_tl1b_semif/bench.json), L_s=256, native path -- not the shared apples-to-apples pod the 1.7B row uses, so do not difference it against that row. No peak-memory figures in this bench."
+  },
+  "mmlu_pro_among_k": 0.5108333333333334,
+  "nlu": {
+   "snli": 0.9164161154539988,
+   "mnli": 0.886734693877551,
+   "boolq": 0.8831804281345565,
+   "anli": 0.6296875
+  },
+  "topic_intent": {
+   "clinc": 0.8927607913669064,
+   "trec": 0.504,
+   "hwu": 0.8020446096654275,
+   "ng20": 0.6255639097744361
+  },
+  "external": {
+   "pagerduty": 0.872,
+   "jevlogs": 0.4293307086614173,
+   "mind2web": 0.6125
+  },
+  "held_out": {
+   "noul": 0.8693333333333333,
+   "score": 0.625832223701731,
+   "flip_both_correct": 0.7878513145965549
+  },
+  "sources": {
+   "jevbench": "hf://guychuk/pcdm-runs/jev_native_tl1b_semif/{original,easy,hard}/summary.json (.accuracy, .brier_mean, .ece.ece, .n_scorable), harness jevbench-v1.",
+   "latency": "hf://guychuk/pcdm-runs/bench_tl1b_semif/bench.json, L_s=256, m=1 for single_ms and m=32 for the marginal.",
+   "mmlu_pro_among_k": "hf://guychuk/pcdm-runs/tl1b_semif/results.json .eval.mmlu_pro.raw.acc_k",
+   "nlu": "hf://guychuk/pcdm-runs/tl1b_semif/results.json .eval.{snli_test,mnli_val,boolq_val,anli_test}.scaled.acc",
+   "topic_intent": "hf://guychuk/pcdm-runs/tl1b_semif/results.json .eval.{clinc_test,trec_fine,hwu64_test,ng20_test}.scaled.acc",
+   "external": "hf://guychuk/pcdm-runs/tl1b_semif/eval_wf.json -- full-file pass (max_state 4096, limit 0).",
+   "held_out": "hf://guychuk/pcdm-runs/tl1b_semif/eval_wf.json -- full-file pass (max_state 4096, limit 0). flip_both_correct = .eval.wh_rubric_flip."
+  },
+  "checkpoint": "tl1b_semif",
+  "note": "ships as OzLabs/typical-large-preview on 2026-09-24 (best.pt sha256 d67d6d20..., releases/MANIFEST.json). PREVIEW, and the label is load-bearing: it fails the pre-registered pass rule \"(hard >= .559 OR hard Brier <= .65) AND long_policy >= .35\". Term 1 passes on Brier .634; term 2 fails on long_policy .053, measured on 19 items. The powered measurement of that same capability reads .974 on n=605 (buffalo:RESULTS.md#5b), which is why it shipped at all rather than being withheld. It is the only 14B to clear any term -- tl1b .656, tl1b_nokd .682, ladder_14b .849 all fail term 1. Same SemIf render as typical-small v3, tap 28/40, 3,072-token states, --drop_truncated on."
+ },
+ {
   "id": "typical-14b-ladder",
   "backbone": "Qwen3-14B-Base",
   "params": "14B",

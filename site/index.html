@@ -186,13 +186,12 @@
 <section class="page chapter" id="field">
   <div class="claim">
     <h2>The whole field, on the same items</h2>
-    <p>Every row below answered the same 231 public JevBench ids. That makes the table comparable, and it does not flatter us: four open decision models and one closed one are ahead of <code>typical&#8209;medium</code> on the standard tier, and a 400M classifier is ahead of <code>typical&#8209;small</code>. We would rather print the field we sit in than the one we win.</p>
+    <p>Every row below answered the same 231 public JevBench ids. That makes the table comparable, and it does not flatter us: four open decision models and one closed one are ahead of <code>typical&#8209;medium</code> on the standard tier, and so is our own 14B preview. What did change this week is the bottom of our range &mdash; <code>typical&#8209;small</code> now leads everything at or below its size, including the 400M classifier that used to be ahead of it. We would rather print the field we sit in than the one we win.</p>
   </div>
   <figure class="fig">
     <div id="jev-field"></div>
     <figcaption>JevBench standard, same 231 public ids. Click a column to re-sort.</figcaption>
   </figure>
-  <p class="mt-30">Plotted against the parameters you have to host, <code>typical&#8209;small</code> now sits on the frontier: nothing in this field at or below 1.7B scores above its .792, and the 400M classifier that used to beat it reads .750. <code>typical&#8209;medium</code> does not sit on it — <code>system&#8209;one&#8209;open</code> at 2B and <code>SemIf</code> at 4B are both above, and <code>SemIf</code> manages it on the same 4B base. Our report put that gap down to their rendering and method, and v3 is where we stopped probing and copied the rendering: on the same recipe, changing only the state layout, <code>typical&#8209;small</code> went from .694 to .792. Read that as a direction and not a measurement &mdash; the paired test over the same items gives p&nbsp;=&nbsp;.23, which is JevBench running out of resolution again rather than proof of a 10-point gain. <code>typical-medium</code> still leads every prompted backbone we ran, at every size, including a 14B.</p>
   <figure class="fig">
     <div class="chart" id="size-score"></div>
     <figcaption>JevBench standard against parameters. The dashed step is the frontier. <span data-count="unplotted">Four</span> entries publish no size.</figcaption>
@@ -332,7 +331,7 @@ m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
 <footer class="footer"><div class="page">
   <div class="cols">
     <div><p class="t-card" style="max-width:20ch">Models that decide, not generate.</p><p class="t-eyebrow mt-30" style="color:var(--color-mid)">Weights on Hugging Face, package on PyPI, source on GitHub.</p></div>
-    <div class="t-mono"><p class="t-eyebrow mb-18">Models</p><p><a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">typical-small</a></p><p><a href="https://huggingface.co/OzLabs/typical-medium" target="_blank" rel="noopener">typical-medium</a></p><p><a href="https://huggingface.co/OzLabs/typical-small-preview" target="_blank" rel="noopener">typical-small-preview</a></p></div>
+    <div class="t-mono"><p class="t-eyebrow mb-18">Models</p><p><a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">typical-small</a></p><p><a href="https://huggingface.co/OzLabs/typical-medium" target="_blank" rel="noopener">typical-medium</a></p><p><a href="https://huggingface.co/OzLabs/typical-large-preview" target="_blank" rel="noopener">typical-large-preview</a></p><p><a href="https://huggingface.co/OzLabs/typical-small-preview" target="_blank" rel="noopener">typical-small-preview</a></p></div>
     <div class="t-mono"><p class="t-eyebrow mb-18">Site</p><p><a href="#field">Results</a></p><p><a href="#watch">Demos</a></p><p><a href="research.html">Research</a></p></div>
   </div>
   <div class="rule t-eyebrow" style="color:var(--color-mid)">Every number on this page traces to a file under site/data</div>
