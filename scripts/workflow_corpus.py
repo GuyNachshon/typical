@@ -1,7 +1,7 @@
 """PLAN6 item 4: rubric-conditioned typed-workflow corpus (Noul / Choice / Score) in JevBench's *shape*.
 
 Builds data_wf/{train,val}.jsonl + data_wf/eval/*.jsonl + manifest.json (row schema state/query/candidates/
-target/p_null/task/label/meta, see data.py). Rows render exactly like pcdm_jev/decider.py at benchmark
+target/p_null/task/label/meta, see pcdm/data.py). Rows render exactly like pcdm_jev/decider.py at benchmark
 time: query = query_text({"type","instructions","criteria"}), candidates = the label strings verbatim.
 Nothing is copied from JevBench: every rubric, policy, scenario and label set here is our own; a leak check
 against the public JevBench states (exact + normalised stem) asserts 0 hits.
@@ -41,6 +41,7 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
 from data import norm_text, group_split, write_jsonl, words  # noqa: E402
 from pcdm_jev.decider import query_text  # noqa: E402  -- the benchmark-time renderer
 

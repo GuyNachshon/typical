@@ -1,0 +1,217 @@
+{
+ "note": "Trained checkpoints with their frozen 3-shot controls. JevBench public subset, 95% intervals cluster-bootstrapped over the paraphrase group. Transcribed from paper/sections/7_results.tex (tab:headline) on branch main. ms is a research-harness single decision at K=2, one pod and build. Recipes differ per row and are named in the paper.",
+ "shipped": [
+  "small v2",
+  "medium v2"
+ ],
+ "rows": [
+  {
+   "name": "Qwen3-1.7B",
+   "label": "small v1",
+   "recipe": "v1",
+   "params": 1.7,
+   "std": 0.694,
+   "std_ci": [
+    0.569,
+    0.819
+   ],
+   "hard": 0.432,
+   "hard_ci": [
+    0.342,
+    0.523
+   ],
+   "mmlu": 0.343,
+   "dq": 0.127,
+   "nll": 1.01,
+   "ms": 45
+  },
+  {
+   "name": "Qwen3-1.7B",
+   "label": "small v2",
+   "recipe": "fixed",
+   "params": 1.7,
+   "ships": true,
+   "std": 0.708,
+   "std_ci": [
+    0.569,
+    0.833
+   ],
+   "hard": 0.432,
+   "hard_ci": [
+    0.342,
+    0.523
+   ],
+   "mmlu": 0.338,
+   "dq": 0.127,
+   "nll": 1.08,
+   "ms": null
+  },
+  {
+   "name": "Qwen3-1.7B",
+   "label": "frozen, 3-shot",
+   "recipe": "frozen",
+   "params": 1.7,
+   "frozen": true,
+   "std": 0.528,
+   "std_ci": [
+    0.389,
+    0.667
+   ],
+   "hard": 0.369,
+   "hard_ci": [
+    0.279,
+    0.459
+   ]
+  },
+  {
+   "name": "Qwen3-4B",
+   "label": "medium v1",
+   "recipe": "v1",
+   "params": 4.0,
+   "std": 0.806,
+   "std_ci": [
+    0.694,
+    0.903
+   ],
+   "hard": 0.423,
+   "hard_ci": [
+    0.333,
+    0.514
+   ],
+   "mmlu": 0.458,
+   "dq": 0.193,
+   "nll": 1.03,
+   "ms": 56
+  },
+  {
+   "name": "Qwen3-4B",
+   "label": "frozen, 3-shot",
+   "recipe": "frozen",
+   "params": 4.0,
+   "frozen": true,
+   "std": 0.778,
+   "std_ci": [
+    0.667,
+    0.889
+   ],
+   "hard": 0.441,
+   "hard_ci": [
+    0.351,
+    0.532
+   ]
+  },
+  {
+   "name": "Qwen3-8B",
+   "label": "8B",
+   "recipe": "wf",
+   "params": 8.0,
+   "std": 0.667,
+   "std_ci": [
+    0.528,
+    0.792
+   ],
+   "hard": 0.396,
+   "hard_ci": [
+    0.306,
+    0.486
+   ],
+   "mmlu": 0.302,
+   "dq": 0.093,
+   "nll": 1.67,
+   "ms": null
+  },
+  {
+   "name": "Qwen3-8B",
+   "label": "frozen, 3-shot",
+   "recipe": "frozen",
+   "params": 8.0,
+   "frozen": true,
+   "std": 0.556,
+   "std_ci": [
+    0.417,
+    0.694
+   ],
+   "hard": 0.369,
+   "hard_ci": [
+    0.279,
+    0.459
+   ]
+  },
+  {
+   "name": "Qwen3-14B",
+   "label": "14B",
+   "recipe": "fixed",
+   "params": 14.0,
+   "best": true,
+   "std": 0.931,
+   "std_ci": [
+    0.861,
+    0.986
+   ],
+   "hard": 0.45,
+   "hard_ci": [
+    0.36,
+    0.541
+   ],
+   "mmlu": 0.498,
+   "dq": 0.235,
+   "nll": 0.95,
+   "ms": 60
+  },
+  {
+   "name": "Qwen3-14B",
+   "label": "frozen, 3-shot",
+   "recipe": "frozen",
+   "params": 14.0,
+   "frozen": true,
+   "std": 0.819,
+   "std_ci": [
+    0.708,
+    0.917
+   ],
+   "hard": 0.559,
+   "hard_ci": [
+    0.468,
+    0.649
+   ]
+  },
+  {
+   "name": "Qwen3.5-4B",
+   "label": "medium v2",
+   "recipe": "fixed",
+   "params": 4.0,
+   "ships": true,
+   "std": 0.861,
+   "std_ci": [
+    0.778,
+    0.944
+   ],
+   "hard": 0.495,
+   "hard_ci": [
+    0.405,
+    0.586
+   ],
+   "mmlu": 0.429,
+   "dq": 0.194,
+   "nll": 0.97,
+   "ms": null
+  },
+  {
+   "name": "Qwen3.5-4B",
+   "label": "frozen, 3-shot",
+   "recipe": "frozen",
+   "params": 4.0,
+   "frozen": true,
+   "std": 0.764,
+   "std_ci": [
+    0.639,
+    0.875
+   ],
+   "hard": 0.495,
+   "hard_ci": [
+    0.405,
+    0.586
+   ]
+  }
+ ]
+}

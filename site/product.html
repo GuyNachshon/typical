@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en" class="booting">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Typical — models that decide, not generate</title>
+<meta name="description" content="Typical: open 1.7B and 4B decision models. One pass over the text, a probability for every option, and an explicit abstain. Results with controls, real demos.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Geist+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="exhibits.css">
+</head>
+<body>
+<nav class="nav"><a class="brand" href="index.html">Typical</a><span class="links"><a href="index.html#field">Results</a><a href="index.html#watch">Demos</a><a href="research.html">Research</a><a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">Weights</a></span><a class="cta" href="index.html#tryit">Try it live</a></nav>
+
+<div class="stage-track"><header class="stage" id="top">
+  <iframe class="stage-film" id="film" src="games/doom/index.html?film=1" title="DOOM, played by the model" loading="eager"></iframe>
+  <div class="stage-shade"></div>
+  <div class="stage-copy">
+    <ul class="t-eyebrow hero brow">
+      <li>Open decision models</li>
+      <li>1.7B and 4B</li>
+      <li>Open weights</li>
+    </ul>
+    <h1 class="t-hero">Models that decide, not generate.</h1>
+    <p class="sub">Give Typical some state, a question, and the options your software can take. Get a probability for each one back, including none of the above.</p>
+    <p class="watching">On screen: Typical playing DOOM, reading one sentence a tick and picking one of five moves.</p>
+    <div class="btns"><a class="btn" href="#results">See the results</a><a class="btn outline" href="research.html">Read the research</a></div>
+  </div>
+  <div class="stage-hud" id="hud">
+    <div class="rec"><i></i><span id="hud-rec">REC · typical-small · E1M1</span></div>
+    <div class="rec-sub t-mono" id="hud-rec2">booting</div>
+    <div id="hud-rows"></div>
+    <div class="sentence" id="hud-sentence">booting…</div>
+  </div>
+</header></div>
+
+<div class="page" style="padding-top:34px"><div class="strip">
+  <span><b>Typical</b> — open decision models, 1.7B and 4B</span>
+  <a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">Weights</a>
+  <a href="https://github.com/GuyNachshon/typical" target="_blank" rel="noopener">Source</a>
+  <a href="research.html">Research</a>
+  <a href="#results">Results</a>
+</div></div>
+
+<section class="page chapter" id="what">
+  <div class="claim">
+    <h2>Generation is the wrong interface for a decision.</h2>
+    <p>A language model can tell you what it thinks. Typical hands your program a distribution over the actions it can actually take, and the odds that none of them are right. No token is ever decoded. The answer is a head on the hidden state, so there is nothing to parse, constrain or retry.</p>
+  </div>
+  <figure class="fig">
+    <div class="media dark">
+      <div id="hero-decision"></div>
+    </div>
+    <figcaption><b>Fig. 1.</b> The instrument reads a state and a question, then plots a live probability for every option.</figcaption>
+  </figure>
+</section>
+
+
+
+<section class="page chapter" id="runtime">
+  <div class="claim">
+    <h2>Your program keeps its logic. It gets a new kind of condition.</h2>
+    <p>The questions, the options and the scale all arrive with the call — none of it is trained in. Take the winning option out of the answer space and its weight lands on the ∅ the model keeps for &ldquo;none of these&rdquo; — far enough that a different line of the program runs.</p>
+  </div>
+  <figure class="fig">
+    <div class="media"><div id="primitives"></div></div>
+    <figcaption><b>Fig. 2.</b> The same call against a shrinking answer space, with the excluded option's weight moving to ∅.</figcaption>
+  </figure>
+</section>
+
+<section class="page chapter" id="latency">
+  <div class="claim">
+    <h2>The second question is nearly free.</h2>
+    <p>Reading the state is the work, and it happens once. A decision on a fresh state takes 45&nbsp;ms; every further question against that same state adds 2.7. Thirty&#8209;two questions on one ticket come to 129&nbsp;ms — four milliseconds a decision.</p>
+  </div>
+  <div class="figband">
+    <div class="page figband-row">
+      <p><span class="t-figure">45</span><i>ms</i><em>one decision, cold state</em></p>
+      <p><span class="t-figure">2.7</span><i>ms</i><em>every question after it</em></p>
+      <p><span class="t-figure">129</span><i>ms</i><em>thirty&#8209;two on one ticket</em></p>
+    </div>
+  </div>
+  <div class="page">
+    <figure class="fig">
+      <div class="media mt-30"><div class="chart" id="chart-g2"></div></div>
+      <figcaption><b>Fig. 3.</b> A breakdown of where a single decision call spends its time.</figcaption>
+    </figure>
+    
+  </div>
+</section>
+
+<section class="page chapter" id="results">
+  <div class="claim">
+    <h2>Small models make useful decision engines.</h2>
+    <p>Three tasks, each with the number you would get by guessing beside the number the model gets &mdash; and then the same benchmark run against general&#8209;purpose models of every size, prompted the ordinary way.</p>
+  </div>
+  <figure class="fig">
+    <div class="media"><div id="results-table"></div></div>
+    <figcaption><b>Fig. 4.</b> Typical against chance, on each of the three tasks.</figcaption>
+  </figure>
+  <figure class="fig">
+    <div class="media mt-30">
+      <p class="t-eyebrow muted" style="margin-bottom:22px">Against general models, prompted</p>
+      <div id="results-compare"></div>
+    </div>
+    <figcaption><b>Fig. 5.</b> The same benchmarks run against general&#8209;purpose models across sizes, prompted the ordinary way.</figcaption>
+  </figure>
+  <p class="note mt-30" style="max-width:72ch">Purpose&#8209;built decision models from other groups score higher than this on JevBench &mdash; up to .986 standard, some of them on typical&#8209;medium&rsquo;s own base checkpoint. Our report attributes that to their rendering and method and is replicating it as a probe; until that probe lands, the gap stands as measured. JevBench figures here are a public&#8209;subset run (72&nbsp;standard / 48&nbsp;easy / 111&nbsp;hard public ids), not a ranked leaderboard entry, and chance is 31.1% standard. <a class="ul" href="index.html#field">The whole field, on the same 231 ids &rarr;</a></p>
+  <p class="note mt-18"><a class="ul" href="research.html#scaling">Every table, every source and the calibration curves &rarr;</a></p>
+
+  <div class="claim mt-55">
+    <h2>Where it works, and where it does not.</h2>
+    <p>Bounded decisions over text you already have. Anything that needs several steps of reasoning, or a document longer than the state window, is outside what these two models do today.</p>
+  </div>
+  <div class="grid gap-18 lg:grid-cols-2 mt-30">
+    <div><h3 class="t-card">Good fit</h3><ul class="fit"><li>Routing and triage</li><li>Classification over labels you define</li><li>Policy and eligibility checks</li><li>Extraction with a closed answer set</li><li>Scoring on a scale you define</li><li>Tool choice and next action</li></ul></div>
+    <div><h3 class="t-card">Not yet</h3><ul class="fit"><li>Documents past the state window</li><li>Serial arithmetic</li><li>Temporal composition</li><li>Multi-step planning</li><li>Vision, or any raw perception</li></ul></div>
+  </div>
+  <p class="note mt-18">Each of these has a measured failure behind it, including the ones that surprised us: object-location phrasing, rules with an &ldquo;or&rdquo; in them, a compaction threshold that never crosses .5, and a truncation bug that taught confident answers without evidence.</p>
+</section>
+
+<section class="page chapter" id="demos">
+  <div class="claim">
+    <h2>Watch it decide.</h2>
+    <p>Every tick, the state is a sentence and the options are the legal moves. The board, the road and the corridor are all text by the time the model sees them. <span class="tag" data-mode-pill></span></p>
+  </div>
+  <figure class="fig">
+      <div class="media dark">
+        <p class="media-label t-eyebrow">The road · Three.js</p>
+        <div class="media-split"><div class="media-scene"><div class="game-mount" data-game="drive"></div></div></div>
+      </div>
+      <figcaption><b>Fig. 6.</b> The model picks each manoeuvre · 123 of 127 matched the rule list.</figcaption>
+    </figure>
+  <div class="gamepair">
+    <figure class="fig">
+    <div class="media dark">
+      <p class="media-label t-eyebrow">Snake · canvas</p>
+      <div class="media-scene" style="min-height:520px"><div class="game-mount" data-game="snake"></div></div>
+    </div>
+    <figcaption><b>Fig. 7.</b> One sentence per tick, the candidate set is the safe moves, and the recorded run matched 98.4% of moves on 62 boards (chance 48%).</figcaption>
+  </figure>
+    <figure class="fig">
+    <div class="media dark">
+      <p class="media-label t-eyebrow">DOOM · E1M1 · live</p>
+      <div class="media-scene" style="min-height:520px"><iframe class="card-film" id="film-card" src="games/doom/index.html?film=1" title="DOOM played by typical-small" loading="lazy"></iframe></div>
+      <div class="card-hud t-mono"><p class="rec"><i></i><span id="card-rec">REC · typical-small · E1M1</span></p><p class="rec-sub" id="card-rec2">booting</p><div id="card-rows"></div><p class="sentence" id="card-sentence"></p></div>
+    </div>
+    <figcaption><b>Fig. 8.</b> Two facts per tick, badly hurt or not and an enemy in sight or not, decide retreat, engage or explore, straight from the text state, never a pixel.</figcaption>
+  </figure>
+  </div>
+<div id="tryit">
+    <div class="exrow" data-exhibit-card>
+      <div class="exrow-head">
+        <span class="tag">Recorded</span>
+        <h3 class="t-feature">Rules are the program</h3>
+        <p>Five fixed facts about a loan applicant and four rules with a stated precedence. Reorder the rules and the model re-decides live on the same facts; a second panel runs six applicants under both orders and flags each flip.</p>
+        <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
+      </div>
+      <div class="exrow-body" data-exhibit-body hidden><div data-demo="rules"></div></div>
+    </div>
+    <div class="exrow" data-exhibit-card>
+      <div class="exrow-head">
+        <span class="tag">Recorded</span>
+        <h3 class="t-feature">Try it</h3>
+        <p>Your own state, question and options, decided in one forward pass, or the prefilled example if the local model server isn't running.</p>
+        <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
+      </div>
+      <div class="exrow-body" data-exhibit-body hidden><div data-demo="tryit"></div></div>
+    </div>
+    <div class="exrow" data-exhibit-card>
+      <div class="exrow-head">
+        <span class="tag">Recorded</span>
+        <h3 class="t-feature">SQL over judgment</h3>
+        <p><code>SELECT * FROM tickets WHERE typical(body, 'the customer mentions a duplicate charge')</code>, 129 rows, one forward pass each, no embeddings, checked against hand labels on four conditions.</p>
+        <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
+      </div>
+      <div class="exrow-body" data-exhibit-body hidden><div data-demo="sql"></div></div>
+    </div>
+    <div class="exrow" data-exhibit-card>
+      <div class="exrow-head">
+        <span class="tag">Recorded</span>
+        <h3 class="t-feature">One document, twenty questions</h3>
+        <p>A short handbook is read once into the KV cache, then twenty typed questions (12 yes/no, 5 choice, 3 score) are answered from that cached state in one call, timed against twenty one-at-a-time calls and marked against a hand label.</p>
+        <button class="btn ghost" type="button" data-exhibit-toggle>Run →</button>
+      </div>
+      <div class="exrow-body" data-exhibit-body hidden><div data-demo="doc-20"></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="page chapter" id="start">
+  <div class="claim">
+    <h2>Three commands and you are running it locally.</h2>
+    <p>Open weights and inference code today. The full training recipe is documented; training code comes next. Download the <code>inference/</code> folder from the model repo, install its requirements, and call it. <code>state</code> is a string or a dict; the options are whatever you pass, per call, with no retraining.</p>
+  </div>
+  <div class="code"><pre >pip install typical-ai</pre></div>
+  <p class="note mt-18">The three calls themselves are the six lines shown above under <a href="#runtime">Your program keeps its logic</a>: <code>choice</code>, <code>noul</code>, <code>score</code>, each taking the same state.</p>
+</section>
+
+<footer class="footer"><div class="page">
+  <div class="cols">
+    <div><p class="t-card" style="max-width:20ch">Models that decide, not generate.</p><p class="t-eyebrow mt-30" style="color:var(--color-mid)">Weights on Hugging Face, package on PyPI, source on GitHub.</p></div>
+    <div class="t-mono"><p class="t-eyebrow mb-18">Models</p><p><a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">typical-small</a></p><p><a href="https://huggingface.co/OzLabs/typical-medium" target="_blank" rel="noopener">typical-medium</a></p><p><a href="https://huggingface.co/OzLabs/typical-small-preview" target="_blank" rel="noopener">typical-small-preview</a></p></div>
+    <div class="t-mono"><p class="t-eyebrow mb-18">Site</p><p><a href="#results">Results</a></p><p><a href="#demos">Demos</a></p><p><a href="research.html">Research</a></p></div>
+  </div>
+  <div class="rule t-eyebrow" style="color:var(--color-mid)">Every number on this page traces to a file under site/data</div>
+</div></footer>
+
+<script src="js/vendor/gsap.min.js" defer></script>
+<script src="js/vendor/ScrollTrigger.min.js" defer></script>
+<script type="module" src="js/shell.js"></script>
+</body>
+</html>

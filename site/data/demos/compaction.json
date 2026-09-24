@@ -1,0 +1,173 @@
+{
+  "task": "make tests/test_dates.py::test_parse_date_iso pass by fixing parse_date in src/utils/dates.py without changing the test.",
+  "calls": [
+    {
+      "tool": "Bash",
+      "args": "pytest tests/test_dates.py -x",
+      "result": "FAILED tests/test_dates.py::test_parse_date_iso - AssertionError: assert datetime(2024, 5, 3) == datetime(2024, 3, 5)\n1 failed in 0.21s",
+      "keep": true,
+      "verbatim": true
+    },
+    {
+      "tool": "Read",
+      "args": "README.md",
+      "result": "# acme-utils\nShared helpers for the Acme billing services. Install with `pip install -e .`. See docs/ for the API reference.",
+      "keep": false,
+      "verbatim": false
+    },
+    {
+      "tool": "Grep",
+      "args": "def parse_date",
+      "result": "src/utils/dates.py:14:def parse_date(s: str) -> datetime:",
+      "keep": true,
+      "verbatim": false
+    },
+    {
+      "tool": "Read",
+      "args": "src/utils/dates.py",
+      "result": "12 from datetime import datetime\n13\n14 def parse_date(s: str) -> datetime:\n15     \"\"\"Parse an ISO date string.\"\"\"\n16     return datetime.strptime(s, \"%Y-%d-%m\")\n17\n18 def format_date(d: datetime) -> str:\n19     return d.strftime(\"%Y-%m-%d\")",
+      "keep": true,
+      "verbatim": true
+    },
+    {
+      "tool": "Read",
+      "args": "src/utils/__init__.py",
+      "result": "from .dates import parse_date, format_date\nfrom .strings import slugify\n__all__ = [\"parse_date\", \"format_date\", \"slugify\"]",
+      "keep": false,
+      "verbatim": false
+    },
+    {
+      "tool": "Bash",
+      "args": "git log --oneline -5",
+      "result": "a41c2f0 bump version to 1.4.2\n9b17e3d add slugify helper\n2c0aa91 ci: run tests on 3.12\n77d0e4b docs: api reference\n5f3b8c1 initial import",
+      "keep": false,
+      "verbatim": false
+    },
+    {
+      "tool": "Grep",
+      "args": "parse_date(",
+      "result": "src/billing/invoice.py:88:    due = parse_date(row[\"due_date\"])\nsrc/billing/export.py:41:    start = parse_date(args.start)\ntests/test_dates.py:7:    assert parse_date(\"2024-03-05\") == datetime(2024, 3, 5)",
+      "keep": true,
+      "verbatim": false
+    },
+    {
+      "tool": "Read",
+      "args": "tests/test_dates.py",
+      "result": "1 from datetime import datetime\n2 from utils.dates import parse_date\n3\n4\n5 def test_parse_date_iso():\n6     # ISO 8601 calendar date: YYYY-MM-DD\n7     assert parse_date(\"2024-03-05\") == datetime(2024, 3, 5)",
+      "keep": true,
+      "verbatim": true
+    },
+    {
+      "tool": "Bash",
+      "args": "ls docs/",
+      "result": "api.md  contributing.md  index.md  release-notes.md",
+      "keep": false,
+      "verbatim": false
+    },
+    {
+      "tool": "Read",
+      "args": "docs/contributing.md",
+      "result": "# Contributing\nOpen a PR against main. Run `ruff check .` and `pytest` before pushing. Squash merges only.",
+      "keep": false,
+      "verbatim": false
+    },
+    {
+      "tool": "Grep",
+      "args": "strptime",
+      "result": "src/utils/dates.py:16:    return datetime.strptime(s, \"%Y-%d-%m\")\nsrc/billing/export.py:12:    # TODO use strptime instead of manual split",
+      "keep": true,
+      "verbatim": false
+    },
+    {
+      "tool": "Read",
+      "args": "src/utils/strings.py",
+      "result": "import re\n\ndef slugify(s: str) -> str:\n    return re.sub(r\"[^a-z0-9]+\", \"-\", s.lower()).strip(\"-\")",
+      "keep": false,
+      "verbatim": false
+    },
+    {
+      "tool": "Bash",
+      "args": "python --version",
+      "result": "Python 3.12.3",
+      "keep": false,
+      "verbatim": false
+    },
+    {
+      "tool": "Read",
+      "args": "src/config.py",
+      "result": "DATABASE_URL = env(\"DATABASE_URL\")\nSMTP_HOST = env(\"SMTP_HOST\", \"localhost\")\nDEBUG = env_bool(\"DEBUG\", False)",
+      "keep": false,
+      "verbatim": false
+    },
+    {
+      "tool": "Edit",
+      "args": "src/utils/dates.py",
+      "result": "Replaced 1 occurrence:\n-    return datetime.strptime(s, \"%Y-%d-%m\")\n+    return datetime.strptime(s, \"%Y-%m-%d\")",
+      "keep": true,
+      "verbatim": true
+    },
+    {
+      "tool": "Bash",
+      "args": "pytest tests/test_dates.py -x",
+      "result": "1 passed in 0.19s",
+      "keep": true,
+      "verbatim": true
+    },
+    {
+      "tool": "Read",
+      "args": "CHANGELOG.md",
+      "result": "## 1.4.2\n- Fix slugify on unicode input\n## 1.4.1\n- Add format_date",
+      "keep": false,
+      "verbatim": false
+    },
+    {
+      "tool": "Grep",
+      "args": "TODO",
+      "result": "src/billing/export.py:12:    # TODO use strptime instead of manual split\nsrc/billing/invoice.py:120:    # TODO paginate",
+      "keep": false,
+      "verbatim": false
+    },
+    {
+      "tool": "Bash",
+      "args": "git status --short",
+      "result": " M src/utils/dates.py",
+      "keep": true,
+      "verbatim": false
+    },
+    {
+      "tool": "Read",
+      "args": ".github/workflows/ci.yml",
+      "result": "name: ci\non: [push, pull_request]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: pip install -e . && pytest",
+      "keep": false,
+      "verbatim": false
+    },
+    {
+      "tool": "Bash",
+      "args": "pytest tests/ -q",
+      "result": "42 passed in 1.83s",
+      "keep": true,
+      "verbatim": true
+    },
+    {
+      "tool": "Bash",
+      "args": "ls src/billing/",
+      "result": "__init__.py  export.py  invoice.py  models.py",
+      "keep": false,
+      "verbatim": false
+    },
+    {
+      "tool": "Read",
+      "args": "docs/release-notes.md",
+      "result": "# Release notes\nSee CHANGELOG.md. Releases are cut from main every two weeks.",
+      "keep": false,
+      "verbatim": false
+    },
+    {
+      "tool": "Bash",
+      "args": "ruff check src/utils/dates.py",
+      "result": "All checks passed!",
+      "keep": true,
+      "verbatim": false
+    }
+  ]
+}

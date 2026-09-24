@@ -4,7 +4,7 @@ these are real-checkpoint tests, not the tiny random-weight fixtures tests/test_
 uses for Qwen3. Qwen3.5 wraps its text trunk in a VL config (text_config/vision_config) and
 alternates Gated-DeltaNet linear-attention layers with regular full-attention layers
 (config.layer_types); Backbone/native.py must handle both transparently, and Qwen3 (tested
-in tests/test_pipeline.py) must be completely unaffected -- see encode.py/native.py comments.
+in tests/test_pipeline.py) must be completely unaffected -- see pcdm/encode.py/native.py comments.
 """
 import os
 
@@ -123,7 +123,7 @@ def test_native_kv_decide_matches_run_batch_qwen35_fp32():
                      "(installed alongside this checkpoint on GPU pods) -- runs on CPU raise "
                      "'Pointer argument cannot be accessed from Triton', unrelated to this test")
 def test_bench_b_fair_batched_runs_without_crashing_on_hybrid_cache():
-    """bench.py's B_fair baseline (score_b_fair_chunk / _cache_rows) crashed on Qwen3.5's hybrid
+    """pcdm/bench.py's B_fair baseline (score_b_fair_chunk / _cache_rows) crashed on Qwen3.5's hybrid
     cache with AttributeError: 'LinearAttentionLayer' object has no attribute
     'batch_repeat_interleave' (tm2 pod run, 2026-09-22) -- score_b_fair_chunk's own top-level
     cache expansion AND _cache_rows' sub-batch row-slicing both called the raw method directly

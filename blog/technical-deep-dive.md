@@ -192,11 +192,11 @@ Training the behaviour instead: false-abstention on CLINC .10 to .08 and on TREC
 
 ### 3.4 Checkpoint selection on calibration
 
-The final recipe selects the checkpoint on validation NLL over the uncertainty and curriculum sets (`--best_on`) rather than on accuracy, and adds a Brier term to the loss.
+The final recipe selects the checkpoint on validation NLL over the uncertainty and curriculum sets (`--best_on`) rather than on accuracy.
 
 The reason is a result we did not enjoy. Re-running the Release-1 candidate at batch 16 instead of 64, which is simply four times fewer examples seen, produced the best hard-tier Brier of any run in the project (.76) and hard accuracy .450, while losing ground on everything in-distribution (CLINC .733, MMLU among-K .323). Small batch is not a recipe, it is under-fitting: the same model, less confident, scores higher on the hard tier. That is fairly direct evidence that a large part of our hard-tier problem is probability quality rather than knowledge, and it is why the objective and the selection rule changed rather than the data volume.
 
-At 14B, the recipe with the long-state fix, the Brier term and calibration-based selection took held-out score NLL from 2.87 to 0.95 and typed-decisions NLL from 1.96 to 1.04, with JevBench hard Brier .85 to .66 (§3ah).
+At 14B, the recipe bundle — facts-first long states, `--drop_truncated`, the 3,072-token window, DecisionMix v2 with the U corpus, typed heads with the ordinal target, and calibration-based `--best_on` selection — took held-out score NLL from 2.87 to 0.95 and typed-decisions NLL from 1.96 to 1.04, with JevBench hard Brier .85 to .66 (§3ah).
 
 <p align="center"><img src="../figures/fig_calibration.png" alt="Held-out score NLL and typed-decisions NLL across checkpoints" width="640"></p>
 <p align="center"><em>Held-out score and typed-decisions NLL across the calibration-fix sequence.</em></p>
@@ -211,7 +211,7 @@ Here is our JevBench public-subset table with cluster-bootstrapped intervals, re
 |---|---:|---|---:|---|
 | `ts1b` (typical-small v1) | .694 | [.569, .819] | .432 | [.342, .523] |
 | `tm1b` (typical-medium v1) | .806 | [.694, .903] | .423 | [.333, .514] |
-| `tm2` (Qwen3.5-4B) | .861 | [.778, .944] | .495 | [.405, .595] |
+| `tm2` (Qwen3.5-4B) | .861 | [.778, .944] | .495 | [.405, .586] |
 | `tl2` (Qwen3.5-9B) | .833 | [.722, .931] | .495 | [.405, .586] |
 | `ladder_14b` | .875 | [.792, .944] | .468 | [.378, .559] |
 | `tl1b` (14B, KD) | .931 | [.861, .986] | .450 | [.360, .541] |

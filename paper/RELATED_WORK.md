@@ -64,8 +64,9 @@ interacts with prior knowledge to destroy calibration — the CogCalib line [wan
 Distribution-free guarantees come from conformal and selective prediction
 [angelopoulos2023conformal, romano2020adaptivecoverage], including for multiple-choice QA
 [kumar2023conformalmcq]. *Positioning: our calibration claims are training-time, not post-hoc — soft
-and ordinal-smoothed targets, a Brier term in the objective, and checkpoint selection on a held-out
-calibration metric; we report no global temperature fit.*
+and ordinal-smoothed targets, and checkpoint selection on a held-out calibration metric (no run trains
+a Brier term in the objective; `--brier_lambda` is 0.0 in every shipped/candidate recipe); we report no
+global temperature fit.*
 
 ## 4. Distillation, context distillation, and calibration preservation
 

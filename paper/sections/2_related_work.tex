@@ -1,136 +1,42 @@
 \section{Related work}
 \label{sec:related}
 
-\paragraph{Runtime-defined label spaces.} Deciding over a candidate set supplied at inference time is an
-old problem. GILE embeds inputs and label descriptions in a shared space so unseen labels are scorable
-\citep{pappas2019gile}; entailment reformulation turns arbitrary label names into hypotheses
-\citep{yin2019zeroshot}; TARS conditions a sentence encoder on the label text itself
-\citep{halder2020tars}; GLiNER and GLiNER2 encode text and a runtime schema jointly in one bidirectional
-pass \citep{zaratiana2023gliner,zaratiana2025gliner2}, the latter also appearing on the JevBench
-leaderboard we report against. The cost axis is the classical cross- versus dual-encoder trade-off: a
-cross-encoder reranker attends candidate to input and pays one forward pass per candidate
-\citep{nogueira2019bertrerank}, a dual encoder is candidate-independent but interacts only at a dot
-product \citep{reimers2019sbert}, and late-interaction and decomposition methods sit between --
-Poly-encoders \citep{humeau2020polyencoders}, ColBERT \citep{khattab2020colbert}, DeFormer
-\citep{cao2020deformer}, PreTTR \citep{macavaney2020prettr}, LUMEN \citep{dejong2023lumen} -- with
-compiling a cross-encoder into a cheaper student as standard practice \citep{lu2022erniesearch}.
-Decoder LLMs with a classification head close the loop \citep{li2023labelsupervised}. Four distinctions
-are worth making explicit. Against \emph{fixed classifiers and sequence classification}: our candidates
-are runtime-defined text, not fixed class indices. Against \emph{GILE, TARS, and dual encoders}: our
-central negative result is precisely that a candidate-independent representation is insufficient for the
-targeted question-conditioned closed-book regime (\Cref{sec:repr:blind}). Against \emph{cross-encoders
-and rerankers}: Typical reuses one state key-value prefix across many decisions and emits a typed
-distribution with an abstention event, rather than independently reranking state--candidate pairs.
-Against \emph{poly-encoders, ColBERT, and late interaction}: our candidates are rendered inside the
-causal computation and acquire contextual slot and set information that a late-interaction embedding of
-the candidate in isolation does not carry. Our own energy-scoring shortlisting front end
-(\Cref{sec:train:latency}) is a member of this family and is retained for exactly the sub-task --
-bounded-$\numcands$ pre-filtering -- that does not require question-conditioned capability.
+\paragraph{Decisions in hidden states.} Probes recover linearly decodable structure from hidden states
+\citep{alain2017probes}, and that structure changes with depth \citep{tenney2019pipeline,belrose2023tunedlens}.
+Circuit analysis localizes where a multiple-choice model binds its chosen option to a symbol
+\citep{lieberum2023circuit}, and \citet{wong2026models} decode the winning option in content space
+before that binding happens, a result \citet{bhatt2026representation} trace across languages. Typical
+deploys the pre-symbol decision as the interface and reads it at mid-depth, where upper layers are
+partly redundant \citep{gromov2024deeperlayers,men2024shortgpt}.
 
-\paragraph{Reading the decision out of hidden states instead of generating it.} This is our closest prior
-art. Linear probes and their controls establish that hidden states carry decodable structure
-\citep{alain2017probes,hewitt2019controltasks,belinkov2022probing}; layerwise analysis shows different
-depths carry different abstractions \citep{tenney2019pipeline,belrose2023tunedlens}; states anticipate
-tokens not yet emitted \citep{pal2023futurelens,wu2024planahead}; and MCQ-specific circuit analysis
-localizes the symbol-binding step \citep{lieberum2023circuit}. Most directly, \citet{wong2026models} show
-a two-stage computation in ordinary multiple-choice prompting: the winning option is decodable in content
-space at the option boundary \emph{before} the answer symbol is bound, a finding traced across languages
-by \citet{bhatt2026representation}. The letter interface itself is documented as unreliable: selection
-bias and option-order sensitivity \citep{zheng2024selectionbias,pezeshkpour2024optionorder}, symbol-identity
-effects and binding fixes \citep{yang2025option,xue2024symbolbinding}, first-token probabilities that
-disagree with the generated answer \citep{wang2024firsttoken}, and the choices-only control quantifying
-how much multiple-choice accuracy needs no question at all \citep{balepur2024artifacts} -- the control we
-adopt as our primary diagnostic (\Cref{sec:experiments:metrics}). Prior work observes the latent decision
-and diagnoses the symbol interface. We do not claim novelty at the level of ``the answer is latent before
-generation'' -- that is \citet{wong2026models}. What we contribute is to make the candidate-aware latent
-representation the \emph{deployed output interface} and to measure what is lost when the candidates are
-removed from the computation, including that the last layer is the wrong tap
-(\citealp{gromov2024deeperlayers,men2024shortgpt,schwartz2020righttool}; \Cref{sec:repr:depth}) and that
-the readout must be over contextual option spans, not slot-agnostic embeddings
-(\Cref{sec:repr:readout}).
+\paragraph{Answer symbols and runtime labels.} Letter answers carry order and symbol biases
+\citep{zheng2024selectionbias,pezeshkpour2024optionorder}, first-token probabilities disagree with the
+text a model generates \citep{wang2024firsttoken}, and format constraints can cost accuracy
+\citep{tam2024speakfreely}. $\dq$ (\Cref{def:deltaq}) extends the choices-only control of
+\citet{balepur2024artifacts} to a shuffled real question. Runtime labels have been scored through
+entailment \citep{yin2019zeroshot}, joint schema encoders \citep{zaratiana2025gliner2}, cross-encoders
+\citep{nogueira2019bertrerank}, dual encoders \citep{reimers2019sbert} and late interaction
+\citep{humeau2020polyencoders,khattab2020colbert}, and decoder classification heads fix labels as
+indices \citep{li2023labelsupervised}. Typical renders all candidates in one causal suffix, so each
+candidate's state carries its slot and its set, and $\dq$ measures what candidate-independent scoring
+gives up (\Cref{sec:analysis:deltaq}).
 
-\paragraph{Calibration, distillation, and what survives a change of interface.} Temperature scaling
-largely fixes in-distribution expected calibration error \citep{guo2017calibration}, though binned ECE is
-itself a biased estimator \citep{naeini2015calibration,kumar2019verifiedcalibration}, motivating proper
-scoring rules as the honest target \citep{gneiting2007scoringrules,brier1950verification}, with the ranked
-probability score as their ordinal-aware member \citep{epstein1969rps,murphy1970rps}. Training-time levers
-include label smoothing \citep{szegedy2016labelsmoothing,mueller2019labelsmoothing} and soft-target
-distillation, which transfers more than argmax \citep{hinton2015distillation,kim2016seqkd} and improves
-probability quality even without a stronger teacher under the label-smoothing view of KD
-\citep{yuan2020teacherfree,zhang2020selfdistillation}; fine-tuning specifically can distort calibration
-through its interaction with prior knowledge \citep{wang2025cogcalib,desai2020calibration}. Our
-calibration claims are training-time rather than post-hoc: soft and ordinal-smoothed targets
-(\Cref{sec:method:typed}), a Brier term in the objective, and checkpoint selection on a held-out
-calibration metric (\Cref{sec:method:selection}) rather than a single global temperature fit. Our
-frozen-teacher distillation term (\Cref{sec:boundary:frozen}) is a distillation target in this sense but a
-narrow one -- the teacher is the same backbone read with a fixed few-shot rendering, so the relevant
-question is componential: which parts of a teacher's behavior survive a change of interface. Our answer
-(priors and calibration, not question-conditioned knowledge) is the negative half of this literature,
-consistent with context distillation compiling a prompt into weights
-\citep{askell2021assistant,snell2022contextdistillation}.
+\paragraph{Computation per decision.} Prefix caching and sharing are established serving techniques
+\citep{kwon2023pagedattention,zheng2023sglang,gim2023promptcache}, and speculative decoding shortens the
+decode loop \citep{leviathan2023speculative}; Typical has no decode loop. Chain-of-thought supplies the
+serial computation that a fixed-depth pass lacks \citep{wei2022cot,merrill2023parallelism,feng2023chain,
+merrill2024expressive}, as do pause tokens \citep{goyal2024pause} and latent reasoning
+\citep{hao2024coconut}; \Cref{sec:limitations} connects this to the decisions Typical finds hardest.
 
-\paragraph{Prefix sharing and the cost of removing the decode loop.} Sharing a long prefix across many
-suffixes is established systems work \citep{juravsky2024hydragen,zheng2023sglang,kwon2023pagedattention,
-gim2023promptcache,pope2023scaling,dao2022flashattention,cheng2023batch}; generation-side accelerators are
-an informative contrast, since speculative decoding and Medusa exist because each sequential decode step
-is overhead-bound rather than compute-bound
-\citep{leviathan2023speculative,chen2023speculativesampling,cai2024medusa}. We contribute no new kernel; we
-report the measured, single-stream-harness consequence of deleting the decode loop entirely
-(\Cref{sec:train:latency}).
-
-\paragraph{Is generation necessary? Expressivity and latent reasoning.} Chain-of-thought buys serial
-computation that a constant-depth transformer provably lacks in one forward pass
-\citep{wei2022cot,li2024cotserial,merrill2024expressive,merrill2023parallelism,feng2023chain}, and helps
-empirically mainly on math and symbolic tasks \citep{sprague2025cot}; filler and pause tokens show part of
-the gain is extra computation rather than verbalized reasoning
-\citep{goyal2024pause,pfau2024filler}, and implicit or latent chain-of-thought internalizes the steps
-\citep{deng2023implicitcot,deng2024internalize,hao2024coconut}. This literature delimits our scope
-(\Cref{sec:discussion}): a single non-generative forward pass is the right instrument for bounded,
-evidence- or prior-driven decisions, and is predicted to fail on serial composition -- exactly where our
-hard tier (temporal, probability, trade-off families) remains near chance.
-
-\paragraph{Ordinal regression, abstention, and long-context failure modes.} Our Score primitive is the
-minimal member of the ordinal-regression family
-\citep{mccullagh1980ordinal,frank2001ordinal,niu2016ordinalcnn,cao2020coral,shi2023corn,diaz2019softordinal}:
-a soft, ordinal-smoothed target that changes no decision and fixes probability quality, where a
-cumulative-link head did not win at matched budget (\Cref{sec:train:typed}). Our abstain option is
-architectural rather than a classical reject rule
-\citep{chow1970reject,geifman2017selective,geifman2019selectivenet,hendrycks2017msp,liu2020energyood}, with
-out-of-scope intent detection as the applied benchmark \citep{larson2019clinc,casanueva2020banking77}. On
-long context, retrieval position and length are known to change and degrade answers
-\citep{liu2024lostmiddle,levy2024moretokens,shi2023distracted,hsieh2024ruler}; our truncation finding
-(\Cref{sec:boundary:truncation}) is the training-side analogue, an instance of data-pipeline failures
-propagating silently through ML systems \citep{sambasivan2021datacascades}.
-
-\paragraph{Fine-tuning versus frozen backbones with in-context examples.} Fine-tuning can distort
-pretrained features and underperform out of distribution \citep{kumar2022finetunedistort}, fair
-comparisons of few-shot fine-tuning against in-context learning are close \citep{mosbach2023fewshot}, LoRA
-both learns and forgets less than full fine-tuning \citep{biderman2024loralearnsless,hu2022lora} yet
-continual fine-tuning still forgets \citep{luo2025forgetting}, and compositional-generalization benchmarks
-show where learned grammars stop composing out of distribution
-\citep{lake2018scan,keysers2020cfq,kim2020cogs,hupkes2020compositionality}. Two of our findings live here:
-rubric-conditioned training transfers inside its own rule grammar and not to unseen composition
-(\Cref{sec:boundary:hard}), and our trained 14B leads its frozen self on the standard tier while a
-same-size frozen backbone with three exemplars still leads on the hard tier
-(\Cref{sec:boundary:frozen}).
-
-\paragraph{Typed decision benchmarks and commercial systems.} JevBench, one of the evaluation suites we
-use, targets a class of commercial ``System-One'' decision models -- most visibly TypeSafe's Jev,
-documented only by vendor pages and a third-party black-box probe, closed-weight and closed-data. We
-therefore say that Typical targets a similar interface and task class, not that it reproduces Jev's
-architecture, which we cannot inspect. The leaderboard carries several open replications that publish
-weights and scores but, apart from GLiNER2 \citep{zaratiana2025gliner2} and the ModernBERT backbone used
-by Laya \citep{warner2024modernbert}, no method papers.
-
-\paragraph{What we claim as new.} Not ``reading decisions from hidden states'', which has ample prior art
-above. The defensible contribution is narrower and sharper: we study the design space for turning a
-pretrained causal LM into a reusable typed decision primitive under a cached-state constraint, and
-identify a specific empirical boundary in it -- candidate-blind reusable decision states fail to preserve
-question-conditioned capability, while candidate-contextual readout succeeds -- together with the
-diagnostic ($\dq$) that makes the boundary visible at all. A secondary methodological contribution is
-that rendering is a first-class experimental factor for this task class: a frozen Qwen3.5-9B checkpoint
-moves 12.5 points of standard-tier accuracy on rendering choice alone (\Cref{sec:boundary:rendering}).
-We draw the cautious conclusion from that, not the convenient one: it means cross-entry benchmark
-comparisons in this area conflate model capability with interface compatibility -- \emph{ours
-included} -- and that rendering should be held fixed when architectures are compared, not that any
-particular published result is wrong.
+\paragraph{Output contracts and training.} Score's soft ordinal target follows ordinal regression
+\citep{frank2001ordinal,cao2020coral}. The abstention gate descends from the reject option
+\citep{chow1970reject,geifman2017selective} and confidence-based out-of-scope detection
+\citep{hendrycks2017msp,larson2019clinc}. We evaluate probabilities with proper scoring rules
+\citep{gneiting2007scoringrules} alongside temperature-scaled calibration \citep{guo2017calibration},
+and train with LoRA \citep{hu2022lora} and distillation \citep{hinton2015distillation}. Compositional
+generalization benchmarks \citep{lake2018scan,keysers2020cfq} motivate the held-out composition level of
+DecisionMix (\Cref{sec:train:rubric}), and work on evidence position in long contexts
+\citep{liu2024lostmiddle} and silent data-pipeline defects \citep{sambasivan2021datacascades} motivates
+the render-crossed design (\Cref{sec:results:long}). Among JevBench's open entries, only GLiNER2
+\citep{zaratiana2025gliner2} and a ModernBERT-based model \citep{warner2024modernbert} have method
+papers.

@@ -1,6 +1,6 @@
 """Build <data>/eval/mmlu_pro.jsonl (+ .meta.json) from TIGER-Lab/MMLU-Pro's test
 split: a fixed-seed, category-stratified sample. Row schema matches the other eval
-sets (see data.py / data_v4/eval/boolq_val.jsonl): state/query/candidates/target/
+sets (see pcdm/data.py / data_v4/eval/boolq_val.jsonl): state/query/candidates/target/
 p_null/task/label/meta. Gold is always present (p_null=0.0), candidates = the option
 texts with letters dropped, state = the question stem.
 
@@ -16,7 +16,8 @@ from pathlib import Path
 from datasets import load_dataset
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from data import trunc, write_jsonl  # reuse the same state-truncation/writer convention as data.py
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
+from data import trunc, write_jsonl  # reuse the same state-truncation/writer convention as pcdm/data.py
 
 QUERY = "Which option is correct?"
 MAX_CAND = 300  # sane cap; MMLU-Pro options are occasionally long multi-clause strings

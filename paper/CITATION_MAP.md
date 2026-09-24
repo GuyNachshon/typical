@@ -62,7 +62,7 @@ or is the prior art a reviewer will raise, "A" = the attack citation (what a sce
 | Fine-tuning can underperform a frozen backbone out of distribution | §3ab, §3ah | A: kumar2022finetunedistort; C: mosbach2023fewshot, biderman2024loralearnsless, luo2025forgetting |
 | Fine-tuning degrades calibration; prior-knowledge interaction | §3ab, §3w | S: wang2025cogcalib, desai2020calibration, guo2017calibration |
 | Soft / ordinal-smoothed targets fix probability quality without changing decisions | §3ac, §3ae | S: mueller2019labelsmoothing, szegedy2016labelsmoothing, diaz2019softordinal, gneiting2007scoringrules, brier1950verification, epstein1969rps, murphy1970rps |
-| Brier term in the objective + checkpoint selection on held-out calibration NLL | §3ah, §3ag | S: gneiting2007scoringrules, brier1950verification, kumar2019verifiedcalibration, naeini2015calibration |
+| Checkpoint selection on held-out calibration NLL (no Brier term trained; `--brier_lambda` is 0.0 in every shipped/candidate run) | §3ah, §3ag | S: gneiting2007scoringrules, brier1950verification, kumar2019verifiedcalibration, naeini2015calibration |
 | We deliberately do not use a global post-hoc temperature | §3y, §6 | C: guo2017calibration, kumar2019verifiedcalibration |
 | Frozen-teacher KD from the same backbone's few-shot distribution | §3ah | S: hinton2015distillation, askell2021assistant, snell2022contextdistillation, yang2024sdft, yuan2020teacherfree |
 | Alternative uncertainty machinery we did not use (positioning) | §6 | C: yang2024laplacelora, angelopoulos2023conformal, romano2020adaptivecoverage, kumar2023conformalmcq, tian2023verbalized, kadavath2022know |
@@ -88,7 +88,7 @@ or is the prior art a reviewer will raise, "A" = the attack citation (what a sce
 | Claim | Source | Keys |
 |---|---|---|
 | Ordinal targets / cumulative-link heads for Score | §3ac | S: mccullagh1980ordinal, frank2001ordinal, niu2016ordinalcnn, cao2020coral, shi2023corn, diaz2019softordinal |
-| Ordinal-aware scoring metric (RPS) for the Score tier | §3ac, metrics.py | S: epstein1969rps, murphy1970rps, gneiting2007scoringrules |
+| Ordinal-aware scoring metric (RPS) for the Score tier | §3ac, pcdm/metrics.py | S: epstein1969rps, murphy1970rps, gneiting2007scoringrules |
 | Bernoulli Noul head is exactly order-invariant; 2-way Choice is not | §3ac | S: zheng2024selectionbias, pezeshkpour2024optionorder, xue2024symbolbinding |
 | Architectural abstain option; selective classification framing | §3h, §3t, §3y | S: chow1970reject, geifman2017selective, geifman2019selectivenet, hendrycks2017msp, liu2020energyood, wen2024abstention; C: chen2023selfevalselective, kumar2023conformalmcq |
 | Out-of-scope intent detection as the abstention benchmark | §3c–§3e, COMPARE §2a | S: larson2019clinc, casanueva2020banking77 |

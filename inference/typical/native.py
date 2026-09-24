@@ -1,5 +1,5 @@
 """native_choice_v1/v2/v3 decision head + the KV-cached serving path -- trimmed port of the
-training repo's native.py + the two mcq.py helpers it needs (_label/_ids/_pack), for
+training repo's pcdm/native.py + the two pcdm/mcq.py helpers it needs (_label/_ids/_pack), for
 inference only. Kept: NativeHead (factored null, per-row Bernoulli "noul" routing via
 _is_bern_row, the letters/tags/letters_nonull/query_only renderers) and native_kv_decide,
 because pcdm_jev.decider.PCDMDecider(mode="native") calls exactly those two things and
@@ -167,7 +167,7 @@ def factored_null_logits(gate, s, c, h, cmask, temperature: float = 1.0):
     """r = sigmoid(gate(z)): z is O(K) permutation-invariant set statistics over the valid
     candidate scores s + rep h + masked candidate-set mean/var of c. Composed as logits so
     softmax(logits) gives P(a_j) = (1-r)*p_j and P(null) = r exactly. Verbatim port of
-    model.factored_null_logits (self-contained: only torch/F, no other model.py state)."""
+    model.factored_null_logits (self-contained: only torch/F, no other pcdm/model.py state)."""
     K = cmask.sum(-1)
     Kf = K.float().clamp_min(1)
     top2 = torch.topk(s, k=min(2, s.shape[1]), dim=-1).values
@@ -423,7 +423,7 @@ def encode_state(head, model, state: str, max_state: int = 256, semif: bool | No
     under regular autograd tracking, regardless of what context the caller happens to be in.
     semif=None defaults to `model.render == "semif"`; native_kv_decide passes semif=False
     explicitly for a bern (yes/no) row's own prefix, since those always use the plain eos+state
-    sink regardless of nc_render (see native.py's module docstring)."""
+    sink regardless of nc_render (see pcdm/native.py's module docstring)."""
     if semif is None:
         semif = getattr(model, "render", "letters") == "semif"
     tok, dev, lm = head.backbone.tokenizer, head.device, head.backbone.model
@@ -455,7 +455,7 @@ def native_kv_decide(head, model, state, queries, chunk: int = 32, max_state: in
     suffix longer than max_suffix raises (raise max_suffix instead).
 
     --nc_render semif: a bern (yes/no) row always renders query_only against the PLAIN eos+state
-    prefix, never the semif JSON wrapper (see native.py's module docstring), so it can't share
+    prefix, never the semif JSON wrapper (see pcdm/native.py's module docstring), so it can't share
     `state_cache` when one is supplied (Typical's per-state LRU key/encode_state default to
     building the semif-wrapped cache whenever model.render=="semif" -- see encode_state). A
     call that mixes bern and non-bern queries under a semif checkpoint therefore builds a

@@ -19,8 +19,8 @@ Trained by full-batch Adam on the soft-CE (NLL) of the mixed distribution over t
 split(s) only: "val", "data_v5_val", and every "data_*_val" set (the --extra_data convention,
 e.g. data_kb_val) present in BOTH dumps -- never on mnli_val/boolq_val or any other eval set.
 Then T is fitted on the same rows, and every remaining common set is evaluated. Writes
-runs/<name>/results.json (train.py format: eval[set][raw|scaled] + cse/ksweep/cf branches, so
-report.py / report_native.py read it) with the gate's weights, features, val NLLs and mean g
+runs/<name>/results.json (pcdm/train.py format: eval[set][raw|scaled] + cse/ksweep/cf branches, so
+pcdm/report.py / pcdm/report_native.py read it) with the gate's weights, features, val NLLs and mean g
 per set under results["gate"], and prints one table: energy (g=0), g=1, native alone, oracle
 (best fixed g per column over {0, .5, 1, 2}, each with its own val-fitted T), and the gate --
 each row T-fitted on the same val rows -- plus mean g per eval set.
@@ -36,6 +36,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from compose_support import eval_set  # noqa: E402
 from fuse_scores import load_dumps  # noqa: E402
@@ -129,7 +130,7 @@ def nll(probs, target):
 
 
 def fit_T(le, K, ln, g, target):
-    """One temperature for the mixture at fixed g, min val NLL over train.py's T grid."""
+    """One temperature for the mixture at fixed g, min val NLL over pcdm/train.py's T grid."""
     return float(min(TS, key=lambda T: nll(mix(le, K, ln, g, T), target).item()))
 
 

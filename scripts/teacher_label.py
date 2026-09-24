@@ -1,7 +1,7 @@
 """Soft labels from an options-in-context (mcq-readout) teacher, for PLAN3 E3-T.
 
 Loads runs/<name>/best.pt (must be a --readout mcq checkpoint), scores every row of a
-jsonl file with mcq.py's own batching (collate_mcq/run_batch_mcq -- the K>51 two-stage
+jsonl file with pcdm/mcq.py's own batching (collate_mcq/run_batch_mcq -- the K>51 two-stage
 chunked scorer just works, unchanged), and writes <file>.teacher.jsonl: each input row's
 fields plus:
   teacher:   softmax(logits/T) over [candidates..., null], K+1 floats (K = len(candidates))
@@ -30,6 +30,7 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
 from mcq import MCQHead, collate_mcq, run_batch_mcq, MAXK_DIRECT, _ids, _pack
 from encode import pick_device
 

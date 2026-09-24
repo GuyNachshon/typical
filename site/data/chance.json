@@ -1,0 +1,16 @@
+{
+  "std": {
+    "acc": 0.311,
+    "n": 72,
+    "n_eff": 36
+  },
+  "easy": {
+    "acc": 0.284,
+    "n": 48
+  },
+  "hard": {
+    "acc": 0.336,
+    "n": 111
+  },
+  "source": "releases/typical-small.md#jevbench-disclosure (identical text in typical-medium.md)"
+}

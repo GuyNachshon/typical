@@ -34,6 +34,7 @@ HF_REPO = "guychuk/pcdm-runs"
 BLUE = "#0072B2"
 ORANGE = "#D55E00"
 GREEN = "#009E73"
+PURPLE = "#8C64B4"
 GRAY = "#767676"
 YELLOW = "#E69F00"
 SKY = "#56B4E9"
@@ -121,68 +122,75 @@ def bench_single_decision_ms(rel_dir: str, k: str, state_tokens: str = "256") ->
 # fig_architecture — schematic of the decision pass (no run data, vector only)
 # ---------------------------------------------------------------------------
 def fig_architecture():
-    fig, ax = plt.subplots(figsize=(7.2, 4.3))
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 6.2)
-    ax.axis("off")
+    # Schematic after the Figma reference, on white for print (node 36:71): light cards, thin dark connectors.
+    # Coordinates are in the reference's pixel space (y down).
+    from matplotlib import font_manager
+    for f in ("Regular", "Medium", "Italic"):
+        p = Path.home() / "Library/Fonts" / f"Inter_24pt-{f}.ttf"
+        if p.exists():
+            font_manager.fontManager.addfont(str(p))
+    BG, CARD, INK, SUB, LINE = "#ffffff", "#f0f0f0", "#1e1e1e", "#5c5c5c", "#1e1e1e"
+    rc = {"font.family": "Inter 24pt", "mathtext.fontset": "custom", "mathtext.rm": "Inter 24pt",
+          "mathtext.it": "Inter 24pt:italic", "mathtext.bf": "Inter 24pt:medium", "pdf.fonttype": 42}
+    with plt.rc_context(rc):
+        fig = plt.figure(figsize=(5.5, 5.5 * 663 / 1306))
+        ax = fig.add_axes([0, 0, 1, 1])
+        fig.patch.set_facecolor(BG)
+        ax.set_facecolor(BG)
+        ax.set_xlim(-40, 1266)
+        ax.set_ylim(623, -40)
+        ax.axis("off")
 
-    def box(x, y, w, h, text, fc, ec="#333333", fontsize=8.6, weight="normal"):
-        b = FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.06,rounding_size=0.08",
-                            linewidth=1.1, edgecolor=ec, facecolor=fc)
-        ax.add_patch(b)
-        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center",
-                 fontsize=fontsize, weight=weight, wrap=True)
-        return b
+        def card(x, y, w, h, title, *subs):
+            # 1 pt = 3.3 px here; titles 7.2 pt, subtitles 6.2 pt, 25 px between lines
+            ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0,rounding_size=12",
+                                        linewidth=0.6, edgecolor="#d6d6d6", facecolor=CARD))
+            n = 1 + len(subs)
+            y0 = y + h / 2 - 25 * (n - 1) / 2 - (3 if subs else 0)
+            ax.text(x + w / 2, y0, title, ha="center", va="center", fontsize=7.2,
+                    color=INK, weight="medium")
+            for i, sub in enumerate(subs, 1):
+                ax.text(x + w / 2, y0 + 25 * i + 3, sub, ha="center", va="center", fontsize=6.2,
+                        color=SUB)
 
-    def arrow(p0, p1, color="#333333", style="-|>", lw=1.3, connectionstyle="arc3,rad=0.0"):
-        a = FancyArrowPatch(p0, p1, arrowstyle=style, mutation_scale=11,
-                             linewidth=lw, color=color, connectionstyle=connectionstyle)
-        ax.add_patch(a)
+        def line(pts, head=True):
+            xs, ys = zip(*pts)
+            if len(pts) > 2:
+                ax.plot(xs[:-1], ys[:-1], color=LINE, lw=0.9, solid_capstyle="butt")
+            ax.add_patch(FancyArrowPatch(pts[-2], pts[-1], arrowstyle="-|>" if head else "-",
+                                         mutation_scale=6.5, lw=0.9, color=LINE,
+                                         shrinkA=0, shrinkB=0))
 
-    # Inputs
-    box(0.15, 4.55, 2.5, 0.95, "state text $x$\n(policy / case / evidence)", "#EAF2F8")
-    box(0.15, 2.9, 2.5, 0.95, "query $q_i$ + rendered\ncandidates $A_i$", "#FDF2E3")
+        card(0, 0, 355, 96, "State text $x$", "policy, case, evidence")
+        card(0, 136, 355, 96, "Question $q$ + candidates $A$", "supplied at request time")
+        card(426, 0, 355, 96, "KV-cached prefix", "encoded once per state")
+        card(426, 136, 355, 96, "Causal suffix", "options + decision token")
+        card(894, 46, 332, 140, "Contextual head (N3)", "$h_D$ scored against each $c_j^{\\mathrm{ctx}}$",
+             "read at 71% of depth")
+        card(894, 282, 332, 100, "$P(a_j \\mid x, q, A)$ and $P(\\varnothing)$",
+             "abstention gate outside softmax")
+        card(162, 483, 332, 100, "Choice", "$K$-way categorical")
+        card(528, 483, 332, 100, "Score", "ordinal target, $\\tau = 0.7$")
+        card(894, 483, 332, 100, "Noul", "Bernoulli yes / no")
 
-    # Prefix / suffix
-    box(3.15, 4.55, 2.55, 0.95, "KV-cached prefix\nencoded ONCE per state", SKY + "33")
-    box(3.15, 2.9, 2.55, 0.95, "suffix (per query, cheap)\noption spans + terminal token", YELLOW + "33")
+        line([(371, 48), (410, 48)])
+        line([(371, 184), (410, 184)])
+        line([(603, 104), (603, 128)])
+        ax.text(615, 116, "attends to cache", ha="left", va="center", fontsize=5.6, color="#7a7a7a")
+        line([(797, 184), (878, 150)])
+        line([(1060, 198), (1060, 268)])
+        line([(1060, 471), (1060, 396)])
+        line([(328, 471), (328, 332), (878, 332)])
+        ax.plot([694, 694], [471, 332], color=LINE, lw=0.9)
 
-    arrow((2.65, 5.02), (3.15, 5.02))
-    arrow((2.65, 3.37), (3.15, 3.37))
-    # prefix feeds every suffix pass (reused across i)
-    arrow((4.4, 4.55), (4.4, 3.85), connectionstyle="arc3,rad=0.0")
-
-    # Head
-    box(6.2, 3.6, 2.6, 1.55,
-        "native head\nreads: pooled option spans\n(N3) + terminal token $h_D$",
-        "#F1EAF7")
-    arrow((5.7, 5.02), (6.2, 4.55))
-    arrow((5.7, 3.37), (6.2, 4.05))
-
-    # Output
-    box(6.55, 1.55, 1.9, 0.95, "$P(y\\,|\\,x, q, A)$\nover $A \\cup \\{\\varnothing\\}$", "#EAF7EE")
-    arrow((7.5, 3.6), (7.5, 2.5))
-
-    # Typed primitives row
-    ax.text(5.0, 1.15, "three typed primitives, one readout", fontsize=9, style="italic",
-             ha="center", color="#333333")
-    prims = [
-        ("Choice", "$K$-way, factored null", BLUE, 0.3, -0.35),
-        ("Score", "ordinal levels, $\\tau{=}0.7$", GREEN, 3.55, -0.12),
-        ("Noul", "Bernoulli, per-row routed", ORANGE, 6.8, 0.12),
-    ]
-    for name, sub, color, x0, rad in prims:
-        box(x0, 0.05, 2.85, 0.85, f"{name}\n{sub}", color + "22", ec=color, fontsize=8.4, weight="bold")
-        arrow((x0 + 1.4, 0.92), (7.05, 1.57), color=color, lw=1.1,
-              connectionstyle=f"arc3,rad={rad}")
-
-    save(
-        fig, "fig_architecture",
-        sources=["native.py:1-40 (docstring, class NativeHead)", "PROJECT.md:8-15"],
-        desc="Schematic of the decision pass: KV-cached state prefix, per-query suffix, "
-             "native head reading pooled option spans + terminal token, three typed "
-             "primitives (Choice / Score / Noul) on one readout.",
-    )
+        save(
+            fig, "fig_architecture",
+            sources=["pcdm/native.py:1-40 (docstring, class NativeHead)", "PROJECT.md:8-15",
+                     "Figma e14cKPwSW027HKDUadTVOR node 36:71 (visual reference)"],
+            desc="Decision pass: state encoded once into a KV cache, per-question causal suffix that "
+                 "attends to it, contextual head (N3) at 71% depth, typed outputs Choice / Score / Noul "
+                 "and a factored abstention gate.",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -275,12 +283,26 @@ def fig_ladder():
 # fig_latency_quality — JevBench standard vs single-decision latency
 # ---------------------------------------------------------------------------
 def fig_latency_quality():
+    # Latency here is the warm per-decision p50 from the public inference package
+    # (runs/serve_bench2/results.json, K=2, 256-token state, prefix KV already cached) --
+    # the same quantity the launch post's release table quotes. The older
+    # runs/bench_*/bench.json ladder measures a different thing (a cold single decision
+    # including the state encode, on an unoptimised serving path) and plotting it here
+    # put every released model to the *right* of the "one-letter decode" band, which is
+    # the opposite of what the measurement says.
+    serve = load_json(RUNS / "serve_bench2" / "results.json")
+
+    def warm_p50(model, k=2, state_tokens=256):
+        m = next((e for e in serve if e["model"] == model), None)
+        if m is None:
+            return None
+        cfg = next((c for c in m["configs"]
+                    if c["K"] == k and c["state_tokens"] == state_tokens), None)
+        return cfg["warm"]["p50_ms"] if cfg else None
+
     points = [
-        ("typical-small (1.7B)", "jev_native_ts1b", "bench_ts1c", "ts1b has no bench.json; "
-         "latency proxy = bench_ts1c, same backbone/tap-20 re-run"),
-        ("typical-medium (4B)", "jev_native_tm1b", "bench_tm1b", None),
-        ("8B (ladder_8b, untyped baseline)", "jev_native_ladder_8b", "bench_ladder_8b", None),
-        ("tl1b (14B, in-flight)", "jev_native_tl1b", "bench_tl1b", None),
+        ("typical-small (1.7B)", "jev_native_ts1b", "typical-small"),
+        ("typical-medium (4B)", "jev_native_tm1b", "typical-medium"),
     ]
     fig, ax = plt.subplots(figsize=(6.4, 4.4))
 
@@ -295,23 +317,24 @@ def fig_latency_quality():
                  ha="center", va="top", transform=ax.get_xaxis_transform())
 
     used_sources = []
-    for label, jev_dir, bench_dir, note in points:
+    for label, jev_dir, serve_model in points:
         s = jev_summary(jev_dir)
-        ms = bench_single_decision_ms(bench_dir, "32")
+        ms = warm_p50(serve_model)
         if s is None or ms is None:
-            note_omitted(f"fig_latency_quality: {label} missing summary or bench data")
+            note_omitted(f"fig_latency_quality: {label} missing summary or serve_bench2 data")
             continue
         acc = s["original"]["accuracy"]
         ax.scatter([ms], [acc], color=BLUE, zorder=5, s=45)
         ax.annotate(label, (ms, acc), textcoords="offset points", xytext=(6, 5), fontsize=7.8)
-        used_sources.append(f"{jev_dir}/summary.json + {bench_dir}/bench.json (K=32, state=256, m=1 total_ms)"
-                             + (f" [{note}]" if note else ""))
+        used_sources.append(
+            f"{jev_dir}/summary.json original.accuracy + serve_bench2/results.json "
+            f"[{serve_model}] K=2, state_tokens=256, warm.p50_ms")
 
     ax.set_xscale("log")
-    ax.set_xlabel("single-decision latency (ms, log scale)")
+    ax.set_xlabel("warm p50 per decision (ms, log scale; state already cached)")
     ax.set_ylabel("JevBench standard accuracy")
     ax.set_ylim(0.5, 1.0)
-    ax.set_xlim(15, 100000)
+    ax.set_xlim(8, 100000)
 
     save(
         fig, "fig_latency_quality",
@@ -320,8 +343,8 @@ def fig_latency_quality():
             "(one-letter decode ~25-40ms, JSON/label decode ~60-200ms, CoT ~3-60s), not a "
             "measured artefact",
         ],
-        desc="JevBench standard accuracy vs measured single-decision latency (ms, log scale) "
-             "for our trained models, with generative-LLM decode-latency comparison bands.",
+        desc="JevBench standard accuracy vs warm per-decision p50 latency (ms, log scale) for "
+             "the two released models, with generative-LLM decode-latency comparison bands.",
     )
 
 
@@ -355,7 +378,7 @@ def fig_calibration():
         i0, i1 = labels.index("ladder_14b"), labels.index("tl1b")
         y0, y1 = score_nll[i0], score_nll[i1]
         ax.annotate(
-            f"long-state fix + frozen-teacher KD\nscore NLL {y0:.2f} \u2192 {y1:.2f}",
+            f"14B recipe bundle\nscore NLL {y0:.2f} \u2192 {y1:.2f}",
             xy=(i1 - w / 2, y1), xytext=((i0 + i1) / 2, max(score_nll) * 0.75),
             arrowprops=dict(arrowstyle="->", color="#333333", lw=1.0),
             fontsize=8, ha="center",
@@ -375,8 +398,13 @@ def fig_calibration():
 # fig_hard_families — per-family JevBench-hard accuracy, 3 models
 # ---------------------------------------------------------------------------
 def fig_hard_families():
-    models = [("ladder_14b", "jev_native_ladder_14b", BLUE),
-              ("tl1b", "jev_native_tl1b", ORANGE),
+    # The released models first: this figure is cited from the launch post, whose failure
+    # section is about typical-small/medium. tl1b is kept as the best checkpoint we trained
+    # and the frozen 14B as the control it loses to; ladder_14b is dropped (it is superseded
+    # by tl1b and made the chart unreadable at five series).
+    models = [("typical-small (1.7B)", "jev_native_ts1b", BLUE),
+              ("typical-medium (4B)", "jev_native_tm1b", ORANGE),
+              ("tl1b (14B, unreleased)", "jev_native_tl1b", PURPLE),
               ("frozen-14B (3-shot)", "jev_zs3_14b", GREEN)]
     data = {}
     families = None
@@ -389,15 +417,16 @@ def fig_hard_families():
         data[label] = {fam: v["accuracy"] for fam, v in pf.items()}
         families = set(pf.keys()) if families is None else families & set(pf.keys())
 
-    families = sorted(families, key=lambda f: data["tl1b"].get(f, 0))
-    fig, ax = plt.subplots(figsize=(7.0, 5.0))
+    sort_key = next(l for l, _, _ in models if l in data)
+    families = sorted(families, key=lambda f: data[sort_key].get(f, 0))
+    fig, ax = plt.subplots(figsize=(7.0, 5.4))
     y = range(len(families))
-    h = 0.25
-    for i, (label, _, color) in enumerate(models):
-        if label not in data:
-            continue
+    drawn = [m for m in models if m[0] in data]
+    h = 0.8 / max(len(drawn), 1)
+    for i, (label, _, color) in enumerate(drawn):
+        off = (i - (len(drawn) - 1) / 2) * h
         vals = [data[label][f] for f in families]
-        ax.barh([yi + (i - 1) * h for yi in y], vals, height=h, color=color, label=label)
+        ax.barh([yi + off for yi in y], vals, height=h, color=color, label=label)
 
     ax.axvline(0.336, color="#333333", linestyle="--", linewidth=1.0)
     ax.text(0.336, len(families) - 0.3, "chance (.336)", rotation=90, fontsize=7.5,
@@ -411,15 +440,14 @@ def fig_hard_families():
     save(
         fig, "fig_hard_families",
         sources=[
-            "runs/jev_native_ladder_14b/summary.json hard.per_family.<family>.accuracy",
+            "runs/jev_native_ts1b/summary.json hard.per_family.<family>.accuracy",
+            "runs/jev_native_tm1b/summary.json hard.per_family.<family>.accuracy",
             "runs/jev_native_tl1b/summary.json hard.per_family.<family>.accuracy",
             "runs/jev_zs3_14b/summary.json hard.per_family.<family>.accuracy (pulled from HF hub)",
         ],
-        desc="Per-family JevBench-hard accuracy (10 families) for ladder_14b, tl1b, and the "
-             "frozen-14B 3-shot control, sorted by tl1b's value, with the chance line at .336. "
-             "Note: ladder_14b's temporal_numeric/probability values here (.333/.50, "
-             "re-derived from hard/results.jsonl) differ from REPORT.md 3ah's prose "
-             "(.20/.40) -- the JSON artefact is used as the source of truth.",
+        desc="Per-family JevBench-hard accuracy (10 families) for the two released models, "
+             "the unreleased 14B, and the frozen-14B 3-shot control, with the chance line "
+             "at .336. Per-family n ranges from 4 to 19 items; no single family separates.",
     )
 
 

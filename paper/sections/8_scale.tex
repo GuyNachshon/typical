@@ -1,0 +1,99 @@
+\section{Speed, scale and probability quality}
+\label{sec:scale}
+
+The architecture fixed in \Cref{sec:depends,sec:invariant} is the same at every backbone size. This
+section measures it against frozen backbones, in latency and in probability quality.
+
+\subsection{Scale}
+\label{sec:results:scaling}
+
+Every trained checkpoint beats its frozen backbone on the standard tier. \Cref{tab:headline} pairs each
+trained checkpoint with a frozen control: the same base model, untrained, reading next-token letter
+logits over the rendered options with three exemplars. The rows are not one recipe;
+\Cref{fig:ladder} plots them against backbone size.
+
+\begin{table}[t]
+  \centering
+  \caption{Trained checkpoints with frozen controls. Recipe: \emph{v1} = v1 release recipe (1{,}024-token
+  window, no likelihood-based selection); \emph{wf} = earlier workflow recipe (no DecisionMix, uncertainty
+  corpus or typed heads); \emph{fixed} = facts-first long states, truncated rows dropped, likelihood-based
+  selection (+KD at 14B). JevBench (public subset); 95\% cluster-bootstrap intervals
+  (\Cref{sec:setup:jevbench}). MMLU-$\numcands$: MMLU-Pro among-$\numcands$. NLL: held-out Score. ms:
+  research-harness single decision at $\numcands{=}2$, one pod and build (the 8B was not on that pod).
+  Checkpoints top to bottom: \texttt{ts1b},
+  \texttt{ts1c}, \texttt{tm1b}, \texttt{ladder\_8b}, \texttt{tl1b}, \texttt{tm2}.}
+  \label{tab:headline}
+  \footnotesize
+  \setlength{\tabcolsep}{2.5pt}
+  \begin{tabular}{llccrrrr}
+    \toprule
+    & & \multicolumn{2}{c}{JevBench} & & & & \\
+    Model & Recipe & std [95\% CI] & hard [95\% CI] & MMLU-$\numcands$ & $\dqsh$ & NLL & ms \\
+    \midrule
+    Qwen3-1.7B (small v1) & v1 & .694 [.569, .819] & .432 [.342, .523] & .343 & .127 & 1.01 & 45 \\
+    % small v2 (ts1c): MMLU/dqsh/NLL read from runs/ts1c/results.json; its CIs and the frozen Qwen3.5-4B CIs
+    % recomputed with scripts/jev_ci.py's procedure on guychuk/pcdm-runs artefacts (not in prose sources).
+    \quad small v2 & fixed & .708 [.569, .833] & .432 [.342, .523] & .338 & .127 & 1.08 & -- \\
+    \quad frozen, 3-shot & -- & .528 [.389, .667] & .369 [.279, .459] & -- & -- & -- & -- \\
+    Qwen3-4B (medium v1) & v1 & .806 [.694, .903] & .423 [.333, .514] & .458 & .193 & 1.03 & 56 \\
+    \quad frozen, 3-shot & -- & .778 [.667, .889] & .441 [.351, .532] & -- & -- & -- & -- \\
+    Qwen3-8B & wf & .667 [.528, .792] & .396 [.306, .486] & .302 & .093 & 1.67 & -- \\
+    \quad frozen, 3-shot & -- & .556 [.417, .694] & .369 [.279, .459] & -- & -- & -- & -- \\
+    Qwen3-14B & fixed & \textbf{.931} [.861, .986] & .450 [.360, .541] & \textbf{.498} & \textbf{.235} & \textbf{0.95} & 60 \\
+    \quad frozen, 3-shot & -- & .819 [.708, .917] & .559 [.468, .649] & -- & -- & -- & -- \\
+    Qwen3.5-4B (medium v2) & fixed & .861 [.778, .944] & .495 [.405, .586] & .429 & .194 & 0.97 & -- \\
+    \quad frozen, 3-shot & -- & .764 [.639, .875] & .495 [.405, .586] & -- & -- & -- & -- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The margins are 16.7, 2.8, 11.1 and 11.1 points at 1.7B (v1), 4B, 8B and 14B; each gap on its own sits
+inside its interval (paired test at 14B, frozen minus trained: $-.111$ $[-.250, +.014]$, $p = .10$).
+Question-conditioned
+knowledge grows with the backbone: $\dqsh$ rises from .127 at 1.7B to .235 at 14B, 2.3 times the 1.7B
+teacher's; the 8B checkpoint is the exception (.093), and sits below the 4B and 14B under one matched
+recipe as well (\Cref{app:extra-figures}).
+
+Qwen3.5-4B (\texttt{typical-medium} v2) is the strongest point per parameter: .861 standard and .495
+hard, above every Qwen3 checkpoint we trained on the hard tier and 9.7 standard-tier points above its
+frozen control. \Cref{sec:limitations} discusses the hard tier, where the frozen 14B leads.
+
+\subsection{Speed}
+\label{sec:results:cost}
+
+Decision latency is nearly flat in backbone size. On the research harness a single decision at
+$\numcands{=}2$ costs 45, 56 and 60\,ms at 1.7B, 4B and 14B: an $8\times$ larger backbone is
+$1.3\times$ slower, because the cached state and a short suffix dominate (\Cref{app:latency-sweep}).
+Cost stays flat to $\numcands{=}32$ and rises at $\numcands{=}256$, where the rendered candidates
+dominate the suffix (\Cref{sec:method:cost}).
+
+On the serving path a warm decision takes 15.5--17\,ms at 1.7B and 19--21\,ms for the Qwen3-4B model
+(warm p50, $\numcands{=}2$, \Cref{fig:serving}; Qwen3.5-4B in \Cref{app:serving}). Reading the candidates inside the forward pass
+(\Cref{sec:analysis:deltaq}) has a price in throughput mode: with many questions against one cached
+state, a candidate-blind energy scorer costs about 1\,ms per question at every $\numcands$ and is
+more than $3\times$ cheaper than the contextual readout from $\numcands{=}32$ on, measured on an earlier
+full-depth prototype (\Cref{app:latency-sweep}).
+
+\subsection{Probability quality}
+\label{sec:results:calibration}
+
+Probability quality is indexed by decision type, so the training data, the target and checkpoint
+selection set it. The ordinal Score target shows the effect of the target alone. In the matched
+fine-tunes of \Cref{sec:results:typed}, the ordinal-smoothed target ($\tauord = 0.7$) adds no parameters
+and improves every probability-quality measure on held-out urgency at flat accuracy (.505 $\to$ .508):
+NLL 2.07 $\to$ 1.23, Brier .79 $\to$ .68, ECE .35 $\to$ .19, ordinal MAE .58 $\to$ .55. On JevBench's 12
+ordinal items the two models make identical per-item predictions, so the gain is in how mass is spread
+over adjacent levels.
+
+A single post-hoc correction cannot do the same job: a global temperature and null-logit offset fit on
+held-out soft-target rows want opposite corrections for an evidence-and-knowledge and a workflow-trained
+checkpoint (\Cref{app:calibration-fit}), so we make the correction in data and objective instead, through null augmentation and per-type targets.
+
+On the 14B backbone the recipe bundle (facts-first long states with truncated rows dropped, a
+3{,}072-token window, DecisionMix v2 and the uncertainty corpus, typed heads with the ordinal target,
+checkpoint selection on held-out uncertainty and curriculum NLL, and frozen-teacher distillation) takes
+held-out Score NLL from 2.87 under the earlier workflow recipe to 0.95, typed-decisions NLL from 1.96 to
+1.04, and JevBench hard-tier Brier from .85 to .66 (\Cref{fig:calibration}). No component is isolated
+except distillation, and the arm without it reaches the same Score NLL. The v1 1.7B and 4B checkpoints,
+which have the ordinal target and the uncertainty corpus but no likelihood-based selection, already
+reach 1.01 and 1.03; all 1.7B and 4B checkpoints with typed heads and DecisionMix sit at 0.97--1.08.

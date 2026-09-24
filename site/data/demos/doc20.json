@@ -1,0 +1,213 @@
+{
+  "doc": "Acme Employee Handbook (excerpt).\nLeave. Full-time employees accrue 1.5 days of paid leave per month, up to 18 days per year. Leave requests must be submitted at least 14 days in advance through the HR portal. Requests for dates in the annual audit week (the first week of March) are not approved. Unused leave up to 5 days carries over to the next year; the rest is forfeited. Sick leave does not require advance notice, but a doctor's note is required after 3 consecutive sick days.\nRefunds. Customers may request a full cash refund within 30 days of purchase if the item is unused and a receipt or order number is provided. Between 31 and 60 days after purchase, store credit is issued instead of cash. No refunds are issued for clearance items or gift cards. Refunds above $500 require approval from a team lead.\nOn-call. The engineer on the primary rotation must acknowledge a page within 15 minutes. If the primary does not acknowledge, the page escalates to the secondary engineer after 15 minutes and to the engineering manager after 30 minutes. On-call shifts are one week long and pay a stipend of $300. Shifts may be swapped with 48 hours' notice if both engineers agree in writing.\nExpenses. Expense claims must be filed within 60 days of the expense with an itemised receipt. Meals are reimbursed up to $75 per day. Alcohol is never reimbursed. Flights must be booked in economy class unless the flight exceeds 6 hours, in which case premium economy is allowed. Claims over $1,000 require pre-approval from a director.\nRemote work. Employees may work remotely up to 3 days per week with manager approval. Fully remote arrangements require a director's sign-off.",
+  "questions": [
+    {
+      "display": "can a full-time employee carry over 8 unused leave days to the next year",
+      "type": "noul",
+      "query": "Question: can a full-time employee carry over 8 unused leave days to the next year?\nAccording to the passage, is the answer to the question yes? Use only the information given.\nyes: the passage establishes that the question's answer is yes.  no: the passage contradicts it or does not settle it.",
+      "labels": [
+        "no",
+        "yes"
+      ],
+      "gold": "no"
+    },
+    {
+      "display": "does a sick leave of 4 consecutive days require a doctor's note",
+      "type": "noul",
+      "query": "Question: does a sick leave of 4 consecutive days require a doctor's note?\nAccording to the passage, is the answer to the question yes? Use only the information given.\nyes: the passage establishes that the question's answer is yes.  no: the passage contradicts it or does not settle it.",
+      "labels": [
+        "no",
+        "yes"
+      ],
+      "gold": "yes"
+    },
+    {
+      "display": "is a leave request for the first week of March approved if it is submitted 20 days in advance",
+      "type": "noul",
+      "query": "Question: is a leave request for the first week of March approved if it is submitted 20 days in advance?\nAccording to the passage, is the answer to the question yes? Use only the information given.\nyes: the passage establishes that the question's answer is yes.  no: the passage contradicts it or does not settle it.",
+      "labels": [
+        "no",
+        "yes"
+      ],
+      "gold": "no"
+    },
+    {
+      "display": "can a customer get a cash refund 45 days after purchase with a receipt and an unused item",
+      "type": "noul",
+      "query": "Question: can a customer get a cash refund 45 days after purchase with a receipt and an unused item?\nAccording to the passage, is the answer to the question yes? Use only the information given.\nyes: the passage establishes that the question's answer is yes.  no: the passage contradicts it or does not settle it.",
+      "labels": [
+        "no",
+        "yes"
+      ],
+      "gold": "no"
+    },
+    {
+      "display": "is a full cash refund available 20 days after purchase for an unused item with a receipt",
+      "type": "noul",
+      "query": "Question: is a full cash refund available 20 days after purchase for an unused item with a receipt?\nAccording to the passage, is the answer to the question yes? Use only the information given.\nyes: the passage establishes that the question's answer is yes.  no: the passage contradicts it or does not settle it.",
+      "labels": [
+        "no",
+        "yes"
+      ],
+      "gold": "yes"
+    },
+    {
+      "display": "does a $700 refund require a team lead's approval",
+      "type": "noul",
+      "query": "Question: does a $700 refund require a team lead's approval?\nAccording to the passage, is the answer to the question yes? Use only the information given.\nyes: the passage establishes that the question's answer is yes.  no: the passage contradicts it or does not settle it.",
+      "labels": [
+        "no",
+        "yes"
+      ],
+      "gold": "yes"
+    },
+    {
+      "display": "must the primary on-call engineer acknowledge a page within 15 minutes",
+      "type": "noul",
+      "query": "Question: must the primary on-call engineer acknowledge a page within 15 minutes?\nAccording to the passage, is the answer to the question yes? Use only the information given.\nyes: the passage establishes that the question's answer is yes.  no: the passage contradicts it or does not settle it.",
+      "labels": [
+        "no",
+        "yes"
+      ],
+      "gold": "yes"
+    },
+    {
+      "display": "does an unacknowledged page reach the engineering manager after 30 minutes",
+      "type": "noul",
+      "query": "Question: does an unacknowledged page reach the engineering manager after 30 minutes?\nAccording to the passage, is the answer to the question yes? Use only the information given.\nyes: the passage establishes that the question's answer is yes.  no: the passage contradicts it or does not settle it.",
+      "labels": [
+        "no",
+        "yes"
+      ],
+      "gold": "yes"
+    },
+    {
+      "display": "can two engineers swap on-call shifts with 24 hours' notice",
+      "type": "noul",
+      "query": "Question: can two engineers swap on-call shifts with 24 hours' notice?\nAccording to the passage, is the answer to the question yes? Use only the information given.\nyes: the passage establishes that the question's answer is yes.  no: the passage contradicts it or does not settle it.",
+      "labels": [
+        "no",
+        "yes"
+      ],
+      "gold": "no"
+    },
+    {
+      "display": "is a bottle of wine on a dinner receipt reimbursable",
+      "type": "noul",
+      "query": "Question: is a bottle of wine on a dinner receipt reimbursable?\nAccording to the passage, is the answer to the question yes? Use only the information given.\nyes: the passage establishes that the question's answer is yes.  no: the passage contradicts it or does not settle it.",
+      "labels": [
+        "no",
+        "yes"
+      ],
+      "gold": "no"
+    },
+    {
+      "display": "is premium economy allowed on a 4-hour flight",
+      "type": "noul",
+      "query": "Question: is premium economy allowed on a 4-hour flight?\nAccording to the passage, is the answer to the question yes? Use only the information given.\nyes: the passage establishes that the question's answer is yes.  no: the passage contradicts it or does not settle it.",
+      "labels": [
+        "no",
+        "yes"
+      ],
+      "gold": "no"
+    },
+    {
+      "display": "can an employee work remotely 3 days per week with manager approval",
+      "type": "noul",
+      "query": "Question: can an employee work remotely 3 days per week with manager approval?\nAccording to the passage, is the answer to the question yes? Use only the information given.\nyes: the passage establishes that the question's answer is yes.  no: the passage contradicts it or does not settle it.",
+      "labels": [
+        "no",
+        "yes"
+      ],
+      "gold": "yes"
+    },
+    {
+      "display": "what does a customer receive for a return 40 days after purchase",
+      "type": "choice",
+      "query": "According to the handbook, what does a customer receive for a return 40 days after purchase? Pick the single option the handbook supports.",
+      "labels": [
+        "cash refund",
+        "store credit",
+        "nothing"
+      ],
+      "gold": "store credit"
+    },
+    {
+      "display": "who receives a page that has gone unacknowledged for 20 minutes",
+      "type": "choice",
+      "query": "According to the handbook, who receives a page that has gone unacknowledged for 20 minutes? Pick the single option the handbook supports.",
+      "labels": [
+        "the primary engineer",
+        "the secondary engineer",
+        "the engineering manager"
+      ],
+      "gold": "the secondary engineer"
+    },
+    {
+      "display": "who must pre-approve an expense claim of $1,500",
+      "type": "choice",
+      "query": "According to the handbook, who must pre-approve an expense claim of $1,500? Pick the single option the handbook supports.",
+      "labels": [
+        "a team lead",
+        "a manager",
+        "a director"
+      ],
+      "gold": "a director"
+    },
+    {
+      "display": "how many days in advance must leave be requested",
+      "type": "choice",
+      "query": "According to the handbook, how many days in advance must leave be requested? Pick the single option the handbook supports.",
+      "labels": [
+        "7 days",
+        "14 days",
+        "30 days"
+      ],
+      "gold": "14 days"
+    },
+    {
+      "display": "what is the daily meal reimbursement limit",
+      "type": "choice",
+      "query": "According to the handbook, what is the daily meal reimbursement limit? Pick the single option the handbook supports.",
+      "labels": [
+        "$50",
+        "$75",
+        "$100"
+      ],
+      "gold": "$75"
+    },
+    {
+      "display": "Rate the escalation level of a page that has gone unacknowledged for 35 minutes. Levels are ordered 0 < 1 < 2.",
+      "type": "score",
+      "query": "Rate the escalation level of a page that has gone unacknowledged for 35 minutes. Levels are ordered 0 < 1 < 2.\n0: still with the primary engineer  1: escalated to the secondary engineer  2: escalated to the engineering manager",
+      "labels": [
+        "0",
+        "1",
+        "2"
+      ],
+      "gold": "2"
+    },
+    {
+      "display": "Rate the approval level required for a $600 refund. Levels are ordered 0 < 1 < 2.",
+      "type": "score",
+      "query": "Rate the approval level required for a $600 refund. Levels are ordered 0 < 1 < 2.\n0: no approval needed  1: team lead approval  2: director approval",
+      "labels": [
+        "0",
+        "1",
+        "2"
+      ],
+      "gold": "1"
+    },
+    {
+      "display": "Rate the annual paid leave a full-time employee can accrue. Levels are ordered low < medium < high.",
+      "type": "score",
+      "query": "Rate the annual paid leave a full-time employee can accrue. Levels are ordered low < medium < high.\nlow: fewer than 10 days  medium: 10 to 17 days  high: 18 days or more",
+      "labels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "gold": "high"
+    }
+  ]
+}

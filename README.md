@@ -33,7 +33,7 @@ public-subset run (72 standard / 48 easy / 111 hard ids; not a ranked leaderboar
 `typical-medium` is the capability-per-millisecond knee of the ladder we've measured: +11 points of JevBench
 standard and +11 points of MMLU-Pro among-K over `typical-small` for 1.25× the per-decision latency
 (56–58 ms vs 45–46 ms at K = 2–32, REPORT.md §3ab/§3af). A 14B candidate (`tl1b`) reaches JevBench standard
-**.931** — the best number this project has produced — but is not yet released; see `PROJECT.md` §1 and §7 for
+**.931** — the best number this project has produced — but is not yet released; see `docs/plan/PROJECT.md` §1 and §7 for
 why and what's still open.
 
 ### Fixed in v2 (2026-09-23): state ordering on long documents
@@ -56,7 +56,7 @@ Medium's backbone changed to Qwen3.5-4B, so re-pull `inference/` from the model 
 
 This also illustrates why JevBench alone is not a sufficient gate here: `ts1c` reads .708 / .432 against
 `typical-small`'s .694 / .432 — statistically indistinguishable — while being 35 points better on the axis the
-fix targeted. RESULTS.md §5a carries confidence intervals for every checkpoint; every adjacent pair on that
+fix targeted. docs/research/RESULTS.md §5a carries confidence intervals for every checkpoint; every adjacent pair on that
 benchmark is inside the noise.
 
 ## Quickstart
@@ -112,14 +112,16 @@ state — this is what "cached state" buys you), and the release-page tables rep
 
 ## Where the docs live
 
-- `PROJECT.md` — start here: document map, code map, run registry, findings ledger, ops rules, open questions.
+`docs/README.md` is the full map; the short version:
+
+- `docs/plan/PROJECT.md` — start here: document map, code map, run registry, findings ledger, ops rules, open questions.
 - `REPORT.md` — the consolidated results log, in chronological sections (§3a, §3b, … §3ah); every claim has a
   matched baseline and a section number.
-- `PLAN7.md` — the current roadmap (scaling ladder, mixture sweep, typed primitives, DecisionMix v2, calibration,
+- `docs/plan/PLAN7.md` — the current roadmap (scaling ladder, mixture sweep, typed primitives, DecisionMix v2, calibration,
   large-K path) and its execution notes.
-- `RESULTS.md` — one results table per model family/size, pulled straight from run artefacts.
-- `COMPARE.md` — the competitive picture against the closed Jev/System One family and the open JevBench leaderboard.
-- `NOVELTY.md` — the contribution story: what is and isn't novel, and why.
+- `docs/research/RESULTS.md` — one results table per model family/size, pulled straight from run artefacts.
+- `docs/research/COMPARE.md` — the competitive picture against the closed Jev/System One family and the open JevBench leaderboard.
+- `docs/research/NOVELTY.md` — the contribution story: what is and isn't novel, and why.
 - `releases/*.md` — one card per public release: exact backbone/adaptation/readout, training args, full results
   tables, known limitations, license.
 
@@ -129,7 +131,7 @@ Training code is not yet public (the release cards ship inference only). The Rel
 (`typical-small`, checkpoint `ts1b`, from `releases/typical-small.md`):
 
 ```bash
-uv run --no-sync python train.py --readout native --nc_head n3 --nc_render letters_nonull --null factored \
+uv run --no-sync python pcdm/train.py --readout native --nc_head n3 --nc_render letters_nonull --null factored \
     --tap_layer 20 --zscore --lora_r 16 --lora_layers 8 \
     --data data_v5 --extra_data data_kb,data_wf,data_wf_hf,data_wf_long,data_wh,data_u \
     --bucket_map data_wf_long=W,data_wh=W,data_u=U \
@@ -140,7 +142,7 @@ uv run --no-sync python train.py --readout native --nc_head n3 --nc_render lette
 ```
 
 The 4B (`typical-medium`, `tm1b`) is the same recipe on `Qwen/Qwen3-4B-Base` at tap 26/36 — see
-`releases/typical-medium.md` for its exact args. `PROJECT.md` §6 has the current pod-ops rules (torch/kernel
+`releases/typical-medium.md` for its exact args. `docs/plan/PROJECT.md` §6 has the current pod-ops rules (torch/kernel
 pinning, micro-batch sizing, watcher rules) for anyone reproducing a run on rented GPUs.
 
 ## License and data notes

@@ -67,7 +67,7 @@ class Typical:
         self.tok = head.backbone.tokenizer
         # Persistent state -> prefix-KV cache (LRU, keyed on the exact state text): choice/
         # score/noul/decide all route through _raw -> _state_kv_for, so a warm call (same
-        # state, new question) never re-runs the state_prefix_forward -- see native.py's
+        # state, new question) never re-runs the state_prefix_forward -- see pcdm/native.py's
         # encode_state/native_kv_decide docstrings. max_states caps how many distinct states
         # are held at once (each entry is one KV cache, ~O(state_tokens) memory).
         self.max_states = max_states

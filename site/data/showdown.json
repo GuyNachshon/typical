@@ -1,0 +1,720 @@
+{
+ "state": "Ticket #7734 \u2014 from ops@northwind.example (Enterprise plan, 3 years)\nSubject: webhook deliveries stopped, and invoice 88213 billed twice\n\n\"Since your Tuesday deploy not one webhook has reached us. Our warehouse has not picked a single order in two days and the team is shipping by hand off a spreadsheet. Separately, invoice 88213 charged us twice for the same seat count \u2014 both receipts are attached. We have a board demo Friday morning and I need deliveries working before then. If this is how the platform behaves under contract, I need to understand what we are renewing in March.\"",
+ "questions": [
+  {
+   "type": "noul",
+   "question": "Is the customer's service currently degraded?",
+   "labels": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "type": "choice",
+   "question": "Which system is failing?",
+   "labels": [
+    "webhooks",
+    "billing",
+    "auth",
+    "search"
+   ]
+  },
+  {
+   "type": "noul",
+   "question": "Does the ticket report a billing error?",
+   "labels": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "type": "score",
+   "question": "How badly is the customer's business affected, 0=not at all..3=severely?",
+   "labels": [
+    "0",
+    "1",
+    "2",
+    "3"
+   ]
+  },
+  {
+   "type": "choice",
+   "question": "Which team should own this ticket?",
+   "labels": [
+    "platform",
+    "billing",
+    "support",
+    "success"
+   ]
+  },
+  {
+   "type": "noul",
+   "question": "Is the customer already using a manual workaround?",
+   "labels": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "type": "score",
+   "question": "How likely is this customer to churn, 0=unlikely..3=very likely?",
+   "labels": [
+    "0",
+    "1",
+    "2",
+    "3"
+   ]
+  },
+  {
+   "type": "noul",
+   "question": "Does the customer mention their contract or renewal?",
+   "labels": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "type": "choice",
+   "question": "By when does the customer need this fixed?",
+   "labels": [
+    "today",
+    "this week",
+    "this month",
+    "no deadline given"
+   ]
+  },
+  {
+   "type": "noul",
+   "question": "Did the problem start after a deploy?",
+   "labels": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "type": "score",
+   "question": "How urgently does this need a response, 0=low..3=immediate?",
+   "labels": [
+    "0",
+    "1",
+    "2",
+    "3"
+   ]
+  },
+  {
+   "type": "noul",
+   "question": "Does this ticket need a reply from a person?",
+   "labels": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "type": "choice",
+   "question": "What is the customer asking us to do?",
+   "labels": [
+    "restore the service",
+    "refund the charge",
+    "explain what happened",
+    "credit the account"
+   ]
+  },
+  {
+   "type": "noul",
+   "question": "Does the customer report losing any data?",
+   "labels": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "type": "noul",
+   "question": "Does the customer raise a security concern?",
+   "labels": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "type": "score",
+   "question": "How technically detailed is this ticket, 0=vague..3=very specific?",
+   "labels": [
+    "0",
+    "1",
+    "2",
+    "3"
+   ]
+  },
+  {
+   "type": "noul",
+   "question": "Does the customer say they attached a file?",
+   "labels": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "type": "choice",
+   "question": "How many accounts does this affect?",
+   "labels": [
+    "one",
+    "several",
+    "all of them"
+   ]
+  },
+  {
+   "type": "noul",
+   "question": "Is the customer's tone hostile?",
+   "labels": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "type": "score",
+   "question": "How high should this be escalated, 0=not at all..3=to a manager now?",
+   "labels": [
+    "0",
+    "1",
+    "2",
+    "3"
+   ]
+  }
+ ],
+ "method": "One request per model, every question in it, the same options pinned by the same JSON schema. Wall clock from a client process. The hosted arm is streamed and each answer is timestamped the moment its value finished arriving, so the replay on the page runs at the pace the model actually wrote at. Typical runs locally on mps.",
+ "models": {
+  "typical-small": {
+   "ours": true,
+   "device": "mps",
+   "ms": 494.9,
+   "measured_utc": "2026-09-23T20:23:54Z",
+   "answers": [
+    {
+     "pick": "yes",
+     "probs": {
+      "no": 0.16,
+      "yes": 0.84
+     },
+     "p_null": 0.021
+    },
+    {
+     "pick": "webhooks",
+     "probs": {
+      "webhooks": 0.998,
+      "billing": 0.002,
+      "auth": 0.0,
+      "search": 0.0
+     },
+     "p_null": 0.0
+    },
+    {
+     "pick": "yes",
+     "probs": {
+      "no": 0.02,
+      "yes": 0.98
+     },
+     "p_null": 0.006
+    },
+    {
+     "pick": "3",
+     "probs": {
+      "0": 0.042,
+      "1": 0.131,
+      "2": 0.328,
+      "3": 0.499
+     },
+     "p_null": 0.0
+    },
+    {
+     "pick": "support",
+     "probs": {
+      "platform": 0.445,
+      "billing": 0.03,
+      "support": 0.459,
+      "success": 0.066
+     },
+     "p_null": 0.11
+    },
+    {
+     "pick": "yes",
+     "probs": {
+      "no": 0.321,
+      "yes": 0.679
+     },
+     "p_null": 0.085
+    },
+    {
+     "pick": "2",
+     "probs": {
+      "0": 0.075,
+      "1": 0.271,
+      "2": 0.361,
+      "3": 0.294
+     },
+     "p_null": 0.0
+    },
+    {
+     "pick": "yes",
+     "probs": {
+      "no": 0.038,
+      "yes": 0.962
+     },
+     "p_null": 0.033
+    },
+    {
+     "pick": "no deadline given",
+     "probs": {
+      "today": 0.181,
+      "this week": 0.098,
+      "this month": 0.09,
+      "no deadline given": 0.63
+     },
+     "p_null": 0.002
+    },
+    {
+     "pick": "yes",
+     "probs": {
+      "no": 0.418,
+      "yes": 0.582
+     },
+     "p_null": 0.027
+    },
+    {
+     "pick": "3",
+     "probs": {
+      "0": 0.007,
+      "1": 0.037,
+      "2": 0.236,
+      "3": 0.72
+     },
+     "p_null": 0.0
+    },
+    {
+     "pick": "yes",
+     "probs": {
+      "no": 0.09,
+      "yes": 0.91
+     },
+     "p_null": 0.055
+    },
+    {
+     "pick": "restore the service",
+     "probs": {
+      "restore the service": 0.574,
+      "refund the charge": 0.129,
+      "explain what happened": 0.296,
+      "credit the account": 0.001
+     },
+     "p_null": 0.045
+    },
+    {
+     "pick": "no",
+     "probs": {
+      "no": 0.597,
+      "yes": 0.403
+     },
+     "p_null": 0.26
+    },
+    {
+     "pick": "no",
+     "probs": {
+      "no": 0.58,
+      "yes": 0.42
+     },
+     "p_null": 0.263
+    },
+    {
+     "pick": "3",
+     "probs": {
+      "0": 0.111,
+      "1": 0.157,
+      "2": 0.3,
+      "3": 0.431
+     },
+     "p_null": 0.0
+    },
+    {
+     "pick": "yes",
+     "probs": {
+      "no": 0.007,
+      "yes": 0.993
+     },
+     "p_null": 0.007
+    },
+    {
+     "pick": "one",
+     "probs": {
+      "one": 0.624,
+      "several": 0.292,
+      "all of them": 0.084
+     },
+     "p_null": 0.031
+    },
+    {
+     "pick": "yes",
+     "probs": {
+      "no": 0.476,
+      "yes": 0.524
+     },
+     "p_null": 0.385
+    },
+    {
+     "pick": "3",
+     "probs": {
+      "0": 0.008,
+      "1": 0.073,
+      "2": 0.257,
+      "3": 0.662
+     },
+     "p_null": 0.0
+    }
+   ],
+   "h100_projected_ms": 96.3,
+   "h100_basis": "Projected, not measured on this call: 45 ms for a single cold decision plus 2.7 ms for each of the other 19, from the published K=2 ladder in releases/typical-small.md#latency (one H100, 256-token state, model load excluded). This call's own measurement is the 494.9 ms it took on mps."
+  },
+  "openrouter/openai/gpt-5.6-terra (low reasoning)": {
+   "ms": 7220.6,
+   "cost_usd": 0.007624,
+   "tokens_in": 1183,
+   "tokens_out": 389,
+   "first_token_ms": 5537.2,
+   "measured_utc": "2026-09-23T20:23:53Z",
+   "timeline": [
+    {
+     "q": 0,
+     "t_ms": 5537.2
+    },
+    {
+     "q": 1,
+     "t_ms": 5643.6
+    },
+    {
+     "q": 2,
+     "t_ms": 5741.5
+    },
+    {
+     "q": 3,
+     "t_ms": 5765.4
+    },
+    {
+     "q": 4,
+     "t_ms": 5807.0
+    },
+    {
+     "q": 5,
+     "t_ms": 5819.6
+    },
+    {
+     "q": 6,
+     "t_ms": 5889.5
+    },
+    {
+     "q": 7,
+     "t_ms": 5995.4
+    },
+    {
+     "q": 8,
+     "t_ms": 6058.2
+    },
+    {
+     "q": 9,
+     "t_ms": 6142.0
+    },
+    {
+     "q": 10,
+     "t_ms": 6213.7
+    },
+    {
+     "q": 11,
+     "t_ms": 6283.4
+    },
+    {
+     "q": 12,
+     "t_ms": 6367.3
+    },
+    {
+     "q": 13,
+     "t_ms": 6442.2
+    },
+    {
+     "q": 14,
+     "t_ms": 6528.0
+    },
+    {
+     "q": 15,
+     "t_ms": 6600.1
+    },
+    {
+     "q": 16,
+     "t_ms": 6692.2
+    },
+    {
+     "q": 17,
+     "t_ms": 6757.2
+    },
+    {
+     "q": 18,
+     "t_ms": 6830.4
+    },
+    {
+     "q": 19,
+     "t_ms": 6932.7
+    }
+   ],
+   "answers": [
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "webhooks",
+     "stated_confidence": 0.98
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "3",
+     "stated_confidence": 0.98
+    },
+    {
+     "pick": "platform",
+     "stated_confidence": 0.72
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "3",
+     "stated_confidence": 0.91
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "this week",
+     "stated_confidence": 0.96
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.97
+    },
+    {
+     "pick": "3",
+     "stated_confidence": 0.98
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "restore the service",
+     "stated_confidence": 0.78
+    },
+    {
+     "pick": "no",
+     "stated_confidence": 0.93
+    },
+    {
+     "pick": "no",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "2",
+     "stated_confidence": 0.76
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "one",
+     "stated_confidence": 0.9
+    },
+    {
+     "pick": "no",
+     "stated_confidence": 0.66
+    },
+    {
+     "pick": "3",
+     "stated_confidence": 0.94
+    }
+   ]
+  },
+  "openrouter/anthropic/claude-haiku-4.5 (low reasoning)": {
+   "ms": 28796.9,
+   "cost_usd": 0.015289,
+   "tokens_in": 2339,
+   "tokens_out": 2590,
+   "first_token_ms": 28218.5,
+   "measured_utc": "2026-09-23T20:24:22Z",
+   "timeline": [
+    {
+     "q": 0,
+     "t_ms": 28218.5
+    },
+    {
+     "q": 1,
+     "t_ms": 28218.5
+    },
+    {
+     "q": 2,
+     "t_ms": 28223.9
+    },
+    {
+     "q": 3,
+     "t_ms": 28223.9
+    },
+    {
+     "q": 4,
+     "t_ms": 28223.9
+    },
+    {
+     "q": 5,
+     "t_ms": 28226.5
+    },
+    {
+     "q": 6,
+     "t_ms": 28226.5
+    },
+    {
+     "q": 7,
+     "t_ms": 28392.9
+    },
+    {
+     "q": 8,
+     "t_ms": 28392.9
+    },
+    {
+     "q": 9,
+     "t_ms": 28396.7
+    },
+    {
+     "q": 10,
+     "t_ms": 28396.7
+    },
+    {
+     "q": 11,
+     "t_ms": 28396.7
+    },
+    {
+     "q": 12,
+     "t_ms": 28396.8
+    },
+    {
+     "q": 13,
+     "t_ms": 28458.9
+    },
+    {
+     "q": 14,
+     "t_ms": 28458.9
+    },
+    {
+     "q": 15,
+     "t_ms": 28565.1
+    },
+    {
+     "q": 16,
+     "t_ms": 28565.1
+    },
+    {
+     "q": 17,
+     "t_ms": 28565.1
+    },
+    {
+     "q": 18,
+     "t_ms": 28625.1
+    },
+    {
+     "q": 19,
+     "t_ms": 28625.1
+    }
+   ],
+   "answers": [
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "webhooks",
+     "stated_confidence": 0.95
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "3",
+     "stated_confidence": 0.95
+    },
+    {
+     "pick": "platform",
+     "stated_confidence": 0.7
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.98
+    },
+    {
+     "pick": "2",
+     "stated_confidence": 0.85
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "this week",
+     "stated_confidence": 0.9
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "3",
+     "stated_confidence": 0.98
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.99
+    },
+    {
+     "pick": "restore the service",
+     "stated_confidence": 0.8
+    },
+    {
+     "pick": "no",
+     "stated_confidence": 0.9
+    },
+    {
+     "pick": "no",
+     "stated_confidence": 0.98
+    },
+    {
+     "pick": "2",
+     "stated_confidence": 0.75
+    },
+    {
+     "pick": "yes",
+     "stated_confidence": 0.97
+    },
+    {
+     "pick": "one",
+     "stated_confidence": 0.85
+    },
+    {
+     "pick": "no",
+     "stated_confidence": 0.8
+    },
+    {
+     "pick": "3",
+     "stated_confidence": 0.9
+    }
+   ]
+  }
+ }
+}

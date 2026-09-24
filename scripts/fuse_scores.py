@@ -17,8 +17,8 @@ candidate ranking (log mode's argmax converges to native's argmax).
 
 No training: reuses compose_support.py's dump loaders, candidate alignment (by string), and
 per-set eval (metrics.summarize + cse/ksweep/cf branches). Sweeps --g_grid, writes
-runs/<name>_g<g>/results.json per g (train.py results.json format, so report.py /
-report_native.py read them directly), and prints one table: rows = g, plus an "oracle" row
+runs/<name>_g<g>/results.json per g (pcdm/train.py results.json format, so pcdm/report.py /
+pcdm/report_native.py read them directly), and prints one table: rows = g, plus an "oracle" row
 (best g per column -- the upper bound a learned per-input gate could reach) and a
 "val-selected" row (single g chosen by min NLL on the dumps' val split, if present).
 
@@ -32,6 +32,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from compose_support import align, _cand_softmax, eval_set  # noqa: E402
 from null_bias import apply_bias, load_npz  # noqa: E402
@@ -107,7 +108,7 @@ def load_dumps(dump_e, dump_n):
 
 
 def run(dump_e, dump_n, g_grid=G_GRID, fusion_mode="log", quiet=False):
-    """-> {g: results_dict} (train.py results.json format, one per g)."""
+    """-> {g: results_dict} (pcdm/train.py results.json format, one per g)."""
     loaded = load_dumps(dump_e, dump_n)
     by_g = {}
     for g in g_grid:

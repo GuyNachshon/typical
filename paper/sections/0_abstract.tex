@@ -1,23 +1,17 @@
-Software that calls a language model to make a bounded decision -- route this ticket, flag this
-transaction, score this alert -- usually recovers the decision from generated answer symbols,
-constrained decoding, or candidate log-probabilities, even though what the caller needs is a
-distribution over a label set defined at request time. We ask whether a pretrained causal language
-model can expose that decision \emph{directly}, without generating an answer, and what must remain
-inside its computation for the decision to stay question-conditioned. Our central result is negative
-and scoped. A decision state computed \emph{before} the candidate set is known -- the formulation
-that would make one state reusable across arbitrary candidate sets -- transfers a listwise teacher's
-candidate priors and calibration but not its question-conditioned closed-book capability. This holds
-across six tested factorizations and distillation objectives and at both backbone depths we tapped,
-and it is invisible to raw accuracy: it appears only under $\dq$, the drop in accuracy when the real
-question is replaced by a shuffled one with the candidate set held fixed. \textbf{Typical} instead
-renders the query and its runtime-defined candidates inside one causal suffix against a state whose
-key-value cache is computed once, and scores the terminal decision state against each candidate's own
-\emph{contextual} hidden state. That readout recovers the question-conditioned signal of a
-letter-generating interface ($\dqsh$ .106 vs.\ .109; teacher .102) with about a quarter of its order
-sensitivity, and carries typed output contracts -- categorical Choice, ordinal Score, Bernoulli Noul
--- plus an abstention gate factored out of the candidate softmax. Standard bounded decisions
-generally improve with backbone scale (1.7B--14B, with an anomalous 8B point) and soft-target
-probability quality improves substantially at fixed capacity through objective and
-checkpoint-selection changes. The boundary is sharp and we report it as prominently: hard
-compositional decisions remain unresolved at every size we trained, and a same-size \emph{frozen}
-backbone read with three in-context exemplars is not beaten there by any model we fine-tuned.
+Software that asks a language model for a decision needs a probability for each option it supplies,
+and a way to say that none of them fit. Typical reads that distribution directly from a pretrained
+language model's hidden states, without generating text. It encodes the input document once, reads each
+question with its candidate options in a short suffix, and scores every candidate at 71\% of the
+network's depth, returning a choice, an ordinal score or a yes/no probability, plus a separate
+probability of abstaining. The hard part of building such a model is making the decision depend on the
+right inputs. A model can score well while ignoring the question, the evidence or the rubric, or while
+shifting with label order and with how many options it is offered, and accuracy shows none of it. We
+built Typical around tests that do. A shuffled-question control, $\dq$, shows that question-dependent
+knowledge appears only when the candidates are read inside the forward pass, in every configuration we
+tested. Training on counterfactual rubric groups makes the model use the rubric, lifting held-out rule families
+by 35--40 points over a model never trained on them, and when training truncates long documents,
+placing the evidence first adds 11.2 points. A Bernoulli head
+makes yes/no answers invariant to label order, and removing the ``none of the above'' option from the candidates, leaving abstention to a separate gate,
+cuts MMLU-Pro false abstention from .692 to .003. A decision takes 45\,ms at
+1.7B and 60\,ms at 14B, and the 14B model reaches .931 on the JevBench standard tier. We release 1.7B
+and 4B models and an inference package.

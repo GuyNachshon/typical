@@ -1,0 +1,14 @@
+{
+  "name": "typical-site",
+  "type": "module",
+  "private": true,
+  "description": "type=module so `node js/*.js` self-tests run as ES modules without warnings; the scripts build style.css from src.css with Tailwind. Run from this directory.",
+  "scripts": {
+    "build:css": "tailwindcss -i src.css -o style.css --minify",
+    "watch:css": "tailwindcss -i src.css -o style.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.0",
+    "tailwindcss": "^4.1.0"
+  }
+}

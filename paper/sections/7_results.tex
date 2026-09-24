@@ -1,0 +1,92 @@
+\section{What the decision should not depend on}
+\label{sec:invariant}
+\label{sec:results}
+
+A decision should stay put when the order of the labels, the number of options offered or the layout of
+the input changes. Each subsection gives the failure a natural design shows, the perturbation that
+exposed it and the change that removed or bounded it.
+
+\subsection{Label order}
+\label{sec:results:typed}
+
+The decision should not change when the same labels appear in a different order. A yes/no decision
+rendered as a two-way Choice fails this test. ``Yes'' and ``no'' occupy two different suffix positions
+with two different contextual states, so the rendering carries order into the scores, and reversing the
+labels of a two-way Choice over \{no, yes\} moves $P(\text{yes})$ by up to .55, and by .01--.15 on
+average across sets (\Cref{app:typed-primitives}). Order invariance alone is easy to obtain: the candidate-blind variants of
+\Cref{sec:analysis:deltaq} are exactly set-stable and carry no question dependence
+(\Cref{app:extra-figures}).
+
+Each output type delivers the property its contract names. Matched fine-tunes compare each type
+against a control that treats the same rows as plain Choice (\Cref{app:typed-primitives}). The Noul
+Bernoulli head renders no candidates (\Cref{sec:method:typed}), so label order cannot enter its
+computation. For rows routed to it, reversing the labels
+moves $P(\text{yes})$ by exactly zero on all nine test sets. The head is better or equal on six of seven
+yes/no sets and clears the untouched PagerDuty floor by a wide margin: accuracy .602 $\to$ .886 against a
+.792 majority floor, NLL 1.04 $\to$ .28. The contract holds only under per-row routing (\Cref{app:typed-primitives}).
+
+Choice has no output index for any label and must read the candidates to score them
+(\Cref{sec:method:task}), so the readout controls how much the order and the rest of the set move the
+scores (\Cref{tab:n1n3}). N3 is far less sensitive to the
+candidate set than the letter-logit readout. Adding three unrelated options shifts N3's pairwise
+log-odds by .09--.13 against .44--.46 for N1, below the teacher's .179, and reordering moves its
+probabilities by .10--.11 against .165. The difference comes from the readout together with its null
+form; exact order invariance is the Bernoulli head's contract.
+
+\subsection{How many options are offered}
+\label{sec:analysis:null}
+
+Whether the model abstains should depend on whether any offered candidate fits, and not on how many
+candidates are offered. Abstention belongs in the gate alone. A rendered ``none of the above'' line
+competes for softmax mass with the real candidates, so its share depends on how many there are. The
+$\numcands$-sweep with the gold label absent exposes this. With the line, abstention has degenerate
+endpoints: the model almost never abstains on CLINC-150 at $\numcands{=}5$ ($P(\nullsym \mid
+\text{absent}) = .02$) and always abstains at $\numcands{=}150$ (1.00) and on Banking77 at
+$\numcands{=}77$.
+
+A matched pair tests the fix: both arms are N3 at layer 20 with the factored gate of
+\Cref{eq:factored-null}, and the treatment removes the rendered $\nullsym$ line. Removing the line
+removes both endpoints (null AUROC by $\numcands$ in \Cref{app:extra-figures}). MMLU-Pro false
+abstention falls from .692 to .003 (far outside its seed-to-seed variation of .05--.10) and accuracy
+rises from .133 to .353, Banking77 with all 77 labels rises from .063 to .579, and CLINC out-of-scope
+accuracy from .639 to .798, with $\dqsh$ unchanged (.118 vs.\ .122) and evidence tasks level
+(\Cref{tab:app-null-fix}). The price is 2--7 points on intent and
+topic label spaces (HWU64 .801 $\to$ .757, 20NG .589 $\to$ .515) and a rise in reorder $\Delta p$ from
+.077 to .123. This configuration, contextual readout at 71\% depth with a gate and no rendered
+$\nullsym$ line, is the architecture of every checkpoint in this section and \Cref{sec:scale}.
+The gate still has to learn when to fire, and the training distribution sets that. Decision-type
+balance and null targets each move a separate axis from the rubric groups of \Cref{sec:results:mixture}.
+Duplicating 20\% of workflow rows with the gold candidate removed and target $\nullsym$ lowers false
+abstention on CLINC-150 from .10 to .08 and on TREC-fine from .27 to .12, and raises accuracy by 2.6,
+3.6, 4.3 and 6.0 points on CLINC-150, TREC-fine, HWU64 and 20NG (\Cref{tab:app-mixture}). The model now spends mass
+on $\nullsym$ where soft gold has none, so held-out Noul drops 4 points and held-out Score NLL rises
+(1.52 $\to$ 2.04).
+
+Family balance acts on false abstention as well. Adding workflow data at family weights E .35 /
+K .25 / W .40 cost 11 points on CLINC-150 and 10 on TREC-fine, almost all of it false abstention
+(CLINC-150 .05 $\to$ .17). In the mixture sweep, which ran without the uncertainty corpus or null
+augmentation, $E \ge .45$ recovers CLINC-150 to .779 with false abstention .10 (\Cref{tab:app-mixture}). The release sampler, E .40 with
+U .10, keeps every evidence set within about 1 point of the evidence-only base (\Cref{app:mixture}).
+
+\subsection{Formatting}
+\label{sec:results:rendering}
+
+The decision should not change when the same content is laid out differently. Frozen models fail this
+test at 4B and 9B. With identical
+JevBench items, frozen Qwen3.5 checkpoints and letter-logit readout, a replication of another published
+system's state and option layout lifts the standard tier by 1.4, 8.3 and 12.5 points at 2B, 4B and 9B,
+surviving a paired per-item test at 4B ($p = .048$) and 9B ($p < .001$); no hard-tier change separates
+(\Cref{tab:rendering}); the effect exceeds most of the spread between public JevBench entries
+(\Cref{app:leaderboard}).
+
+A trained model depends on the render it was trained in. At 1.7B,
+render mismatch inside one trained model costs more than the training defect. In the off-diagonal cells
+of \Cref{tab:twobytwo}, switching the evaluation render costs 14.5 points for the facts-first model and
+19.0 for the facts-last one, which lands on its \texttt{policy\_permit} floor (.615 against .612). At
+14B it costs 7.6 and 6.8 points, so the larger backbone tolerates render mismatch better.
+
+Typical fixes the layout of the question and options in the suffix (\Cref{sec:method:pass}), but the
+caller writes the state, and the render crossing of \Cref{sec:results:long}, which separates data
+effects from compatibility effects, measures what a change of state layout costs. The frozen controls of \Cref{tab:headline} use a
+letter-logit rendering we did not sweep, so frozen-versus-trained comparisons carry a rendering factor of
+the size shown here.

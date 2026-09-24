@@ -6,7 +6,7 @@ null mass is dropped and the rest renormalised over the labels -- p_null is repo
 runtime block, not scored. Modes: energy (model.decide, KV-cached state), native
 (native.native_kv_decide), compose (PLAN5 sec 3: P(null) = 1 - r_energy, P(a_j) = r_energy *
 P_native(a_j | answerable)), mcq_zero_shot (PLAN7 track A: frozen --backbone, no checkpoint,
-no LoRA -- next-token logits over the option letters via mcq.py's rendering, restricted to
+no LoRA -- next-token logits over the option letters via pcdm/mcq.py's rendering, restricted to
 the option set; ∅ is never rendered, so p_null = 0). Cold path: no candidate cache, every
 label embedded on the fly.
 

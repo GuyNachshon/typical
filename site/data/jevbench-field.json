@@ -1,0 +1,193 @@
+{
+ "what": "The same 231 public JevBench ids for every row.",
+ "chance": {
+  "std": 0.311,
+  "hard": 0.336
+ },
+ "caveats": [
+  "A public-subset run against fstandhartinger/jevbench v1.2.1, not a ranked leaderboard entry.",
+  "Adjacent rows are not separable: the hard tier is 111 items, so a 95% interval is about plus or minus 9 points."
+ ],
+ "sources": {
+  "ours": "site/data/models.json",
+  "frozen": "site/data/frozen.json",
+  "others": "REPORT section 3q, same 231 public ids"
+ },
+ "rows": [
+  {
+   "name": "Jev 1.13.0",
+   "kind": "decision model",
+   "std": 0.986,
+   "hard": 0.73,
+   "ours": false,
+   "note": "closed"
+  },
+  {
+   "name": "DiffusionGemma-as-Jev",
+   "kind": "decision model",
+   "std": 0.986,
+   "hard": 0.676,
+   "ours": false,
+   "size": "26B",
+   "params_total": 26.0,
+   "params_active": 4.0
+  },
+  {
+   "name": "SemIf",
+   "kind": "decision model",
+   "size": "4B",
+   "std": 0.986,
+   "hard": 0.613,
+   "ours": false,
+   "params_total": 4.0,
+   "params_active": 4.0
+  },
+  {
+   "name": "OpenJev",
+   "kind": "decision model",
+   "size": "26B",
+   "std": 0.972,
+   "hard": 0.64,
+   "ours": false,
+   "params_total": 26.0,
+   "params_active": 4.0
+  },
+  {
+   "name": "system-one-open",
+   "kind": "decision model",
+   "size": "2B",
+   "std": 0.931,
+   "hard": 0.486,
+   "ours": false,
+   "params_total": 2.0,
+   "params_active": 2.0
+  },
+  {
+   "name": "typical-medium",
+   "kind": "decision model",
+   "size": "4B",
+   "std": 0.8611111111111112,
+   "hard": 0.4954954954954955,
+   "ours": true,
+   "params_total": 4.0,
+   "params_active": 4.0
+  },
+  {
+   "name": "open-alternative-jev",
+   "kind": "decision model",
+   "size": "4B",
+   "std": 0.833,
+   "hard": 0.568,
+   "ours": false,
+   "params_total": 4.0,
+   "params_active": 4.0
+  },
+  {
+   "name": "Qwen3-14B-Base",
+   "kind": "prompted, 3 exemplars",
+   "std": 0.819,
+   "hard": 0.559,
+   "ours": false,
+   "size": "14B",
+   "params_total": 14.0,
+   "params_active": 14.0
+  },
+  {
+   "name": "Qwen3.5-9B-Base",
+   "kind": "prompted, 3 exemplars",
+   "std": 0.806,
+   "hard": 0.541,
+   "ours": false,
+   "size": "9B",
+   "params_total": 9.0,
+   "params_active": 9.0
+  },
+  {
+   "name": "Qwen3.5-4B-Base",
+   "kind": "prompted, 3 exemplars",
+   "std": 0.764,
+   "hard": 0.495,
+   "ours": false,
+   "size": "4B",
+   "params_total": 4.0,
+   "params_active": 4.0
+  },
+  {
+   "name": "jeff (GLiFormer)",
+   "kind": "classifier",
+   "size": "400M",
+   "std": 0.75,
+   "hard": 0.387,
+   "ours": false,
+   "params_total": 0.4,
+   "params_active": 0.4
+  },
+  {
+   "name": "typical-small",
+   "kind": "decision model",
+   "size": "1.7B",
+   "std": 0.7083333333333334,
+   "hard": 0.43243243243243246,
+   "ours": true,
+   "params_total": 1.7,
+   "params_active": 1.7
+  },
+  {
+   "name": "Laya (ModernBERT)",
+   "kind": "classifier",
+   "std": 0.694,
+   "hard": 0.351,
+   "ours": false
+  },
+  {
+   "name": "GLiNER2",
+   "kind": "classifier",
+   "std": 0.639,
+   "hard": 0.369,
+   "ours": false
+  },
+  {
+   "name": "Qwen3.5-2B-Base",
+   "kind": "prompted, 3 exemplars",
+   "std": 0.583,
+   "hard": 0.387,
+   "ours": false,
+   "size": "2B",
+   "params_total": 2.0,
+   "params_active": 2.0
+  },
+  {
+   "name": "Qwen3-8B-Base",
+   "kind": "prompted, 3 exemplars",
+   "std": 0.556,
+   "hard": 0.369,
+   "ours": false,
+   "size": "8B",
+   "params_total": 8.0,
+   "params_active": 8.0
+  },
+  {
+   "name": "Qwen3-1.7B-Base",
+   "kind": "prompted, 3 exemplars",
+   "std": 0.528,
+   "hard": 0.369,
+   "ours": false,
+   "size": "1.7B",
+   "params_total": 1.7,
+   "params_active": 1.7
+  },
+  {
+   "name": "open-jev-deberta-v3-large",
+   "kind": "classifier",
+   "std": 0.431,
+   "hard": 0.378,
+   "ours": false
+  }
+ ],
+ "unknown_size": [
+  "GLiNER2",
+  "Jev 1.13.0",
+  "Laya (ModernBERT)",
+  "open-jev-deberta-v3-large"
+ ]
+}

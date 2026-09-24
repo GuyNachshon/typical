@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>games-v3-dev — Typical</title>
+<link rel="stylesheet" href="style.css" />
+<style>
+  body { background: #c4c3b6; color: #000; }
+  .v3-wrap { max-width: 1800px; margin: 0 auto; padding: 48px 32px 96px; }
+  .v3-head { font-family: 'Instrument Serif', Georgia, serif; font-size: 40px; margin: 0 0 8px; }
+  .v3-sub { font-family: 'Inter', sans-serif; font-size: 13px; color: #595855; max-width: 60ch; margin: 0 0 40px; }
+  .v3-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+  @media (max-width: 1400px) { .v3-grid { grid-template-columns: 1fr; max-width: 560px; margin: 0 auto; } }
+  .v3-cell { display: flex; flex-direction: column; gap: 10px; }
+  .v3-cell-head { display: flex; align-items: baseline; justify-content: space-between; font-family: 'Inter', sans-serif; }
+  .v3-cell-title { font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
+  .v3-live-btn { font-family: inherit; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; background: transparent; border: 1px solid #595855; color: #000; border-radius: 2px; padding: 4px 9px; cursor: pointer; }
+  .v3-live-btn.on { background: #000; color: #fff; }
+  .game-card {
+    width: 560px;
+    height: 560px;
+    max-width: 100%;
+    aspect-ratio: 1 / 1;
+    background: #000;
+    clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 26px, 100% 100%, 0 100%);
+  }
+</style>
+</head>
+<body>
+<div class="v3-wrap">
+  <h1 class="v3-head">games — v3</h1>
+  <p class="v3-sub">
+    Three real renderers over the pure-logic engines (js/snake.js, js/games/doom.js, js/games/drive.js):
+    Snake on canvas, Drive and the arena on Three.js. Static replay mode works with no server; the Live
+    pill on each card switches that card to call the local model directly. Not linked from the live site.
+  </p>
+  <div class="v3-grid">
+    <div class="v3-cell">
+      <div class="v3-cell-head">
+        <span class="v3-cell-title">01 · Snake</span>
+        <button class="v3-live-btn" data-live-toggle="snake" type="button">static</button>
+      </div>
+      <div class="game-card" id="card-snake"></div>
+    </div>
+    <div class="v3-cell">
+      <div class="v3-cell-head">
+        <span class="v3-cell-title">02 · Drive</span>
+        <button class="v3-live-btn" data-live-toggle="drive" type="button">static</button>
+      </div>
+      <div class="game-card" id="card-drive"></div>
+    </div>
+    <div class="v3-cell">
+      <div class="v3-cell-head">
+        <span class="v3-cell-title">03 · Arena (Doom-like)</span>
+        <button class="v3-live-btn" data-live-toggle="doom" type="button">static</button>
+      </div>
+      <div class="game-card" id="card-doom"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { decide, mode, probeHealth } from './js/api.js';
+  import { mount as mountSnake } from './js/games/render-snake.js';
+  import { mount as mountDrive } from './js/games/render-drive.js';
+  import { mount as mountDoom } from './js/games/render-doom.js';
+
+  await probeHealth(); // sets api.mode() to 'live' if /api/health answers, else 'static'
+
+  // Per-card mode override: starts synced to the real server probe, flips independently per
+  // card via its "live"/"static" pill - lets the dev page exercise both render paths (replay
+  // playback vs live decide()) without needing three separate servers.
+  function cardMode(key, btn) {
+    let forced = mode(); // 'live' | 'static'
+    btn.textContent = forced;
+    btn.classList.toggle('on', forced === 'live');
+    btn.addEventListener('click', () => {
+      forced = forced === 'live' ? 'static' : 'live';
+      btn.textContent = forced;
+      btn.classList.toggle('on', forced === 'live');
+    });
+    return () => forced;
+  }
+
+  const snakeBtn = document.querySelector('[data-live-toggle="snake"]');
+  const driveBtn = document.querySelector('[data-live-toggle="drive"]');
+  const doomBtn = document.querySelector('[data-live-toggle="doom"]');
+
+  const ctx = { decide, mode };
+  await mountSnake(document.getElementById('card-snake'), { decide, mode: cardMode('snake', snakeBtn), ctx });
+  await mountDrive(document.getElementById('card-drive'), { decide, mode: cardMode('drive', driveBtn), ctx });
+  await mountDoom(document.getElementById('card-doom'), { decide, mode: cardMode('doom', doomBtn), ctx });
+</script>
+</body>
+</html>

@@ -178,7 +178,7 @@ switching the null off (β = −6 → .850), which kills OOS detection (.001). *
 spaces is a novelty/absence confound, not a K-bias** — unfamiliar label *vocabulary* looks like "gold absent" (null AUROC
 .745 on Banking77-K vs .952 on trained CLINC vocabulary). Fix must come from training signal that separates the two
 (gold-present rows over held-out label vocabularies, i.e. label-space-level held-out splits in training), not from calibration.
-`runs/joint_emb_nullbias/results.json` holds the val-fitted variant in train.py's schema.
+`runs/joint_emb_nullbias/results.json` holds the val-fitted variant in pcdm/train.py's schema.
 
 **(2) `joint_emb + listwise` (`joint_emb_lw`, $4).** Same as `joint_emb` plus the `SetMixer` (identity-at-init) over
 candidates. Best val NLL of any run (0.381 vs 0.389).
@@ -492,7 +492,7 @@ answer generation), read out by a direct head over the terminal decision state h
 (N2 semantic, N3 contextual, N2N3 hybrid) vs the letter-logit control N1. Large K routes through the existing energy scorer
 → top-r → native choice. E3-ms continues as the optional compilation branch. Success axes (PLAN4 §15): evidence retention,
 Δ_q ≈ teacher's, decision quality (NLL/ECE/Brier/ChaosNLI/null, disaggregated abstention), one-suffix-per-query latency
-over K = 2…256. `report_native.py` prints that table.
+over K = 2…256. `pcdm/report_native.py` prints that table.
 
 ## 3l. PLAN4 Phase B/C — `native_choice_v1` (2026-09-19/20, H100)
 
@@ -538,7 +538,7 @@ question-dependent knowledge depending on the variant; its lower raw score is mo
 *less candidate-prior exploitation* (choices-only .121 vs .213) — N2 is less artifact-driven, not less knowledgeable, with a
 third of N1's order bias (reorder Δp .06 vs .17). This is the first non-generative readout in the project that exposes
 question-conditioned parametric knowledge; the candidate-blind Z never did. N3 (contextual candidates) tests whether the
-rest of the raw gap is recoverable. (`false_abstain` column in `report_native.py` needs verification — it disagrees with
+rest of the raw gap is recoverable. (`false_abstain` column in `pcdm/report_native.py` needs verification — it disagrees with
 among-K − acc; use the latter until fixed.)
 
 **`nc_n3` (h_D scored against each option's own contextual hidden states, slot identity preserved; $9):**
@@ -1129,7 +1129,7 @@ base model reading next-token letter logits over the rendered options (`pcdm_jev
 | JevBench Brier std / hard | .40 / .88 | .29 / .83 | .55 / .83 | **.17** / .85 |
 | JevBench p50 latency (s, in-process H100) | .077 (base) / .554 (wf, NVL) | .089 | .087 | .070 |
 | JevBench hard: long_policy / multi_hop / trap / tradeoff | .16 / .17 / .75 / .33 | – | – | **.05** / .44 / 1.00 / .67 |
-| `bench.py --native` L_s = 256: single decision K = 2 / 32 / 256 (ms)† | 65 / 66 / 96 | 90 / 94 / 114 | 70 / 71 / 126 | 61 / 62 / 158 |
+| `pcdm/bench.py --native` L_s = 256: single decision K = 2 / 32 / 256 (ms)† | 65 / 66 / 96 | 90 / 94 / 114 | 70 / 71 / 126 | 61 / 62 / 158 |
 | marginal ms per query, M = 32, K = 2 / 32 / 128 / 256 | 4.0 / 4.7 / 18.4 / 36.0 | 5.9 / 12.1 / 21.9 / 49.9 | | |
 | peak memory K = 2 → 256 (GB) | – | 14.5 → 18.6 | 29.3 → 34.1 | 51.6 → 57.5 |
 | zero-shot control: JevBench std / easy / hard | .583 / .833 / .369 | .722 / 1.00 / .414 | .375 / .354 / .360 (**broken**, see note) | .819 / 1.00 / .441 |
@@ -1329,6 +1329,7 @@ is exactly the long_policy .05 of the 14B (§3ab) and .21 of `typical-medium`. F
 regeneration (`wf/train_long_v2.jsonl`, case position < 8% of the text), `--drop_truncated` (rows longer than the window
 are dropped, never cut), `--grad_ckpt`, `--best_on` (checkpoint selection on the uncertainty + curriculum val NLL),
 `--brier_lambda`, and frozen-backbone teacher labels via `scripts/teacher_label.py --zero_shot --shots 3`.
+(Correction 2026-09-24: `--brier_lambda` was listed here but the run args record 0.0; no Brier term was trained.)
 A second bug (commit 6d0a7e3): the SDPA padding mask was built as `long`, which forces PyTorch's O(L²) math kernel — the
 cause of the 14B OOMs at 3,072-token states (and of the ladder's memory pain); `bool` fixed it.
 
@@ -1406,7 +1407,8 @@ an earlier draft of §3ab quoted .20/.40 for temporal/probability from a transcr
 ## 3ai. `tl1b_nokd` — the KD control, and what it leaves confounded (H100, 2026-09-22, ~$30)
 
 `tl1b` bundled five changes at once (facts-first long corpus, `--drop_truncated`, a 3,072-token window,
-`--brier_lambda`, calibration-based `--best_on`) *plus* KD from the frozen 14B. `tl1b_nokd` is the matched control:
+`--brier_lambda`, calibration-based `--best_on`) *plus* KD from the frozen 14B. (Correction 2026-09-24: `--brier_lambda`
+was listed here but the run args record 0.0; no Brier term was trained.) `tl1b_nokd` is the matched control:
 identical recipe, `--distill_beta 0`, one flag different. All values below read from the artefacts on
 `guychuk/pcdm-runs` (`jev_native_*/hard/summary.json`, `.../original/summary.json`), not from run logs.
 
@@ -1433,7 +1435,8 @@ probability .50 (n=10), routing_hard 1.00 (n=5), temporal_numeric .20 (n=15), tr
 
 **What this does *not* establish.** With KD eliminated, the credit for the long_policy recovery (.053 → .211) falls to
 "the truncation fix" — but that is still four changes in a trenchcoat. Nothing in the record separates facts-first
-rendering from `--drop_truncated`, the wider window, the Brier term, or calibration-based checkpoint selection. §3ag
+rendering from `--drop_truncated`, the wider window, or calibration-based checkpoint selection (not a Brier term —
+correction 2026-09-24: no run in this pair trained one). §3ag
 states the mechanism (states right-truncate, so a `Case:` rendered last was dropped 98.8% of the time at
 `max_state` 1,024) and the mechanism is well-evidenced as a *description of the data*; it is not evidenced as the
 *cause* of the metric movement. The paper says so explicitly rather than claiming the stronger version.

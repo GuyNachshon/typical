@@ -1,0 +1,45 @@
+\section{Testing what a decision depends on}
+\label{sec:tests}
+\label{sec:setup}
+
+A decision model can score well while reading the wrong parts of its input, so we tested each part of
+\Cref{sec:method} with one protocol. For each input that should decide the answer (the question, the
+evidence, the rubric) a control removes it and we measure how much accuracy falls. For each factor that
+should leave the answer alone (label order, the number of options offered, formatting) a perturbation
+varies it and we measure how far the output moves. Accuracy on the unperturbed input measures neither.
+
+\paragraph{Inputs that should matter.}
+\label{sec:setup:deltaq}
+For the question, the control replaces the real question and holds the state and candidates fixed.
+
+\begin{definition}[Question-dependence gap]
+\label{def:deltaq}
+$\dq = \mathrm{Acc}\big(f(\state, \query, \cands)\big) - \mathrm{Acc}\big(f(\state, \tilde{\query},
+\cands)\big)$, where $\tilde{\query}$ replaces the real question with the state and candidate set held
+fixed: an empty placeholder in the \emph{choices-only} variant, a real unrelated question from the same
+corpus in the \emph{shuffled-question} variant $\dqsh$, primary throughout.
+\end{definition}
+
+$\dq$ extends the choices-only control of \citet{balepur2024artifacts} to a shuffled real question, which
+is stricter because a placeholder can leak candidate priors through the rendering. The reference is the
+listwise teacher at $\dqsh = .102$ on the MMLU-Pro probe, and $|\dqsh| < .02$ counts as zero
+(\Cref{app:protocol}). For the evidence, SNLI accuracy is set against the hypothesis-only baseline, and
+long documents are rendered with the facts before or after the policy text, with training render
+crossed against evaluation render. For the rubric, \emph{rubric-flip} pairs share a state and candidate
+set under two rubrics with different gold, and a shuffled rubric replaces the real one.
+
+\paragraph{Factors that should not matter.}
+For label order we reverse the labels of a yes/no decision, and on MMLU-Pro we reorder the candidates
+(\emph{reorder $\Delta p$}) or add three unrelated options (\emph{pairwise $\Delta$log-odds};
+\Cref{sec:setup:metrics}). For the number of options we remove the gold label, sweep $\numcands$ and record how often the model abstains. For
+formatting we change only the layout of the state and options, with weights and items fixed, and read the off-diagonal cells of the
+render crossing.
+
+\paragraph{Evaluation sets and JevBench.}
+\label{sec:setup:data}
+\label{sec:setup:jevbench}
+Training corpora are in \Cref{tab:corpora}; the evaluation sets, held-out splits, metrics, bootstraps
+and latency protocol are in \Cref{app:protocol,app:leaderboard}. JevBench
+(\texttt{fstandhartinger/jevbench} v1.2.1) is a third-party benchmark of yes/no, choice and ordinal
+decisions in standard, easy and hard tiers, and every JevBench number here is on its 231 public ids and
+unranked.

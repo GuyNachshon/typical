@@ -1,0 +1,74 @@
+{
+  "protocol": "frozen backbone, letter logits over the rendered options, 3 exemplars, same 231 public ids",
+  "source": "gpu-runpod-full-experiment:REPORT.md#\u00a73ag-frozen-controls (rows carrying their own source key are from buffalo:RESULTS.md \u00a75)",
+  "rows": [
+    {
+      "backbone": "Qwen3-1.7B-Base",
+      "std": 0.528,
+      "easy": 1.0,
+      "hard": 0.369,
+      "brier_hard": 0.71,
+      "trained": "typical-small"
+    },
+    {
+      "backbone": "Qwen3-4B-Base",
+      "std": 0.778,
+      "easy": 1.0,
+      "hard": 0.441,
+      "brier_hard": 0.67,
+      "trained": null
+    },
+    {
+      "backbone": "Qwen3-4B (instruct)",
+      "std": 0.778,
+      "easy": 1.0,
+      "hard": 0.423,
+      "brier_hard": 0.95,
+      "trained": null
+    },
+    {
+      "backbone": "Qwen3-8B-Base",
+      "std": 0.556,
+      "easy": 0.958,
+      "hard": 0.369,
+      "brier_hard": 0.74,
+      "trained": null
+    },
+    {
+      "backbone": "Qwen3-14B-Base",
+      "std": 0.819,
+      "easy": 1.0,
+      "hard": 0.559,
+      "brier_hard": 0.6,
+      "trained": "typical-14b-ladder"
+    },
+    {
+      "backbone": "Qwen3.5-2B-Base",
+      "std": 0.583,
+      "easy": 0.979,
+      "hard": 0.387,
+      "brier_hard": 0.67,
+      "trained": null,
+      "source": "buffalo:RESULTS.md#5-jevbench (jev_zs3_q35_2b)"
+    },
+    {
+      "backbone": "Qwen3.5-4B-Base",
+      "std": 0.764,
+      "easy": 1.0,
+      "hard": 0.495,
+      "brier_hard": 0.6,
+      "trained": "typical-medium"
+    },
+    {
+      "backbone": "Qwen3.5-9B-Base",
+      "std": 0.806,
+      "easy": 1.0,
+      "hard": 0.541,
+      "brier_hard": 0.55,
+      "trained": null,
+      "source": "buffalo:RESULTS.md#5-jevbench (jev_zs3_q35_9b)"
+    }
+  ],
+  "in_flight": "a 14B release candidate, not yet a release (Qwen3-14B, facts-first long rows, 3,072-token states, frozen-14B distillation), and tl2 (Qwen3.5-9B) trained but not yet evaluated; pass rule: hard >= .559 or hard Brier <= .65, long_policy >= .35 (REPORT #3ag). tm2 (Qwen3.5-4B) is no longer in flight -- it shipped as typical-medium on 2026-09-23, as ts1c did for typical-small (buffalo:RESULTS.md#7, releases/MANIFEST.json).",
+  "long_state_bug": "data_wf_long rendered the case facts last and training right-truncated at max_state, so 98.8% of long-policy rows lost their facts at 1,024 tokens; fixed by facts-first regeneration + --drop_truncated (REPORT \u00a73ag, commit 2fad326). Both shipped checkpoints carry the fix: ts1c and tm2 train at 2,048-token states with --drop_truncated and read .947 / .950 on 605 held-out facts-first long states, against .598 / .612 for the superseded ts1b / tm1b (buffalo:RESULTS.md#5b)."
+}

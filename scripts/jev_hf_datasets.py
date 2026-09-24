@@ -36,6 +36,7 @@ from huggingface_hub import hf_hub_download
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "pcdm"))
 from data import norm_text  # noqa: E402
 from pcdm_jev.decider import query_text  # noqa: E402
 

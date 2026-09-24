@@ -14,11 +14,11 @@ or label-ordered (REPORT.md §3w correction), so a naive head-N is not represent
 they always stay adjacent; strata are meta.family (meta.qtype when a row has no family).
 
 Scoring (native mode) batches BATCH rows per forward through run_batch_native (mcq.collate_mcq + the
-same batched call train.py uses), instead of one native_kv_decide call per row -- ~3 rows/s per-row vs.
+same batched call pcdm/train.py uses), instead of one native_kv_decide call per row -- ~3 rows/s per-row vs.
 30+ rows/s batched on H100 at K<=10 (test_native_kv_decide_matches_run_batch already proves the two
 paths agree per-row; tests/test_pipeline.py adds a batched-vs-single-row check on 6 rows here). A row
 whose rendered suffix exceeds native.MAX_SUFFIX is chunked hierarchically INSIDE run_batch_native (see
-native.py's module docstring) rather than failing, so "suffix_overflow" below should now read ~0 even for
+pcdm/native.py's module docstring) rather than failing, so "suffix_overflow" below should now read ~0 even for
 big-K files like tree_choice_cap (K=320) -- previously native_kv_decide had no chunking fallback and
 those rows were scored as chance (REPORT.md §3w correction). The counter stays, as a rescue-path
 diagnostic: it only increments if a row still can't be scored (a genuine RuntimeError/AssertionError),
@@ -38,6 +38,7 @@ import torch
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
 from mcq import collate_mcq  # noqa: E402
 from metrics import rubric_flip, summarize  # noqa: E402
 from native import run_batch_native  # noqa: E402

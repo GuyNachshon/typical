@@ -1,0 +1,3799 @@
+{
+  "support": {
+    "queries": [
+      {
+        "type": "choice",
+        "question": "Which team should own this message? Each option's criterion is listed; pick the single best match. A topic mentioned in passing is not a request.\nbilling: charges, invoices, duplicate payments, refunds of money  orders: cancelling, changing, or tracking an order, subscription, or booking  returns: items that arrived damaged, defective, or wrong  account: login problems, passwords, account access  general: anything else",
+        "labels": [
+          "billing",
+          "orders",
+          "returns",
+          "account",
+          "general"
+        ]
+      },
+      {
+        "type": "choice",
+        "question": "What does the customer want? Each option's criterion is listed; pick the single best match.\na refund: money back for a charge or purchase  a cancellation: an order, subscription, booking, or account cancelled  a replacement or repair: a damaged or faulty item replaced or fixed  account access: to log in or reset a password  information: an answer to a question, no action on their account",
+        "labels": [
+          "a refund",
+          "a cancellation",
+          "a replacement or repair",
+          "account access",
+          "information"
+        ]
+      }
+    ],
+    "items": [
+      {
+        "text": "I was charged twice for order #4471. My card statement shows two identical $59.99 charges on the same day."
+      },
+      {
+        "text": "There are two charges from you on my bank statement for the same subscription renewal. Please refund one."
+      },
+      {
+        "text": "Why did you bill me twice this month? I only have one account and one plan."
+      },
+      {
+        "text": "Duplicate charge: invoice 8812 was taken from my card two times. I need the second one reversed."
+      },
+      {
+        "text": "My statement shows $120 charged twice on March 3rd for the same order. This is a double charge."
+      },
+      {
+        "text": "I got two receipts for the same purchase and my card was debited both times."
+      },
+      {
+        "text": "You charged my PayPal twice for a single pair of shoes. Order number is 22910."
+      },
+      {
+        "text": "Being billed twice for one month of Premium. Second charge appeared 4 minutes after the first."
+      },
+      {
+        "text": "I see a duplicate transaction on my Visa ending 4401, both for $34.50 from your store."
+      },
+      {
+        "text": "Two identical charges hit my account this morning for the annual plan. I only signed up once."
+      },
+      {
+        "text": "Refund request: I was double charged when the checkout page timed out and I resubmitted."
+      },
+      {
+        "text": "My husband's card shows the same $89 charge twice from your company. We placed one order."
+      },
+      {
+        "text": "Hello, the renewal was charged two times. Please remove the extra charge and confirm."
+      },
+      {
+        "text": "Double billing on account 77120: the September invoice was paid twice by auto-pay."
+      },
+      {
+        "text": "I have been charged twice for the same booking reference. Please fix."
+      },
+      {
+        "text": "The app says one payment but my bank shows two debits of $15 to you on the same date."
+      },
+      {
+        "text": "I want to cancel my subscription effective immediately. Please confirm by email."
+      },
+      {
+        "text": "How do I cancel my order? I placed it ten minutes ago by mistake."
+      },
+      {
+        "text": "Please cancel my Premium plan before the next renewal date."
+      },
+      {
+        "text": "Cancel order 55210. I found the item cheaper elsewhere."
+      },
+      {
+        "text": "I no longer need the service. Please close my account and cancel any future billing."
+      },
+      {
+        "text": "Can you cancel the second item in my order but keep the first one?"
+      },
+      {
+        "text": "I'd like to cancel my membership. What is the process?"
+      },
+      {
+        "text": "Please cancel my reservation for the 14th; my flight was moved."
+      },
+      {
+        "text": "Cancel my auto-renewal. I do not want to be charged again next year."
+      },
+      {
+        "text": "I want to stop the subscription and cancel it for good. Nothing personal, just not using it."
+      },
+      {
+        "text": "Requesting cancellation of order #9031 which has not shipped yet."
+      },
+      {
+        "text": "Please cancel the trial before it converts to a paid plan tomorrow."
+      },
+      {
+        "text": "I need to cancel my appointment booked through your app for Thursday."
+      },
+      {
+        "text": "Cancel everything on my account. I am moving abroad and cannot use the service."
+      },
+      {
+        "text": "Is it possible to cancel the pre-order for the console? I changed my mind."
+      },
+      {
+        "text": "Please cancel my monthly box. I have too many products already."
+      },
+      {
+        "text": "I am writing to cancel my contract under the 14-day cooling-off period."
+      },
+      {
+        "text": "Cancel my ticket for Saturday's show and refund it to the original card."
+      },
+      {
+        "text": "The package arrived with the box crushed and the lamp inside is shattered."
+      },
+      {
+        "text": "My order arrived damaged: the screen of the tablet has a crack across the corner."
+      },
+      {
+        "text": "Received the chair today and one leg is snapped off. It was broken in transit."
+      },
+      {
+        "text": "The mug came in pieces. The box had no padding at all."
+      },
+      {
+        "text": "Item arrived broken. The blender jar is cracked and leaks water."
+      },
+      {
+        "text": "The book arrived with a torn cover and bent pages, looks like it got wet in shipping."
+      },
+      {
+        "text": "Opened the delivery and the frame glass is smashed. Photos attached."
+      },
+      {
+        "text": "My headphones arrived with the left cup dented and the hinge broken."
+      },
+      {
+        "text": "The parcel was delivered soaked and the electronics inside no longer power on."
+      },
+      {
+        "text": "Vase arrived in a hundred pieces. Courier must have dropped it."
+      },
+      {
+        "text": "The monitor I ordered came with a shattered panel out of the box."
+      },
+      {
+        "text": "Damaged on delivery: the bike frame has a deep dent and the wheel is bent."
+      },
+      {
+        "text": "The sofa arrived with a ripped seam and a broken castor."
+      },
+      {
+        "text": "Two of the six wine glasses were broken when the box arrived."
+      },
+      {
+        "text": "The keyboard arrived with several keys snapped off. The packaging was crushed."
+      },
+      {
+        "text": "I cannot log in. The password reset email never arrives."
+      },
+      {
+        "text": "Locked out of my account after too many attempts. Please reset my password."
+      },
+      {
+        "text": "I forgot my password and the reset link says it has expired."
+      },
+      {
+        "text": "Login fails with 'invalid credentials' even though I just changed the password."
+      },
+      {
+        "text": "Can you help me reset my password? I no longer have access to the old phone number for 2FA."
+      },
+      {
+        "text": "I can't sign in on the mobile app but the website works with the same password."
+      },
+      {
+        "text": "Please send me a password reset link; the button on the login page does nothing."
+      },
+      {
+        "text": "My account says it is locked. I need to get back in to download invoices."
+      },
+      {
+        "text": "The two-factor code never comes through so I cannot log into my account."
+      },
+      {
+        "text": "I am unable to log in since the update. It keeps sending me back to the login screen."
+      },
+      {
+        "text": "Need a password reset for user jsmith@example.com. Recovery email is out of date."
+      },
+      {
+        "text": "Every time I try to log in it says my email is not recognised, but I've had this account for years."
+      },
+      {
+        "text": "I changed my password yesterday and now nothing works. Please reset it."
+      },
+      {
+        "text": "Login loop: enter credentials, spinner, back to login. Tried three browsers."
+      },
+      {
+        "text": "Can't access my account. The password I saved in my browser is rejected."
+      },
+      {
+        "text": "Please unlock my account and send a new temporary password."
+      },
+      {
+        "text": "Where is my order? The tracking page has said 'in transit' for six days."
+      },
+      {
+        "text": "Do you ship to Canada, and what are the customs fees?"
+      },
+      {
+        "text": "I'd like to change the delivery address on order 31877 before it ships."
+      },
+      {
+        "text": "What is the difference between the Pro and the Business plan?"
+      },
+      {
+        "text": "Can I get an invoice with my company VAT number on it?"
+      },
+      {
+        "text": "The color of the jacket I received is navy, but I ordered black."
+      },
+      {
+        "text": "Do you have this dress in a size 12? The website only shows 8 and 10."
+      },
+      {
+        "text": "I want to upgrade my plan to the annual option. How do I do that?"
+      },
+      {
+        "text": "Great service, just wanted to say thanks to Marcus who helped me on chat yesterday."
+      },
+      {
+        "text": "Is the warranty transferable if I sell the laptop to a friend?"
+      },
+      {
+        "text": "I was charged once for my order but I never received a confirmation email."
+      },
+      {
+        "text": "How do I add a second user to my team account?"
+      },
+      {
+        "text": "The discount code SPRING20 is not being applied at checkout."
+      },
+      {
+        "text": "Can you tell me the ingredients in the vanilla protein powder?"
+      },
+      {
+        "text": "My order shipped to my old address. Can you redirect it?"
+      },
+      {
+        "text": "I received one item from my order of three. Where are the other two?"
+      },
+      {
+        "text": "Is there a student discount available for the software?"
+      },
+      {
+        "text": "Please update the email address on my account to my new work address."
+      },
+      {
+        "text": "The app crashes when I open the settings page on Android 14."
+      },
+      {
+        "text": "I'd like to return a sweater that doesn't fit. It is unworn with tags."
+      },
+      {
+        "text": "What are your opening hours for the downtown store?"
+      },
+      {
+        "text": "Can I pause my subscription for two months while I travel?"
+      },
+      {
+        "text": "How long does a refund take to appear on my card after a return?"
+      },
+      {
+        "text": "The tracking number you sent me doesn't work on the courier's site."
+      },
+      {
+        "text": "I want to exchange the blue kettle for the red one, same model."
+      },
+      {
+        "text": "Do you offer gift wrapping for orders placed this week?"
+      },
+      {
+        "text": "My promotional credit of $10 has disappeared from my account balance."
+      },
+      {
+        "text": "The size chart on the product page seems wrong; a medium fits like a small."
+      },
+      {
+        "text": "Can I change my payment method from PayPal to a credit card?"
+      },
+      {
+        "text": "What does 'backordered' mean for my item, and when will it ship?"
+      },
+      {
+        "text": "I'd like to request a copy of all the data you hold about me."
+      },
+      {
+        "text": "Your website keeps showing prices in euros even though I am in the UK."
+      },
+      {
+        "text": "Is it possible to schedule delivery for a specific day?"
+      },
+      {
+        "text": "The manual for the espresso machine is only in German. Is there an English version?"
+      },
+      {
+        "text": "I received a marketing email after unsubscribing. Please remove me from the list."
+      },
+      {
+        "text": "Can you confirm my order 60412 was placed successfully? The page went blank."
+      },
+      {
+        "text": "I'd like to add a gift message to an order I placed an hour ago."
+      },
+      {
+        "text": "How do I export my invoices for the last tax year?"
+      },
+      {
+        "text": "The product photos show a carrying case but none was included in the box."
+      },
+      {
+        "text": "Are the toys in the baby range free of BPA?"
+      },
+      {
+        "text": "I have a question about the loyalty points: do they expire?"
+      },
+      {
+        "text": "Can you send a replacement charger? Mine was lost while travelling."
+      },
+      {
+        "text": "The delivery driver left my parcel with a neighbour who is away for a week."
+      },
+      {
+        "text": "Please apply my recent purchase to the loyalty account I created afterwards."
+      },
+      {
+        "text": "What is the maximum file size for uploads on the free tier?"
+      },
+      {
+        "text": "I noticed a typo in your terms of service, section 4.2."
+      },
+      {
+        "text": "Do you accept Apple Pay in the physical stores?"
+      },
+      {
+        "text": "The API is returning 500 errors for the /reports endpoint since this morning."
+      },
+      {
+        "text": "Can I merge my two accounts into one? I signed up twice with different emails."
+      },
+      {
+        "text": "The chair I bought squeaks when I lean back. Is this normal?"
+      },
+      {
+        "text": "I'd like to know if the winter coat is machine washable."
+      },
+      {
+        "text": "My monthly invoice is higher than last month. Can you explain the line items?"
+      },
+      {
+        "text": "Please send me a receipt for my purchase yesterday at the airport store."
+      },
+      {
+        "text": "How do I redeem the gift card I received for my birthday?"
+      },
+      {
+        "text": "The download link for my e-book has expired. Can you resend it?"
+      },
+      {
+        "text": "Does the fitness tracker work with iPhone 12?"
+      },
+      {
+        "text": "I placed an order with express shipping but the estimated delivery is next week."
+      },
+      {
+        "text": "Can I get the product in bulk? I need 200 units for an event."
+      },
+      {
+        "text": "The receipt shows tax charged but my organisation is tax exempt."
+      },
+      {
+        "text": "I was overcharged for shipping: the site said free shipping over $50 and my order was $62."
+      },
+      {
+        "text": "Can you recommend a lens for portrait photography that works with my camera?"
+      },
+      {
+        "text": "My package says delivered but nothing has arrived. Nobody was home."
+      },
+      {
+        "text": "I'd like to leave a review for the headphones but the button is greyed out."
+      },
+      {
+        "text": "The dashboard is showing last week's numbers instead of today's."
+      }
+    ],
+    "recorded": [
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9958385825157166
+          },
+          {
+            "label": "a refund",
+            "p": 0.876846194267273
+          }
+        ],
+        "ms": 676.3552089687437
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9982877373695374
+          },
+          {
+            "label": "a refund",
+            "p": 0.9977920055389404
+          }
+        ],
+        "ms": 170.8862500381656
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9983198046684265
+          },
+          {
+            "label": "information",
+            "p": 0.9190424680709839
+          }
+        ],
+        "ms": 452.7599170105532
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.994469940662384
+          },
+          {
+            "label": "a refund",
+            "p": 0.997718334197998
+          }
+        ],
+        "ms": 221.12716699484736
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9951034784317017
+          },
+          {
+            "label": "a refund",
+            "p": 0.7496105432510376
+          }
+        ],
+        "ms": 188.27604199759662
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.979721188545227
+          },
+          {
+            "label": "a refund",
+            "p": 0.8981874585151672
+          }
+        ],
+        "ms": 177.46366700157523
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9988037347793579
+          },
+          {
+            "label": "a refund",
+            "p": 0.9329113364219666
+          }
+        ],
+        "ms": 186.68629101011902
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9959096312522888
+          },
+          {
+            "label": "a refund",
+            "p": 0.43162479996681213
+          }
+        ],
+        "ms": 204.80062498245388
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9969305396080017
+          },
+          {
+            "label": "a refund",
+            "p": 0.8830186128616333
+          }
+        ],
+        "ms": 344.9195839930326
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9928326606750488
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.5856624245643616
+          }
+        ],
+        "ms": 338.95212499191985
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9944057464599609
+          },
+          {
+            "label": "a refund",
+            "p": 0.9999365210533142
+          }
+        ],
+        "ms": 297.25104197859764
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9986565113067627
+          },
+          {
+            "label": "information",
+            "p": 0.5270434021949768
+          }
+        ],
+        "ms": 267.9627080215141
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9976237416267395
+          },
+          {
+            "label": "a refund",
+            "p": 0.9781026244163513
+          }
+        ],
+        "ms": 230.2584580029361
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9977753758430481
+          },
+          {
+            "label": "a refund",
+            "p": 0.91502445936203
+          }
+        ],
+        "ms": 228.038709028624
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9662846922874451
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.7785540223121643
+          }
+        ],
+        "ms": 205.1812080317177
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9516450762748718
+          },
+          {
+            "label": "information",
+            "p": 0.781385600566864
+          }
+        ],
+        "ms": 226.23737499816343
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9930459856987
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9977476000785828
+          }
+        ],
+        "ms": 203.73204204952344
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9992302060127258
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9931048154830933
+          }
+        ],
+        "ms": 221.21208294993266
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9569523334503174
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.98326176404953
+          }
+        ],
+        "ms": 180.9322079643607
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9959312081336975
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9882710576057434
+          }
+        ],
+        "ms": 214.12537503056228
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.4275985062122345
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9980100989341736
+          }
+        ],
+        "ms": 218.99662498617545
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9987910985946655
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.7855663299560547
+          }
+        ],
+        "ms": 213.0756250116974
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9659324884414673
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9962432384490967
+          }
+        ],
+        "ms": 206.98308298597112
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9929013848304749
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9648971557617188
+          }
+        ],
+        "ms": 216.57291700830683
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9057773351669312
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9854981303215027
+          }
+        ],
+        "ms": 234.85433403402567
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9756441116333008
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9971939921379089
+          }
+        ],
+        "ms": 222.23304095678031
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9969887137413025
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9776667356491089
+          }
+        ],
+        "ms": 230.17108399653807
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.7811981439590454
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9868370890617371
+          }
+        ],
+        "ms": 201.3231249875389
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9955382943153381
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9965992569923401
+          }
+        ],
+        "ms": 248.04729199968278
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.7935458421707153
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9903386831283569
+          }
+        ],
+        "ms": 247.06479196902364
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9955670237541199
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9560946822166443
+          }
+        ],
+        "ms": 245.14466704567894
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9876604676246643
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9990091919898987
+          }
+        ],
+        "ms": 220.56133300065994
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9170821905136108
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9676059484481812
+          }
+        ],
+        "ms": 240.0423749932088
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9669234156608582
+          },
+          {
+            "label": "a refund",
+            "p": 0.8525576591491699
+          }
+        ],
+        "ms": 229.25379202933982
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.9292169809341431
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.630877673625946
+          }
+        ],
+        "ms": 187.15850001899526
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.9310595393180847
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.9266607761383057
+          }
+        ],
+        "ms": 173.94404101651162
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.8356788754463196
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.9785610437393188
+          }
+        ],
+        "ms": 179.87108300440013
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.7244720458984375
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.5595237016677856
+          }
+        ],
+        "ms": 181.06358300428838
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.9626134037971497
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.9421796798706055
+          }
+        ],
+        "ms": 209.7388330148533
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.9065605998039246
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.8425440192222595
+          }
+        ],
+        "ms": 214.37758405227214
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.9088107943534851
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.8815128207206726
+          }
+        ],
+        "ms": 197.1358330338262
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.9276362657546997
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.9894905090332031
+          }
+        ],
+        "ms": 183.4493750357069
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.7583043575286865
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.8842710256576538
+          }
+        ],
+        "ms": 208.7349590146914
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.8031673431396484
+          },
+          {
+            "label": "a refund",
+            "p": 0.5864787697792053
+          }
+        ],
+        "ms": 180.21262501133606
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.7663041353225708
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.9695056676864624
+          }
+        ],
+        "ms": 186.00945797516033
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.9769272208213806
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.9804808497428894
+          }
+        ],
+        "ms": 184.96858299477026
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.967879056930542
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.986902117729187
+          }
+        ],
+        "ms": 181.67637498117983
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.9413699507713318
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.8251854777336121
+          }
+        ],
+        "ms": 183.25583299156278
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.8470671772956848
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.9360599517822266
+          }
+        ],
+        "ms": 207.9435409978032
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9978951215744019
+          },
+          {
+            "label": "account access",
+            "p": 0.9993184804916382
+          }
+        ],
+        "ms": 188.92845802474767
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.979637622833252
+          },
+          {
+            "label": "account access",
+            "p": 0.9990559220314026
+          }
+        ],
+        "ms": 188.8498329790309
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9893038272857666
+          },
+          {
+            "label": "account access",
+            "p": 0.9931386709213257
+          }
+        ],
+        "ms": 201.17370900698006
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9961524605751038
+          },
+          {
+            "label": "account access",
+            "p": 0.9802024960517883
+          }
+        ],
+        "ms": 188.24966700049117
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9943601489067078
+          },
+          {
+            "label": "account access",
+            "p": 0.9997109174728394
+          }
+        ],
+        "ms": 227.2609579958953
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9957749247550964
+          },
+          {
+            "label": "account access",
+            "p": 0.9968292713165283
+          }
+        ],
+        "ms": 232.84570797113702
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9989719390869141
+          },
+          {
+            "label": "account access",
+            "p": 0.9997671842575073
+          }
+        ],
+        "ms": 212.7135000191629
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9895884394645691
+          },
+          {
+            "label": "account access",
+            "p": 0.998619556427002
+          }
+        ],
+        "ms": 244.37608302105218
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9975225329399109
+          },
+          {
+            "label": "account access",
+            "p": 0.990484356880188
+          }
+        ],
+        "ms": 220.70633299881592
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9970636367797852
+          },
+          {
+            "label": "account access",
+            "p": 0.99745112657547
+          }
+        ],
+        "ms": 181.80041597224772
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9098736047744751
+          },
+          {
+            "label": "account access",
+            "p": 0.9985895752906799
+          }
+        ],
+        "ms": 185.2991670020856
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9988148808479309
+          },
+          {
+            "label": "account access",
+            "p": 0.9985363483428955
+          }
+        ],
+        "ms": 199.91000002482906
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9852659106254578
+          },
+          {
+            "label": "account access",
+            "p": 0.9971518516540527
+          }
+        ],
+        "ms": 182.8461670083925
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9745836853981018
+          },
+          {
+            "label": "account access",
+            "p": 0.9886245131492615
+          }
+        ],
+        "ms": 196.91866700304672
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9990545511245728
+          },
+          {
+            "label": "account access",
+            "p": 0.9948741793632507
+          }
+        ],
+        "ms": 168.90358400996774
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.991895854473114
+          },
+          {
+            "label": "account access",
+            "p": 0.9988495111465454
+          }
+        ],
+        "ms": 190.3462090413086
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9974959492683411
+          },
+          {
+            "label": "information",
+            "p": 0.9426551461219788
+          }
+        ],
+        "ms": 233.01849997369573
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9848920702934265
+          },
+          {
+            "label": "information",
+            "p": 0.9567112922668457
+          }
+        ],
+        "ms": 197.42733403109014
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9995875954627991
+          },
+          {
+            "label": "information",
+            "p": 0.6109676361083984
+          }
+        ],
+        "ms": 203.64812499610707
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9092969298362732
+          },
+          {
+            "label": "information",
+            "p": 0.9633809328079224
+          }
+        ],
+        "ms": 200.10341703891754
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9966842532157898
+          },
+          {
+            "label": "information",
+            "p": 0.8657655119895935
+          }
+        ],
+        "ms": 220.38074996089563
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.849564790725708
+          },
+          {
+            "label": "information",
+            "p": 0.4097810685634613
+          }
+        ],
+        "ms": 241.65937496582046
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.922226071357727
+          },
+          {
+            "label": "information",
+            "p": 0.9585389494895935
+          }
+        ],
+        "ms": 225.1237080199644
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9519009590148926
+          },
+          {
+            "label": "information",
+            "p": 0.7617582082748413
+          }
+        ],
+        "ms": 172.41704202024266
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9901408553123474
+          },
+          {
+            "label": "information",
+            "p": 0.8757292628288269
+          }
+        ],
+        "ms": 160.29029100900516
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9335798621177673
+          },
+          {
+            "label": "information",
+            "p": 0.5585992932319641
+          }
+        ],
+        "ms": 147.40791695658118
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9392579793930054
+          },
+          {
+            "label": "a refund",
+            "p": 0.5246288776397705
+          }
+        ],
+        "ms": 147.68291695509106
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.8327224850654602
+          },
+          {
+            "label": "account access",
+            "p": 0.5337148904800415
+          }
+        ],
+        "ms": 172.10620798869058
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.7446297407150269
+          },
+          {
+            "label": "information",
+            "p": 0.725998044013977
+          }
+        ],
+        "ms": 152.4617500253953
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.975663959980011
+          },
+          {
+            "label": "information",
+            "p": 0.9993434548377991
+          }
+        ],
+        "ms": 156.58800001256168
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9098204374313354
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.3987801671028137
+          }
+        ],
+        "ms": 150.6994579685852
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.6808239221572876
+          },
+          {
+            "label": "information",
+            "p": 0.41594964265823364
+          }
+        ],
+        "ms": 171.9014160335064
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.7833145260810852
+          },
+          {
+            "label": "information",
+            "p": 0.9707927107810974
+          }
+        ],
+        "ms": 189.5064580021426
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9529902935028076
+          },
+          {
+            "label": "account access",
+            "p": 0.8101627230644226
+          }
+        ],
+        "ms": 174.24625001149252
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9891249537467957
+          },
+          {
+            "label": "information",
+            "p": 0.8514162302017212
+          }
+        ],
+        "ms": 159.83274998143315
+      },
+      {
+        "decisions": [
+          {
+            "label": "returns",
+            "p": 0.9818310737609863
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.9523916244506836
+          }
+        ],
+        "ms": 153.4565839683637
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9222475290298462
+          },
+          {
+            "label": "information",
+            "p": 0.9942660927772522
+          }
+        ],
+        "ms": 317.2960000229068
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9823363423347473
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.5910271406173706
+          }
+        ],
+        "ms": 159.1832919511944
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.4890446960926056
+          },
+          {
+            "label": "a refund",
+            "p": 0.9963829517364502
+          }
+        ],
+        "ms": 296.3736249948852
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9035856127738953
+          },
+          {
+            "label": "information",
+            "p": 0.8832792043685913
+          }
+        ],
+        "ms": 167.401917045936
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.5317111015319824
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.9610654711723328
+          }
+        ],
+        "ms": 759.3721249722876
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.8072842359542847
+          },
+          {
+            "label": "information",
+            "p": 0.9940009117126465
+          }
+        ],
+        "ms": 159.23808299703524
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.6608358025550842
+          },
+          {
+            "label": "information",
+            "p": 0.6929919123649597
+          }
+        ],
+        "ms": 762.5736659974791
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9421839714050293
+          },
+          {
+            "label": "information",
+            "p": 0.9368705153465271
+          }
+        ],
+        "ms": 158.66095799719915
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.672975480556488
+          },
+          {
+            "label": "information",
+            "p": 0.6772140860557556
+          }
+        ],
+        "ms": 310.16366701805964
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.8520050644874573
+          },
+          {
+            "label": "information",
+            "p": 0.8750594854354858
+          }
+        ],
+        "ms": 177.34375002328306
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9851906299591064
+          },
+          {
+            "label": "information",
+            "p": 0.9977206587791443
+          }
+        ],
+        "ms": 195.45333296991885
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9769386649131775
+          },
+          {
+            "label": "information",
+            "p": 0.9857481122016907
+          }
+        ],
+        "ms": 184.83583303168416
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.6614246964454651
+          },
+          {
+            "label": "information",
+            "p": 0.9765563607215881
+          }
+        ],
+        "ms": 171.48116597672924
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9625284671783447
+          },
+          {
+            "label": "information",
+            "p": 0.9663411378860474
+          }
+        ],
+        "ms": 165.30633304500952
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.5994936227798462
+          },
+          {
+            "label": "a cancellation",
+            "p": 0.9489055275917053
+          }
+        ],
+        "ms": 172.7314589661546
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9109909534454346
+          },
+          {
+            "label": "information",
+            "p": 0.8252436518669128
+          }
+        ],
+        "ms": 167.21375001361594
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9833841919898987
+          },
+          {
+            "label": "information",
+            "p": 0.6756345629692078
+          }
+        ],
+        "ms": 177.06966697005555
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9986584186553955
+          },
+          {
+            "label": "information",
+            "p": 0.9431982040405273
+          }
+        ],
+        "ms": 168.76187501475215
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9636840224266052
+          },
+          {
+            "label": "information",
+            "p": 0.8180691599845886
+          }
+        ],
+        "ms": 176.22374999336898
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9807766079902649
+          },
+          {
+            "label": "information",
+            "p": 0.9827002286911011
+          }
+        ],
+        "ms": 167.50016703736037
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.8867945075035095
+          },
+          {
+            "label": "information",
+            "p": 0.9948681592941284
+          }
+        ],
+        "ms": 177.40620800759643
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.7551835775375366
+          },
+          {
+            "label": "a replacement or repair",
+            "p": 0.9982367157936096
+          }
+        ],
+        "ms": 159.41641601966694
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9299113154411316
+          },
+          {
+            "label": "information",
+            "p": 0.7886400818824768
+          }
+        ],
+        "ms": 182.23445798503235
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9111818075180054
+          },
+          {
+            "label": "a refund",
+            "p": 0.47390541434288025
+          }
+        ],
+        "ms": 166.76862497115508
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9630211591720581
+          },
+          {
+            "label": "information",
+            "p": 0.9986258149147034
+          }
+        ],
+        "ms": 173.1160000199452
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9799268245697021
+          },
+          {
+            "label": "information",
+            "p": 0.779276430606842
+          }
+        ],
+        "ms": 182.61495797196403
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9814754724502563
+          },
+          {
+            "label": "information",
+            "p": 0.9865114092826843
+          }
+        ],
+        "ms": 173.20337501587346
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9979522228240967
+          },
+          {
+            "label": "information",
+            "p": 0.9888384938240051
+          }
+        ],
+        "ms": 189.27262496436015
+      },
+      {
+        "decisions": [
+          {
+            "label": "account",
+            "p": 0.9163103103637695
+          },
+          {
+            "label": "account access",
+            "p": 0.4201148450374603
+          }
+        ],
+        "ms": 179.44058397551998
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9490925073623657
+          },
+          {
+            "label": "information",
+            "p": 0.497706800699234
+          }
+        ],
+        "ms": 159.3524169875309
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9910795092582703
+          },
+          {
+            "label": "information",
+            "p": 0.992526113986969
+          }
+        ],
+        "ms": 172.63008299050853
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9967236518859863
+          },
+          {
+            "label": "information",
+            "p": 0.9960273504257202
+          }
+        ],
+        "ms": 166.17820801911876
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.664568305015564
+          },
+          {
+            "label": "a refund",
+            "p": 0.5480509400367737
+          }
+        ],
+        "ms": 172.6424170192331
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9364323019981384
+          },
+          {
+            "label": "information",
+            "p": 0.9534747004508972
+          }
+        ],
+        "ms": 160.3639589739032
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9573749303817749
+          },
+          {
+            "label": "a refund",
+            "p": 0.954387903213501
+          }
+        ],
+        "ms": 173.35141700459644
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9305940270423889
+          },
+          {
+            "label": "information",
+            "p": 0.9803534746170044
+          }
+        ],
+        "ms": 167.44099999777973
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.9598842859268188
+          },
+          {
+            "label": "information",
+            "p": 0.8765878677368164
+          }
+        ],
+        "ms": 165.8382919849828
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.7503018975257874
+          },
+          {
+            "label": "information",
+            "p": 0.9573151469230652
+          }
+        ],
+        "ms": 164.57970900228247
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.9790877103805542
+          },
+          {
+            "label": "information",
+            "p": 0.8723918199539185
+          }
+        ],
+        "ms": 171.30145797273144
+      },
+      {
+        "decisions": [
+          {
+            "label": "billing",
+            "p": 0.933504581451416
+          },
+          {
+            "label": "a refund",
+            "p": 0.9855996966362
+          }
+        ],
+        "ms": 182.46854201424867
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9754706621170044
+          },
+          {
+            "label": "information",
+            "p": 0.9924260377883911
+          }
+        ],
+        "ms": 172.94366599526256
+      },
+      {
+        "decisions": [
+          {
+            "label": "orders",
+            "p": 0.7697587013244629
+          },
+          {
+            "label": "information",
+            "p": 0.6288987994194031
+          }
+        ],
+        "ms": 166.61174996988848
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.9704174995422363
+          },
+          {
+            "label": "information",
+            "p": 0.8674929738044739
+          }
+        ],
+        "ms": 170.72329099755734
+      },
+      {
+        "decisions": [
+          {
+            "label": "general",
+            "p": 0.974033772945404
+          },
+          {
+            "label": "information",
+            "p": 0.989883542060852
+          }
+        ],
+        "ms": 160.7916250359267
+      }
+    ]
+  },
+  "alert": {
+    "queries": [
+      {
+        "type": "choice",
+        "question": "Under PagerDuty alerting principles, what should the on-call system do with this log line?\nignore: No human action needed; keep it in the log stream.  ticket: A human should look during business hours; open a ticket, do not page.  page: A human must act now; page the on-call engineer.",
+        "labels": [
+          "ignore",
+          "ticket",
+          "page"
+        ]
+      }
+    ],
+    "items": [
+      {
+        "text": "[postgres] ERROR: postgres PANIC: could not write to file pg_wal/00000001000004E2: No space left on device. disk=/var/lib/postgresql 100% inodes=100% host=authz-2b1. INSERT into orders failing. replica cannot catch up."
+      },
+      {
+        "text": "[checkout-api] WARN: slo.burn service=checkout-api window=5m burn_rate=14.2x error_budget_remaining=8% availability=0.812 (SLO 0.995). 5xx=1840/2400 requests. primary journey POST /v1/checkout failing. runbook=https://runbooks.internal/checkout-slo"
+      },
+      {
+        "text": "[edge] WARN: tls.certificate notAfter=2026-09-17T14:10:00Z hours_remaining=6.2 host=api.checkout.example.com serving_prod=true clients=current. auto-renew job last failed: rateLimited. browsers will fail TLS this afternoon."
+      },
+      {
+        "text": "[checkout-api] INFO: deployment succeeded rev=2026.09.17.8 replicas=6/6. PagerDuty example of a suppressed notification."
+      },
+      {
+        "text": "[checkout-api] INFO: GET /favicon.ico 404 req=req_9ba0d11c client=bot. no user journey affected."
+      },
+      {
+        "text": "[postgres] WARN: disk /var/lib/postgresql in_use=0.81 host=ip-10-2-7-9. fill_rate predicts full in 46 hours. log rotation running. writes still succeeding. follow runbook disk-capacity."
+      }
+    ],
+    "recorded": [
+      {
+        "decisions": [
+          {
+            "label": "page",
+            "p": 0.9493324756622314
+          }
+        ],
+        "ms": 137.30766699882224
+      },
+      {
+        "decisions": [
+          {
+            "label": "page",
+            "p": 0.9198744893074036
+          }
+        ],
+        "ms": 130.7969590416178
+      },
+      {
+        "decisions": [
+          {
+            "label": "page",
+            "p": 0.9166547060012817
+          }
+        ],
+        "ms": 137.21216697013006
+      },
+      {
+        "decisions": [
+          {
+            "label": "ignore",
+            "p": 0.9086671471595764
+          }
+        ],
+        "ms": 115.53087498759851
+      },
+      {
+        "decisions": [
+          {
+            "label": "ignore",
+            "p": 0.8344132304191589
+          }
+        ],
+        "ms": 118.63041698234156
+      },
+      {
+        "decisions": [
+          {
+            "label": "ignore",
+            "p": 0.539388120174408
+          }
+        ],
+        "ms": 114.2482910072431
+      }
+    ]
+  },
+  "tool": {
+    "items": [
+      {
+        "text": "User: Will it rain in Lisbon tomorrow?",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\norder_food: Places a food delivery order  get_directions: Returns a route between two places  get_weather: Fetches the current or forecast weather for a location  control_lights: Turns smart lights on/off or dims them  translate_text: Translates text between languages  send_email: Sends an email to a given address",
+            "labels": [
+              "order_food",
+              "get_directions",
+              "get_weather",
+              "control_lights",
+              "translate_text",
+              "send_email"
+            ]
+          }
+        ],
+        "gold": "get_weather"
+      },
+      {
+        "text": "User: What's the temperature in Denver right now?",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\norder_food: Places a food delivery order  web_search: Searches the web for a query  get_weather: Fetches the current or forecast weather for a location  create_reminder: Creates a reminder at a time or place  translate_text: Translates text between languages  get_directions: Returns a route between two places",
+            "labels": [
+              "order_food",
+              "web_search",
+              "get_weather",
+              "create_reminder",
+              "translate_text",
+              "get_directions"
+            ]
+          }
+        ],
+        "gold": "get_weather"
+      },
+      {
+        "text": "User: Email Marta the quarterly numbers.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\ncreate_calendar_event: Adds an event to the user's calendar  set_timer: Starts a countdown timer  send_email: Sends an email to a given address  find_recipe: Finds a recipe by dish or ingredients  translate_text: Translates text between languages  order_food: Places a food delivery order",
+            "labels": [
+              "create_calendar_event",
+              "set_timer",
+              "send_email",
+              "find_recipe",
+              "translate_text",
+              "order_food"
+            ]
+          }
+        ],
+        "gold": "send_email"
+      },
+      {
+        "text": "User: Send a note to Sam saying I'm running late.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\nsend_email: Sends an email to a given address  track_package: Reports the delivery status of a parcel  get_weather: Fetches the current or forecast weather for a location  create_calendar_event: Adds an event to the user's calendar  web_search: Searches the web for a query  find_recipe: Finds a recipe by dish or ingredients",
+            "labels": [
+              "send_email",
+              "track_package",
+              "get_weather",
+              "create_calendar_event",
+              "web_search",
+              "find_recipe"
+            ]
+          }
+        ],
+        "gold": "send_email"
+      },
+      {
+        "text": "User: Put lunch with Lee on my calendar for Friday.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\ncreate_calendar_event: Adds an event to the user's calendar  get_weather: Fetches the current or forecast weather for a location  set_timer: Starts a countdown timer  web_search: Searches the web for a query  translate_text: Translates text between languages  order_food: Places a food delivery order",
+            "labels": [
+              "create_calendar_event",
+              "get_weather",
+              "set_timer",
+              "web_search",
+              "translate_text",
+              "order_food"
+            ]
+          }
+        ],
+        "gold": "create_calendar_event"
+      },
+      {
+        "text": "User: Schedule a dentist visit next Tuesday at 3.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\nget_weather: Fetches the current or forecast weather for a location  track_package: Reports the delivery status of a parcel  get_directions: Returns a route between two places  send_email: Sends an email to a given address  translate_text: Translates text between languages  create_calendar_event: Adds an event to the user's calendar",
+            "labels": [
+              "get_weather",
+              "track_package",
+              "get_directions",
+              "send_email",
+              "translate_text",
+              "create_calendar_event"
+            ]
+          }
+        ],
+        "gold": "create_calendar_event"
+      },
+      {
+        "text": "User: Set a timer for 12 minutes.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\nget_directions: Returns a route between two places  set_timer: Starts a countdown timer  web_search: Searches the web for a query  translate_text: Translates text between languages  create_reminder: Creates a reminder at a time or place  create_calendar_event: Adds an event to the user's calendar",
+            "labels": [
+              "get_directions",
+              "set_timer",
+              "web_search",
+              "translate_text",
+              "create_reminder",
+              "create_calendar_event"
+            ]
+          }
+        ],
+        "gold": "set_timer"
+      },
+      {
+        "text": "User: Start a 25-minute countdown.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\nget_weather: Fetches the current or forecast weather for a location  set_timer: Starts a countdown timer  order_food: Places a food delivery order  get_directions: Returns a route between two places  create_calendar_event: Adds an event to the user's calendar  control_lights: Turns smart lights on/off or dims them",
+            "labels": [
+              "get_weather",
+              "set_timer",
+              "order_food",
+              "get_directions",
+              "create_calendar_event",
+              "control_lights"
+            ]
+          }
+        ],
+        "gold": "set_timer"
+      },
+      {
+        "text": "User: Look up who won the 40th Super Bowl.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\ncreate_calendar_event: Adds an event to the user's calendar  web_search: Searches the web for a query  order_food: Places a food delivery order  set_timer: Starts a countdown timer  send_email: Sends an email to a given address  control_lights: Turns smart lights on/off or dims them",
+            "labels": [
+              "create_calendar_event",
+              "web_search",
+              "order_food",
+              "set_timer",
+              "send_email",
+              "control_lights"
+            ]
+          }
+        ],
+        "gold": "web_search"
+      },
+      {
+        "text": "User: Search for reviews of the new Osaka museum.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\nsend_email: Sends an email to a given address  translate_text: Translates text between languages  track_package: Reports the delivery status of a parcel  control_lights: Turns smart lights on/off or dims them  create_reminder: Creates a reminder at a time or place  web_search: Searches the web for a query",
+            "labels": [
+              "send_email",
+              "translate_text",
+              "track_package",
+              "control_lights",
+              "create_reminder",
+              "web_search"
+            ]
+          }
+        ],
+        "gold": "web_search"
+      },
+      {
+        "text": "User: How do you say 'thank you' in Japanese?",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\ntrack_package: Reports the delivery status of a parcel  find_recipe: Finds a recipe by dish or ingredients  set_timer: Starts a countdown timer  send_email: Sends an email to a given address  translate_text: Translates text between languages  get_directions: Returns a route between two places",
+            "labels": [
+              "track_package",
+              "find_recipe",
+              "set_timer",
+              "send_email",
+              "translate_text",
+              "get_directions"
+            ]
+          }
+        ],
+        "gold": "translate_text"
+      },
+      {
+        "text": "User: Translate this paragraph into French.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\ncreate_calendar_event: Adds an event to the user's calendar  get_directions: Returns a route between two places  web_search: Searches the web for a query  control_lights: Turns smart lights on/off or dims them  send_email: Sends an email to a given address  translate_text: Translates text between languages",
+            "labels": [
+              "create_calendar_event",
+              "get_directions",
+              "web_search",
+              "control_lights",
+              "send_email",
+              "translate_text"
+            ]
+          }
+        ],
+        "gold": "translate_text"
+      },
+      {
+        "text": "User: How do I get from Leeds to the airport?",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\nsend_email: Sends an email to a given address  order_food: Places a food delivery order  get_directions: Returns a route between two places  track_package: Reports the delivery status of a parcel  get_weather: Fetches the current or forecast weather for a location  control_lights: Turns smart lights on/off or dims them",
+            "labels": [
+              "send_email",
+              "order_food",
+              "get_directions",
+              "track_package",
+              "get_weather",
+              "control_lights"
+            ]
+          }
+        ],
+        "gold": "get_directions"
+      },
+      {
+        "text": "User: Directions to the nearest pharmacy.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\norder_food: Places a food delivery order  translate_text: Translates text between languages  get_directions: Returns a route between two places  create_calendar_event: Adds an event to the user's calendar  get_weather: Fetches the current or forecast weather for a location  find_recipe: Finds a recipe by dish or ingredients",
+            "labels": [
+              "order_food",
+              "translate_text",
+              "get_directions",
+              "create_calendar_event",
+              "get_weather",
+              "find_recipe"
+            ]
+          }
+        ],
+        "gold": "get_directions"
+      },
+      {
+        "text": "User: Order a large pepperoni pizza to my place.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\ncreate_reminder: Creates a reminder at a time or place  order_food: Places a food delivery order  control_lights: Turns smart lights on/off or dims them  create_calendar_event: Adds an event to the user's calendar  get_directions: Returns a route between two places  send_email: Sends an email to a given address",
+            "labels": [
+              "create_reminder",
+              "order_food",
+              "control_lights",
+              "create_calendar_event",
+              "get_directions",
+              "send_email"
+            ]
+          }
+        ],
+        "gold": "order_food"
+      },
+      {
+        "text": "User: Get me pad thai from the usual spot.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\nweb_search: Searches the web for a query  find_recipe: Finds a recipe by dish or ingredients  create_calendar_event: Adds an event to the user's calendar  create_reminder: Creates a reminder at a time or place  order_food: Places a food delivery order  control_lights: Turns smart lights on/off or dims them",
+            "labels": [
+              "web_search",
+              "find_recipe",
+              "create_calendar_event",
+              "create_reminder",
+              "order_food",
+              "control_lights"
+            ]
+          }
+        ],
+        "gold": "order_food"
+      },
+      {
+        "text": "User: Remind me to call Dr. Okafor at 5.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\nweb_search: Searches the web for a query  create_reminder: Creates a reminder at a time or place  get_directions: Returns a route between two places  order_food: Places a food delivery order  get_weather: Fetches the current or forecast weather for a location  create_calendar_event: Adds an event to the user's calendar",
+            "labels": [
+              "web_search",
+              "create_reminder",
+              "get_directions",
+              "order_food",
+              "get_weather",
+              "create_calendar_event"
+            ]
+          }
+        ],
+        "gold": "create_reminder"
+      },
+      {
+        "text": "User: Remind me to buy milk when I'm at the store.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\norder_food: Places a food delivery order  create_calendar_event: Adds an event to the user's calendar  translate_text: Translates text between languages  send_email: Sends an email to a given address  create_reminder: Creates a reminder at a time or place  control_lights: Turns smart lights on/off or dims them",
+            "labels": [
+              "order_food",
+              "create_calendar_event",
+              "translate_text",
+              "send_email",
+              "create_reminder",
+              "control_lights"
+            ]
+          }
+        ],
+        "gold": "create_reminder"
+      },
+      {
+        "text": "User: Where is my order #7?",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\ncontrol_lights: Turns smart lights on/off or dims them  create_reminder: Creates a reminder at a time or place  get_weather: Fetches the current or forecast weather for a location  translate_text: Translates text between languages  web_search: Searches the web for a query  track_package: Reports the delivery status of a parcel",
+            "labels": [
+              "control_lights",
+              "create_reminder",
+              "get_weather",
+              "translate_text",
+              "web_search",
+              "track_package"
+            ]
+          }
+        ],
+        "gold": "track_package"
+      },
+      {
+        "text": "User: Has the package from the Patels shipped yet?",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\ntranslate_text: Translates text between languages  order_food: Places a food delivery order  create_calendar_event: Adds an event to the user's calendar  web_search: Searches the web for a query  track_package: Reports the delivery status of a parcel  get_weather: Fetches the current or forecast weather for a location",
+            "labels": [
+              "translate_text",
+              "order_food",
+              "create_calendar_event",
+              "web_search",
+              "track_package",
+              "get_weather"
+            ]
+          }
+        ],
+        "gold": "track_package"
+      },
+      {
+        "text": "User: Dim the living room lights to 40%.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\nfind_recipe: Finds a recipe by dish or ingredients  translate_text: Translates text between languages  create_reminder: Creates a reminder at a time or place  control_lights: Turns smart lights on/off or dims them  web_search: Searches the web for a query  track_package: Reports the delivery status of a parcel",
+            "labels": [
+              "find_recipe",
+              "translate_text",
+              "create_reminder",
+              "control_lights",
+              "web_search",
+              "track_package"
+            ]
+          }
+        ],
+        "gold": "control_lights"
+      },
+      {
+        "text": "User: Turn off the bedroom lights.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\ntranslate_text: Translates text between languages  create_calendar_event: Adds an event to the user's calendar  web_search: Searches the web for a query  create_reminder: Creates a reminder at a time or place  control_lights: Turns smart lights on/off or dims them  find_recipe: Finds a recipe by dish or ingredients",
+            "labels": [
+              "translate_text",
+              "create_calendar_event",
+              "web_search",
+              "create_reminder",
+              "control_lights",
+              "find_recipe"
+            ]
+          }
+        ],
+        "gold": "control_lights"
+      },
+      {
+        "text": "User: How do I make shakshuka?",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\nget_directions: Returns a route between two places  send_email: Sends an email to a given address  track_package: Reports the delivery status of a parcel  create_calendar_event: Adds an event to the user's calendar  find_recipe: Finds a recipe by dish or ingredients  create_reminder: Creates a reminder at a time or place",
+            "labels": [
+              "get_directions",
+              "send_email",
+              "track_package",
+              "create_calendar_event",
+              "find_recipe",
+              "create_reminder"
+            ]
+          }
+        ],
+        "gold": "find_recipe"
+      },
+      {
+        "text": "User: Find a recipe using chickpeas and spinach.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\norder_food: Places a food delivery order  track_package: Reports the delivery status of a parcel  send_email: Sends an email to a given address  set_timer: Starts a countdown timer  create_calendar_event: Adds an event to the user's calendar  find_recipe: Finds a recipe by dish or ingredients",
+            "labels": [
+              "order_food",
+              "track_package",
+              "send_email",
+              "set_timer",
+              "create_calendar_event",
+              "find_recipe"
+            ]
+          }
+        ],
+        "gold": "find_recipe"
+      },
+      {
+        "text": "User: Hey, good morning! Hope you're doing well.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\ntranslate_text: Translates text between languages  create_calendar_event: Adds an event to the user's calendar  get_directions: Returns a route between two places  get_weather: Fetches the current or forecast weather for a location  send_email: Sends an email to a given address  track_package: Reports the delivery status of a parcel  none: small talk, a greeting, or anything that does not need a tool",
+            "labels": [
+              "translate_text",
+              "create_calendar_event",
+              "get_directions",
+              "get_weather",
+              "send_email",
+              "track_package",
+              "none"
+            ]
+          }
+        ],
+        "gold": "none"
+      },
+      {
+        "text": "User: Ha, that made me laugh, thanks for sharing.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\ncreate_reminder: Creates a reminder at a time or place  send_email: Sends an email to a given address  translate_text: Translates text between languages  get_weather: Fetches the current or forecast weather for a location  set_timer: Starts a countdown timer  find_recipe: Finds a recipe by dish or ingredients  none: small talk, a greeting, or anything that does not need a tool",
+            "labels": [
+              "create_reminder",
+              "send_email",
+              "translate_text",
+              "get_weather",
+              "set_timer",
+              "find_recipe",
+              "none"
+            ]
+          }
+        ],
+        "gold": "none"
+      },
+      {
+        "text": "User: Just wanted to say thanks for your help earlier.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\nsend_email: Sends an email to a given address  get_directions: Returns a route between two places  control_lights: Turns smart lights on/off or dims them  find_recipe: Finds a recipe by dish or ingredients  set_timer: Starts a countdown timer  get_weather: Fetches the current or forecast weather for a location  none: small talk, a greeting, or anything that does not need a tool",
+            "labels": [
+              "send_email",
+              "get_directions",
+              "control_lights",
+              "find_recipe",
+              "set_timer",
+              "get_weather",
+              "none"
+            ]
+          }
+        ],
+        "gold": "none"
+      },
+      {
+        "text": "User: What a nice day it is today.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\ncreate_reminder: Creates a reminder at a time or place  get_directions: Returns a route between two places  get_weather: Fetches the current or forecast weather for a location  send_email: Sends an email to a given address  set_timer: Starts a countdown timer  translate_text: Translates text between languages  none: small talk, a greeting, or anything that does not need a tool",
+            "labels": [
+              "create_reminder",
+              "get_directions",
+              "get_weather",
+              "send_email",
+              "set_timer",
+              "translate_text",
+              "none"
+            ]
+          }
+        ],
+        "gold": "none"
+      },
+      {
+        "text": "User: No worries, I'll figure it out myself.",
+        "queries": [
+          {
+            "type": "choice",
+            "question": "Which tool applies? Each option's criterion is listed; pick the single best match. Small talk needs no tool.\ncontrol_lights: Turns smart lights on/off or dims them  track_package: Reports the delivery status of a parcel  get_weather: Fetches the current or forecast weather for a location  get_directions: Returns a route between two places  find_recipe: Finds a recipe by dish or ingredients  send_email: Sends an email to a given address  none: small talk, a greeting, or anything that does not need a tool",
+            "labels": [
+              "control_lights",
+              "track_package",
+              "get_weather",
+              "get_directions",
+              "find_recipe",
+              "send_email",
+              "none"
+            ]
+          }
+        ],
+        "gold": "none"
+      }
+    ],
+    "recorded": [
+      {
+        "decisions": [
+          {
+            "label": "get_weather",
+            "p": 0.9999986290931702
+          }
+        ],
+        "ms": 153.3708330243826
+      },
+      {
+        "decisions": [
+          {
+            "label": "get_weather",
+            "p": 0.9999733567237854
+          }
+        ],
+        "ms": 132.9878750257194
+      },
+      {
+        "decisions": [
+          {
+            "label": "send_email",
+            "p": 0.9999372959136963
+          }
+        ],
+        "ms": 268.4282090049237
+      },
+      {
+        "decisions": [
+          {
+            "label": "send_email",
+            "p": 0.997296154499054
+          }
+        ],
+        "ms": 129.63358301203698
+      },
+      {
+        "decisions": [
+          {
+            "label": "create_calendar_event",
+            "p": 0.9999307990074158
+          }
+        ],
+        "ms": 253.48341703647748
+      },
+      {
+        "decisions": [
+          {
+            "label": "create_calendar_event",
+            "p": 0.9999439716339111
+          }
+        ],
+        "ms": 106.54579196125269
+      },
+      {
+        "decisions": [
+          {
+            "label": "set_timer",
+            "p": 0.9996783137321472
+          }
+        ],
+        "ms": 629.6227499842644
+      },
+      {
+        "decisions": [
+          {
+            "label": "set_timer",
+            "p": 0.9999812841415405
+          }
+        ],
+        "ms": 100.32595903612673
+      },
+      {
+        "decisions": [
+          {
+            "label": "web_search",
+            "p": 0.9994115233421326
+          }
+        ],
+        "ms": 717.639499984216
+      },
+      {
+        "decisions": [
+          {
+            "label": "web_search",
+            "p": 0.9993462562561035
+          }
+        ],
+        "ms": 121.20129202958196
+      },
+      {
+        "decisions": [
+          {
+            "label": "translate_text",
+            "p": 0.9996734857559204
+          }
+        ],
+        "ms": 131.29308295901865
+      },
+      {
+        "decisions": [
+          {
+            "label": "translate_text",
+            "p": 0.9999328255653381
+          }
+        ],
+        "ms": 116.58812500536442
+      },
+      {
+        "decisions": [
+          {
+            "label": "get_directions",
+            "p": 0.9999915957450867
+          }
+        ],
+        "ms": 120.53066695807502
+      },
+      {
+        "decisions": [
+          {
+            "label": "get_directions",
+            "p": 0.9963465929031372
+          }
+        ],
+        "ms": 120.95720798242837
+      },
+      {
+        "decisions": [
+          {
+            "label": "order_food",
+            "p": 0.9999632239341736
+          }
+        ],
+        "ms": 123.28825000440702
+      },
+      {
+        "decisions": [
+          {
+            "label": "order_food",
+            "p": 0.9629718065261841
+          }
+        ],
+        "ms": 124.27245901199058
+      },
+      {
+        "decisions": [
+          {
+            "label": "create_reminder",
+            "p": 0.999886155128479
+          }
+        ],
+        "ms": 125.43120799819008
+      },
+      {
+        "decisions": [
+          {
+            "label": "create_reminder",
+            "p": 0.999711811542511
+          }
+        ],
+        "ms": 120.02733297413215
+      },
+      {
+        "decisions": [
+          {
+            "label": "track_package",
+            "p": 0.9975606203079224
+          }
+        ],
+        "ms": 100.95495800487697
+      },
+      {
+        "decisions": [
+          {
+            "label": "track_package",
+            "p": 0.9999470710754395
+          }
+        ],
+        "ms": 103.88283396605402
+      },
+      {
+        "decisions": [
+          {
+            "label": "control_lights",
+            "p": 0.9999973773956299
+          }
+        ],
+        "ms": 125.08137500844896
+      },
+      {
+        "decisions": [
+          {
+            "label": "control_lights",
+            "p": 0.9999069571495056
+          }
+        ],
+        "ms": 108.90237498097122
+      },
+      {
+        "decisions": [
+          {
+            "label": "find_recipe",
+            "p": 0.9999406933784485
+          }
+        ],
+        "ms": 109.05112494947389
+      },
+      {
+        "decisions": [
+          {
+            "label": "find_recipe",
+            "p": 0.9998915195465088
+          }
+        ],
+        "ms": 104.32545799994841
+      },
+      {
+        "decisions": [
+          {
+            "label": "none",
+            "p": 0.9987711906433105
+          }
+        ],
+        "ms": 341.3951660040766
+      },
+      {
+        "decisions": [
+          {
+            "label": "none",
+            "p": 0.9929394125938416
+          }
+        ],
+        "ms": 131.69129198649898
+      },
+      {
+        "decisions": [
+          {
+            "label": "none",
+            "p": 0.9918169379234314
+          }
+        ],
+        "ms": 130.16445899847895
+      },
+      {
+        "decisions": [
+          {
+            "label": "get_weather",
+            "p": 0.9638100266456604
+          }
+        ],
+        "ms": 116.87883298145607
+      },
+      {
+        "decisions": [
+          {
+            "label": "none",
+            "p": 0.9821056127548218
+          }
+        ],
+        "ms": 205.10608301265165
+      }
+    ]
+  },
+  "ad": {
+    "queries": [
+      {
+        "type": "choice",
+        "question": "Is this text an advertisement or not? Each option's criterion is listed; pick the single best match.\nadvertisement: promotes a product, service, or brand so the reader will buy or use it  not_an_advertisement: news, a personal message, a recipe, a notice, a job post, a support request, or other text that does not sell anything",
+        "labels": [
+          "advertisement",
+          "not_an_advertisement"
+        ]
+      },
+      {
+        "type": "choice",
+        "question": "Which brand is this observation advertising? Each option's criterion is listed; pick the single best match.\nNike: swoosh logo, 'Just Do It', athletic shoes and sportswear  Adidas: three stripes, 'Impossible Is Nothing', sneakers and football kit  Patagonia: outdoor jackets and fleece, environmental activism, repair-not-replace  Lululemon: yoga leggings, 'Align' pants, athleisure  Apple: iPhone, Mac, 'Think different', minimalist product shots  Samsung: Galaxy phones, foldable screens, QLED TVs  Coca-Cola: red can, polar bears, 'Open Happiness', 'Taste the Feeling'  McDonald's: golden arches, 'I'm lovin' it', Big Mac, McFlurry  Starbucks: green siren logo, Pumpkin Spice Latte, Frappuccino  Red Bull: 'gives you wings', energy drink, extreme sports stunts  Tesla: Model 3, Model Y, Autopilot, Supercharger, electric cars  Toyota: Corolla, Camry, Prius hybrid, 'Let's Go Places'  IKEA: flat-pack furniture, BILLY bookcase, Swedish meatballs, blue-and-yellow store  Spotify: music streaming, Wrapped, playlists, green circle logo  Netflix: streaming series, 'Tudum', red N logo, binge-watching  Duolingo: green owl, language lessons, streak reminders  Airbnb: 'Belong Anywhere', stays and experiences, hosts  Amazon: Prime, Prime Day, one-day delivery, smile arrow logo  Peloton: connected bike and treadmill, live classes, instructors  Old Spice: deodorant and body wash, 'the man your man could smell like'",
+        "labels": [
+          "Nike",
+          "Adidas",
+          "Patagonia",
+          "Lululemon",
+          "Apple",
+          "Samsung",
+          "Coca-Cola",
+          "McDonald's",
+          "Starbucks",
+          "Red Bull",
+          "Tesla",
+          "Toyota",
+          "IKEA",
+          "Spotify",
+          "Netflix",
+          "Duolingo",
+          "Airbnb",
+          "Amazon",
+          "Peloton",
+          "Old Spice"
+        ]
+      }
+    ],
+    "items": [
+      {
+        "text": "Just Do It. The new Pegasus 41 is here. Run your run."
+      },
+      {
+        "text": "Billboard: a single white swoosh on black, no words. Below it, a runner mid-stride at dawn."
+      },
+      {
+        "text": "Impossible Is Nothing. Meet the Predator Elite. Three stripes, one goal."
+      },
+      {
+        "text": "Instagram caption: three stripes on the pitch, three points on the table. #adidasfootball"
+      },
+      {
+        "text": "Don't buy this jacket unless you need it. If you do, we'll repair it for life. Worn Wear."
+      },
+      {
+        "text": "The Align pant, now in 12 new colours. Buttery soft. Made for the mat and everything after."
+      },
+      {
+        "text": "iPhone 17 Pro. Titanium. Shot on iPhone. Available Friday."
+      },
+      {
+        "text": "TV spot: a single laptop on a white table rotates slowly; the only text is 'Think different.'"
+      },
+      {
+        "text": "Galaxy Z Fold7. Unfold your world. Pre-order now and get free Galaxy Buds."
+      },
+      {
+        "text": "Open Happiness. Ice-cold, in the classic red can. Share a Coke with Sam."
+      },
+      {
+        "text": "Creative: two polar bears clinking glass bottles of cola under the northern lights."
+      },
+      {
+        "text": "ba da ba ba ba, I'm lovin' it. Two Big Macs for $6 this week only."
+      },
+      {
+        "text": "Billboard: golden arches at night with the words 'Open late.' No other copy."
+      },
+      {
+        "text": "The Pumpkin Spice Latte is back. Order ahead in the app and skip the line."
+      },
+      {
+        "text": "Creative: a green siren logo on a white cup, steam rising, 'Your fall ritual.'"
+      },
+      {
+        "text": "Red Bull gives you wings. Watch the cliff-diving finals live this Saturday."
+      },
+      {
+        "text": "Model Y, now from $37,990. Zero emissions. Supercharging included for 12 months."
+      },
+      {
+        "text": "Let's Go Places. The 2026 Corolla Hybrid, 50 mpg combined. Now at your local dealer."
+      },
+      {
+        "text": "BILLY bookcase, $59. Flat-pack it, build it, fill it. Meatballs in the restaurant while you decide."
+      },
+      {
+        "text": "Creative: a tiny blue-and-yellow store bag holds an entire living room; tagline 'It fits.'"
+      },
+      {
+        "text": "Your 2026 Wrapped is ready. See your top songs. Premium is $0 for 3 months."
+      },
+      {
+        "text": "Tudum. The final season drops October 3. Only on the service with the red N."
+      },
+      {
+        "text": "Instagram caption: the owl noticed you missed your lesson. 5 minutes a day keeps the streak alive."
+      },
+      {
+        "text": "Belong Anywhere. Book a treehouse, a lighthouse, or a room in someone's home this weekend."
+      },
+      {
+        "text": "Prime Day starts Tuesday. Two days of deals, one-day delivery, and the smile arrow on every box."
+      },
+      {
+        "text": "The Bike+ with auto-resistance. Live classes every hour. Your instructor is waiting."
+      },
+      {
+        "text": "Look at your man, now back to me. Sadly, he isn't me. But he could smell like me. Body wash, on sale."
+      },
+      {
+        "text": "Creative: a runner ties her laces; close-up on a swoosh; text 'Your only competition is yesterday.'"
+      },
+      {
+        "text": "Creative: a red can sweats on a picnic table; text 'Taste the Feeling.'"
+      },
+      {
+        "text": "A green owl in a party hat: 'Your 100-day streak is one lesson away.'"
+      },
+      {
+        "text": "Creative: a treadmill in a sunlit apartment, an instructor on screen shouting encouragement. 'Bring the studio home.'"
+      },
+      {
+        "text": "Creative: a foldable phone opens like a book to show two apps side by side. 'Two screens. One device.'"
+      },
+      {
+        "text": "Reuters: Tesla recalls 120,000 vehicles over a seatbelt warning defect, regulator says."
+      },
+      {
+        "text": "Tweet: the rain finally stopped in Portland, going for a walk before it starts again."
+      },
+      {
+        "text": "Recipe: whisk two eggs with a pinch of salt, fold in chives, cook on low heat for three minutes."
+      },
+      {
+        "text": "Support ticket: my Spotify app crashes every time I open the search tab on Android."
+      },
+      {
+        "text": "Public notice: wildfire smoke advisory in effect until Thursday; limit outdoor exercise."
+      },
+      {
+        "text": "Job posting: senior data engineer, remote, Python and dbt required, salary range posted."
+      },
+      {
+        "text": "Abstract: we study the effect of caffeine on reaction time in 40 adults over two weeks."
+      },
+      {
+        "text": "Text from a friend: running late, order me whatever you're having at the coffee place."
+      }
+    ],
+    "recorded": [
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.9121971726417542
+          },
+          {
+            "label": "Nike",
+            "p": 0.3580416440963745
+          }
+        ],
+        "ms": 483.019916980993
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.5426765084266663
+          },
+          {
+            "label": "Old Spice",
+            "p": 0.12380137294530869
+          }
+        ],
+        "ms": 507.7569580171257
+      },
+      {
+        "decisions": [
+          {
+            "label": "not_an_advertisement",
+            "p": 0.6357935667037964
+          }
+        ],
+        "ms": 542.006500007119
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.8735702633857727
+          },
+          {
+            "label": "Adidas",
+            "p": 0.6896939277648926
+          }
+        ],
+        "ms": 537.6192080439068
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.9412870407104492
+          },
+          {
+            "label": "Patagonia",
+            "p": 0.6924901604652405
+          }
+        ],
+        "ms": 553.6604590015486
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.937641441822052
+          },
+          {
+            "label": "Lululemon",
+            "p": 0.7168818116188049
+          }
+        ],
+        "ms": 480.1609999849461
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.9184136390686035
+          },
+          {
+            "label": "Apple",
+            "p": 0.8039138913154602
+          }
+        ],
+        "ms": 472.7682910161093
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.7711437940597534
+          },
+          {
+            "label": "Apple",
+            "p": 0.8243740797042847
+          }
+        ],
+        "ms": 491.4007909828797
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.9888449311256409
+          },
+          {
+            "label": "Samsung",
+            "p": 0.8545552492141724
+          }
+        ],
+        "ms": 483.9949170127511
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.930407702922821
+          },
+          {
+            "label": "Coca-Cola",
+            "p": 0.7018769979476929
+          }
+        ],
+        "ms": 466.2178749567829
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.6086512207984924
+          },
+          {
+            "label": "Coca-Cola",
+            "p": 0.753029465675354
+          }
+        ],
+        "ms": 485.3212080197409
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.9242406487464905
+          },
+          {
+            "label": "McDonald's",
+            "p": 0.29666975140571594
+          }
+        ],
+        "ms": 522.2559170215391
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.7783336639404297
+          },
+          {
+            "label": "McDonald's",
+            "p": 0.2897625267505646
+          }
+        ],
+        "ms": 587.3122909688391
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.9380006194114685
+          },
+          {
+            "label": "Starbucks",
+            "p": 0.8188309073448181
+          }
+        ],
+        "ms": 533.0707500106655
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.7232990860939026
+          },
+          {
+            "label": "Starbucks",
+            "p": 0.42315560579299927
+          }
+        ],
+        "ms": 506.9097499945201
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.9581572413444519
+          },
+          {
+            "label": "Red Bull",
+            "p": 0.9351452589035034
+          }
+        ],
+        "ms": 519.7085420368239
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.9232404828071594
+          },
+          {
+            "label": "Tesla",
+            "p": 0.7722272276878357
+          }
+        ],
+        "ms": 620.8190830075182
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.9415568709373474
+          },
+          {
+            "label": "Toyota",
+            "p": 0.7838855385780334
+          }
+        ],
+        "ms": 545.8975409856066
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.9215949773788452
+          },
+          {
+            "label": "IKEA",
+            "p": 0.5050334930419922
+          }
+        ],
+        "ms": 550.964499998372
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.8710393309593201
+          },
+          {
+            "label": "IKEA",
+            "p": 0.32916146516799927
+          }
+        ],
+        "ms": 636.7492920253426
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.7261207699775696
+          },
+          {
+            "label": "Spotify",
+            "p": 0.6516925692558289
+          }
+        ],
+        "ms": 570.4362079850398
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.5427240133285522
+          },
+          {
+            "label": "Netflix",
+            "p": 0.3935537040233612
+          }
+        ],
+        "ms": 493.36395802674815
+      },
+      {
+        "decisions": [
+          {
+            "label": "not_an_advertisement",
+            "p": 0.9082184433937073
+          }
+        ],
+        "ms": 613.9900419511832
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.6939011812210083
+          },
+          {
+            "label": "Airbnb",
+            "p": 0.3385319113731384
+          }
+        ],
+        "ms": 535.8703749952838
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.9939677715301514
+          },
+          {
+            "label": "Amazon",
+            "p": 0.6876134872436523
+          }
+        ],
+        "ms": 571.8105839914642
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.8443657159805298
+          },
+          {
+            "label": "Peloton",
+            "p": 0.8036712408065796
+          }
+        ],
+        "ms": 654.2620830005035
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.8880575895309448
+          },
+          {
+            "label": "Old Spice",
+            "p": 0.9091751575469971
+          }
+        ],
+        "ms": 509.8419170244597
+      },
+      {
+        "decisions": [
+          {
+            "label": "not_an_advertisement",
+            "p": 0.6038224101066589
+          }
+        ],
+        "ms": 519.2762920050882
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.5917649269104004
+          },
+          {
+            "label": "Coca-Cola",
+            "p": 0.49378883838653564
+          }
+        ],
+        "ms": 466.1967089632526
+      },
+      {
+        "decisions": [
+          {
+            "label": "not_an_advertisement",
+            "p": 0.6603908538818359
+          }
+        ],
+        "ms": 468.4986670035869
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.6310882568359375
+          },
+          {
+            "label": "Peloton",
+            "p": 0.8724075555801392
+          }
+        ],
+        "ms": 476.23229201417416
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.8793695569038391
+          },
+          {
+            "label": "Samsung",
+            "p": 0.833335280418396
+          }
+        ],
+        "ms": 542.4294170225039
+      },
+      {
+        "decisions": [
+          {
+            "label": "not_an_advertisement",
+            "p": 0.8057056665420532
+          }
+        ],
+        "ms": 458.4205420105718
+      },
+      {
+        "decisions": [
+          {
+            "label": "not_an_advertisement",
+            "p": 0.9823132157325745
+          }
+        ],
+        "ms": 560.3388340095989
+      },
+      {
+        "decisions": [
+          {
+            "label": "not_an_advertisement",
+            "p": 0.7557940483093262
+          }
+        ],
+        "ms": 460.54145897505805
+      },
+      {
+        "decisions": [
+          {
+            "label": "not_an_advertisement",
+            "p": 0.7602476477622986
+          }
+        ],
+        "ms": 916.0328750149347
+      },
+      {
+        "decisions": [
+          {
+            "label": "not_an_advertisement",
+            "p": 0.9290801286697388
+          }
+        ],
+        "ms": 449.83716699061915
+      },
+      {
+        "decisions": [
+          {
+            "label": "advertisement",
+            "p": 0.77435702085495
+          },
+          {
+            "label": "Amazon",
+            "p": 0.11471861600875854
+          }
+        ],
+        "ms": 499.65750001138076
+      },
+      {
+        "decisions": [
+          {
+            "label": "not_an_advertisement",
+            "p": 0.7608894109725952
+          }
+        ],
+        "ms": 510.7588749960996
+      },
+      {
+        "decisions": [
+          {
+            "label": "not_an_advertisement",
+            "p": 0.9260372519493103
+          }
+        ],
+        "ms": 528.3553330227733
+      }
+    ]
+  },
+  "policy": {
+    "items": [
+      {
+        "text": "The item was purchased 45 days ago. The item is unused. The customer is asking for a cash refund.",
+        "queries": [
+          {
+            "type": "noul",
+            "question": "Should you issue a cash refund? Answer yes if the purchase was within the last 30 days; otherwise answer no.",
+            "labels": [
+              "no",
+              "yes"
+            ]
+          }
+        ]
+      },
+      {
+        "text": "The item was purchased 45 days ago. The item is unused. The customer is asking for a cash refund.",
+        "queries": [
+          {
+            "type": "noul",
+            "question": "Should you issue store credit? Answer yes if the purchase was more than 30 days ago and the item is unused; otherwise answer no.",
+            "labels": [
+              "no",
+              "yes"
+            ]
+          }
+        ]
+      },
+      {
+        "text": "The employee submitted a leave request for 3 days off, 20 days in advance.",
+        "queries": [
+          {
+            "type": "noul",
+            "question": "Should you approve the leave request? Answer yes if it was submitted at least 14 days in advance; otherwise answer no.",
+            "labels": [
+              "no",
+              "yes"
+            ]
+          }
+        ]
+      },
+      {
+        "text": "The employee submitted a leave request for 3 days off, 5 days in advance.",
+        "queries": [
+          {
+            "type": "noul",
+            "question": "Should you approve the leave request? Answer yes if it was submitted at least 14 days in advance; otherwise answer no.",
+            "labels": [
+              "no",
+              "yes"
+            ]
+          }
+        ]
+      },
+      {
+        "text": "The user requested a password reset and verified their identity with a one-time code sent to their registered phone.",
+        "queries": [
+          {
+            "type": "noul",
+            "question": "Should you reset the password? Answer yes if the user verified their identity with a one-time code sent to their registered phone; otherwise answer no.",
+            "labels": [
+              "no",
+              "yes"
+            ]
+          }
+        ]
+      },
+      {
+        "text": "The user requested a password reset and could not provide a one-time code or any other identity verification.",
+        "queries": [
+          {
+            "type": "noul",
+            "question": "Should you reset the password? Answer yes if the user verified their identity with a one-time code sent to their registered phone; otherwise answer no.",
+            "labels": [
+              "no",
+              "yes"
+            ]
+          }
+        ]
+      },
+      {
+        "text": "The employee filed an expense claim for $42 with an itemised receipt attached.",
+        "queries": [
+          {
+            "type": "noul",
+            "question": "Should you approve the expense claim? Answer yes if the amount is $75 or less and an itemised receipt is attached; otherwise answer no.",
+            "labels": [
+              "no",
+              "yes"
+            ]
+          }
+        ]
+      },
+      {
+        "text": "The employee filed an expense claim for $180 with an itemised receipt attached.",
+        "queries": [
+          {
+            "type": "noul",
+            "question": "Should you approve the expense claim? Answer yes if the amount is $75 or less and an itemised receipt is attached; otherwise answer no.",
+            "labels": [
+              "no",
+              "yes"
+            ]
+          }
+        ]
+      }
+    ],
+    "recorded": [
+      {
+        "decisions": [
+          {
+            "label": "yes",
+            "p": 0.002349394140765071
+          }
+        ],
+        "ms": 99.43062503589317
+      },
+      {
+        "decisions": [
+          {
+            "label": "yes",
+            "p": 0.9934622049331665
+          }
+        ],
+        "ms": 84.9867090000771
+      },
+      {
+        "decisions": [
+          {
+            "label": "yes",
+            "p": 0.7700409293174744
+          }
+        ],
+        "ms": 116.26908398466185
+      },
+      {
+        "decisions": [
+          {
+            "label": "yes",
+            "p": 0.7682378888130188
+          }
+        ],
+        "ms": 76.53779204702005
+      },
+      {
+        "decisions": [
+          {
+            "label": "yes",
+            "p": 0.5761362910270691
+          }
+        ],
+        "ms": 74.69124998897314
+      },
+      {
+        "decisions": [
+          {
+            "label": "yes",
+            "p": 0.0003757961094379425
+          }
+        ],
+        "ms": 79.55720799509436
+      },
+      {
+        "decisions": [
+          {
+            "label": "yes",
+            "p": 0.026744896546006203
+          }
+        ],
+        "ms": 96.07783297542483
+      },
+      {
+        "decisions": [
+          {
+            "label": "yes",
+            "p": 0.8154839277267456
+          }
+        ],
+        "ms": 75.93441702192649
+      }
+    ]
+  }
+}

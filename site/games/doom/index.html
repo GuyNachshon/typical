@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DOOM (Chocolate Doom / WASM) — Typical harness</title>
+<style>
+  body { background:#111; color:#ddd; font:12px/1.4 ui-monospace, monospace; margin:0; padding:12px; }
+  canvas { display:block; width:640px; height:400px; background:#000; }
+  pre { white-space:pre-wrap; max-width:640px; }
+  body.film { padding:0; overflow:hidden; background:#000; }
+  /* film: scale the 4:3 frame to the viewport width and centre the 3D viewport (top 84% of the frame); the status bar falls below the fold */
+  body.film canvas { width:100vw; height:75vw; margin-top: calc((100vh - 63vw) / 2); image-rendering:pixelated; }
+  body.film pre { display:none; }
+  @media (max-aspect-ratio: 1/1) { body.film canvas { width:133.4vh; height:100vh; margin-top:0; margin-left:calc((100vw - 133.4vh) / 2); } }
+</style>
+</head>
+<body>
+<script>if (location.search.includes('film')) document.body.classList.add('film');
+// The page draws an ASCII layer over this canvas (js/ascii.js) by sampling it with drawImage.
+// SDL asks for a WebGL context without preserveDrawingBuffer, so the buffer is empty by the time
+// anyone outside the draw call reads it. Force the flag on before the wasm boots; at 640x400 the
+// cost is not measurable next to the software renderer itself.
+(function () {
+  const get = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (type, attrs) {
+    if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+      attrs = Object.assign({}, attrs, { preserveDrawingBuffer: true });
+    }
+    return get.call(this, type, attrs);
+  };
+})();</script>
+<canvas id="canvas" width="640" height="400" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+<pre id="state">booting…</pre>
+<script>
+// Chocolate Doom key codes (src/doomkeys.h) for the default bindings (src/m_controls.c).
+const KEYS = {
+  forward: 0xad, back: 0xaf, left: 0xac, right: 0xae,
+  strafeleft: 44, straferight: 46,
+  fire: 0x80 + 0x1d, use: 32, run: 0x80 + 0x36,
+  enter: 13, escape: 27, y: 121, n: 110, equals: 61,
+  '1': 49, '2': 50, '3': 51, '4': 52, '5': 53, '6': 54, '7': 55,
+};
+const held = {};
+window.Doom = {
+  KEYS,
+  ready: false,
+  state() {
+    if (!Doom.ready) return { in_level: false, booting: true };
+    return JSON.parse(Module.UTF8ToString(Module._typical_state_json()));
+  },
+  key(key, down) {
+    const code = typeof key === 'number' ? key : KEYS[key];
+    if (code == null) throw new Error('unknown key ' + key);
+    Module._typical_input(code, down ? 1 : 0);
+    held[code] = !!down;
+  },
+  // Hold a key for ms, then release. Resolves after release.
+  press(key, ms = 100) {
+    Doom.key(key, true);
+    return new Promise(r => setTimeout(() => { Doom.key(key, false); r(); }, ms));
+  },
+  // Closed-loop turn: hold left/right until the view has turned `deg` degrees (or maxMs). Fixed
+  // hold times are useless here - the wasm build runs ~18 tics/s headless, presses under ~150ms
+  // are dropped, and a 180ms press is ~20 degrees, so aiming into an 8-degree crosshair needs
+  // the angle read back. Resolves with the actual delta.
+  async turnBy(key, deg, maxMs = 1500) {
+    const norm = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
+    const a0 = Doom.state().angle;
+    const t0 = performance.now();
+    Doom.key(key, true);
+    while (Math.abs(norm(Doom.state().angle - a0)) < deg && performance.now() - t0 < maxMs) await new Promise(r => setTimeout(r, 8));
+    Doom.key(key, false);
+    await new Promise(r => setTimeout(r, 60));
+    return norm(Doom.state().angle - a0);
+  },
+  // skill 1..5 as in the menu; loads E1M1 on the next game tic.
+  newGame(skill = 3) {
+    Module._typical_new_game(skill - 1);
+    // Hold the attract sequence off for good: the engine was swapping our level for demo2 (E1M5)
+    // about ten seconds in, which looked like the hero restarting itself.
+    if (Module._typical_lock_demo) Module._typical_lock_demo(1);
+  },
+  lockDemo(on = true) { if (Module._typical_lock_demo) Module._typical_lock_demo(on ? 1 : 0); },
+  releaseAll() { for (const c in held) if (held[c]) Doom.key(+c, false); },
+};
+
+var Module = {
+  // -nosound mutes everything; E1M1 is started from JS via typical_new_game once the title loop is up.
+  arguments: ['-iwad', 'doom1.wad', '-window', '-nogui', '-nosound', '-nomusic', '-nomouse'],
+  preRun: [() => { Module.FS.createPreloadedFile('', 'doom1.wad', 'doom1.wad', true, true); }],
+  onRuntimeInitialized() {
+    Doom.ready = true;
+    // The page starts the level (js/shell.js), and it is the only thing that may: when this
+    // harness also auto-started one, the two starts raced and the engine dropped back to its
+    // attract screen a second later, mid-hero.
+    Doom.autoStart = false;
+    // film mode: enlarge the view to full screen (Doom's '=' key, KEY_EQUALS = 61) so the bezel goes away
+    if (document.body.classList.contains('film')) [3200, 3700, 4200].forEach((t) => setTimeout(() => Doom.press(61, 120), t));
+  },
+  canvas: document.getElementById('canvas'),
+  print: t => console.log(t),
+  printErr: t => console.error(t),
+};
+setInterval(() => {
+  try { document.getElementById('state').textContent = JSON.stringify(Doom.state(), null, 1); }
+  catch (e) { document.getElementById('state').textContent = String(e); }
+}, 250);
+</script>
+<script src="websockets-doom.js"></script>
+</body>
+</html>

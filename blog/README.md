@@ -20,16 +20,18 @@ Check the cited section before changing a number, not just the number.
 
 This is the part that goes stale first, so read it before editing.
 
-- **The GitHub repo is private.** The only public artefacts are the Hugging Face model repos
-  (`OzLabs/typical-small`, `OzLabs/typical-medium`, `OzLabs/typical-small-preview`), which ship the
-  weights, the self-contained `inference/` package, and the eval artefacts. Neither post links
-  `REPORT.md`, `RESULTS.md` or `COMPARE.md` as if a reader could open them; the deep dive cites
-  report section numbers as provenance and says up front that the report publishes with the
-  training code. Do not reintroduce relative links out of `blog/`.
-- **There is no `pip install typical`.** PyPI `typical` is an unrelated package (Sean Stewart's
-  typing toolkit). The install flow in the launch post is the real one: download the model repo,
-  install `inference/requirements.txt`, put `inference/` on `sys.path`. The posts state plainly
-  that a packaged install does not exist yet. See the open naming question below.
+- **The GitHub repo is public as of 2026-09-23** (`github.com/GuyNachshon/typical`, all branches
+  consolidated into `main`), alongside the Hugging Face model repos (`OzLabs/typical-small`,
+  `OzLabs/typical-medium`, `OzLabs/typical-small-preview`). Both posts were written while it was
+  private, so they cite report section numbers as provenance rather than linking them, and they
+  never assume a reader can open `REPORT.md`. That is now conservative rather than required — but
+  the posts render outside this tree, so any link you add must be an absolute URL, never a
+  relative link out of `blog/`.
+- **The package is `typical-ai`, imported as `typical_ai`.** Verified live on PyPI at 0.1.0,
+  Apache-2.0, Python >= 3.11. The bare `typical` on PyPI is an unrelated typing toolkit (Sean
+  Stewart's) and taking that name would break anyone who has both, so do not write
+  `pip install typical` anywhere. The source-checkout flow (`inference/requirements.txt`,
+  `inference/` on `sys.path`) still works and is the fallback, not the headline.
 - **Licensing.** Both released checkpoints are Apache-2.0 over Apache-2.0 Qwen3 base models, and
   the posts say so. The headline claim is "open weights and inference code today, recipe
   documented, training code coming", because two portions of `data_u`
@@ -47,6 +49,24 @@ This is the part that goes stale first, so read it before editing.
   **+.111 at a second seed**. Render mismatch is a *separate* real effect (23 points, .842 → .615
   onto the .612 floor) and does not explain the truncation effect away. Do not reintroduce the
   "null result" framing.
+- **Watch the 605 vs 330 distinction.** On all 605 held-out long-state items the facts-last arm goes
+  .830 (matched) → .640 (mismatched). The .842 → .615 pair, and the .612 majority floor, are the
+  K = 2 `policy_permit` subset, n = 330. Earlier drafts of both the deep dive and this README
+  attached the subset numbers to "605 items". Do not reintroduce that.
+
+- **Use the paired test on JevBench, never overlapping marginal intervals.** Both posts previously
+  wrote "the intervals overlap, so we won't claim the frozen model wins." That is the test the
+  paper explicitly warns against (Table `tab:tl1b` caption): marginal intervals over the same 111
+  items should not be differenced by eye. The paired cluster bootstrap gives frozen minus `tl1b`
+  = **+.108 [+.027, +.189], p = .015** on hard, +.081 [−.009, +.171], p = .082 against
+  `tl1b_nokd`, and −.111 [−.250, +.014], p = .10 on standard. State it at that resolution.
+
+- **The frozen 14B leads on the serial families, so "missing data coverage" is not the whole
+  story.** Per-family hard, frozen vs `tl1b`: tradeoff .500/.167, long_policy .421/.158,
+  ambiguous .714/.429, probability .500/.300, temporal_numeric .333/.200; `tl1b` leads only on
+  multi_hop (.611/.444). Earlier drafts said the frozen model "does no better on these specific
+  families either", which its own figure data contradicts. Missing coverage explains why training
+  did not add the behaviour; it does not explain why training appears to have removed it.
 - **Do not say KD contributed nothing.** The matched `--distill_beta 0` control (`tl1b_nokd`) came
   out slightly ahead on hard (.477 vs .450), long-policy (.211 vs .158), standard Brier (.127 vs
   .175) and val NLL (0.410 vs 0.438), but the cluster-bootstrapped hard-tier intervals overlap
@@ -112,13 +132,13 @@ cleanly to the usual targets:
    straight to HF model cards. Don't trim those links to make it more "marketing"; the promise of
    both posts is that every claim is checkable.
 
-## Open question for a human
+## Settled: the package name
 
-Our inference package is imported as `from typical import Typical`, and PyPI `typical` v2.9.0 is
-an established, unrelated package. A future `pip` release needs either a different distribution
-name (with the import name possibly following) or a conversation with that project's maintainer.
-Both posts avoid the collision by shipping the package inside the model repos, so nothing is
-blocked, but it needs deciding before any packaged install ships.
+This was the open question here until 2026-09-23. PyPI `typical` v2.9.0 is an established,
+unrelated typing toolkit, so the distribution shipped as **`typical-ai`** and the import name
+followed it to **`typical_ai`** — taking the bare name would have broken anyone who had both.
+0.1.0 is live, Apache-2.0, Python >= 3.11. The package still ships inside each model repo for
+anyone who would rather vendor it.
 
 ## Updating them later
 

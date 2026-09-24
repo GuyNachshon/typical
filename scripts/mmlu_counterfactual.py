@@ -19,7 +19,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from data import write_jsonl  # same state-length filter / writer convention as data.py/mmlu_pro_eval.py
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
+from data import write_jsonl  # same state-length filter / writer convention as pcdm/data.py/mmlu_pro_eval.py
 
 TASK = "mmlu_cf"
 

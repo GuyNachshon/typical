@@ -1,0 +1,250 @@
+/* exhibits.css — layout for the demo modules (js/demos/{sql,doc-20,rules,tryit,ads,compaction}.js)
+   and the game chrome (js/games/loop.js), on the v11 "robot workshop at dusk" lane
+   (designs/AGILITY_DESIGN.md). Reads --color-* / --font-* / --radius-* / --text-* straight off
+   style.css's :root (Tailwind's @theme resolves them at compute time, so load order doesn't
+   matter, but this file is still linked after style.css). No card shell inside .exrow-body
+   (that's the one white 12px panel already), no radii beyond the system's 6/12px, no shadows.
+   Every probability display is a bars() row (js/bars.js) — same primitive as the rest of the
+   page — sized compact where a register needs many of them (SQL, DOC-20, the rules table). */
+
+.exhibit { display: flex; flex-direction: column; gap: 16px; color: var(--color-off); }
+.exhibit, .exhibit * { box-sizing: border-box; text-wrap: pretty; }
+
+/* tag — equipment-label badge, mirrors .tag (style.css) exactly; used ad hoc (e.g. rules' FLIP
+   mark) so it isn't duplicated here — see js/demos/rules.js. */
+
+/* ghost text link — no box chrome, underline on hover (not a filled/bordered control) */
+.ex-ghost {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-off);
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+.ex-ghost:hover, .ex-ghost[aria-pressed='true'] { text-decoration: underline; text-underline-offset: 3px; }
+.ex-ghost:disabled { color: var(--color-mid); cursor: default; text-decoration: none; }
+
+.ex-chip-row { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+
+/* running commentary line under a register / small explanatory footer */
+.ex-caption { font-size: 13px; line-height: 1.5; color: var(--color-mid); margin: 0; max-width: 70ch; }
+
+/* details/summary "read the handbook" disclosure */
+.ex-details summary { font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-off); cursor: pointer; }
+.ex-details summary:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ex-details pre { font-family: var(--font-mono); font-size: 12px; line-height: 1.6; color: var(--color-mid); white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0 0; }
+
+/* big numeral pair (DOC-20 timing) */
+.ex-stat-row { display: flex; gap: 32px; }
+.ex-stat { display: flex; flex-direction: column; gap: 4px; }
+.ex-stat-num { font-family: var(--font-sans); font-weight: 400; font-size: 40px; letter-spacing: -1.4px; line-height: 1; color: var(--color-off); font-variant-numeric: tabular-nums; }
+
+/* hairline table (RULES 6x2 outcomes) — same recipe as .register (style.css) */
+.ex-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-variant-numeric: tabular-nums; }
+.ex-table th { text-align: left; font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.72px; text-transform: uppercase; color: var(--color-mid); border-bottom: 1px solid var(--color-off); padding: 10px 10px 10px 0; }
+.ex-table td { font-size: 14px; color: var(--color-off); border-bottom: 1px solid var(--color-steel); padding: 10px 10px 10px 0; vertical-align: top; overflow-wrap: break-word; }
+.ex-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.ex-cell-word { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+
+/* ================================================================================
+   SQL / DOC-20 / RULES — thin layout wrappers only, no card chrome. Every probability row
+   here is a real bars() mount (js/bars.js), one candidate wide, restyled compact below.
+   ================================================================================ */
+.sql-query { font-family: var(--font-mono); font-size: 13px; color: var(--color-mid); margin: 0; overflow-wrap: break-word; }
+.sql-query .cond { color: var(--color-off); font-weight: 700; }
+.sql-register { display: flex; flex-direction: column; }
+.doc20-register { display: flex; flex-direction: column; }
+
+/* compact register bars: label gets the room (full ticket text / question text), the track and
+   value shrink to a fixed width, and each row reads as a hairline (steel rule), 14px. */
+.sql-register .bar, .doc20-register .bar {
+  grid-template-columns: 1fr 72px 38px;
+  gap: 10px;
+  font-size: 14px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--color-steel);
+}
+.sql-register .bar:last-child, .doc20-register .bar:last-child { border-bottom: none; }
+
+.rules-panel1 { display: grid; grid-template-columns: 1fr; gap: 24px; }
+@media (min-width: 480px) { .rules-panel1 { grid-template-columns: 1fr 1fr; } }
+.rules-facts { list-style: none; padding: 0; margin: 0; counter-reset: fact; display: flex; flex-direction: column; }
+.rules-facts li { counter-increment: fact; font-size: 14px; color: var(--color-off); padding: 7px 0; border-bottom: 1px solid var(--color-steel); }
+.rules-facts li:last-child { border-bottom: none; }
+.rules-facts li::before { content: counter(fact) '. '; color: var(--color-mid); }
+
+.rules-order-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--color-steel); }
+.rules-order-row:last-child { border-bottom: none; }
+.rules-order-text { flex: 1 1 auto; font-size: 14px; color: var(--color-off); }
+.rules-order-btns { display: flex; gap: 8px; flex: none; }
+.rules-order-btns .ex-ghost { font-size: 14px; }
+.rules-live-bars { margin-bottom: 8px; }
+.rules-applicant { font-size: 13px; color: var(--color-off); }
+
+/* rules panel2 table cells: label already shown as .ex-cell-word above the bar, so the bar
+   itself drops its label column and shows only the track + value, tight enough for a cell. */
+.rules-cell-bar .bar { grid-template-columns: 1fr 34px; gap: 6px; }
+.rules-cell-bar .bar .label { display: none; }
+
+/* ================================================================================
+   TRY IT (js/demos/tryit.js)
+   ================================================================================ */
+.tryit-exhibit { width: 100%; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.tryit-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  background: var(--color-white);
+  border: 1px solid var(--color-steel);
+  border-radius: var(--radius-btn);
+  color: var(--color-off);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  padding: 10px 12px;
+  margin: 2px 0 14px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.tryit-textarea { resize: none; line-height: 1.5; overflow: hidden; }
+.tryit-input:focus-visible { outline: none; border-color: var(--color-off); }
+.tryit-type-row { margin-bottom: 14px; }
+.tryit-action-row { display: flex; align-items: center; gap: 20px; margin-bottom: 14px; }
+.tryit-bars:empty { display: none; }
+.tryit-notice { font-size: 13px; color: var(--color-mid); margin: 0; }
+
+/* ================================================================================
+   game chrome (js/games/loop.js) — canvas fills the .media-scene box; HUD top-right; decision
+   strip + sentence bottom-left over a scrim; hint + MODEL/RESTART bottom-right. Everything is
+   absolutely positioned inside .gc-root (itself already absolute-inset via .media-scene > *,
+   style.css), clipped by .media's own overflow:hidden — nothing scrolls, nothing escapes.
+   ================================================================================ */
+.gc-root { overflow: hidden; outline: none; }
+.gc-root:focus { outline: none; }
+.gc-root:focus .gc-stage { outline: 1px solid var(--color-steel); outline-offset: -1px; }
+
+.gc-stage { position: absolute; inset: 0; overflow: hidden; }
+.gc-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+.gc-hud {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 4;
+  max-width: 60%;
+  color: var(--color-warm);
+  text-align: right;
+  line-height: 1.6;
+  pointer-events: none;
+}
+.gc-hud div { margin-top: 2px; }
+/* under 48rem the panel's own .media-label sits top-left at the same height — drop the HUD below it */
+@media (max-width: 48rem) { .gc-hud { top: 46px; } }
+.gc-hud .gc-hint { font-weight: 400; text-transform: uppercase; }
+
+/* bottom-left: scrim (photographic overlay, not decorative — the readout needs a legible
+   surface over whatever the canvas is drawing) + decision bars + read sentence. */
+.gc-foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  max-width: min(520px, 58%);
+  padding: 44px 18px 16px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 75%);
+  pointer-events: none;
+}
+.gc-decision { display: grid; gap: 6px; margin-bottom: 8px; }
+.gc-decision .bar { grid-template-columns: minmax(64px, 130px) 1fr 38px; gap: 8px; font-size: 14px; }
+.gc-sentence {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgba(240, 238, 235, 0.75);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.gc-sentence + .gc-sentence { margin-top: 4px; -webkit-line-clamp: 1; }
+
+/* bottom-right: take-over hint + small outline controls */
+.gc-foot-top {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.gc-hint {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.36px;
+  text-transform: uppercase;
+  color: rgba(240, 238, 235, 0.55);
+  white-space: nowrap;
+}
+@media (max-width: 40rem) { .gc-hint { display: none; } }
+.gc-controls { display: flex; gap: 6px; flex: none; }
+.gc-controls .btn.outline { padding: 7px 10px; font-size: 10px; }
+.gc-controls .btn.outline.gc-on { background: var(--color-warm); color: var(--color-off); }
+
+/* A game strip ticks every 200-450ms; the 600ms page-wide fill transition would still be catching
+   up with the previous decision when the next one lands. */
+.gc-decision .bar .fill { transition-duration: 200ms; }
+
+/* Drive: the street and its instruments occupy separate, untransformed cells. */
+.media.dark:has(.gc-drive) { background: #292827; border-radius: 0; }
+.media:has(.gc-drive) > .media-label {
+  position: static; margin: 0; padding: 14px 18px; color: #c2bfba;
+  border-bottom: 1px solid #938f89; transform: none; clip-path: none;
+  line-height: 1.5; white-space: normal;
+}
+.media-scene:has(> .gc-drive) { min-height: 0; background: #292827; }
+.media-scene > .gc-drive {
+  position: relative; inset: auto; display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  overflow: visible; color: #f0eeeb; background: #292827;
+}
+.gc-drive .gc-stage { position: relative; inset: auto; min-height: 520px; }
+.gc-drive canvas { cursor: crosshair; touch-action: manipulation; }
+.gc-drive .drive-surface { pointer-events: none; }
+.gc-drive .drive-instruments {
+  display: flex; flex-direction: column; gap: 22px; min-width: 0;
+  padding: 22px; border-left: 1px solid #938f89;
+}
+.gc-drive .gc-hud, .gc-drive .gc-foot, .gc-drive .gc-foot-top,
+.gc-drive .gc-hazards-wrap {
+  position: static; inset: auto; width: auto; max-width: none;
+  padding: 0; margin: 0; background: none; transform: none; clip-path: none;
+  text-align: left; min-width: 0;
+}
+.gc-drive .gc-hud { color: #c2bfba; font-size: 10px; line-height: 1.8; }
+.gc-drive .gc-hud div { white-space: normal; overflow-wrap: anywhere; }
+.gc-drive .gc-hud div:first-child { color: #f0eeeb; margin-bottom: 12px; }
+.gc-drive .gc-foot { pointer-events: auto; }
+.gc-drive .gc-decision { gap: 9px; margin-bottom: 20px; }
+.gc-drive .gc-decision .bar { grid-template-columns: 122px minmax(0, 1fr) 32px; gap: 8px; font-size: 11px; }
+.gc-drive .bar .label { white-space: normal; overflow: visible; text-overflow: clip; }
+.gc-drive .gc-sentence {
+  display: block; overflow: visible; -webkit-line-clamp: unset;
+  color: #c2bfba; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere;
+}
+.gc-drive .gc-hazards-wrap { margin-top: auto; }
+.gc-drive .gc-hazards-label { color: #c2bfba; font: 10px/1.6 var(--font-mono, monospace); margin-bottom: 8px; }
+.gc-drive .gc-hazards, .gc-drive .gc-controls { display: flex; flex-wrap: wrap; gap: 6px; }
+.gc-drive .gc-btn { font-size: 10px; padding: 7px 10px; }
+.gc-drive .gc-btn:focus-visible { outline: 2px solid #f0eeeb; outline-offset: 3px; }
+@media (max-width: 48rem) {
+  .media-scene > .gc-drive { grid-template-columns: minmax(0, 1fr); }
+  .gc-drive .gc-stage { min-height: 320px; }
+  .gc-drive .drive-instruments { padding: 18px; gap: 18px; border-left: 0; border-top: 1px solid #938f89; }
+}

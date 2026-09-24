@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Typical works &mdash; reading a decision out of a language model</title>
+<meta name="description" content="The research behind Typical: a typed decision read from a pretrained language model in one pass, the control that says whether a model read the question at all, and what we could not fix.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Geist+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="exhibits.css">
+</head>
+<body class="post">
+<nav class="nav"><a class="brand" href="index.html">Typical</a><span class="links"><a href="index.html#field">Results</a><a href="index.html#watch">Demos</a><a href="research.html" aria-current="page">Research</a><a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">Weights</a></span><a class="cta" href="index.html#tryit">Try it live</a></nav>
+
+<header class="page masthead" id="top">
+  <h1>Typed decisions, read straight out of a language model</h1>
+  <p class="masthead-sub">How Typical works, what we measured, and the control that says whether a model read the question at all.</p>
+  <div class="masthead-meta t-mono">
+    <span>Guy Nachshon &middot; Oz Labs</span>
+    <span>24 September 2026</span>
+    <a href="paper.pdf">Paper (PDF)</a>
+    <a href="https://github.com/GuyNachshon/typical" target="_blank" rel="noopener">Source</a>
+    <a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">Weights</a>
+  </div>
+</header>
+
+<section class="page chapter" id="what">
+  <div class="claim">
+    <h2>A decision is not a sentence</h2>
+    <p>Software that routes a ticket or rates an alert wants one thing from a model: a probability for each option it already knows about, and a way to say that none of them fit. What it usually gets is a sentence, which it then has to parse.</p>
+    <p>Typical reads the probability out of a pretrained causal language model. The state is encoded once. Each question is a short suffix carrying its own candidates. A head partway up the stack scores the end of that suffix against each candidate. No token is sampled, and the answer is one of the options you passed or an explicit abstention, by construction.</p>
+    <p>This page is the paper with the proofs left in and the notation taken out. Every number on it is transcribed from that paper; the paper says where each one was measured.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="pass">
+  <div class="claim">
+    <h2>One pass, one state, many questions</h2>
+    <p>The state goes in once as an ordinary causal prefix and we keep its key-value cache. Every question after that is a short suffix: the question, the candidates rendered as lettered lines, and a terminal decision token. The suffix attends to the cached state; suffixes batched against one state do not attend to each other.</p>
+    <p>A decision is one forward pass over the state, the question and the candidates together. The expensive half comes from cache.</p>
+  </div>
+  <figure class="fig">
+    <div class="chart" id="chart-arch"></div>
+    <figcaption>The read path. Nothing is decoded.</figcaption>
+  </figure>
+</section>
+
+<section class="page chapter" id="formal">
+  <div class="claim">
+    <h2>The decision, written down</h2>
+    <p>A decision is a tuple: a state <em>S</em>, a question <em>Q</em>, a candidate set <em>C</em> supplied at request time, and a type. The model returns a probability for each candidate and one more for abstaining, and they sum to one.</p>
+  </div>
+  <div class="mathblock">
+    <math display="block"><mrow><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>j</mi></msub><mo>&#8739;</mo><mi>S</mi><mo>,</mo><mi>Q</mi><mo>,</mo><mi>C</mi><mo>)</mo><mo>,</mo><mspace width="1em"/><msub><mi>p</mi><mi>&#8709;</mi></msub><mo>+</mo><munder><mo>&#8721;</mo><mi>j</mi></munder><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>j</mi></msub><mo>)</mo><mo>=</mo><mn>1</mn></mrow></math>
+    <p class="mathnote t-mono">No token is sampled. C is text, supplied per call, so the model has no output index for any label and has to read the candidates to score them.</p>
+  </div>
+  <div class="claim">
+    <p>At the tap layer the pass gives a terminal decision state <em>h</em><sub>D</sub> and, for each candidate, a contextual state <em>h</em><sub>j</sub>: the mean hidden state over the tokens where that option was rendered. Both are projected, and the score is a bilinear form with a small learned correction on the elementwise product.</p>
+  </div>
+  <div class="mathblock">
+    <math display="block"><mrow><mi>u</mi><mo>=</mo><msub><mi>W</mi><mi>h</mi></msub><msub><mi>h</mi><mi>D</mi></msub><mo>,</mo><mspace width="1.4em"/><msub><mi>v</mi><mi>j</mi></msub><mo>=</mo><msub><mi>W</mi><mi>c</mi></msub><msub><mi>h</mi><mi>j</mi></msub><mo>,</mo><mspace width="1.4em"/><msub><mi>s</mi><mi>j</mi></msub><mo>=</mo><mfrac><mrow><msup><mi>u</mi><mo>&#8868;</mo></msup><msub><mi>v</mi><mi>j</mi></msub></mrow><msqrt><msub><mi>d</mi><mi>v</mi></msub></msqrt></mfrac><mo>+</mo><msup><mi>w</mi><mo>&#8868;</mo></msup><mo>(</mo><mi>u</mi><mo>&#8857;</mo><msub><mi>v</mi><mi>j</mi></msub><mo>)</mo><mo>+</mo><mi>g</mi><mo>(</mo><mi>u</mi><mo>&#8857;</mo><msub><mi>v</mi><mi>j</mi></msub><mo>)</mo></mrow></math>
+    <p class="mathnote t-mono">g is a two-layer MLP. The option letters stay in the rendered text and are never read out.</p>
+  </div>
+  <div class="claim">
+    <p>Abstention is a gate outside the candidate softmax, not a line in the list. It reads permutation-invariant statistics over the scores &mdash; maximum, top-two margin, mean, log-mean-exp &mdash; plus the projected decision state, and returns a single <em>r</em>.</p>
+  </div>
+  <div class="mathblock">
+    <math display="block"><mrow><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>j</mi></msub><mo>)</mo><mo>=</mo><mo>(</mo><mn>1</mn><mo>&#8722;</mo><mi>r</mi><mo>)</mo><mfrac><mrow><mi>exp</mi><mo>(</mo><msub><mi>s</mi><mi>j</mi></msub><mo>/</mo><mi>T</mi><mo>)</mo></mrow><mrow><munder><mo>&#8721;</mo><mi>k</mi></munder><mi>exp</mi><mo>(</mo><msub><mi>s</mi><mi>k</mi></msub><mo>/</mo><mi>T</mi><mo>)</mo></mrow></mfrac><mo>,</mo><mspace width="1.4em"/><msub><mi>p</mi><mi>&#8709;</mi></msub><mo>=</mo><mi>r</mi></mrow></math>
+  </div>
+  <div class="claim">
+    <p>Two properties fall straight out of that shape, and both are exact rather than measured.</p>
+  </div>
+  <div class="proof">
+    <p class="proof-head t-mono">Pairwise odds do not depend on abstention</p>
+    <p>Take any two candidates. The factor <em>(1&minus;r)</em> multiplies every non-null candidate, so it cancels:</p>
+    <math display="block"><mrow><mfrac><mrow><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>j</mi></msub><mo>)</mo></mrow><mrow><mi>P</mi><mo>(</mo><msub><mi>c</mi><mi>k</mi></msub><mo>)</mo></mrow></mfrac><mo>=</mo><mfrac><mrow><mo>(</mo><mn>1</mn><mo>&#8722;</mo><mi>r</mi><mo>)</mo><mi>exp</mi><mo>(</mo><msub><mi>s</mi><mi>j</mi></msub><mo>/</mo><mi>T</mi><mo>)</mo></mrow><mrow><mo>(</mo><mn>1</mn><mo>&#8722;</mo><mi>r</mi><mo>)</mo><mi>exp</mi><mo>(</mo><msub><mi>s</mi><mi>k</mi></msub><mo>/</mo><mi>T</mi><mo>)</mo></mrow></mfrac><mo>=</mo><mi>exp</mi><mo>(</mo><mo>(</mo><msub><mi>s</mi><mi>j</mi></msub><mo>&#8722;</mo><msub><mi>s</mi><mi>k</mi></msub><mo>)</mo><mo>/</mo><mi>T</mi><mo>)</mo></mrow></math>
+    <p>So how likely the model is to abstain never reorders the candidates, and a caller who has already decided not to abstain can use the renormalised distribution unchanged. The scores themselves stay set-dependent; that is the part the gate does not touch.</p>
+    <p class="proof-head t-mono">The gate is temperature-invariant</p>
+    <p><em>T</em> enters only the candidate softmax, and <em>r</em> reads untempered statistics. Recalibrating temperature therefore never moves <em>p</em><sub>&#8709;</sub> &mdash; you can tune the sharpness of the answer without disturbing the decision to answer at all.</p>
+  </div>
+  <div class="claim">
+    <p>The types are contracts on that distribution. Choice is the K-way readout. Score reuses it over ordered levels with a smoothed target, <em>t&#771;</em><sub>j</sub> &prop; exp(&minus;&#124;j&minus;y&#124;/&tau;) at &tau;&nbsp;=&nbsp;0.7, which adds no parameters and makes a near miss cost less than a distant one. Noul takes a dedicated Bernoulli head, P(yes)&nbsp;=&nbsp;&sigma;(<em>w</em><sub>n</sub><sup>&#8868;</sup><em>h</em><sub>D</sub>), on a suffix that renders no candidate text at all &mdash; which is why label order cannot enter its computation.</p>
+    <p>M decisions about one state cost <em>O</em>(&#124;S&#124;) once, plus <em>M</em>&middot;<em>O</em>(&#124;Q&#124;&nbsp;+&nbsp;&#124;C&#124;) for the suffixes, through only the kept 71% of layers. That is the whole reason the second question is cheap.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="readout">
+  <div class="claim">
+    <h2>Three ways to read an answer out</h2>
+    <p>Once the pass is done there is more than one place to look. <strong>N1</strong> reads the next-token logits of the option letters. That is the standard multiple-choice interface, never sampled. <strong>N2</strong> scores the decision state against a frozen embedding of each label's text. <strong>N3</strong>, the one Typical ships, scores it against each candidate's own contextual state: the hidden state over the tokens where that option was rendered, inside the same pass.</p>
+    <p>All three arms train on the same data for the same steps with the same option shuffling. They differ in what the decision state is scored against.</p>
+  </div>
+  <figure class="fig">
+    <div id="chart-readouts"></div>
+    <figcaption>Three readouts of one decision pass, 1.7B backbone. Bars are relative to the best value in the row.</figcaption>
+  </figure>
+  <div class="claim">
+    <p>N2 is the informative failure. Give the model the label's meaning but not the slot it was rendered in and among-K accuracy drops 10 to 12 points, half the question-conditioned signal goes, and on Banking77 with 77 options it collapses to .012 against N3's .497. What the decision state has learned is partly <em>which rendered slot holds the answer</em>, and an independently embedded label cannot carry that.</p>
+    <p>N3 keeps N1's question-dependence (.106 against .109 across seeds) and is far steadier when the option set changes. Add three unrelated options and N1's pairwise log-odds move by .44 to .46; N3's move by .09 to .13, a quarter as much.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="control">
+  <div class="claim">
+    <h2>The control that decides whether any of this is real</h2>
+    <p>A decision model can score well above chance on a benchmark without reading the question at all, by learning which option strings tend to be correct together. Accuracy will not tell you. Calibration will not tell you either: one of the variants below has an expected calibration error of .04.</p>
+    <p>So we measure &Delta;q: accuracy with the real question, minus accuracy with the question replaced by an unrelated one. A model that scores the same either way has not used the question. Below is every variant we tested, ranked by accuracy. That is the view a leaderboard gives you.</p>
+  </div>
+  <figure class="fig">
+    <div class="show-head"><p class="show-eyebrow t-mono">12 variants &middot; MMLU-Pro, n = 1,200</p><button class="btn dark" type="button" id="dq-reveal">Add the control</button></div>
+    <div class="chart" id="chart-deltaq"></div>
+    <figcaption>Accuracy against &Delta;q. The band is the &plusmn;.02 spread 1,200 items allow. Hover a point for its configuration.</figcaption>
+  </figure>
+  <div class="claim">
+    <p>Six variants computed the decision state <em>before</em> seeing the candidates. All six sit at zero. Every readout that processes the candidates inside the forward pass carries .09 to .12, and so does the listwise teacher they were distilled from.</p>
+    <p>We tried to move it and could not. Cross-attention over every candidate token: &minus;.003. Supervising the change in the teacher's log-odds across seven candidate sets: exactly zero. Reading all 28 layers instead of a mid-depth tap: &minus;.008. Their accuracy of .12 to .17 sits well above the .10 chance rate and comes entirely from priors over which labels go together.</p>
+    <p>One alternative we cannot rule out is optimisation: the zero-initialised set-conditioning attention stayed inert through 4,000 steps of direct supervision. This may be hard to train rather than impossible to represent.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="depth">
+  <div class="claim">
+    <h2>Why the head is not on top</h2>
+    <p>We truncate the backbone at about 71% of its depth and never compute the layers above. That was not an efficiency decision.</p>
+    <p>Our first full-scale model read the final layer and scored <strong>58.6 on SNLI</strong>. That is the hypothesis-only baseline: the number you get by ignoring the premise and guessing from the sentence you are asked about. The last layer had specialised into predicting the next token and had stopped carrying the evidence.</p>
+  </div>
+  <figure class="fig onmeasure">
+    <div class="chart" id="chart-depth"></div>
+    <figcaption>Matched 1.7B runs differing only in where the head reads. Validation NLL falls .430 to .341; &Delta;q is unchanged at .117 and .118.</figcaption>
+  </figure>
+  <div class="claim">
+    <p>Mid-depth carries both the evidence and the question-conditioned knowledge in one model. Every released and ladder checkpoint taps there, and LoRA at rank 16 adapts the top eight kept layers while everything below stays frozen.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="rubrics">
+  <div class="claim">
+    <h2>Teaching a model to read the rule instead of the room</h2>
+    <p>A decision model that memorises &ldquo;this kind of ticket gets that label&rdquo; is worthless the moment the policy changes. So most of the workflow training is counterfactual: the same state and the same option list appear under different rubrics with different correct answers, and only the rubric decides.</p>
+    <p>Counterfactual training is the largest training-distribution effect we measured, larger than anything we changed in the architecture. Held-out families, grammars and rubric styles go from .481 / .507 / .491 to <strong>.827 / .881 / .888</strong>. Held-out rubric-flip accuracy goes from .477 to .710.</p>
+    <p>The control is the part worth reading. Accuracy under a <em>shuffled</em> rubric falls from .446 to .405. The model got worse at answering when we handed it the wrong rule, which is what depending on the rule looks like.</p>
+    <p>It works inside the grammar we generate and stops at its edge. Level-7 composition, which mixes temporal, unit and expected-value reasoning and which our generator never produces, moves from .477 to .498. The curriculum that moved every in-distribution family by thirty-odd points moved that one by two.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="long">
+  <div class="claim">
+    <h2>Where you put the evidence changes the answer</h2>
+    <p>Training truncates long states from the right. We rendered the supporting facts at the end of every row of our long-policy corpus, so most of those rows lost their evidence before the model ever saw it. We were training the model to answer long policies from states that no longer contained the answer. It learned to expect the case block at the end, and learned not to look anywhere else.</p>
+    <p>Two arms with byte-identical flags, same 23,318 rows, rendered facts-first or facts-last, scored on 605 held-out long states with nothing truncated at evaluation time. Facts-first adds <strong>11.2 points</strong>, <em>p</em> = 5&times;10<sup>&minus;10</sup>, and the gap replicates at a second seed.</p>
+  </div>
+  <figure class="fig onmeasure">
+    <div class="chart" id="chart-render"></div>
+    <figcaption>Training render against evaluation render, 605 held-out long states. The diagonal is the matched comparison; the off-diagonal holds the evaluation render fixed. Shade is accuracy above the .413 floor.</figcaption>
+  </figure>
+  <div class="claim">
+    <p>That is a rendering choice, not a modelling one. It is the kind of thing that hides inside a data pipeline and reads as a capability limit for months.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="scaling">
+  <div class="claim">
+    <h2>What size buys, and where it stops</h2>
+    <p>Every trained checkpoint against its own frozen control: the same backbone, no training, letter logits, three examples in the prompt.</p>
+  </div>
+  <figure class="fig">
+    <div class="chart" id="chart-ladder"></div>
+    <figcaption>JevBench standard tier, public subset, against backbone size. Bars are 95% intervals, cluster-bootstrapped over the paraphrase group. Hover any point.</figcaption>
+  </figure>
+  <div class="claim">
+    <p>Training is worth 15 to 20 points of standard-tier accuracy at every size we ran, and the 14B reaches .931. The shipped 4B reaches .861 against its frozen control's .764.</p>
+    <p>Read the intervals before reading the ranking. The standard tier is 72 items drawn from 36 states written two ways; adjacent rows on this chart are not separable, and we do not treat them as if they were.</p>
+    <p>And on the hard tier the ordering inverts. The frozen 14B scores .559 where our trained 14B scores .450. Training helps on the tier we built data for and hurts on the tier we did not. That is the clearest open problem in the project.</p>
+  </div>
+</section>
+
+<section class="page chapter" id="cost">
+  <div class="claim">
+    <h2>What one decision costs</h2>
+    <p>In the research harness a single decision at two options takes 45&nbsp;ms at 1.7B and 60&nbsp;ms at 14B. On the optimised serving path a warm decision is <strong>15.5 to 17&nbsp;ms</strong> at 1.7B and 19 to 21&nbsp;ms for the Qwen3-4B model. The Qwen3.5-4B model measures 34 to 46&nbsp;ms, on reference DeltaNet kernels that nobody has tuned yet.</p>
+    <p>For a loop, what matters is the next decision. The state is already cached, so each further question about it is a short suffix and costs a few milliseconds.</p>
+  </div>
+  <figure class="fig">
+    <div class="media"><div class="chart" id="chart-latency"></div></div>
+    <figcaption>Cost of one decision and of each question after it, measured in process on one H100.</figcaption>
+  </figure>
+</section>
+
+<section class="page chapter" id="get">
+  <div class="claim">
+    <h2>Read it, run it, break it</h2>
+    <p>The paper has the derivations, the full tables and the appendices this page skips. The weights are on Hugging Face and the inference package needs torch, transformers, safetensors, huggingface_hub and numpy.</p>
+  </div>
+  <div class="code"><pre><code>pip install typical-ai</code></pre></div>
+  <div class="code"><pre><code>from typical_ai import Typical
+
+m = Typical.from_pretrained("OzLabs/typical-medium", device="auto")
+m.choice(state, "Which team should own this ticket?", ["billing", "shipping", "support"])</code></pre></div>
+  <div class="claim">
+    <p>If you find a decision it gets confidently wrong, that is the interesting case and we would like to see it.</p>
+  </div>
+</section>
+
+<footer class="footer"><div class="page">
+  <div class="cols">
+    <div><p class="t-card" style="max-width:20ch">Models that decide, not generate.</p><p class="t-eyebrow mt-30" style="color:var(--color-mid)">Weights on Hugging Face, package on PyPI, source on GitHub.</p></div>
+    <div class="t-mono"><p class="t-eyebrow mb-18">Models</p><p><a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">typical-small</a></p><p><a href="https://huggingface.co/OzLabs/typical-medium" target="_blank" rel="noopener">typical-medium</a></p><p><a href="https://huggingface.co/OzLabs/typical-small-preview" target="_blank" rel="noopener">typical-small-preview</a></p></div>
+    <div class="t-mono"><p class="t-eyebrow mb-18">Site</p><p><a href="index.html#field">Results</a></p><p><a href="index.html#watch">Demos</a></p><p><a href="research.html">Research</a></p></div>
+  </div>
+  <div class="rule t-eyebrow" style="color:var(--color-mid)">Every number on this page is transcribed from the paper</div>
+</div></footer>
+
+<script src="js/vendor/gsap.min.js" defer></script>
+<script src="js/vendor/ScrollTrigger.min.js" defer></script>
+<script type="module" src="js/shell.js"></script>
+<script type="module" src="js/researchpage.js"></script>
+</body>
+</html>

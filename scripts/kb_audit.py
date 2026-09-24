@@ -23,6 +23,7 @@ from itertools import combinations
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pcdm"))
 from scripts.leak_audit import build_index, best_match  # reuse the MinHash machinery (DRY)
 
 EVAL_PATH = Path("data_v4/eval/mmlu_pro.jsonl")
