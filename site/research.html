@@ -3,8 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/png" href="/favicon.png">
 <title>How Typical works &mdash; reading a decision out of a language model</title>
 <meta name="description" content="The research behind Typical: a typed decision read from a pretrained language model in one pass, the control that says whether a model read the question at all, and what we could not fix.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Typical">
+<meta property="og:title" content="How Typical works — reading a decision out of a language model">
+<meta property="og:description" content="The research behind Typical: typed decisions from a pretrained language model in one pass.">
+<meta property="og:url" content="https://typical.ozlabs.ai/research.html">
+<meta property="og:image" content="https://typical.ozlabs.ai/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Typical — typed decisions, read straight out of a language model.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://typical.ozlabs.ai/og.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Geist+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -17,7 +29,7 @@
   <h1>Typed decisions, read straight out of a language model</h1>
   <p class="masthead-sub">How Typical works, what we measured, and the control that says whether a model read the question at all.</p>
   <div class="masthead-meta t-mono">
-    <span>Guy Nachshon &middot; <a href="https://ozlabs.ai" target="_blank" rel="noopener">Oz Labs</a></span>
+    <span>Guy Nachshon, Zack Zornstein, Gil Zornstein &middot; <a href="https://ozlabs.ai" target="_blank" rel="noopener">Oz Labs</a></span>
     <span>24 September 2026</span>
     <a href="paper.pdf">Paper (PDF)</a>
     <a href="https://github.com/GuyNachshon/typical" target="_blank" rel="noopener">Source</a>
@@ -206,12 +218,9 @@ m.choice(state, "Which team should own this ticket?", ["billing", "shipping", "s
   </div>
 </section>
 
-<section class="page chapter" id="talk">
-  <div class="claim">
-    <h2>Talk to us</h2>
-    <p>If a number here does not reproduce, or a derivation is wrong, we would rather know. The same goes for a result you think we have read too generously.</p>
-    <p class="mt-30"><a class="btn dark" href="mailto:hi@ozlabs.ai">hi@ozlabs.ai</a></p>
-  </div>
+<section class="contact page" id="talk" aria-labelledby="contact-title">
+  <div><p class="t-eyebrow">Piqued your interest—or raised questions?</p><h2 class="t-section" id="contact-title">Talk to us.</h2></div>
+  <a class="btn dark" href="mailto:hi@ozlabs.ai">Contact us</a>
 </section>
 
 <footer class="footer"><div class="page">

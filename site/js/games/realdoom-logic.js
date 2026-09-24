@@ -58,6 +58,29 @@ export function candidatesFor(state) {
   return LABELS.filter((l) => l !== 'shoot' || canShoot);
 }
 
+const replayKey = (sentence, candidates) => JSON.stringify([sentence, candidates]);
+
+// A recorded model call is reusable whenever the rendered state sentence and candidate list are
+// identical: those are the model's complete inputs. The live game can diverge from the original
+// wall-clock recording while still showing the exact model output for every state it revisits.
+export function replayIndex(doc) {
+  const index = new Map();
+  for (const d of doc?.decisions ?? []) {
+    if (!d?.desc || !Array.isArray(d.candidates) || !Array.isArray(d.probs) || !d.candidates.includes(d.move)) continue;
+    index.set(replayKey(d.desc, d.candidates), {
+      move: d.move,
+      probs: Object.fromEntries(d.candidates.map((label, i) => [label, d.probs[i] ?? 0])),
+      p_null: 0,
+      ms: d.ms ?? 0,
+    });
+  }
+  return index;
+}
+
+export function recordedDecision(index, sentence, candidates) {
+  return index?.get(replayKey(sentence, candidates)) ?? null;
+}
+
 // state -> the sentence the model reads: only the situations that apply, worded exactly as the
 // rule conditions (js/games/doom.js RULES), monster type included, in a fixed order. No
 // health/ammo numbers (see doom.js describe()). The lead monster (crosshair first, then
@@ -231,6 +254,9 @@ function selfTest() {
   console.assert(candidatesFor(s1).join() === 'retreat,shoot,turn left,turn right,explore', 'with a target and ammo, all five labels are offered');
   console.assert(!candidatesFor({ ...s1, monsters: [] }).includes('shoot'), 'nothing in sight: shoot is not on the table');
   console.assert(!candidatesFor({ ...s1, monsters: [{ type: 'imp', dist: 400, bearing: 20, visible: false }] }).includes('shoot'), 'a monster behind a wall is not a target');
+  const replay = replayIndex({ decisions: [{ desc: 'state', candidates: ['a', 'b'], probs: [0.2, 0.8], move: 'b', ms: 12 }] });
+  console.assert(recordedDecision(replay, 'state', ['a', 'b'])?.probs.b === 0.8, 'recorded model output is keyed by its complete inputs');
+  console.assert(recordedDecision(replay, 'state', ['b', 'a']) === null, 'candidate order is part of the recorded input');
   console.assert(scriptedPolicy(s1) === 'shoot' && resolveIntent(s1, 'shoot') === 'shoot' && keyPress(s1, 'shoot', 'shoot')[0] === 'fire', 'crosshair target, centred and close -> fire');
   const far = { ...s1, monsters: [{ type: 'zombieman', dist: 600, bearing: 1, in_crosshair: true }] };
   console.assert(resolveIntent(far, 'shoot') === 'move forward', 'a shoot decision 9 cells out closes the distance first');
