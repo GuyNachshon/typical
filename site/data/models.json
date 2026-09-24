@@ -69,11 +69,11 @@
   "sources": {
    "jevbench": "runs/jev_native_v3t20_wf/summary.json",
    "latency": "releases/typical-small.md#latency",
-   "mmlu_pro_among_k": "releases/typical-small.md#\u00a73ae-table",
-   "nlu": "releases/typical-small.md#\u00a73ae-table",
-   "topic_intent": "releases/typical-small.md#\u00a73ae-table",
-   "external": "releases/typical-small.md#\u00a73ae-table",
-   "held_out": "releases/typical-small.md#\u00a73ae-table"
+   "mmlu_pro_among_k": "releases/typical-small.md#§3ae-table",
+   "nlu": "releases/typical-small.md#§3ae-table",
+   "topic_intent": "releases/typical-small.md#§3ae-table",
+   "external": "releases/typical-small.md#§3ae-table",
+   "held_out": "releases/typical-small.md#§3ae-table"
   }
  },
  {
@@ -85,21 +85,21 @@
   "hf_url": "https://huggingface.co/OzLabs/typical-small",
   "jevbench": {
    "std": {
-    "acc": 0.7083333333333334,
-    "brier": 0.4231324308004447,
-    "ece": 0.15155392636855441,
+    "acc": 0.7916666666666666,
+    "brier": 0.370220602788655,
+    "ece": 0.1634162896209293,
     "n": 72
    },
    "easy": {
     "acc": 1.0,
-    "brier": 0.002105722190339487,
-    "ece": 0.015349641442298894,
+    "brier": 0.0007692348777637191,
+    "ece": 0.009568235526482227,
     "n": 48
    },
    "hard": {
-    "acc": 0.43243243243243246,
-    "brier": 0.7220186972065705,
-    "ece": 0.24054944300436756,
+    "acc": 0.44144144144144143,
+    "brier": 0.746190957169912,
+    "ece": 0.24009501128583344,
     "n": 111
    }
   },
@@ -119,40 +119,40 @@
     "k256": 9.3
    }
   },
-  "mmlu_pro_among_k": 0.3383333333333333,
+  "mmlu_pro_among_k": 0.31583333333333335,
   "nlu": {
-   "snli": 0.8885548206053318,
-   "mnli": 0.8530612244897959,
-   "boolq": 0.7758409785932722,
-   "anli": 0.491875
+   "snli": 0.9033874523952696,
+   "mnli": 0.8666666666666667,
+   "boolq": 0.8174311926605504,
+   "anli": 0.511875
   },
   "topic_intent": {
-   "clinc": 0.7954136690647482,
-   "trec": 0.496,
-   "hwu": 0.7472118959107806,
-   "ng20": 0.5516062884483938
+   "clinc": 0.8304856115107914,
+   "trec": 0.494,
+   "hwu": 0.7843866171003717,
+   "ng20": 0.549419002050581
   },
   "external": {
-   "pagerduty": null,
-   "jevlogs": null,
-   "mind2web": null
+   "pagerduty": 0.8566666666666667,
+   "jevlogs": 0.6482283464566929,
+   "mind2web": 0.399375
   },
   "held_out": {
-   "noul": null,
-   "score": null,
-   "flip_both_correct": null
+   "noul": 0.7053333333333334,
+   "score": 0.5139813581890812,
+   "flip_both_correct": 0.7180417044424298
   },
   "sources": {
-   "jevbench": "hf://guychuk/pcdm-runs/jev_native_ts1c/summary.json \u2014 not mirrored into the local runs/ directory, which is partial. Its accuracies coincide with ts1c_tap17's standard and ts1b's hard to seven digits, but its Brier and ECE differ from both (hard Brier .7220 vs ts1b's .7909), so it is an independent run that ties, not a copy. The run-to-checkpoint mapping is inferred from the jev_native_<name> convention, not recorded in the summary.",
-   "latency": "buffalo:RESULTS.md#6-single-decision-latency (Qwen3-1.7B row, labelled \"ts1b-shape recipe\") = REPORT.md#3ab apples-to-apples. 1.7B apples-to-apples ladder row (REPORT #3ab, one pod, one torch build). It is a recipe-shape row, not a checkpoint row: ts1c is the same Qwen3-1.7B-Base backbone, same tap 20, same 512x2x8 tower as ts1b, so the shape row still describes it. ts1c's own bench (runs/bench_ts1c/bench.json) reads 60.6 ms at K=2 on a different pod/harness and is not comparable to the other rows in this file.",
-   "mmlu_pro_among_k": "runs/ts1c/results.json .eval.mmlu_pro.raw.acc_k",
-   "nlu": "runs/ts1c/results.json .eval.{snli_test,mnli_val,boolq_val,anli_test}.scaled.acc (the accessor buffalo:RESULTS.md#1 uses)",
-   "topic_intent": "runs/ts1c/results.json .eval.{clinc_test,trec_fine,hwu64_test,ng20_test}.scaled.acc (the accessor buffalo:RESULTS.md#1 uses)",
-   "external": "MISSING -- no full-file eval_wf pass (max_state 4096, limit 0) exists for ts1c. runs/ts1c/eval_wf.json absent. runs/ts1c/results.json has these sets but at the capped training-pass protocol (eval_cap 1500, max_state 2048), which on ts1b/tm1b disagrees with the full pass by up to 34 points on pagerduty_trigger and flips sign across taps -- not the protocol the published .817/.838 figures use.",
-   "held_out": "MISSING -- no full-file eval_wf pass (max_state 4096, limit 0) exists for ts1c. runs/ts1c/eval_wf.json absent. runs/ts1c/results.json has these sets but at the capped training-pass protocol (eval_cap 1500, max_state 2048), which on ts1b/tm1b disagrees with the full pass by up to 34 points on pagerduty_trigger and flips sign across taps -- not the protocol the published .817/.838 figures use."
+   "jevbench": "hf://guychuk/pcdm-runs/jev_native_ts1b_semif/{original,easy,hard}/summary.json (.accuracy, .brier_mean, .ece.ece, .n_scorable), harness version jevbench-v1 = buffalo:RESULTS.md#5a. 95% CIs there: standard [.667, .903], hard [.351, .532].",
+   "latency": "buffalo:RESULTS.md#6-single-decision-latency (Qwen3-1.7B row, labelled \"ts1b-shape recipe\") = REPORT.md#3ab apples-to-apples, one pod, one torch build. v3 is the ts1b recipe exactly -- tap 20, 512x2x8 tower, max_state 1024, 12k steps -- so the shape row describes this checkpoint more directly than it described ts1c. Its own bench (hf://guychuk/pcdm-runs/bench_ts1b_semif/bench.json) reads 58.5 ms at K=2, but is partial (L_s=256 only) and on a different pod/harness, so it is not substituted here.",
+   "mmlu_pro_among_k": "hf://guychuk/pcdm-runs/ts1b_semif/results.json .eval.mmlu_pro.raw.acc_k",
+   "nlu": "hf://guychuk/pcdm-runs/ts1b_semif/results.json .eval.{snli_test,mnli_val,boolq_val,anli_test}.scaled.acc (the accessor buffalo:RESULTS.md#1 uses)",
+   "topic_intent": "hf://guychuk/pcdm-runs/ts1b_semif/results.json .eval.{clinc_test,trec_fine,hwu64_test,ng20_test}.scaled.acc (the accessor buffalo:RESULTS.md#1 uses)",
+   "external": "hf://guychuk/pcdm-runs/ts1b_semif/eval_wf.json -- the full-file pass (max_state 4096, limit 0), the same protocol as the published ts1b figures, so v1-vs-v3 is matched. ts1c never had this pass, which is why these two blocks read MISSING for v2.",
+   "held_out": "hf://guychuk/pcdm-runs/ts1b_semif/eval_wf.json -- the full-file pass (max_state 4096, limit 0), the same protocol as the published ts1b figures, so v1-vs-v3 is matched. ts1c never had this pass, which is why these two blocks read MISSING for v2. flip_both_correct = .eval.wh_rubric_flip."
   },
-  "checkpoint": "ts1c",
-  "note": "ships as OzLabs/typical-small v2, in-place supersede of ts1b on 2026-09-23 (releases/MANIFEST.json, best.pt sha256 c830931e...). Long-state facts-first .947 vs ts1b's .598 (+34.9, n=605, buffalo:RESULTS.md#5b). Backbone, tap and tower unchanged from ts1b."
+  "checkpoint": "ts1b_semif",
+  "note": "ships as OzLabs/typical-small v3, in-place supersede of ts1c on 2026-09-24 (best.pt sha256 dc183b39..., verified against hf://guychuk/pcdm-runs/ts1b_semif/best.pt; buffalo:RESULTS.md#7, REPORT.md#3am). Trained on the SemIf-style state render -- the same rendering the 4B SemIf model uses, and the render the frozen Qwen3.5 controls gain most from. Backbone, tap and tower unchanged from ts1b/ts1c. Recipe is ts1b's, not ts1c's: max_state 1,024 and 12k steps, with --drop_truncated off. Long-state facts-first .952 and facts-last .846 (n=605, buffalo:RESULTS.md#5b) -- v3 is the first small checkpoint strong in BOTH orders, where ts1c read .947/.790."
  },
  {
   "id": "typical-medium",
@@ -286,11 +286,11 @@
   },
   "sources": {
    "jevbench": "runs/jev_native_ladder_14b/summary.json",
-   "latency": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-apples-to-apples-table",
-   "mmlu_pro_among_k": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table",
-   "nlu": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table",
-   "topic_intent": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table",
-   "held_out": "gpu-runpod-full-experiment:REPORT.md#\u00a73ab-table"
+   "latency": "gpu-runpod-full-experiment:REPORT.md#§3ab-apples-to-apples-table",
+   "mmlu_pro_among_k": "gpu-runpod-full-experiment:REPORT.md#§3ab-table",
+   "nlu": "gpu-runpod-full-experiment:REPORT.md#§3ab-table",
+   "topic_intent": "gpu-runpod-full-experiment:REPORT.md#§3ab-table",
+   "held_out": "gpu-runpod-full-experiment:REPORT.md#§3ab-table"
   },
   "note": "scaling-ladder point (PLAN7 Track A), not a public release -- no HF repo, no PagerDuty/jevlogs/Mind2Web/flip numbers in the source table"
  }

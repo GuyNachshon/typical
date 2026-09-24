@@ -40,7 +40,7 @@
   <p class="masthead-sub">Open decision models. Generate an answer, or read a decision.</p>
   <div class="masthead-meta t-mono">
     <span>Oz Labs</span>
-    <span>23 September 2026</span>
+    <span>24 September 2026</span>
     <a href="https://huggingface.co/OzLabs/typical-small" target="_blank" rel="noopener">Weights</a>
     <a href="https://github.com/GuyNachshon/typical" target="_blank" rel="noopener">Source</a>
     <a href="paper.pdf">Paper (PDF)</a>
@@ -192,7 +192,7 @@
     <div id="jev-field"></div>
     <figcaption>JevBench standard, same 231 public ids. Click a column to re-sort.</figcaption>
   </figure>
-  <p class="mt-30">Plotted against the parameters you have to host, neither of our models sits on the frontier. A 400M classifier scores above <code>typical&#8209;small</code>, and <code>SemIf</code> scores above <code>typical&#8209;medium</code> on the same 4B base — a gap our report puts down to their rendering and method, and one we are still probing. <code>typical-medium</code> leads every prompted backbone we ran, at every size, including a 14B.</p>
+  <p class="mt-30">Plotted against the parameters you have to host, <code>typical&#8209;small</code> now sits on the frontier: nothing in this field at or below 1.7B scores above its .792, and the 400M classifier that used to beat it reads .750. <code>typical&#8209;medium</code> does not sit on it — <code>system&#8209;one&#8209;open</code> at 2B and <code>SemIf</code> at 4B are both above, and <code>SemIf</code> manages it on the same 4B base. Our report put that gap down to their rendering and method, and v3 is where we stopped probing and copied the rendering: on the same recipe, changing only the state layout, <code>typical&#8209;small</code> went from .694 to .792. Read that as a direction and not a measurement &mdash; the paired test over the same items gives p&nbsp;=&nbsp;.23, which is JevBench running out of resolution again rather than proof of a 10-point gain. <code>typical-medium</code> still leads every prompted backbone we ran, at every size, including a 14B.</p>
   <figure class="fig">
     <div class="chart" id="size-score"></div>
     <figcaption>JevBench standard against parameters. The dashed step is the frontier. <span data-count="unplotted">Four</span> entries publish no size.</figcaption>
@@ -206,27 +206,29 @@
 <section class="page chapter" id="separating">
   <div class="claim">
     <h2>What actually separates the two models</h2>
-    <p>The JevBench columns above look like a ranking. They are not one. The standard tier is 72 items drawn from only 36 independent states, each written twice, and the hard tier is 111 items. Cluster-bootstrapped over the paraphrase group, that is a 95% interval of roughly ±6 to 13 points on any standard-tier number and ±9 on any hard-tier one. <code>typical-medium</code>'s standard-tier interval is [.778, .944] and its hard-tier interval is [.405, .586]. Put the same &plusmn;6 to 13 around <code>typical-small</code>'s .708, and the same &plusmn;9 around its .432, and the two models' intervals overlap on both tiers.</p>
+    <p>The JevBench columns above look like a ranking. They are not one. The standard tier is 72 items drawn from only 36 independent states, each written twice, and the hard tier is 111 items. Cluster-bootstrapped over the paraphrase group, that is a 95% interval of roughly ±6 to 13 points on any standard-tier number and ±9 on any hard-tier one. <code>typical-medium</code>'s standard-tier interval is [.778, .944] and its hard-tier interval is [.405, .595]. Put the same &plusmn;6 to 13 around <code>typical-small</code>'s .792, and the same &plusmn;9 around its .441, and the two models' intervals overlap on both tiers.</p>
     <p><strong>JevBench cannot separate these two models.</strong> Nor can it separate any adjacent pair in our seven-checkpoint ladder, which spans 1.7B to 14B and four backbone generations. Two of those checkpoints score exactly 55 of 111 on the hard tier while disagreeing on 26 items outright. That is not a tie, it is a measurement that has run out of resolution. Do not read the standard-tier gap between Small and Medium as a result. We do not.</p>
-    <p>What does separate them is everything measured at a sample size that can answer the question.</p>
+    <p>What does separate them is everything measured at a sample size that can answer the question. Every <code>typical-small</code> number below is the v3 checkpoint, published 24 September; it replaced a one-day-old v2 in place, at the same address, and the comparison that made us do it is at the end of this section.</p>
   </div>
   <table class="register">
     <thead>
       <tr><th>Evaluation set</th><th><code>typical-small</code></th><th><code>typical-medium</code></th></tr>
     </thead>
     <tbody>
-      <tr><td data-label="Set">MMLU-Pro among-K</td><td data-label="small">.338</td><td data-label="medium">.429</td></tr>
-      <tr><td data-label="Set">ANLI</td><td data-label="small">.492</td><td data-label="medium">.554</td></tr>
-      <tr><td data-label="Set">BoolQ</td><td data-label="small">.776</td><td data-label="medium">.840</td></tr>
-      <tr><td data-label="Set">20 Newsgroups</td><td data-label="small">.552</td><td data-label="medium">.579</td></tr>
-      <tr><td data-label="Set">SNLI</td><td data-label="small">.889</td><td data-label="medium">.900</td></tr>
-      <tr><td data-label="Set">MNLI</td><td data-label="small">.853</td><td data-label="medium">.855</td></tr>
-      <tr><td data-label="Set">JevBench standard Brier</td><td data-label="small">.423</td><td data-label="medium">.224</td></tr>
+      <tr><td data-label="Set">MMLU-Pro among-K</td><td data-label="small">.316</td><td data-label="medium">.429</td></tr>
+      <tr><td data-label="Set">ANLI</td><td data-label="small">.512</td><td data-label="medium">.554</td></tr>
+      <tr><td data-label="Set">BoolQ</td><td data-label="small">.817</td><td data-label="medium">.840</td></tr>
+      <tr><td data-label="Set">20 Newsgroups</td><td data-label="small">.549</td><td data-label="medium">.579</td></tr>
+      <tr><td data-label="Set">SNLI</td><td data-label="small">.903</td><td data-label="medium">.900</td></tr>
+      <tr><td data-label="Set">MNLI</td><td data-label="small">.867</td><td data-label="medium">.855</td></tr>
+      <tr><td data-label="Set">JevBench standard Brier</td><td data-label="small">.370</td><td data-label="medium">.224</td></tr>
     </tbody>
   </table>
   <div class="mt-18 mb-18">
-    <p>Medium leads by 9 points on MMLU-Pro among-K, 6 on ANLI, 6 on BoolQ and 3 on 20 Newsgroups, and its standard-tier Brier is nearly half Small's, which is what matters if you intend to threshold on the probability rather than take the argmax.</p>
-    <p class="mt-18">It is not a clean sweep, and three sets are held off the table above for space rather than for comfort. The two tie on CLINC-150 to within a tenth of a point, and CLINC is in the training mix anyway, so read that row as capacity and not as evidence about unseen labels. Medium is 3 points worse than Small on HWU64 and 2 points worse on TREC-fine, the 50-way fine-grained topic set. All three are on the <a href="research.html">research page</a>. One matched full-file pass covers both shipping checkpoints. On held-out DecisionMix-v2 families, against a .384 floor, Small reads .853 and Medium .889. On level-7 composition, the families our generator never produces, they read .524 and .539 against a .460 floor &mdash; six and eight points, where every in-distribution family is forty above its own. And on held-out yes/no, against a .583 floor, Medium reads .858 and Small reads <strong>.643</strong>. That is seven points below what the superseded 1.7B scored on the same file, and it is the one number in this release that went backwards. Small gained elsewhere in the same pass &mdash; PagerDuty .857 against a .792 floor, JevBench standard .708 &mdash; but if your decisions are mostly yes/no at 1.7B, take Medium.</p>
+    <p>Medium leads by 11 points on MMLU-Pro among-K, 4 on ANLI, 3 on 20 Newsgroups and 2 on BoolQ, and its standard-tier Brier is 39% lower, which is what matters if you intend to threshold on the probability rather than take the argmax. Both inference sets now go the other way &mdash; Small takes SNLI by four thousandths and MNLI by a point &mdash; close enough to read as level, but the direction flipped with v3.</p>
+    <p class="mt-18">It is not a clean sweep, and three sets are held off the table above for space rather than for comfort. All three go to Small: CLINC-150 by 4 points, HWU64 by 7, and TREC-fine, the 50-way fine-grained topic set, by 1. CLINC is in the training mix anyway, so read that row as capacity and not as evidence about unseen labels. All three are on the <a href="research.html">research page</a>.</p>
+    <p class="mt-18">One matched pass at the capped protocol covers both shipping checkpoints. On held-out DecisionMix-v2 families, against a .384 floor, Small reads .820 and Medium .889. On level-7 composition, the families our generator never produces, they read .499 and .540 against a .460 floor &mdash; four and eight points, where every in-distribution family is forty above its own. And on held-out yes/no, against a .583 floor, Medium reads .858 and Small reads .705. That gap is the one that should decide it: if your decisions are mostly yes/no at 1.7B, Medium is 15 points ahead and it is the pick.</p>
+    <p class="mt-18">Small's v3 checkpoint also brings a full-file pass of its own, at the protocol the superseded 1.7B was published under, so the two are directly comparable. Against that baseline it is level on yes/no &mdash; .705 against .715, under a point apart &mdash; where the v2 checkpoint shipped 7 points down and this page said so. It gains 4 points on PagerDuty, .857 against a .792 floor. <strong>The one number that went backwards has come back.</strong></p>
     <p class="mt-18"><strong>Take Medium for accuracy, Small for cost, and do not use the benchmark column to decide.</strong> If you are choosing between these two for real work, the number you want is a paired test on your own decisions, not a leaderboard row.</p>
   </div>
 </section>

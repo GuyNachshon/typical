@@ -1,7 +1,25 @@
 # typical-small
 
+> **Superseded 2026-09-24, one day after shipping.** This card describes `ts1c`, which went out as
+> v2 on 2026-09-23. The public repo now serves **v3 = `ts1b_semif`** (`best.pt` sha256 `dc183b39…`,
+> verified against `hf://guychuk/pcdm-runs/ts1b_semif/best.pt`). Everything below is still an
+> accurate record of `ts1c` and is kept as such — it is **not** a description of what the repo
+> serves today, and this card needs a full rewrite for v3.
+>
+> v3 in one line: JevBench standard **.792** (Brier .370), hard **.441**; long states **.952**
+> facts-first and **.846** facts-last, the first small checkpoint strong in both orders; held-out
+> yes/no **.705** against `ts1b`'s .715 on the matched full-file pass. It is the same backbone, tap
+> and tower, trained on the SemIf-style state render and otherwise on `ts1b`'s recipe (1,024-token
+> states, `--drop_truncated` off) rather than `ts1c`'s. Sources: `buffalo:RESULTS.md` §5a/§5b/§7,
+> `hf://guychuk/pcdm-runs/{ts1b_semif,jev_native_ts1b_semif}/`, `site/data/models.json`.
+>
+> One correction that belongs with it: the **−7 point** yes/no regression this card reports below
+> compared `ts1c`'s *capped* .6427 against `ts1b`'s *full-file* .7147 — two different protocols.
+> Matched full-file, v3 reads .705 against .715, so the regression was partly an artefact of the
+> comparison and is now closed either way.
+
 **Release line: https://huggingface.co/OzLabs/typical-small** — this card describes checkpoint
-`ts1c`, which has **not** been uploaded yet; the public repo still carries the previous checkpoint.
+`ts1c`, superseded by `ts1b_semif` (see the note above).
 
 A clean retrain of the 1.7B checkpoint at `runs/ts1c`, superseding `ts1b` (the previous
 `typical-small`). Still the successor line to `typical-small-preview` (`nc_v3_tap20_wf`). Parent

@@ -243,51 +243,51 @@
    {
     "lo": 0.3,
     "hi": 0.4,
-    "n": 1,
-    "mean_confidence": 0.3510885238647461,
-    "accuracy": 0.0
+    "n": 0,
+    "mean_confidence": null,
+    "accuracy": null
    },
    {
     "lo": 0.4,
     "hi": 0.5,
-    "n": 4,
-    "mean_confidence": 0.4371916800737381,
-    "accuracy": 0.0
+    "n": 0,
+    "mean_confidence": null,
+    "accuracy": null
    },
    {
     "lo": 0.5,
     "hi": 0.6,
-    "n": 9,
-    "mean_confidence": 0.5576445791456435,
-    "accuracy": 0.6666666666666666
+    "n": 7,
+    "mean_confidence": 0.5203516823904855,
+    "accuracy": 0.7142857142857143
    },
    {
     "lo": 0.6,
     "hi": 0.7,
     "n": 5,
-    "mean_confidence": 0.6504239678382874,
-    "accuracy": 0.6
+    "mean_confidence": 0.6493007421493531,
+    "accuracy": 1.0
    },
    {
     "lo": 0.7,
     "hi": 0.8,
-    "n": 10,
-    "mean_confidence": 0.7633156895637512,
-    "accuracy": 0.5
+    "n": 7,
+    "mean_confidence": 0.7479182992662702,
+    "accuracy": 0.7142857142857143
    },
    {
     "lo": 0.8,
     "hi": 0.9,
-    "n": 13,
-    "mean_confidence": 0.8601841422227713,
-    "accuracy": 0.9230769230769231
+    "n": 11,
+    "mean_confidence": 0.8530451872132041,
+    "accuracy": 0.8181818181818182
    },
    {
     "lo": 0.9,
     "hi": 1.0,
-    "n": 30,
-    "mean_confidence": 0.9709315260251363,
-    "accuracy": 0.8333333333333334
+    "n": 42,
+    "mean_confidence": 0.9770479329994747,
+    "accuracy": 0.7857142857142857
    }
   ],
   "easy": [
@@ -350,15 +350,15 @@
    {
     "lo": 0.8,
     "hi": 0.9,
-    "n": 2,
-    "mean_confidence": 0.8784024119377136,
-    "accuracy": 1.0
+    "n": 0,
+    "mean_confidence": null,
+    "accuracy": null
    },
    {
     "lo": 0.9,
     "hi": 1.0,
-    "n": 46,
-    "mean_confidence": 0.9892698344977006,
+    "n": 48,
+    "mean_confidence": 0.9904317644735178,
     "accuracy": 1.0
    }
   ],
@@ -380,58 +380,58 @@
    {
     "lo": 0.2,
     "hi": 0.3,
-    "n": 1,
-    "mean_confidence": 0.296875536441803,
-    "accuracy": 0.0
+    "n": 3,
+    "mean_confidence": 0.25482123096783954,
+    "accuracy": 0.3333333333333333
    },
    {
     "lo": 0.3,
     "hi": 0.4,
-    "n": 12,
-    "mean_confidence": 0.3613033468524615,
-    "accuracy": 0.16666666666666666
+    "n": 9,
+    "mean_confidence": 0.3402721815639072,
+    "accuracy": 0.2222222222222222
    },
    {
     "lo": 0.4,
     "hi": 0.5,
-    "n": 8,
-    "mean_confidence": 0.45540908351540565,
-    "accuracy": 0.375
+    "n": 13,
+    "mean_confidence": 0.4504077090666844,
+    "accuracy": 0.23076923076923078
    },
    {
     "lo": 0.5,
     "hi": 0.6,
-    "n": 16,
-    "mean_confidence": 0.5730288065969944,
-    "accuracy": 0.25
+    "n": 18,
+    "mean_confidence": 0.5392117533418868,
+    "accuracy": 0.3333333333333333
    },
    {
     "lo": 0.6,
     "hi": 0.7,
-    "n": 18,
-    "mean_confidence": 0.6430074241426256,
-    "accuracy": 0.2777777777777778
+    "n": 20,
+    "mean_confidence": 0.6473054230213166,
+    "accuracy": 0.5
    },
    {
     "lo": 0.7,
     "hi": 0.8,
-    "n": 31,
-    "mean_confidence": 0.7483474054644185,
-    "accuracy": 0.5806451612903226
+    "n": 15,
+    "mean_confidence": 0.7538506587346395,
+    "accuracy": 0.6666666666666666
    },
    {
     "lo": 0.8,
     "hi": 0.9,
-    "n": 15,
-    "mean_confidence": 0.8524231870969137,
-    "accuracy": 0.6
+    "n": 5,
+    "mean_confidence": 0.8649447917938232,
+    "accuracy": 0.4
    },
    {
     "lo": 0.9,
     "hi": 1.0,
-    "n": 10,
-    "mean_confidence": 0.9697487890720368,
-    "accuracy": 0.7
+    "n": 28,
+    "mean_confidence": 0.9718877226114273,
+    "accuracy": 0.5357142857142857
    }
   ]
  },
@@ -871,5 +871,5 @@
    }
   ]
  },
- "source": "runs/jev_native_*/summary.json (.<tier>.ece.bins) -- typical-small = jev_native_ts1c, typical-medium = jev_native_tm2. Both are the shipping checkpoints; the std column is the benchmark's original tier."
+ "source": "runs/jev_native_*/summary.json (.<tier>.ece.bins) -- typical-small = jev_native_ts1b_semif (v3, hf://guychuk/pcdm-runs), typical-medium = jev_native_tm2. Both are the shipping checkpoints; the std column is the benchmark's original tier."
 }
