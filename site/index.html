@@ -303,7 +303,6 @@ m.choice(state, "What does the customer want?", ["refund", "replacement", "repai
 m.noul(state, "Is the order still under warranty?")
 m.score(state, "How urgent is this ticket?", ["0", "1", "2", "3"])</pre></div>
   <p class="note mt-18"><code>state</code> is a string or any JSON-serialisable dict. The package is <code>typical‑ai</code> on PyPI, Apache‑2.0, Python 3.11 or newer. The import is <code>typical_ai</code>: PyPI’s bare <code>typical</code> is an established typing toolkit and is not us.</p>
-  <p class="note mt-18">The source is on <a class="ul" href="https://github.com/GuyNachshon/typical" target="_blank" rel="noopener">GitHub</a>. Both checkpoints are Apache‑2.0 over Apache‑2.0 Qwen3 base models. The training mix is not uniformly permissive and we are not going to imply it is: ANLI is CC BY‑NC 4.0, SciQ is CC BY‑NC 3.0, and two portions of the uncertainty corpus declare no licence at all. Whether non‑commercially‑licensed training data constrains the use of the resulting weights is unsettled, and a launch post is not the place it gets resolved. The whole per‑source table is in each model card so your own counsel has something to read.</p>
 </section>
 
 <section class="page chapter" id="next">

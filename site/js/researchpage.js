@@ -25,6 +25,7 @@ function numberFigures() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   numberFigures();
+  import('./copycode.js').then((m) => m.mountCopyButtons()).catch(() => {});
   mountFlow(document.getElementById('chart-arch'));
 
   const [dq, ro, lad, lat, dep, ren] = await Promise.all([

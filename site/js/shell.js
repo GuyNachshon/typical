@@ -593,6 +593,7 @@ function mountTryit(ctx) {
 // ---- boot -------------------------------------------------------------------------
 
 async function boot() {
+  import('./copycode.js').then((m) => m.mountCopyButtons()).catch(() => {});
   glueSeparators(); // static prose, before anything awaits
   bindWidows();
   await probeHealth();

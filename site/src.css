@@ -560,6 +560,22 @@
   .code { background: var(--color-off); color: var(--color-warm); border-radius: var(--radius-card); padding: 30px; }
   .code pre { margin: 0; font-family: var(--font-mono); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; }
   .code + .code { margin-top: 18px; }
+  /* ---- copy button ---- */
+  .code { position: relative; }
+  .code-copy {
+    position: absolute; top: 12px; right: 12px; appearance: none; cursor: pointer;
+    padding: 6px 10px; border: 1px solid rgba(240, 238, 235, 0.22); border-radius: var(--radius-btn);
+    background: transparent; color: rgba(240, 238, 235, 0.55);
+    font-size: 11px; letter-spacing: 0.36px; line-height: 1;
+    opacity: 0; transition: opacity var(--duration-state) var(--ease-out), color var(--duration-tap) var(--ease-out), border-color var(--duration-tap) var(--ease-out), transform var(--duration-tap) var(--ease-out);
+  }
+  /* it appears when the block is approached, and is always there for a keyboard */
+  .code:hover .code-copy, .code-copy:focus-visible { opacity: 1; }
+  .code-copy:hover { color: var(--color-warm); border-color: rgba(240, 238, 235, 0.45); }
+  .code-copy:active { transform: scale(0.97); }
+  .code-copy.is-done { opacity: 1; color: var(--color-warm); border-color: rgba(240, 238, 235, 0.45); }
+  /* no hover on a touch screen, so the button simply stays */
+  @media (hover: none) { .code-copy { opacity: 1; } }
 
 
   .exlist { border-bottom: 1px solid var(--color-steel); }
