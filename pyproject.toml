@@ -1,17 +1,30 @@
 [project]
-name = "typical-site"
+name = "pcdm"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
+    "datasets>=5.0.1",
+    "datasketch>=2.0.0",
+    "gradio>=6.28.0",
+    "matplotlib>=3.11.2",
+    "numpy>=2.4.6",
+    "peft>=0.21.0",
+    "pytest>=9.1.1",
+    "scikit-learn>=1.9.1",
     "torch>=2.14.0",
     "transformers>=5.17.0",
+    "wandb>=0.30.0",
+    # site/server.py (merged from typical-research-site)
     "safetensors>=0.4.0",
     "huggingface_hub>=0.25.0",
-    "numpy>=2.0.0",
     "fastapi>=0.115.0",
     "uvicorn>=0.30.0",
-    "datasets>=3.0.0",
 ]
 
+[tool.pytest.ini_options]
+# the training modules live in pcdm/, the harness packages (pcdm_jev, scripts) at the root
+pythonpath = ["pcdm", "."]
+
 [tool.uv]
+# the repo is a workspace of scripts, not an installable distribution; do not try to build pcdm/
 package = false

@@ -1,0 +1,1160 @@
+% references.bib -- verified bibliography for the Typical / System-One decision-model paper.
+%
+% PROVENANCE. Every entry below was machine-fetched, never hand-written:
+%   1. work located via the OpenAlex works API (or ACL Anthology / arXiv API), then
+%   2. the BibTeX itself retrieved by DOI content negotiation:
+%        curl -sLH "Accept: application/x-bibtex" https://doi.org/<doi>
+%      (CrossRef for publisher DOIs, DataCite for 10.48550/arXiv.* DOIs), or
+%      https://aclanthology.org/<id>.bib for ACL Anthology entries.
+%   3. the fetched title was string-matched against the intended title (Jaccard >= 0.6);
+%      10 fuzzy-search mismatches were caught this way and re-fetched by exact identifier.
+% dblp.org (and its uni-trier / dagstuhl mirrors) was unusable: all three are behind an
+% Anubis proof-of-work bot wall that returns an HTML challenge to curl.
+%
+% CAVEATS for the paper writer:
+%   * the misc/arXiv entries carry the preprint year; many appeared later at ICLR/NeurIPS/ACL.
+%     Upgrade to the venue entry before submission where the venue matters.
+%   * A few CrossRef titles contain HTML markup (e.g. <i>...</i> in jiang2021calibration)
+%     and SHOUTING CAPS (brier1950verification, murphy1970rps) -- strip/normalise at use time.
+%   * Keys follow {firstauthor}{year}{keyword}; 11 keys were aligned to the spellings already
+%     cited in paper/sections/*.tex (e.g. humeau2020polyencoders, wong2026models, zhao2021calibrate).
+%   * Anything listed under "[VERIFY]" at the end of this file was NOT verified and MUST NOT be
+%     cited as a BibTeX key.
+
+% ===== 1. Zero-shot / dynamic-label classification, label embeddings, encoder efficiency =====
+
+% source: 10.1162/tacl_a_00259
+@article{pappas2019gile, title={{GILE: A Generalized Input-Label Embedding for Text Classification}}, volume={7}, ISSN={2307-387X}, url={http://dx.doi.org/10.1162/tacl_a_00259}, DOI={10.1162/tacl_a_00259}, journal={Transactions of the Association for Computational Linguistics}, publisher={MIT Press - Journals}, author={Pappas, Nikolaos and Henderson, James}, year={2019}, month=Nov, pages={139--155} }
+
+% source: 10.18653/v1/2020.coling-main.285
+@inproceedings{halder2020tars, title={{Task-Aware Representation of Sentences for Generic Text Classification}}, url={http://dx.doi.org/10.18653/v1/2020.coling-main.285}, DOI={10.18653/v1/2020.coling-main.285}, booktitle={Proceedings of the 28th International Conference on Computational Linguistics}, publisher={International Committee on Computational Linguistics}, author={Halder, Kishaloy and Akbik, Alan and Krapac, Josip and Vollgraf, Roland}, year={2020}, pages={3202--3213} }
+
+% source: 10.18653/v1/2024.naacl-long.300
+@inproceedings{zaratiana2023gliner, title={{GLiNER: Generalist Model for Named Entity Recognition using Bidirectional Transformer}}, url={http://dx.doi.org/10.18653/v1/2024.naacl-long.300}, DOI={10.18653/v1/2024.naacl-long.300}, booktitle={Proceedings of the 2024 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies (Volume 1: Long Papers)}, publisher={Association for Computational Linguistics}, author={Zaratiana, Urchade and Tomeh, Nadi and Holat, Pierre and Charnois, Thierry}, year={2024}, pages={5364--5376} }
+
+% source: 10.48550/arxiv.2507.18546
+@misc{zaratiana2025gliner2,
+  doi = {10.48550/ARXIV.2507.18546},
+  url = {https://arxiv.org/abs/2507.18546},
+  author = {Zaratiana, Urchade and Pasternak, Gil and Boyd, Oliver and Hurn-Maloney, George and Lewis, Ash},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{GLiNER2: An Efficient Multi-Task Information Extraction System with Schema-Driven Interface}},
+  publisher = {arXiv},
+  year = {2025},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.48550/arxiv.2209.11055
+@misc{tunstall2022setfit,
+  doi = {10.48550/ARXIV.2209.11055},
+  url = {https://arxiv.org/abs/2209.11055},
+  author = {Tunstall, Lewis and Reimers, Nils and Jo, Unso Eun Seo and Bates, Luke and Korat, Daniel and Wasserblat, Moshe and Pereg, Oren},
+  keywords = {Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Efficient Few-Shot Learning Without Prompts}},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.18653/v1/d19-1404
+@inproceedings{yin2019zeroshot, title={{Benchmarking Zero-shot Text Classification: Datasets, Evaluation and Entailment Approach}}, url={http://dx.doi.org/10.18653/v1/d19-1404}, DOI={10.18653/v1/d19-1404}, booktitle={Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP)}, publisher={Association for Computational Linguistics}, author={Yin, Wenpeng and Hay, Jamaal and Roth, Dan}, year={2019}, pages={3912--3921} }
+
+% source: 10.48550/arxiv.1905.01969
+@misc{humeau2020polyencoders,
+  doi = {10.48550/ARXIV.1905.01969},
+  url = {https://arxiv.org/abs/1905.01969},
+  author = {Humeau, Samuel and Shuster, Kurt and Lachaux, Marie-Anne and Weston, Jason},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Poly-encoders: Transformer Architectures and Pre-training Strategies for Fast and Accurate Multi-sentence Scoring}},
+  publisher = {arXiv},
+  year = {2019},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arxiv.2004.12832
+@misc{khattab2020colbert,
+  doi = {10.48550/ARXIV.2004.12832},
+  url = {https://arxiv.org/abs/2004.12832},
+  author = {Khattab, Omar and Zaharia, Matei},
+  keywords = {Information Retrieval (cs.IR), Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{ColBERT: Efficient and Effective Passage Search via Contextualized Late Interaction over BERT}},
+  publisher = {arXiv},
+  year = {2020},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.18653/v1/2020.acl-main.411
+@inproceedings{cao2020deformer, title={{DeFormer: Decomposing Pre-trained Transformers for Faster Question Answering}}, url={http://dx.doi.org/10.18653/v1/2020.acl-main.411}, DOI={10.18653/v1/2020.acl-main.411}, booktitle={Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics}, publisher={Association for Computational Linguistics}, author={Cao, Qingqing and Trivedi, Harsh and Balasubramanian, Aruna and Balasubramanian, Niranjan}, year={2020}, pages={4487--4497} }
+
+% source: 10.1145/3397271.3401093
+@inproceedings{macavaney2020prettr, series={SIGIR '20}, title={{Efficient Document Re-Ranking for Transformers by Precomputing Term Representations}}, url={http://dx.doi.org/10.1145/3397271.3401093}, DOI={10.1145/3397271.3401093}, booktitle={Proceedings of the 43rd International ACM SIGIR Conference on Research and Development in Information Retrieval}, publisher={ACM}, author={MacAvaney, Sean and Nardini, Franco Maria and Perego, Raffaele and Tonellotto, Nicola and Goharian, Nazli and Frieder, Ophir}, year={2020}, month=July, pages={49--58}, collection={SIGIR '20} }
+
+% source: 10.18653/v1/2023.emnlp-main.168
+@inproceedings{yang2023mixencoder, title={{Once is Enough: A Light-Weight Cross-Attention for Fast Sentence Pair Modeling}}, url={http://dx.doi.org/10.18653/v1/2023.emnlp-main.168}, DOI={10.18653/v1/2023.emnlp-main.168}, booktitle={Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing}, publisher={Association for Computational Linguistics}, author={Yang, Yuanhang and Qi, Shiyi and Liu, Chuanyi and Wang, Qifan and Gao, Cuiyun and Xu, Zenglin}, year={2023}, pages={2800--2806} }
+
+% source: 10.48550/arxiv.2205.09153
+@misc{lu2022erniesearch,
+  doi = {10.48550/ARXIV.2205.09153},
+  url = {https://arxiv.org/abs/2205.09153},
+  author = {Lu, Yuxiang and Liu, Yiding and Liu, Jiaxiang and Shi, Yunsheng and Huang, Zhengjie and Sun, Shikun Feng Yu and Tian, Hao and Wu, Hua and Wang, Shuaiqiang and Yin, Dawei and Wang, Haifeng},
+  keywords = {Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{ERNIE-Search: Bridging Cross-Encoder with Dual-Encoder via Self On-the-fly Distillation for Dense Passage Retrieval}},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arxiv.2310.01208
+@misc{li2023labelsupervised,
+  doi = {10.48550/ARXIV.2310.01208},
+  url = {https://arxiv.org/abs/2310.01208},
+  author = {Li, Zongxi and Li, Xianming and Liu, Yuzhang and Xie, Haoran and Li, Jing and Wang, Fu-lee and Li, Qing and Zhong, Xiaoqin},
+  keywords = {Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Label Supervised LLaMA Finetuning}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.18653/v1/d19-1410
+@inproceedings{reimers2019sbert, title={{Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks}}, url={http://dx.doi.org/10.18653/v1/d19-1410}, DOI={10.18653/v1/d19-1410}, booktitle={Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP)}, publisher={Association for Computational Linguistics}, author={Reimers, Nils and Gurevych, Iryna}, year={2019}, pages={3980--3990} }
+
+% source: 10.48550/arxiv.1901.04085
+@misc{nogueira2019bertrerank,
+  doi = {10.48550/ARXIV.1901.04085},
+  url = {https://arxiv.org/abs/1901.04085},
+  author = {Nogueira, Rodrigo and Cho, Kyunghyun},
+  keywords = {Information Retrieval (cs.IR), Computation and Language (cs.CL), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Passage Re-ranking with BERT}},
+  publisher = {arXiv},
+  year = {2019},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.2301.10448
+@misc{dejong2023lumen,
+  doi = {10.48550/ARXIV.2301.10448},
+  url = {https://arxiv.org/abs/2301.10448},
+  author = {de Jong, Michiel and Zemlyanskiy, Yury and FitzGerald, Nicholas and Ainslie, Joshua and Sanghai, Sumit and Sha, Fei and Cohen, William},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Pre-computed memory or on-the-fly encoding? A hybrid approach to retrieval augmentation makes the most of your compute}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.18653/v1/2025.acl-long.127
+@inproceedings{warner2024modernbert, title={{Smarter, Better, Faster, Longer: A Modern Bidirectional Encoder for Fast, Memory Efficient, and Long Context Finetuning and Inference}}, url={http://dx.doi.org/10.18653/v1/2025.acl-long.127}, DOI={10.18653/v1/2025.acl-long.127}, booktitle={Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, publisher={Association for Computational Linguistics}, author={Warner, Benjamin and Chaffin, Antoine and Clavié, Benjamin and Weller, Orion and Hallström, Oskar and Taghadouini, Said and Gallagher, Alexis and Biswas, Raja and Ladhak, Faisal and Aarsen, Tom and Adams, Griffin Thomas and Howard, Jeremy and Poli, Iacopo}, year={2025}, pages={2526--2547} }
+
+% source: 10.18653/v1/2020.nlp4convai-1.5
+@inproceedings{casanueva2020banking77, title={{Efficient Intent Detection with Dual Sentence Encoders}}, url={http://dx.doi.org/10.18653/v1/2020.nlp4convai-1.5}, DOI={10.18653/v1/2020.nlp4convai-1.5}, booktitle={Proceedings of the 2nd Workshop on Natural Language Processing for Conversational AI}, publisher={Association for Computational Linguistics}, author={Casanueva, Iñigo and Tem{\v c}inas, Tadas and Gerz, Daniela and Henderson, Matthew and Vuli{\'c}, Ivan}, year={2020}, pages={38--45} }
+
+% source: 10.18653/v1/d19-1131
+@inproceedings{larson2019clinc, title={{An Evaluation Dataset for Intent Classification and Out-of-Scope Prediction}}, url={http://dx.doi.org/10.18653/v1/d19-1131}, DOI={10.18653/v1/d19-1131}, booktitle={Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP)}, publisher={Association for Computational Linguistics}, author={Larson, Stefan and Mahendran, Anish and Peper, Joseph J. and Clarke, Christopher and Lee, Andrew and Hill, Parker and Kummerfeld, Jonathan K. and Leach, Kevin and Laurenzano, Michael A. and Tang, Lingjia and Mars, Jason}, year={2019}, pages={1311--1316} }
+
+
+% ===== 2. Reading decisions from hidden states; MCQ interface artifacts =====
+
+% source: 10.18653/v1/2026.findings-acl.1144
+@inproceedings{wong2026models, title={{When Models Decide and When They Bind: A Two-Stage Computation for Multiple-Choice Question Answering}}, url={http://dx.doi.org/10.18653/v1/2026.findings-acl.1144}, DOI={10.18653/v1/2026.findings-acl.1144}, booktitle={Findings of the Association for Computational Linguistics: ACL 2026}, publisher={Association for Computational Linguistics}, author={Wong, Hugh Mee and Nouwen, Rick and Gatt, Albert}, year={2026}, pages={22804--22821} }
+
+% source: aclanthology.org/2026.findings-acl.2105
+@inproceedings{bhatt2026representation,
+    title = "From Representation to Choice: Tracing Decision Emergence Across Languages in {LLM}s",
+    author = "Bhatt, Divyanshu  and
+      Joshi, Abhinav  and
+      Patel, Ujjaval  and
+      Modi, Ashutosh",
+    editor = "Liakata, Maria  and
+      Moreira, Viviane P.  and
+      Zhang, Jiajun  and
+      Jurgens, David",
+    booktitle = "Findings of the {A}ssociation for {C}omputational {L}inguistics: {ACL} 2026",
+    month = jul,
+    year = "2026",
+    address = "San Diego, California, United States",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2026.findings-acl.2105/",
+    doi = "10.18653/v1/2026.findings-acl.2105",
+    pages = "42423--42442",
+    ISBN = "979-8-89176-395-1"
+}
+
+% source: 10.48550/arXiv.2307.09458
+@misc{lieberum2023circuit,
+  doi = {10.48550/ARXIV.2307.09458},
+  url = {https://arxiv.org/abs/2307.09458},
+  author = {Lieberum, Tom and Rahtz, Matthew and Kramár, János and Nanda, Neel and Irving, Geoffrey and Shah, Rohin and Mikulik, Vladimir},
+  keywords = {Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Does Circuit Analysis Interpretability Scale? Evidence from Multiple Choice Capabilities in Chinchilla}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.18653/v1/2023.conll-1.37
+@inproceedings{pal2023futurelens, title={{Future Lens: Anticipating Subsequent Tokens from a Single Hidden State}}, url={http://dx.doi.org/10.18653/v1/2023.conll-1.37}, DOI={10.18653/v1/2023.conll-1.37}, booktitle={Proceedings of the 27th Conference on Computational Natural Language Learning (CoNLL)}, publisher={Association for Computational Linguistics}, author={Pal, Koyena and Sun, Jiuding and Yuan, Andrew and Wallace, Byron and Bau, David}, year={2023}, pages={548--560} }
+
+% source: 10.48550/arXiv.2404.00859
+@misc{wu2024planahead,
+  doi = {10.48550/ARXIV.2404.00859},
+  url = {https://arxiv.org/abs/2404.00859},
+  author = {Wu, Wilson and Morris, John X. and Levine, Lionel},
+  keywords = {Machine Learning (cs.LG), Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Do language models plan ahead for future tokens?}},
+  publisher = {arXiv},
+  year = {2024},
+  copyright = {Creative Commons Attribution Share Alike 4.0 International}
+}
+
+% source: 10.48550/arxiv.2212.03827
+@misc{burns2023latentknowledge,
+  doi = {10.48550/ARXIV.2212.03827},
+  url = {https://arxiv.org/abs/2212.03827},
+  author = {Burns, Collin and Ye, Haotian and Klein, Dan and Steinhardt, Jacob},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Discovering Latent Knowledge in Language Models Without Supervision}},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.18653/v1/2023.findings-emnlp.68
+@inproceedings{azaria2023internalstate, title={{The Internal State of an LLM Knows When It's Lying}}, url={http://dx.doi.org/10.18653/v1/2023.findings-emnlp.68}, DOI={10.18653/v1/2023.findings-emnlp.68}, booktitle={Findings of the Association for Computational Linguistics: EMNLP 2023}, publisher={Association for Computational Linguistics}, author={Azaria, Amos and Mitchell, Tom}, year={2023}, pages={967--976} }
+
+% source: 10.48550/arxiv.1610.01644
+@misc{alain2017probes,
+  doi = {10.48550/ARXIV.1610.01644},
+  url = {https://arxiv.org/abs/1610.01644},
+  author = {Alain, Guillaume and Bengio, Yoshua},
+  keywords = {Machine Learning (stat.ML), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Understanding intermediate layers using linear classifier probes}},
+  publisher = {arXiv},
+  year = {2016},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.1162/coli_a_00422
+@article{belinkov2022probing, title={{Probing Classifiers: Promises, Shortcomings, and Advances}}, volume={48}, ISSN={1530-9312}, url={http://dx.doi.org/10.1162/coli_a_00422}, DOI={10.1162/coli_a_00422}, number={1}, journal={Computational Linguistics}, publisher={MIT Press}, author={Belinkov, Yonatan}, year={2022}, pages={207--219} }
+
+% source: 10.18653/v1/d19-1275
+@inproceedings{hewitt2019controltasks, title={{Designing and Interpreting Probes with Control Tasks}}, url={http://dx.doi.org/10.18653/v1/d19-1275}, DOI={10.18653/v1/d19-1275}, booktitle={Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP)}, publisher={Association for Computational Linguistics}, author={Hewitt, John and Liang, Percy}, year={2019}, pages={2733--2743} }
+
+% source: 10.18653/v1/p19-1452
+@inproceedings{tenney2019pipeline, title={{BERT Rediscovers the Classical NLP Pipeline}}, url={http://dx.doi.org/10.18653/v1/p19-1452}, DOI={10.18653/v1/p19-1452}, booktitle={Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics}, publisher={Association for Computational Linguistics}, author={Tenney, Ian and Das, Dipanjan and Pavlick, Ellie}, year={2019}, pages={4593--4601} }
+
+% source: 10.48550/arxiv.2303.08112
+@misc{belrose2023tunedlens,
+  doi = {10.48550/ARXIV.2303.08112},
+  url = {https://arxiv.org/abs/2303.08112},
+  author = {Belrose, Nora and Ostrovsky, Igor and McKinney, Lev and Furman, Zach and Smith, Logan and Halawi, Danny and Biderman, Stella and Steinhardt, Jacob},
+  keywords = {Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Eliciting Latent Predictions from Transformers with the Tuned Lens}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.48550/arxiv.2309.03882
+@misc{zheng2024selectionbias,
+  doi = {10.48550/ARXIV.2309.03882},
+  url = {https://arxiv.org/abs/2309.03882},
+  author = {Zheng, Chujie and Zhou, Hao and Meng, Fandong and Zhou, Jie and Huang, Minlie},
+  keywords = {Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Large Language Models Are Not Robust Multiple Choice Selectors}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.18653/v1/2024.findings-naacl.130
+@inproceedings{pezeshkpour2024optionorder, title={{Large Language Models Sensitivity to The Order of Options in Multiple-Choice Questions}}, url={http://dx.doi.org/10.18653/v1/2024.findings-naacl.130}, DOI={10.18653/v1/2024.findings-naacl.130}, booktitle={Findings of the Association for Computational Linguistics: NAACL 2024}, publisher={Association for Computational Linguistics}, author={Pezeshkpour, Pouya and Hruschka, Estevam}, year={2024}, pages={2006--2017} }
+
+% source: 10.18653/v1/2024.acl-long.555
+@inproceedings{balepur2024artifacts, title={{Artifacts or Abduction: How Do LLMs Answer Multiple-Choice Questions Without the Question?}}, url={http://dx.doi.org/10.18653/v1/2024.acl-long.555}, DOI={10.18653/v1/2024.acl-long.555}, booktitle={Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, publisher={Association for Computational Linguistics}, author={Balepur, Nishant and Ravichander, Abhilasha and Rudinger, Rachel}, year={2024}, pages={10308--10330} }
+
+% source: 10.48550/arxiv.2210.12353
+@misc{robinson2023mcp,
+  doi = {10.48550/ARXIV.2210.12353},
+  url = {https://arxiv.org/abs/2210.12353},
+  author = {Robinson, Joshua and Rytting, Christopher Michael and Wingate, David},
+  keywords = {Computation and Language (cs.CL), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Leveraging Large Language Models for Multiple Choice Question Answering}},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.18653/v1/2024.findings-acl.441
+@inproceedings{wang2024firsttoken, title={{``My Answer is C'': First-Token Probabilities Do Not Match Text Answers in Instruction-Tuned Language Models}}, url={http://dx.doi.org/10.18653/v1/2024.findings-acl.441}, DOI={10.18653/v1/2024.findings-acl.441}, booktitle={Findings of the Association for Computational Linguistics ACL 2024}, publisher={Association for Computational Linguistics}, author={Wang, Xinpeng and Ma, Bolei and Hu, Chengzhi and Weber-Genzel, Leon and Röttger, Paul and Kreuter, Frauke and Hovy, Dirk and Plank, Barbara}, year={2024}, pages={7407--7416} }
+
+% source: 10.18653/v1/2025.naacl-long.95
+@inproceedings{yang2025option, title={{Option Symbol Matters: Investigating and Mitigating Multiple-Choice Option Symbol Bias of Large Language Models}}, url={http://dx.doi.org/10.18653/v1/2025.naacl-long.95}, DOI={10.18653/v1/2025.naacl-long.95}, booktitle={Proceedings of the 2025 Conference of the Nations of the Americas Chapter of the Association for Computational Linguistics: Human Language Technologies (Volume 1: Long Papers)}, publisher={Association for Computational Linguistics}, author={Yang, Zhen and Jian, Ping and Li, Chengzhi}, year={2025}, pages={1902--1917} }
+
+% source: 10.18653/v1/2024.acl-long.237
+@inproceedings{xue2024symbolbinding, title={{Strengthened Symbol Binding Makes Large Language Models Reliable Multiple-Choice Selectors}}, url={http://dx.doi.org/10.18653/v1/2024.acl-long.237}, DOI={10.18653/v1/2024.acl-long.237}, booktitle={Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, publisher={Association for Computational Linguistics}, author={Xue, Mengge and Hu, Zhenyu and Liu, Liqun and Liao, Kuo and Li, Shuang and Han, Honglin and Zhao, Meng and Yin, Chengguo}, year={2024}, pages={4331--4344} }
+
+% source: 10.48550/arxiv.2403.17887
+@misc{gromov2024deeperlayers,
+  doi = {10.48550/ARXIV.2403.17887},
+  url = {https://arxiv.org/abs/2403.17887},
+  author = {Gromov, Andrey and Tirumala, Kushal and Shapourian, Hassan and Glorioso, Paolo and Roberts, Daniel A.},
+  keywords = {Computation and Language (cs.CL), Machine Learning (cs.LG), Machine Learning (stat.ML), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{The Unreasonable Ineffectiveness of the Deeper Layers}},
+  publisher = {arXiv},
+  year = {2024},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.18653/v1/2025.findings-acl.1035
+@inproceedings{men2024shortgpt, title={{ShortGPT: Layers in Large Language Models are More Redundant Than You Expect}}, url={http://dx.doi.org/10.18653/v1/2025.findings-acl.1035}, DOI={10.18653/v1/2025.findings-acl.1035}, booktitle={Findings of the Association for Computational Linguistics: ACL 2025}, publisher={Association for Computational Linguistics}, author={Men, Xin and Xu, Mingyu and Zhang, Qingyu and Yuan, Qianhao and Wang, Bingning and Lin, Hongyu and Lu, Yaojie and Han, Xianpei and Chen, Weipeng}, year={2025}, pages={20192--20204} }
+
+% source: 10.18653/v1/2020.acl-main.593
+@inproceedings{schwartz2020righttool, title={{The Right Tool for the Job: Matching Model and Instance Complexities}}, url={http://dx.doi.org/10.18653/v1/2020.acl-main.593}, DOI={10.18653/v1/2020.acl-main.593}, booktitle={Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics}, publisher={Association for Computational Linguistics}, author={Schwartz, Roy and Stanovsky, Gabriel and Swayamdipta, Swabha and Dodge, Jesse and Smith, Noah A.}, year={2020}, pages={6640--6651} }
+
+
+% ===== 3. Calibration, proper scoring rules, conformal / selective prediction =====
+
+% source: 10.48550/arxiv.1706.04599
+@misc{guo2017calibration,
+  doi = {10.48550/ARXIV.1706.04599},
+  url = {https://arxiv.org/abs/1706.04599},
+  author = {Guo, Chuan and Pleiss, Geoff and Sun, Yu and Weinberger, Kilian Q.},
+  keywords = {Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{On Calibration of Modern Neural Networks}},
+  publisher = {arXiv},
+  year = {2017},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.1109/cvpr.2016.308
+@inproceedings{szegedy2016labelsmoothing, title={{Rethinking the Inception Architecture for Computer Vision}}, url={http://dx.doi.org/10.1109/cvpr.2016.308}, DOI={10.1109/cvpr.2016.308}, booktitle={2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, publisher={IEEE}, author={Szegedy, Christian and Vanhoucke, Vincent and Ioffe, Sergey and Shlens, Jon and Wojna, Zbigniew}, year={2016}, month=June, pages={2818--2826} }
+
+% source: 10.48550/arXiv.1906.02629
+@misc{mueller2019labelsmoothing,
+  doi = {10.48550/ARXIV.1906.02629},
+  url = {https://arxiv.org/abs/1906.02629},
+  author = {Müller, Rafael and Kornblith, Simon and Hinton, Geoffrey},
+  keywords = {Machine Learning (cs.LG), Machine Learning (stat.ML), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{When Does Label Smoothing Help?}},
+  publisher = {arXiv},
+  year = {2019},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.1109/iccv.2017.324
+@inproceedings{lin2017focal, title={{Focal Loss for Dense Object Detection}}, url={http://dx.doi.org/10.1109/iccv.2017.324}, DOI={10.1109/iccv.2017.324}, booktitle={2017 IEEE International Conference on Computer Vision (ICCV)}, publisher={IEEE}, author={Lin, Tsung-Yi and Goyal, Priya and Girshick, Ross and He, Kaiming and Dollar, Piotr}, year={2017}, month=Oct, pages={2999--3007} }
+
+% source: 10.48550/arxiv.2002.09437
+@misc{mukhoti2020focalcalibration,
+  doi = {10.48550/ARXIV.2002.09437},
+  url = {https://arxiv.org/abs/2002.09437},
+  author = {Mukhoti, Jishnu and Kulharia, Viveka and Sanyal, Amartya and Golodetz, Stuart and Torr, Philip H. S. and Dokania, Puneet K.},
+  keywords = {Machine Learning (cs.LG), Computer Vision and Pattern Recognition (cs.CV), Machine Learning (stat.ML), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Calibrating Deep Neural Networks using Focal Loss}},
+  publisher = {arXiv},
+  year = {2020},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.2308.13111
+@misc{yang2024laplacelora,
+  doi = {10.48550/ARXIV.2308.13111},
+  url = {https://arxiv.org/abs/2308.13111},
+  author = {Yang, Adam X. and Robeyns, Maxime and Wang, Xi and Aitchison, Laurence},
+  keywords = {Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Bayesian Low-rank Adaptation for Large Language Models}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.18653/v1/2025.acl-long.722
+@inproceedings{wang2025cogcalib, title={{Towards Objective Fine-tuning: How LLMs' Prior Knowledge Causes Potential Poor Calibration?}}, url={http://dx.doi.org/10.18653/v1/2025.acl-long.722}, DOI={10.18653/v1/2025.acl-long.722}, booktitle={Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, publisher={Association for Computational Linguistics}, author={Wang, Ziming and Shi, Zeyu and Zhou, Haoyi and Gao, Shiqi and Sun, Qingyun and Li, Jianxin}, year={2025}, pages={14830--14853} }
+
+% source: 10.1198/016214506000001437
+@article{gneiting2007scoringrules, title={{Strictly Proper Scoring Rules, Prediction, and Estimation}}, volume={102}, ISSN={1537-274X}, url={http://dx.doi.org/10.1198/016214506000001437}, DOI={10.1198/016214506000001437}, number={477}, journal={Journal of the American Statistical Association}, publisher={Informa UK Limited}, author={Gneiting, Tilmann and Raftery, Adrian E}, year={2007}, month=Mar, pages={359--378} }
+
+% source: 10.1175/1520-0493(1950)078<0001:vofeit>2.0.co;2
+@article{brier1950verification, title={{VERIFICATION OF FORECASTS EXPRESSED IN TERMS OF PROBABILITY}}, volume={78}, ISSN={1520-0493}, url={http://dx.doi.org/10.1175/1520-0493(1950)078<0001:vofeit>2.0.co;2}, DOI={10.1175/1520-0493(1950)078<0001:vofeit>2.0.co;2}, number={1}, journal={Monthly Weather Review}, publisher={American Meteorological Society}, author={BRIER, GLENN W.}, year={1950}, month=Jan, pages={1--3} }
+
+% source: 10.1609/aaai.v29i1.9602
+@article{naeini2015calibration, title={{Obtaining Well Calibrated Probabilities Using Bayesian Binning}}, volume={29}, ISSN={2159-5399}, url={http://dx.doi.org/10.1609/aaai.v29i1.9602}, DOI={10.1609/aaai.v29i1.9602}, number={1}, journal={Proceedings of the AAAI Conference on Artificial Intelligence}, publisher={Association for the Advancement of Artificial Intelligence (AAAI)}, author={Pakdaman Naeini, Mahdi and Cooper, Gregory and Hauskrecht, Milos}, year={2015}, month=Feb }
+
+% source: 10.48550/arXiv.1909.10155
+@misc{kumar2019verifiedcalibration,
+  doi = {10.48550/ARXIV.1909.10155},
+  url = {https://arxiv.org/abs/1909.10155},
+  author = {Kumar, Ananya and Liang, Percy and Ma, Tengyu},
+  keywords = {Machine Learning (cs.LG), Machine Learning (stat.ML), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Verified Uncertainty Calibration}},
+  publisher = {arXiv},
+  year = {2019},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.18653/v1/2020.emnlp-main.21
+@inproceedings{desai2020calibration, title={{Calibration of Pre-trained Transformers}}, url={http://dx.doi.org/10.18653/v1/2020.emnlp-main.21}, DOI={10.18653/v1/2020.emnlp-main.21}, booktitle={Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing (EMNLP)}, publisher={Association for Computational Linguistics}, author={Desai, Shrey and Durrett, Greg}, year={2020}, pages={295--302} }
+
+% source: 10.1162/tacl_a_00407
+@article{jiang2021calibration, title={{How Can We Know
+                    <i>When</i>
+                    Language Models Know? On the Calibration of Language Models for Question Answering}}, volume={9}, ISSN={2307-387X}, url={http://dx.doi.org/10.1162/tacl_a_00407}, DOI={10.1162/tacl_a_00407}, journal={Transactions of the Association for Computational Linguistics}, publisher={MIT Press}, author={Jiang, Zhengbao and Araki, Jun and Ding, Haibo and Neubig, Graham}, year={2021}, pages={962--977} }
+
+% source: 10.18653/v1/2023.emnlp-main.330
+@inproceedings{tian2023verbalized, title={{Just Ask for Calibration: Strategies for Eliciting Calibrated Confidence Scores from Language Models Fine-Tuned with Human Feedback}}, url={http://dx.doi.org/10.18653/v1/2023.emnlp-main.330}, DOI={10.18653/v1/2023.emnlp-main.330}, booktitle={Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing}, publisher={Association for Computational Linguistics}, author={Tian, Katherine and Mitchell, Eric and Zhou, Allan and Sharma, Archit and Rafailov, Rafael and Yao, Huaxiu and Finn, Chelsea and Manning, Christopher}, year={2023}, pages={5433--5442} }
+
+% source: 10.48550/arxiv.2207.05221
+@misc{kadavath2022know,
+  doi = {10.48550/ARXIV.2207.05221},
+  url = {https://arxiv.org/abs/2207.05221},
+  author = {Kadavath, Saurav and Conerly, Tom and Askell, Amanda and Henighan, Tom and Drain, Dawn and Perez, Ethan and Schiefer, Nicholas and Hatfield-Dodds, Zac and DasSarma, Nova and Tran-Johnson, Eli and Johnston, Scott and El-Showk, Sheer and Jones, Andy and Elhage, Nelson and Hume, Tristan and Chen, Anna and Bai, Yuntao and Bowman, Sam and Fort, Stanislav and Ganguli, Deep and Hernandez, Danny and Jacobson, Josh and Kernion, Jackson and Kravec, Shauna and Lovitt, Liane and Ndousse, Kamal and Olsson, Catherine and Ringer, Sam and Amodei, Dario and Brown, Tom and Clark, Jack and Joseph, Nicholas and Mann, Ben and McCandlish, Sam and Olah, Chris and Kaplan, Jared},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Language Models (Mostly) Know What They Know}},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.48550/arxiv.2102.09690
+@misc{zhao2021calibrate,
+  doi = {10.48550/ARXIV.2102.09690},
+  url = {https://arxiv.org/abs/2102.09690},
+  author = {Zhao, Tony Z. and Wallace, Eric and Feng, Shi and Klein, Dan and Singh, Sameer},
+  keywords = {Computation and Language (cs.CL), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Calibrate Before Use: Improving Few-Shot Performance of Language Models}},
+  publisher = {arXiv},
+  year = {2021},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.1561/2200000101
+@article{angelopoulos2023conformal, title={{Conformal Prediction: A Gentle Introduction}}, volume={16}, ISSN={1935-8245}, url={http://dx.doi.org/10.1561/2200000101}, DOI={10.1561/2200000101}, number={4}, journal={Foundations and Trends® in Machine Learning}, publisher={Emerald}, author={Angelopoulos, Anastasios N. and Bates, Stephen}, year={2023}, month=Mar, pages={494--591} }
+
+% source: 10.48550/arxiv.2006.02544
+@article{romano2020adaptivecoverage,
+  doi = {10.48550/ARXIV.2006.02544},
+  url = {https://arxiv.org/abs/2006.02544},
+  author = {Romano, Yaniv and Sesia, Matteo and Candès, Emmanuel J.},
+  keywords = {Methodology (stat.ME), Machine Learning (stat.ML), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Classification with Valid and Adaptive Coverage}},
+  publisher = {arXiv},
+  year = {2020},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.2305.18404
+@misc{kumar2023conformalmcq,
+  doi = {10.48550/ARXIV.2305.18404},
+  url = {https://arxiv.org/abs/2305.18404},
+  author = {Kumar, Bhawesh and Lu, Charlie and Gupta, Gauri and Palepu, Anil and Bellamy, David and Raskar, Ramesh and Beam, Andrew},
+  keywords = {Computation and Language (cs.CL), Machine Learning (cs.LG), Machine Learning (stat.ML), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Conformal Prediction with Large Language Models for Multi-Choice Question Answering}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.1175/1520-0450(1969)008<0985:assfpf>2.0.co;2
+@article{epstein1969rps, title={{A Scoring System for Probability Forecasts of Ranked Categories}}, volume={8}, ISSN={0021-8952}, url={http://dx.doi.org/10.1175/1520-0450(1969)008<0985:assfpf>2.0.co;2}, DOI={10.1175/1520-0450(1969)008<0985:assfpf>2.0.co;2}, number={6}, journal={Journal of Applied Meteorology}, publisher={American Meteorological Society}, author={Epstein, Edward S.}, year={1969}, month=Dec, pages={985--987} }
+
+% source: 10.1175/1520-0493(1970)098<0917:trpsat>2.3.co;2
+@article{murphy1970rps, title={{THE RANKED PROBABILITY SCORE AND THE PROBABILITY SCORE: A COMPARISON<sup>1,,</sup><sup>2</sup>}}, volume={98}, ISSN={1520-0493}, url={http://dx.doi.org/10.1175/1520-0493(1970)098<0917:trpsat>2.3.co;2}, DOI={10.1175/1520-0493(1970)098<0917:trpsat>2.3.co;2}, number={12}, journal={Monthly Weather Review}, publisher={American Meteorological Society}, author={MURPHY, ALLAN H.}, year={1970}, month=Dec, pages={917--924} }
+
+
+% ===== 4. Distillation, context distillation, self-distillation =====
+
+% source: 10.48550/arXiv.1503.02531
+@misc{hinton2015distillation,
+  doi = {10.48550/ARXIV.1503.02531},
+  url = {https://arxiv.org/abs/1503.02531},
+  author = {Hinton, Geoffrey and Vinyals, Oriol and Dean, Jeff},
+  keywords = {Machine Learning (stat.ML), Machine Learning (cs.LG), Neural and Evolutionary Computing (cs.NE), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Distilling the Knowledge in a Neural Network}},
+  publisher = {arXiv},
+  year = {2015},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.18653/v1/d16-1139
+@inproceedings{kim2016seqkd, title={{Sequence-Level Knowledge Distillation}}, url={http://dx.doi.org/10.18653/v1/d16-1139}, DOI={10.18653/v1/d16-1139}, booktitle={Proceedings of the 2016 Conference on Empirical Methods in Natural
+          Language Processing}, publisher={Association for Computational Linguistics}, author={Kim, Yoon and Rush, Alexander M.}, year={2016}, pages={1317--1327} }
+
+% source: 10.48550/arXiv.2112.00861
+@misc{askell2021assistant,
+  doi = {10.48550/ARXIV.2112.00861},
+  url = {https://arxiv.org/abs/2112.00861},
+  author = {Askell, Amanda and Bai, Yuntao and Chen, Anna and Drain, Dawn and Ganguli, Deep and Henighan, Tom and Jones, Andy and Joseph, Nicholas and Mann, Ben and DasSarma, Nova and Elhage, Nelson and Hatfield-Dodds, Zac and Hernandez, Danny and Kernion, Jackson and Ndousse, Kamal and Olsson, Catherine and Amodei, Dario and Brown, Tom and Clark, Jack and McCandlish, Sam and Olah, Chris and Kaplan, Jared},
+  keywords = {Computation and Language (cs.CL), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{A General Language Assistant as a Laboratory for Alignment}},
+  publisher = {arXiv},
+  year = {2021},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.2209.15189
+@misc{snell2022contextdistillation,
+  doi = {10.48550/ARXIV.2209.15189},
+  url = {https://arxiv.org/abs/2209.15189},
+  author = {Snell, Charlie and Klein, Dan and Zhong, Ruiqi},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Learning by Distilling Context}},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.18653/v1/2024.acl-long.58
+@inproceedings{yang2024sdft, title={{Self-Distillation Bridges Distribution Gap in Language Model Fine-Tuning}}, url={http://dx.doi.org/10.18653/v1/2024.acl-long.58}, DOI={10.18653/v1/2024.acl-long.58}, booktitle={Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, publisher={Association for Computational Linguistics}, author={Yang, Zhaorui and Pang, Tianyu and Feng, Haozhe and Wang, Han and Chen, Wei and Zhu, Minfeng and Liu, Qian}, year={2024}, pages={1028--1043} }
+
+% source: 10.1109/cvpr42600.2020.00396
+@inproceedings{yuan2020teacherfree, title={{Revisiting Knowledge Distillation via Label Smoothing Regularization}}, url={http://dx.doi.org/10.1109/cvpr42600.2020.00396}, DOI={10.1109/cvpr42600.2020.00396}, booktitle={2020 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, publisher={IEEE}, author={Yuan, Li and Tay, Francis EH and Li, Guilin and Wang, Tao and Feng, Jiashi}, year={2020}, month=June, pages={3902--3910} }
+
+% source: 10.48550/arXiv.2006.05065
+@article{zhang2020selfdistillation,
+  doi = {10.48550/ARXIV.2006.05065},
+  url = {https://arxiv.org/abs/2006.05065},
+  author = {Zhang, Zhilu and Sabuncu, Mert R.},
+  keywords = {Machine Learning (cs.LG), Machine Learning (stat.ML), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Self-Distillation as Instance-Specific Label Smoothing}},
+  publisher = {arXiv},
+  year = {2020},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+
+% ===== 5. Prefix / KV sharing, serving efficiency, generation-side accelerators =====
+
+% source: 10.48550/arXiv.2402.05099
+@misc{juravsky2024hydragen,
+  doi = {10.48550/ARXIV.2402.05099},
+  url = {https://arxiv.org/abs/2402.05099},
+  author = {Juravsky, Jordan and Brown, Bradley and Ehrlich, Ryan and Fu, Daniel Y. and Ré, Christopher and Mirhoseini, Azalia},
+  keywords = {Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Hydragen: High-Throughput LLM Inference with Shared Prefixes}},
+  publisher = {arXiv},
+  year = {2024},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.52202/079017-2000
+@inproceedings{zheng2023sglang, series={NeurIPS 2024}, title={{SGLang: Efficient Execution of Structured Language Model Programs}}, url={http://dx.doi.org/10.52202/079017-2000}, DOI={10.52202/079017-2000}, booktitle={Advances in Neural Information Processing Systems 37}, publisher={Neural Information Processing Systems Foundation, Inc. (NeurIPS)}, author={Zheng, Lianmin and Yin, Liangsheng and Xie, Zhiqiang and Sun, Chuyue and Huang, Jeff and Yu, Cody and Cao, Shiyi and Kozyrakis, Christos and Stoica, Ion and Gonzalez, Joseph and Barrett, Clark and Sheng, Ying}, year={2024}, pages={62557--62583}, collection={NeurIPS 2024} }
+
+% source: 10.1145/3600006.3613165
+@inproceedings{kwon2023pagedattention, series={SOSP '23}, title={{Efficient Memory Management for Large Language Model Serving with PagedAttention}}, url={http://dx.doi.org/10.1145/3600006.3613165}, DOI={10.1145/3600006.3613165}, booktitle={Proceedings of the 29th Symposium on Operating Systems Principles}, publisher={ACM}, author={Kwon, Woosuk and Li, Zhuohan and Zhuang, Siyuan and Sheng, Ying and Zheng, Lianmin and Yu, Cody Hao and Gonzalez, Joseph and Zhang, Hao and Stoica, Ion}, year={2023}, month=Oct, pages={611--626}, collection={SOSP '23} }
+
+% source: 10.48550/arXiv.2311.04934
+@misc{gim2023promptcache,
+  doi = {10.48550/ARXIV.2311.04934},
+  url = {https://arxiv.org/abs/2311.04934},
+  author = {Gim, In and Chen, Guojun and Lee, Seung-seob and Sarda, Nikhil and Khandelwal, Anurag and Zhong, Lin},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Prompt Cache: Modular Attention Reuse for Low-Latency Inference}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.2211.05102
+@misc{pope2023scaling,
+  doi = {10.48550/ARXIV.2211.05102},
+  url = {https://arxiv.org/abs/2211.05102},
+  author = {Pope, Reiner and Douglas, Sholto and Chowdhery, Aakanksha and Devlin, Jacob and Bradbury, James and Levskaya, Anselm and Heek, Jonathan and Xiao, Kefan and Agrawal, Shivani and Dean, Jeff},
+  keywords = {Machine Learning (cs.LG), Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Efficiently Scaling Transformer Inference}},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.52202/068431-1189
+@inproceedings{dao2022flashattention, series={NeurIPS 2022}, title={{FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness}}, url={http://dx.doi.org/10.52202/068431-1189}, DOI={10.52202/068431-1189}, booktitle={Advances in Neural Information Processing Systems 35}, publisher={Neural Information Processing Systems Foundation, Inc. (NeurIPS)}, author={Dao, Tri and Fu, Dan and Ermon, Stefano and Rudra, Atri and Ré, Christopher}, year={2022}, pages={16344--16359}, collection={NeurIPS 2022} }
+
+% source: 10.48550/arXiv.2211.17192
+@misc{leviathan2023speculative,
+  doi = {10.48550/ARXIV.2211.17192},
+  url = {https://arxiv.org/abs/2211.17192},
+  author = {Leviathan, Yaniv and Kalman, Matan and Matias, Yossi},
+  keywords = {Machine Learning (cs.LG), Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Fast Inference from Transformers via Speculative Decoding}},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.48550/arXiv.2302.01318
+@misc{chen2023speculativesampling,
+  doi = {10.48550/ARXIV.2302.01318},
+  url = {https://arxiv.org/abs/2302.01318},
+  author = {Chen, Charlie and Borgeaud, Sebastian and Irving, Geoffrey and Lespiau, Jean-Baptiste and Sifre, Laurent and Jumper, John},
+  keywords = {Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Accelerating Large Language Model Decoding with Speculative Sampling}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.48550/arXiv.2401.10774
+@misc{cai2024medusa,
+  doi = {10.48550/ARXIV.2401.10774},
+  url = {https://arxiv.org/abs/2401.10774},
+  author = {Cai, Tianle and Li, Yuhong and Geng, Zhengyang and Peng, Hongwu and Lee, Jason D. and Chen, Deming and Dao, Tri},
+  keywords = {Machine Learning (cs.LG), Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Medusa: Simple LLM Inference Acceleration Framework with Multiple Decoding Heads}},
+  publisher = {arXiv},
+  year = {2024},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.18653/v1/2023.emnlp-industry.74
+@inproceedings{cheng2023batch, title={{Batch Prompting: Efficient Inference with Large Language Model APIs}}, url={http://dx.doi.org/10.18653/v1/2023.emnlp-industry.74}, DOI={10.18653/v1/2023.emnlp-industry.74}, booktitle={Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing: Industry Track}, publisher={Association for Computational Linguistics}, author={Cheng, Zhoujun and Kasai, Jungo and Yu, Tao}, year={2023}, pages={792--810} }
+
+
+% ===== 6. Chain-of-thought necessity, expressivity limits, latent / implicit CoT, constrained decoding =====
+
+% source: 10.52202/068431-1800
+@inproceedings{wei2022cot, series={NeurIPS 2022}, title={{Chain-Of-Thought Prompting Elicits Reasoning in Large Language Models}}, url={http://dx.doi.org/10.52202/068431-1800}, DOI={10.52202/068431-1800}, booktitle={Advances in Neural Information Processing Systems 35}, publisher={Neural Information Processing Systems Foundation, Inc. (NeurIPS)}, author={Wei, Jason and Wang, Xuezhi and Schuurmans, Dale and Bosma, Maarten and Ichter, Brian and Xia, Fei and Chi, Ed and Le, Quoc V and Zhou, Denny}, year={2022}, pages={24824--24837}, collection={NeurIPS 2022} }
+
+% source: 10.48550/arXiv.2409.12183
+@misc{sprague2025cot,
+  doi = {10.48550/ARXIV.2409.12183},
+  url = {https://arxiv.org/abs/2409.12183},
+  author = {Sprague, Zayne and Yin, Fangcong and Rodriguez, Juan Diego and Jiang, Dongwei and Wadhwa, Manya and Singhal, Prasann and Zhao, Xinyu and Ye, Xi and Mahowald, Kyle and Durrett, Greg},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{To CoT or not to CoT? Chain-of-thought helps mainly on math and symbolic reasoning}},
+  publisher = {arXiv},
+  year = {2024},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.48550/arxiv.2402.12875
+@misc{li2024cotserial,
+  doi = {10.48550/ARXIV.2402.12875},
+  url = {https://arxiv.org/abs/2402.12875},
+  author = {Li, Zhiyuan and Liu, Hong and Zhou, Denny and Ma, Tengyu},
+  keywords = {Machine Learning (cs.LG), Computational Complexity (cs.CC), Machine Learning (stat.ML), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Chain of Thought Empowers Transformers to Solve Inherently Serial Problems}},
+  publisher = {arXiv},
+  year = {2024},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arxiv.2310.07923
+@misc{merrill2024expressive,
+  doi = {10.48550/ARXIV.2310.07923},
+  url = {https://arxiv.org/abs/2310.07923},
+  author = {Merrill, William and Sabharwal, Ashish},
+  keywords = {Machine Learning (cs.LG), Computational Complexity (cs.CC), Computation and Language (cs.CL), Logic in Computer Science (cs.LO), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{The Expressive Power of Transformers with Chain of Thought}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.1162/tacl_a_00562
+@article{merrill2023parallelism, title={{The Parallelism Tradeoff: Limitations of Log-Precision Transformers}}, volume={11}, ISSN={2307-387X}, url={http://dx.doi.org/10.1162/tacl_a_00562}, DOI={10.1162/tacl_a_00562}, journal={Transactions of the Association for Computational Linguistics}, publisher={MIT Press}, author={Merrill, William and Sabharwal, Ashish}, year={2023}, pages={531--545} }
+
+% source: 10.48550/arXiv.2305.15408
+@misc{feng2023chain,
+  doi = {10.48550/ARXIV.2305.15408},
+  url = {https://arxiv.org/abs/2305.15408},
+  author = {Feng, Guhao and Zhang, Bohang and Gu, Yuntian and Ye, Haotian and He, Di and Wang, Liwei},
+  keywords = {Machine Learning (cs.LG), Computational Complexity (cs.CC), Computation and Language (cs.CL), Machine Learning (stat.ML), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Towards Revealing the Mystery behind Chain of Thought: A Theoretical Perspective}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arxiv.2310.02226
+@misc{goyal2024pause,
+  doi = {10.48550/ARXIV.2310.02226},
+  url = {https://arxiv.org/abs/2310.02226},
+  author = {Goyal, Sachin and Ji, Ziwei and Rawat, Ankit Singh and Menon, Aditya Krishna and Kumar, Sanjiv and Nagarajan, Vaishnavh},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Think before you speak: Training Language Models With Pause Tokens}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arxiv.2404.15758
+@misc{pfau2024filler,
+  doi = {10.48550/ARXIV.2404.15758},
+  url = {https://arxiv.org/abs/2404.15758},
+  author = {Pfau, Jacob and Merrill, William and Bowman, Samuel R.},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), FOS: Computer and information sciences, FOS: Computer and information sciences, I.2.6},
+  title = {{Let's Think Dot by Dot: Hidden Computation in Transformer Language Models}},
+  publisher = {arXiv},
+  year = {2024},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.48550/arxiv.2311.01460
+@misc{deng2023implicitcot,
+  doi = {10.48550/ARXIV.2311.01460},
+  url = {https://arxiv.org/abs/2311.01460},
+  author = {Deng, Yuntian and Prasad, Kiran and Fernandez, Roland and Smolensky, Paul and Chaudhary, Vishrav and Shieber, Stuart},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Implicit Chain of Thought Reasoning via Knowledge Distillation}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arxiv.2405.14838
+@misc{deng2024internalize,
+  doi = {10.48550/ARXIV.2405.14838},
+  url = {https://arxiv.org/abs/2405.14838},
+  author = {Deng, Yuntian and Choi, Yejin and Shieber, Stuart},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{From Explicit CoT to Implicit CoT: Learning to Internalize CoT Step by Step}},
+  publisher = {arXiv},
+  year = {2024},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.2412.06769
+@misc{hao2024coconut,
+  doi = {10.48550/ARXIV.2412.06769},
+  url = {https://arxiv.org/abs/2412.06769},
+  author = {Hao, Shibo and Sukhbaatar, Sainbayar and Su, DiJia and Li, Xian and Hu, Zhiting and Weston, Jason and Tian, Yuandong},
+  keywords = {Computation and Language (cs.CL), FOS: Computer and information sciences},
+  title = {{Training Large Language Models to Reason in a Continuous Latent Space}},
+  publisher = {arXiv},
+  year = {2024},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.18653/v1/2023.emnlp-main.674
+@inproceedings{geng2023grammarconstrained, title={{Grammar-Constrained Decoding for Structured NLP Tasks without Finetuning}}, url={http://dx.doi.org/10.18653/v1/2023.emnlp-main.674}, DOI={10.18653/v1/2023.emnlp-main.674}, booktitle={Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing}, publisher={Association for Computational Linguistics}, author={Geng, Saibo and Josifoski, Martin and Peyrard, Maxime and West, Robert}, year={2023}, pages={10932--10952} }
+
+% source: 10.48550/arXiv.2307.09702
+@misc{willard2023guided,
+  doi = {10.48550/ARXIV.2307.09702},
+  url = {https://arxiv.org/abs/2307.09702},
+  author = {Willard, Brandon T. and Louf, Rémi},
+  keywords = {Computation and Language (cs.CL), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Efficient Guided Generation for Large Language Models}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.48550/arXiv.2403.06988
+@misc{beurerkellner2024domino,
+  doi = {10.48550/ARXIV.2403.06988},
+  url = {https://arxiv.org/abs/2403.06988},
+  author = {Beurer-Kellner, Luca and Fischer, Marc and Vechev, Martin},
+  keywords = {Machine Learning (cs.LG), Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Guiding LLMs The Right Way: Fast, Non-Invasive Constrained Generation}},
+  publisher = {arXiv},
+  year = {2024},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.18653/v1/2024.emnlp-industry.91
+@inproceedings{tam2024speakfreely, title={{Let Me Speak Freely? A Study On The Impact Of Format Restrictions On Large Language Model Performance.}}, url={http://dx.doi.org/10.18653/v1/2024.emnlp-industry.91}, DOI={10.18653/v1/2024.emnlp-industry.91}, booktitle={Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing: Industry Track}, publisher={Association for Computational Linguistics}, author={Tam, Zhi Rui and Wu, Cheng-Kuang and Tsai, Yi-Lin and Lin, Chieh-Yen and Lee, Hung-yi and Chen, Yun-Nung}, year={2024}, pages={1218--1236} }
+
+
+% ===== 7. Ordinal regression heads and ordinal targets =====
+
+% source: 10.1111/j.2517-6161.1980.tb01109.x
+@article{mccullagh1980ordinal, title={{Regression Models for Ordinal Data}}, volume={42}, ISSN={1467-9868}, url={http://dx.doi.org/10.1111/j.2517-6161.1980.tb01109.x}, DOI={10.1111/j.2517-6161.1980.tb01109.x}, number={2}, journal={Journal of the Royal Statistical Society Series B: Statistical Methodology}, publisher={Oxford University Press (OUP)}, author={McCullagh, Peter}, year={1980}, month=Jan, pages={109--127} }
+
+% source: 10.1007/3-540-44795-4_13
+@inbook{frank2001ordinal, title={{A Simple Approach to Ordinal Classification}}, ISBN={9783540447955}, ISSN={0302-9743}, url={http://dx.doi.org/10.1007/3-540-44795-4_13}, DOI={10.1007/3-540-44795-4_13}, booktitle={Machine Learning: ECML 2001}, publisher={Springer Berlin Heidelberg}, author={Frank, Eibe and Hall, Mark}, year={2001}, pages={145--156} }
+
+% source: 10.1109/cvpr.2016.532
+@inproceedings{niu2016ordinalcnn, title={{Ordinal Regression with Multiple Output CNN for Age Estimation}}, url={http://dx.doi.org/10.1109/cvpr.2016.532}, DOI={10.1109/cvpr.2016.532}, booktitle={2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, publisher={IEEE}, author={Niu, Zhenxing and Zhou, Mo and Wang, Le and Gao, Xinbo and Hua, Gang}, year={2016}, month=June, pages={4920--4928} }
+
+% source: 10.1016/j.patrec.2020.11.008
+@article{cao2020coral, title={{Rank consistent ordinal regression for neural networks with application to age estimation}}, volume={140}, ISSN={0167-8655}, url={http://dx.doi.org/10.1016/j.patrec.2020.11.008}, DOI={10.1016/j.patrec.2020.11.008}, journal={Pattern Recognition Letters}, publisher={Elsevier BV}, author={Cao, Wenzhi and Mirjalili, Vahid and Raschka, Sebastian}, year={2020}, month=Dec, pages={325--331} }
+
+% source: 10.1007/s10044-023-01181-9
+@article{shi2023corn, title={{Deep neural networks for rank-consistent ordinal regression based on conditional probabilities}}, volume={26}, ISSN={1433-755X}, url={http://dx.doi.org/10.1007/s10044-023-01181-9}, DOI={10.1007/s10044-023-01181-9}, number={3}, journal={Pattern Analysis and Applications}, publisher={Springer Science and Business Media LLC}, author={Shi, Xintong and Cao, Wenzhi and Raschka, Sebastian}, year={2023}, month=June, pages={941--955} }
+
+% source: 10.1109/cvpr.2019.00487
+@inproceedings{diaz2019softordinal, title={{Soft Labels for Ordinal Regression}}, url={http://dx.doi.org/10.1109/cvpr.2019.00487}, DOI={10.1109/cvpr.2019.00487}, booktitle={2019 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, publisher={IEEE}, author={Díaz, Raúl and Marathe, Amit}, year={2019}, month=June, pages={4733--4742} }
+
+
+% ===== 8. Abstention, selective classification, OOD / out-of-scope detection =====
+
+% source: 10.1109/tit.1970.1054406
+@article{chow1970reject, title={{On optimum recognition error and reject tradeoff}}, volume={16}, ISSN={1557-9654}, url={http://dx.doi.org/10.1109/tit.1970.1054406}, DOI={10.1109/tit.1970.1054406}, number={1}, journal={IEEE Transactions on Information Theory}, publisher={Institute of Electrical and Electronics Engineers (IEEE)}, author={Chow, C.}, year={1970}, month=Jan, pages={41--46} }
+
+% source: 10.48550/arXiv.1705.08500
+@misc{geifman2017selective,
+  doi = {10.48550/ARXIV.1705.08500},
+  url = {https://arxiv.org/abs/1705.08500},
+  author = {Geifman, Yonatan and El-Yaniv, Ran},
+  keywords = {Machine Learning (cs.LG), Artificial Intelligence (cs.AI), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Selective Classification for Deep Neural Networks}},
+  publisher = {arXiv},
+  year = {2017},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.1901.09192
+@misc{geifman2019selectivenet,
+  doi = {10.48550/ARXIV.1901.09192},
+  url = {https://arxiv.org/abs/1901.09192},
+  author = {Geifman, Yonatan and El-Yaniv, Ran},
+  keywords = {Machine Learning (cs.LG), Machine Learning (stat.ML), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{SelectiveNet: A Deep Neural Network with an Integrated Reject Option}},
+  publisher = {arXiv},
+  year = {2019},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.1610.02136
+@article{hendrycks2017msp,
+  doi = {10.48550/ARXIV.1610.02136},
+  url = {https://arxiv.org/abs/1610.02136},
+  author = {Hendrycks, Dan and Gimpel, Kevin},
+  keywords = {Neural and Evolutionary Computing (cs.NE), Computer Vision and Pattern Recognition (cs.CV), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{A Baseline for Detecting Misclassified and Out-of-Distribution Examples in Neural Networks}},
+  publisher = {arXiv},
+  year = {2016},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.2010.03759
+@misc{liu2020energyood,
+  doi = {10.48550/ARXIV.2010.03759},
+  url = {https://arxiv.org/abs/2010.03759},
+  author = {Liu, Weitang and Wang, Xiaoyun and Owens, John D. and Li, Yixuan},
+  keywords = {Machine Learning (cs.LG), Artificial Intelligence (cs.AI), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Energy-based Out-of-distribution Detection}},
+  publisher = {arXiv},
+  year = {2020},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.2407.18418
+@misc{wen2024abstention,
+  doi = {10.48550/ARXIV.2407.18418},
+  url = {https://arxiv.org/abs/2407.18418},
+  author = {Wen, Bingbing and Yao, Jihan and Feng, Shangbin and Xu, Chenjun and Tsvetkov, Yulia and Howe, Bill and Wang, Lucy Lu},
+  keywords = {Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Know Your Limits: A Survey of Abstention in Large Language Models}},
+  publisher = {arXiv},
+  year = {2024},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.18653/v1/2023.findings-emnlp.345
+@inproceedings{chen2023selfevalselective, title={{Adaptation with Self-Evaluation to Improve Selective Prediction in LLMs}}, url={http://dx.doi.org/10.18653/v1/2023.findings-emnlp.345}, DOI={10.18653/v1/2023.findings-emnlp.345}, booktitle={Findings of the Association for Computational Linguistics: EMNLP 2023}, publisher={Association for Computational Linguistics}, author={Chen, Jiefeng and Yoon, Jinsung and Ebrahimi, Sayna and Arik, Sercan and Pfister, Tomas and Jha, Somesh}, year={2023}, pages={5190--5213} }
+
+
+% ===== 9. Long context, evidence position, and data-pipeline failure modes =====
+
+% source: 10.1162/tacl_a_00638
+@article{liu2024lostmiddle, title={{Lost in the Middle: How Language Models Use Long Contexts}}, volume={12}, ISSN={2307-387X}, url={http://dx.doi.org/10.1162/tacl_a_00638}, DOI={10.1162/tacl_a_00638}, journal={Transactions of the Association for Computational Linguistics}, publisher={MIT Press}, author={Liu, Nelson F. and Lin, Kevin and Hewitt, John and Paranjape, Ashwin and Bevilacqua, Michele and Petroni, Fabio and Liang, Percy}, year={2024}, pages={157--173} }
+
+% source: 10.18653/v1/2024.acl-long.818
+@inproceedings{levy2024moretokens, title={{Same Task, More Tokens: the Impact of Input Length on the Reasoning Performance of Large Language Models}}, url={http://dx.doi.org/10.18653/v1/2024.acl-long.818}, DOI={10.18653/v1/2024.acl-long.818}, booktitle={Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, publisher={Association for Computational Linguistics}, author={Levy, Mosh and Jacoby, Alon and Goldberg, Yoav}, year={2024}, pages={15339--15353} }
+
+% source: 10.48550/arXiv.2302.00093
+@misc{shi2023distracted,
+  doi = {10.48550/ARXIV.2302.00093},
+  url = {https://arxiv.org/abs/2302.00093},
+  author = {Shi, Freda and Chen, Xinyun and Misra, Kanishka and Scales, Nathan and Dohan, David and Chi, Ed and Schärli, Nathanael and Zhou, Denny},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Large Language Models Can Be Easily Distracted by Irrelevant Context}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.48550/arXiv.2404.06654
+@misc{hsieh2024ruler,
+  doi = {10.48550/ARXIV.2404.06654},
+  url = {https://arxiv.org/abs/2404.06654},
+  author = {Hsieh, Cheng-Ping and Sun, Simeng and Kriman, Samuel and Acharya, Shantanu and Rekesh, Dima and Jia, Fei and Zhang, Yang and Ginsburg, Boris},
+  keywords = {Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{RULER: What's the Real Context Size of Your Long-Context Language Models?}},
+  publisher = {arXiv},
+  year = {2024},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.1145/3411764.3445518
+@inproceedings{sambasivan2021datacascades, series={CHI '21}, title={{``Everyone wants to do the model work, not the data work'': Data Cascades in High-Stakes AI}}, url={http://dx.doi.org/10.1145/3411764.3445518}, DOI={10.1145/3411764.3445518}, booktitle={Proceedings of the 2021 CHI Conference on Human Factors in Computing Systems}, publisher={ACM}, author={Sambasivan, Nithya and Kapania, Shivani and Highfill, Hannah and Akrong, Diana and Paritosh, Praveen and Aroyo, Lora M}, year={2021}, month=May, pages={1--15}, collection={CHI '21} }
+
+
+% ===== 10. Fine-tuning vs. frozen + in-context learning; instruction tuning; compositional generalization =====
+
+% source: 10.48550/arXiv.2202.10054
+@misc{kumar2022finetunedistort,
+  doi = {10.48550/ARXIV.2202.10054},
+  url = {https://arxiv.org/abs/2202.10054},
+  author = {Kumar, Ananya and Raghunathan, Aditi and Jones, Robbie and Ma, Tengyu and Liang, Percy},
+  keywords = {Machine Learning (cs.LG), Computer Vision and Pattern Recognition (cs.CV), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Fine-Tuning can Distort Pretrained Features and Underperform Out-of-Distribution}},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.18653/v1/2023.findings-acl.779
+@inproceedings{mosbach2023fewshot, title={{Few-shot Fine-tuning vs. In-context Learning: A Fair Comparison and Evaluation}}, url={http://dx.doi.org/10.18653/v1/2023.findings-acl.779}, DOI={10.18653/v1/2023.findings-acl.779}, booktitle={Findings of the Association for Computational Linguistics: ACL 2023}, publisher={Association for Computational Linguistics}, author={Mosbach, Marius and Pimentel, Tiago and Ravfogel, Shauli and Klakow, Dietrich and Elazar, Yanai}, year={2023}, pages={12284--12314} }
+
+% source: 10.48550/arXiv.2405.09673
+@misc{biderman2024loralearnsless,
+  doi = {10.48550/ARXIV.2405.09673},
+  url = {https://arxiv.org/abs/2405.09673},
+  author = {Biderman, Dan and Portes, Jacob and Ortiz, Jose Javier Gonzalez and Paul, Mansheej and Greengard, Philip and Jennings, Connor and King, Daniel and Havens, Sam and Chiley, Vitaliy and Frankle, Jonathan and Blakeney, Cody and Cunningham, John P.},
+  keywords = {Machine Learning (cs.LG), Artificial Intelligence (cs.AI), Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{LoRA Learns Less and Forgets Less}},
+  publisher = {arXiv},
+  year = {2024},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.1109/taslpro.2025.3606231
+@article{luo2025forgetting, title={{An Empirical Study of Catastrophic Forgetting in Large Language Models During Continual Fine-Tuning}}, volume={33}, ISSN={2998-4173}, url={http://dx.doi.org/10.1109/taslpro.2025.3606231}, DOI={10.1109/taslpro.2025.3606231}, journal={IEEE Transactions on Audio, Speech and Language Processing}, publisher={Institute of Electrical and Electronics Engineers (IEEE)}, author={Luo, Yun and Yang, Zhen and Meng, Fandong and Li, Yafu and Zhou, Jie and Zhang, Yue}, year={2025}, pages={3776--3786} }
+
+% source: 10.52202/075280-2400
+@inproceedings{zhou2023lima, series={NeurIPS 2023}, title={{LIMA: Less Is More for Alignment}}, url={http://dx.doi.org/10.52202/075280-2400}, DOI={10.52202/075280-2400}, booktitle={Advances in Neural Information Processing Systems 36}, publisher={Neural Information Processing Systems Foundation, Inc. (NeurIPS)}, author={Zhou, Chunting and Liu, Pengfei and Xu, Puxin and Iyer, Srinivasan and Sun, Jiao and Mao, Yuning and Ma, Xuezhe and Efrat, Avia and Yu, Ping and Yu, Lili and Zhang, Susan and Ghosh, Gargi and Lewis, Mike and Zettlemoyer, Luke and Levy, Omer}, year={2023}, pages={55006--55021}, collection={NeurIPS 2023} }
+
+% source: 10.48550/arXiv.2312.01552
+@misc{lin2024urial,
+  doi = {10.48550/ARXIV.2312.01552},
+  url = {https://arxiv.org/abs/2312.01552},
+  author = {Lin, Bill Yuchen and Ravichander, Abhilasha and Lu, Ximing and Dziri, Nouha and Sclar, Melanie and Chandu, Khyathi and Bhagavatula, Chandra and Choi, Yejin},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{The Unlocking Spell on Base LLMs: Rethinking Alignment via In-Context Learning}},
+  publisher = {arXiv},
+  year = {2023},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.48550/arXiv.2109.01652
+@misc{wei2022flan,
+  doi = {10.48550/ARXIV.2109.01652},
+  url = {https://arxiv.org/abs/2109.01652},
+  author = {Wei, Jason and Bosma, Maarten and Zhao, Vincent Y. and Guu, Kelvin and Yu, Adams Wei and Lester, Brian and Du, Nan and Dai, Andrew M. and Le, Quoc V.},
+  keywords = {Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Finetuned Language Models Are Zero-Shot Learners}},
+  publisher = {arXiv},
+  year = {2021},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.2110.08207
+@misc{sanh2022t0,
+  doi = {10.48550/ARXIV.2110.08207},
+  url = {https://arxiv.org/abs/2110.08207},
+  author = {Sanh, Victor and Webson, Albert and Raffel, Colin and Bach, Stephen H. and Sutawika, Lintang and Alyafeai, Zaid and Chaffin, Antoine and Stiegler, Arnaud and Scao, Teven Le and Raja, Arun and Dey, Manan and Bari, M Saiful and Xu, Canwen and Thakker, Urmish and Sharma, Shanya Sharma and Szczechla, Eliza and Kim, Taewoon and Chhablani, Gunjan and Nayak, Nihal and Datta, Debajyoti and Chang, Jonathan and Jiang, Mike Tian-Jian and Wang, Han and Manica, Matteo and Shen, Sheng and Yong, Zheng Xin and Pandey, Harshit and Bawden, Rachel and Wang, Thomas and Neeraj, Trishala and Rozen, Jos and Sharma, Abheesht and Santilli, Andrea and Fevry, Thibault and Fries, Jason Alan and Teehan, Ryan and Bers, Tali and Biderman, Stella and Gao, Leo and Wolf, Thomas and Rush, Alexander M.},
+  keywords = {Machine Learning (cs.LG), Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Multitask Prompted Training Enables Zero-Shot Task Generalization}},
+  publisher = {arXiv},
+  year = {2021},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.48550/arXiv.2210.11416
+@misc{chung2024flant5,
+  doi = {10.48550/ARXIV.2210.11416},
+  url = {https://arxiv.org/abs/2210.11416},
+  author = {Chung, Hyung Won and Hou, Le and Longpre, Shayne and Zoph, Barret and Tay, Yi and Fedus, William and Li, Yunxuan and Wang, Xuezhi and Dehghani, Mostafa and Brahma, Siddhartha and Webson, Albert and Gu, Shixiang Shane and Dai, Zhuyun and Suzgun, Mirac and Chen, Xinyun and Chowdhery, Aakanksha and Castro-Ros, Alex and Pellat, Marie and Robinson, Kevin and Valter, Dasha and Narang, Sharan and Mishra, Gaurav and Yu, Adams and Zhao, Vincent and Huang, Yanping and Dai, Andrew and Yu, Hongkun and Petrov, Slav and Chi, Ed H. and Dean, Jeff and Devlin, Jacob and Roberts, Adam and Zhou, Denny and Le, Quoc V. and Wei, Jason},
+  keywords = {Machine Learning (cs.LG), Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Scaling Instruction-Finetuned Language Models}},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.48550/arXiv.1711.00350
+@article{lake2018scan,
+  doi = {10.48550/ARXIV.1711.00350},
+  url = {https://arxiv.org/abs/1711.00350},
+  author = {Lake, Brenden M. and Baroni, Marco},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Generalization without systematicity: On the compositional skills of sequence-to-sequence recurrent networks}},
+  publisher = {arXiv},
+  year = {2017},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.1912.09713
+@misc{keysers2020cfq,
+  doi = {10.48550/ARXIV.1912.09713},
+  url = {https://arxiv.org/abs/1912.09713},
+  author = {Keysers, Daniel and Schärli, Nathanael and Scales, Nathan and Buisman, Hylke and Furrer, Daniel and Kashubin, Sergii and Momchev, Nikola and Sinopalnikov, Danila and Stafiniak, Lukasz and Tihon, Tibor and Tsarkov, Dmitry and Wang, Xiao and van Zee, Marc and Bousquet, Olivier},
+  keywords = {Machine Learning (cs.LG), Computation and Language (cs.CL), Machine Learning (stat.ML), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Measuring Compositional Generalization: A Comprehensive Method on Realistic Data}},
+  publisher = {arXiv},
+  year = {2019},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.18653/v1/2020.emnlp-main.731
+@inproceedings{kim2020cogs, title={{COGS: A Compositional Generalization Challenge Based on Semantic Interpretation}}, url={http://dx.doi.org/10.18653/v1/2020.emnlp-main.731}, DOI={10.18653/v1/2020.emnlp-main.731}, booktitle={Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing (EMNLP)}, publisher={Association for Computational Linguistics}, author={Kim, Najoung and Linzen, Tal}, year={2020}, pages={9087--9105} }
+
+% source: 10.1613/jair.1.11674
+@article{hupkes2020compositionality, title={{Compositionality Decomposed: How do Neural Networks Generalise?}}, volume={67}, ISSN={1076-9757}, url={http://dx.doi.org/10.1613/jair.1.11674}, DOI={10.1613/jair.1.11674}, journal={Journal of Artificial Intelligence Research}, publisher={AI Access Foundation}, author={Hupkes, Dieuwke and Dankers, Verna and Mul, Mathijs and Bruni, Elia}, year={2020}, month=Apr, pages={757--795} }
+
+
+% ===== 11. Backbones, benchmarks, and datasets used in this work =====
+
+% source: 10.48550/arXiv.1706.03762
+@misc{vaswani2017attention,
+  doi = {10.48550/ARXIV.1706.03762},
+  url = {https://arxiv.org/abs/1706.03762},
+  author = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and Kaiser, Lukasz and Polosukhin, Illia},
+  keywords = {Computation and Language (cs.CL), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Attention Is All You Need}},
+  publisher = {arXiv},
+  year = {2017},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.18653/v1/n19-1423
+@inproceedings{devlin2019bert, title={{BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding}}, url={http://dx.doi.org/10.18653/v1/n19-1423}, DOI={10.18653/v1/n19-1423}, booktitle={Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers)}, publisher={Association for Computational Linguistics}, author={Devlin, Jacob and Chang, Ming-Wei and Lee, Kenton and Toutanova, Kristina}, year={2019}, pages={4171--4186} }
+
+% source: 10.48550/arXiv.1907.11692
+@misc{liu2019roberta,
+  doi = {10.48550/ARXIV.1907.11692},
+  url = {https://arxiv.org/abs/1907.11692},
+  author = {Liu, Yinhan and Ott, Myle and Goyal, Naman and Du, Jingfei and Joshi, Mandar and Chen, Danqi and Levy, Omer and Lewis, Mike and Zettlemoyer, Luke and Stoyanov, Veselin},
+  keywords = {Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{RoBERTa: A Robustly Optimized BERT Pretraining Approach}},
+  publisher = {arXiv},
+  year = {2019},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.2111.09543
+@misc{he2023debertav3,
+  doi = {10.48550/ARXIV.2111.09543},
+  url = {https://arxiv.org/abs/2111.09543},
+  author = {He, Pengcheng and Gao, Jianfeng and Chen, Weizhu},
+  keywords = {Computation and Language (cs.CL), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences, I.2; I.7, cs.CL, cs.GL},
+  title = {{DeBERTaV3: Improving DeBERTa using ELECTRA-Style Pre-Training with Gradient-Disentangled Embedding Sharing}},
+  publisher = {arXiv},
+  year = {2021},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+
+% source: 10.48550/arXiv.2005.14165
+@misc{brown2020gpt3,
+  doi = {10.48550/ARXIV.2005.14165},
+  url = {https://arxiv.org/abs/2005.14165},
+  author = {Brown, Tom B. and Mann, Benjamin and Ryder, Nick and Subbiah, Melanie and Kaplan, Jared and Dhariwal, Prafulla and Neelakantan, Arvind and Shyam, Pranav and Sastry, Girish and Askell, Amanda and Agarwal, Sandhini and Herbert-Voss, Ariel and Krueger, Gretchen and Henighan, Tom and Child, Rewon and Ramesh, Aditya and Ziegler, Daniel M. and Wu, Jeffrey and Winter, Clemens and Hesse, Christopher and Chen, Mark and Sigler, Eric and Litwin, Mateusz and Gray, Scott and Chess, Benjamin and Clark, Jack and Berner, Christopher and McCandlish, Sam and Radford, Alec and Sutskever, Ilya and Amodei, Dario},
+  keywords = {Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Language Models are Few-Shot Learners}},
+  publisher = {arXiv},
+  year = {2020},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.2203.02155
+@misc{ouyang2022instructgpt,
+  doi = {10.48550/ARXIV.2203.02155},
+  url = {https://arxiv.org/abs/2203.02155},
+  author = {Ouyang, Long and Wu, Jeff and Jiang, Xu and Almeida, Diogo and Wainwright, Carroll L. and Mishkin, Pamela and Zhang, Chong and Agarwal, Sandhini and Slama, Katarina and Ray, Alex and Schulman, John and Hilton, Jacob and Kelton, Fraser and Miller, Luke and Simens, Maddie and Askell, Amanda and Welinder, Peter and Christiano, Paul and Leike, Jan and Lowe, Ryan},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Training language models to follow instructions with human feedback}},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.2106.09685
+@misc{hu2022lora,
+  doi = {10.48550/ARXIV.2106.09685},
+  url = {https://arxiv.org/abs/2106.09685},
+  author = {Hu, Edward J. and Shen, Yelong and Wallis, Phillip and Allen-Zhu, Zeyuan and Li, Yuanzhi and Wang, Shean and Wang, Lu and Chen, Weizhu},
+  keywords = {Computation and Language (cs.CL), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{LoRA: Low-Rank Adaptation of Large Language Models}},
+  publisher = {arXiv},
+  year = {2021},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.2505.09388
+@misc{yang2025qwen3,
+  doi = {10.48550/ARXIV.2505.09388},
+  url = {https://arxiv.org/abs/2505.09388},
+  author = {Yang, An and Li, Anfeng and Yang, Baosong and Zhang, Beichen and Hui, Binyuan and Zheng, Bo and Yu, Bowen and Gao, Chang and Huang, Chengen and Lv, Chenxu and Zheng, Chujie and Liu, Dayiheng and Zhou, Fan and Huang, Fei and Hu, Feng and Ge, Hao and Wei, Haoran and Lin, Huan and Tang, Jialong and Yang, Jian and Tu, Jianhong and Zhang, Jianwei and Yang, Jianxin and Yang, Jiaxi and Zhou, Jing and Zhou, Jingren and Lin, Junyang and Dang, Kai and Bao, Keqin and Yang, Kexin and Yu, Le and Deng, Lianghao and Li, Mei and Xue, Mingfeng and Li, Mingze and Zhang, Pei and Wang, Peng and Zhu, Qin and Men, Rui and Gao, Ruize and Liu, Shixuan and Luo, Shuang and Li, Tianhao and Tang, Tianyi and Yin, Wenbiao and Ren, Xingzhang and Wang, Xinyu and Zhang, Xinyu and Ren, Xuancheng and Fan, Yang and Su, Yang and Zhang, Yichang and Zhang, Yinger and Wan, Yu and Liu, Yuqiong and Wang, Zekun and Cui, Zeyu and Zhang, Zhenru and Zhou, Zhipeng and Qiu, Zihan},
+  keywords = {Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Qwen3 Technical Report}},
+  publisher = {arXiv},
+  year = {2025},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.48550/arXiv.2009.03300
+@misc{hendrycks2021mmlu,
+  doi = {10.48550/ARXIV.2009.03300},
+  url = {https://arxiv.org/abs/2009.03300},
+  author = {Hendrycks, Dan and Burns, Collin and Basart, Steven and Zou, Andy and Mazeika, Mantas and Song, Dawn and Steinhardt, Jacob},
+  keywords = {Computers and Society (cs.CY), Artificial Intelligence (cs.AI), Computation and Language (cs.CL), Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {{Measuring Massive Multitask Language Understanding}},
+  publisher = {arXiv},
+  year = {2020},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+% source: 10.52202/079017-3018
+@inproceedings{wang2024mmlupro, series={NeurIPS 2024}, title={{MMLU-Pro: A More Robust and Challenging Multi-Task Language Understanding Benchmark}}, url={http://dx.doi.org/10.52202/079017-3018}, DOI={10.52202/079017-3018}, booktitle={Advances in Neural Information Processing Systems 37}, publisher={Neural Information Processing Systems Foundation, Inc. (NeurIPS)}, author={Wang, Yubo and Ma, Xueguang and Zhang, Ge and Ni, Yuansheng and Chandra, Abhranil and Guo, Shiguang and Ren, Weiming and Arulraj, Aaran and He, Xuan and Jiang, Ziyan and Li, Tianle and Ku, Max and Wang, Kai and Zhuang, Alex and Fan, Rongqi and Yue, Xiang and Chen, Wenhu}, year={2024}, pages={95266--95290}, collection={NeurIPS 2024} }
+
+% source: 10.18653/v1/2022.acl-long.229
+@inproceedings{lin2022truthfulqa, title={{TruthfulQA: Measuring How Models Mimic Human Falsehoods}}, url={http://dx.doi.org/10.18653/v1/2022.acl-long.229}, DOI={10.18653/v1/2022.acl-long.229}, booktitle={Proceedings of the 60th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, publisher={Association for Computational Linguistics}, author={Lin, Stephanie and Hilton, Jacob and Evans, Owain}, year={2022}, pages={3214--3252} }
+
+% source: 10.18653/v1/d15-1075
+@inproceedings{bowman2015snli, title={{A large annotated corpus for learning natural language inference}}, url={http://dx.doi.org/10.18653/v1/d15-1075}, DOI={10.18653/v1/d15-1075}, booktitle={Proceedings of the 2015 Conference on Empirical Methods in Natural Language Processing}, publisher={Association for Computational Linguistics}, author={Bowman, Samuel R. and Angeli, Gabor and Potts, Christopher and Manning, Christopher D.}, year={2015}, pages={632--642} }
+
+% source: 10.18653/v1/n18-1101
+@inproceedings{williams2018mnli, title={{A Broad-Coverage Challenge Corpus for Sentence Understanding through Inference}}, url={http://dx.doi.org/10.18653/v1/n18-1101}, DOI={10.18653/v1/n18-1101}, booktitle={Proceedings of the 2018 Conference of the North American Chapter of
+          the Association for Computational Linguistics: Human Language
+          Technologies, Volume 1 (Long Papers)}, publisher={Association for Computational Linguistics}, author={Williams, Adina and Nangia, Nikita and Bowman, Samuel}, year={2018}, pages={1112--1122} }
+
+% source: 10.18653/v1/2020.acl-main.441
+@inproceedings{nie2020anli, title={{Adversarial NLI: A New Benchmark for Natural Language Understanding}}, url={http://dx.doi.org/10.18653/v1/2020.acl-main.441}, DOI={10.18653/v1/2020.acl-main.441}, booktitle={Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics}, publisher={Association for Computational Linguistics}, author={Nie, Yixin and Williams, Adina and Dinan, Emily and Bansal, Mohit and Weston, Jason and Kiela, Douwe}, year={2020}, pages={4885--4901} }
+
+% source: 10.18653/v1/2020.emnlp-main.734
+@inproceedings{nie2020chaosnli, title={{What Can We Learn from Collective Human Opinions on Natural Language Inference Data?}}, url={http://dx.doi.org/10.18653/v1/2020.emnlp-main.734}, DOI={10.18653/v1/2020.emnlp-main.734}, booktitle={Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing (EMNLP)}, publisher={Association for Computational Linguistics}, author={Nie, Yixin and Zhou, Xiang and Bansal, Mohit}, year={2020}, pages={9131--9143} }
+
+% source: 10.18653/v1/2020.acl-main.774
+@inproceedings{chen2020unli, title={{Uncertain Natural Language Inference}}, url={http://dx.doi.org/10.18653/v1/2020.acl-main.774}, DOI={10.18653/v1/2020.acl-main.774}, booktitle={Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics}, publisher={Association for Computational Linguistics}, author={Chen, Tongfei and Jiang, Zhengping and Poliak, Adam and Sakaguchi, Keisuke and Van Durme, Benjamin}, year={2020}, pages={8772--8779} }
+
+% source: 10.18653/v1/n19-1300
+@inproceedings{clark2019boolq, title={{BoolQ: Exploring the Surprising Difficulty of Natural Yes/No Questions}}, url={http://dx.doi.org/10.18653/v1/n19-1300}, DOI={10.18653/v1/n19-1300}, booktitle={Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers)}, publisher={Association for Computational Linguistics}, author={Clark, Christopher and Lee, Kenton and Chang, Ming-Wei and Kwiatkowski, Tom and Collins, Michael and Toutanova, Kristina}, year={2019}, pages={2924--2936} }
+
+
+% =====================================================================
+% [VERIFY] -- NOT verified this session; DO NOT CITE as BibTeX keys.
+% =====================================================================
+%
+% Works wanted but not obtainable from a machine-readable record this session:
+%   % [VERIFY] Yu et al., "Orca: A Distributed Serving System for Transformer-Based Generative
+%             Models", OSDI 2022 -- no DOI in CrossRef/OpenAlex, no arXiv record found.
+%   % [VERIFY] El-Yaniv and Wiener, "On the Foundations of Noise-free Selective Classification",
+%             JMLR 11 (2010) -- JMLR entries carry no DOI; not retrievable by content negotiation.
+%   % [VERIFY] Menon et al., "A Statistical Perspective on Distillation", ICML 2021 -- identifier
+%             guesses failed title verification; refetch before citing.
+%   % [VERIFY] Wang et al., "Rethinking Calibration of Deep Neural Networks: Do Not Be Afraid of
+%             Overconfidence" (inverse focal loss), NeurIPS 2021 -- identifier not verified.
+%   % [VERIFY] Radford et al., "Language Models are Unsupervised Multitask Learners" (GPT-2) --
+%             technical report, no DOI.
+%
+% Non-archival web artifacts (the System-One product line, its open replications, and the
+% JevBench harness). These have no DOI and no peer-reviewed record; cite them as footnote URLs
+% with an access date, NOT as BibTeX keys. URLs as recorded in COMPARE.md 5 (accessed 2026-09-18)
+% and REPORT.md 3q (accessed 2026-09-20):
+%   % [VERIFY] TypeSafe, "Introducing System One Models & Jev" -- https://typesafe.ai/blog/introducing-system-one-models-and-jev
+%   % [VERIFY] TypeSafe docs: https://docs.typesafe.ai/concepts/system-one , /primitives/choice.md ,
+%             /confidence.md , /models.md , /model-jaggedness/jev-1.13.md , /cookbooks/parallel_questions.md
+%   % [VERIFY] TypeSafe workflow evals -- https://evals.typesafe.ai/
+%   % [VERIFY] A. Hume, "Jev's architecture, unmasked" (17 Sep 2026) -- https://archerhume.com/posts/jevs-architecture-unmasked
+%             evidence bundle: https://archerhume.com/research/jev/evidence.json
+%   % [VERIFY] JevBench v1.2.1 harness -- https://github.com/fstandhartinger/jevbench , https://jevbench.dev/
+%   % [VERIFY] Open replications on the JevBench leaderboard: SemIf (formerly OpenJev, Qwen3.5-4B),
+%             OpenJev (26B-A4B), djev (diffusion-gemma), system-one / system-one-open (Gemma E2B LoRA),
+%             Laya (ModernBERT), jeff (GLiFormer 400M), open-jev-deberta-v3-large,
+%             open-alternative-jev -- leaderboard listings only; no method papers published.
+%             (GLiNER2, also on that leaderboard, DOES have a paper: zaratiana2025gliner2.)
+

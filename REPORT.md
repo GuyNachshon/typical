@@ -1,0 +1,1848 @@
+# PCDM — project report (v0 → v1), 2026-09-16/17
+
+Consolidated record of what was built, what broke, what was learned, and where the hypotheses of `idea.md` stand.
+Numbers: `runs/*/results.json` (temperature-scaled on val). Design docs: `PLAN.md` (v0), `PLAN2.md` (v1 + revisions).
+Live logs: W&B project `guy-na8/pcdm`; artifacts: HF `guychuk/pcdm-runs` (private), data `guychuk/pcdm-data` (private).
+
+## 1. What was built
+
+| piece | v0 (Mac, MPS) | v1 (RunPod H100 ×2) |
+|---|---|---|
+| backbone | frozen Qwen3-0.6B-Base, layer 20, features cached per string | Qwen3-1.7B-Base, truncated at layer 20, LoRA r16 on layers 13–20 (hand-rolled), layers 1–12 frozen |
+| state↔query interaction | 2-layer 512-d cross-attn tower (query tokens + slot → state tokens) | same tower; **plus joint prefix encoding** (`--joint`: query as causal suffix of the state, KV-cached at inference) |
+| candidates | mean-pooled frozen features of the label text, cached | same, from frozen layer 12; **hybrid** frozen-space similarity features in the scorer |
+| null | extra softmax logit from the slot (F) → candidate-aware (G) | candidate-aware (G) default |
+| features | – | per-dim z-score of backbone features (`--zscore`) |
+| data | 44k rows, 5 sources | 758k rows, 24 tasks, 21 eval sets incl. 3 fully held-out label spaces (Banking77, TREC, 20NG), 10 query templates/family, label-wording augmentation, leak audit |
+| training | 8 epochs on cached features (minutes) | 12k–24k steps × 64, resumable checkpoints, W&B, HF upload, two-pod schedule scripts |
+| baselines | prompted 0.6B log-probs; frozen cross-encoder + linear heads; pooled MLP | KV-cached prompted 1.7B and 8B; LoRA cross-encoder (`C_lora`) |
+| tests | – | `tests/test_pipeline.py` (16 tests, CPU, 5 s): ragged masks, permutation equivariance, loss = hand soft-CE, LoRA grads, checkpoint/resume reproduces loss, joint causal invariance, KV-cache decide == concatenation |
+
+Cost: v0 $0 (local); v1 ≈ $35 of H100 time for 16 runs (of the $145 balance).
+
+## 2. Bugs and findings, in the order they bit
+
+1. **Attention-sink token (v0).** Qwen3 has no BOS; position 0's hidden state is content-independent (cos 0.9998 between
+   `neutral`, `yes`, `transfer`). Every single-token candidate was one vector. Fix: prepend `<|endoftext|>`, drop it.
+2. **Fixed classifier in disguise (v0).** Three fixed NLI label strings → the scorer memorised three vectors; paraphrased
+   labels scored 11% (below chance). Fix: randomise label wordings in training; keep 5 wordings held out for eval.
+3. **State-only null leaks its base rate (v0).** `s_∅ = f(state)` learned the 13% synthetic-null prior and put it on every
+   clean item (ChaosNLI NLL 1.33 vs 1.17 without null). Fix: candidate-aware null (variant G): NLL 1.15, ECE 0.034.
+4. **Last-layer tap = hypothesis-only model (v1, the big one).** v1 read the backbone's *last* layer; SNLI 58.6 = the
+   hypothesis-only baseline; the tower never used the premise. Tap layer 20 → 65.3 (frozen) / 68.2 (LoRA); NLI family
+   loss finally descends. Backbone size was never the bottleneck (0.6B→1.7B bought nothing until the tap moved).
+5. **Rogue dimensions (v1).** 3 dims carry ~30% of token norm (mean token cosine 0.45–0.64). Per-dim z-score:
+   +3.5 SNLI / −0.08 NLL locally; +2–4 on CLINC/HWU64, best null AUROC at scale.
+6. **Null over-fires on unfamiliar wordings — a data bug (v1).** Gold-absent synthesis used `K = N−1` near-miss sets
+   (teaches "almost the whole label set ⇒ none") and a 25% rate. Data v3: 15%, K∈{3,10}. TREC/20NG accuracies doubled.
+7. **LoRA dropout active at eval** (modules built after `from_pretrained`'s `eval()`); fixed.
+8. **The cross-encoder is not the "expensive joint" alternative (v1, the reframing).** `C_lora` is a *causal* decoder over
+   `premise [SEP] hypothesis`: premise states never see the hypothesis. It is itself late-interaction — its "state memory"
+   is the premise KV cache and its "tower" is 28 pretrained layers applied to the hypothesis. Ours replaced those with 2
+   fresh 512-d layers. Literature (DeFormer, PreTTR, LUMEN, Poly-encoders, ColBERT): keep pretrained joint layers over a
+   precomputed prefix. Implemented as `--joint` with a bit-exact causal-invariance test. (Result: §4, pending.)
+9. **Ops (RunPod).** `tmux kill-session` doesn't kill `timeout`-wrapped schedule children (a ghost schedule trained a second
+   model on the same GPU); `pkill -f` over SSH kills the SSH shell; `--env` vars don't reach SSH sessions; two pods sharing
+   one uv `.venv` on a volume corrupt it (`uv run` auto-syncs; use `--no-sync` + per-pod envs); driver 570 hosts need a
+   cu126 torch wheel. All recorded in memory for next time.
+
+## 3. Results (v1, temperature-scaled; single seed unless noted)
+
+Runs: `main_s0` original v1 config (last-layer tap); `diag_tap20_frozen` / `diag_tap20` tap-20 diagnostics (no LoRA / LoRA);
+`main_v2` tap-20 + LoRA + z-score; `main_v3` same + data v3, 2 epochs; `main_v3_s1` seed 1 (1 epoch); `abl_nohybrid` no
+frozen-space similarity; `B_1.7B` / `B_8B` prompted LMs (3-shot, KV-cached candidate log-probs, literal "none of the above");
+`C_lora` LoRA cross-encoder with per-task heads (no null, fixed label sets).
+
+| metric | main_s0 | diag_tap20_frozen | diag_tap20 | main_v2 | main_v3 | main_v3_s1 | abl_nohybrid | B_1.7B | B_8B | C_lora |
+|---|---|---|---|---|---|---|---|---|---|---|
+| snli_test/acc | 0.586 | 0.653 | 0.682 | 0.681 | 0.701 | 0.685 | 0.692 | 0.791 | 0.818 | 0.855 |
+| mnli_val/acc | 0.514 | 0.574 | 0.615 | 0.635 | 0.648 | 0.621 | 0.633 | 0.702 | 0.823 | 0.768 |
+| anli_test/acc | 0.356 | 0.362 | 0.414 | 0.422 | 0.435 | 0.424 | 0.425 | 0.445 | 0.504 | 0.376 |
+| boolq_val/acc | 0.492 | 0.592 | 0.628 | 0.628 | 0.663 | 0.624 | 0.641 | 0.782 | 0.863 | 0.598 |
+| clinc_test/acc (K=150) | 0.562 | 0.551 | 0.611 | 0.654 | 0.708 | 0.673 | 0.669 | 0.450 | 0.387 | 0.393 |
+| hwu64_test/acc (K=64) | 0.697 | 0.693 | 0.750 | 0.790 | 0.836 | 0.816 | 0.848 | 0.030 | 0.020 | 0.623 |
+| clinc_heldout/acc (unseen intents) | 0.612 | 0.671 | 0.667 | 0.688 | 0.689 | 0.658 | 0.494 | 0.530 | 0.390 | – |
+| clinc_heldout/acc_k | 0.761 | 0.729 | 0.764 | 0.769 | 0.771 | 0.729 | 0.704 | 0.830 | 0.875 | – |
+| banking77_test/acc (K=77, held-out dataset) | 0.269 | 0.336 | 0.309 | 0.329 | 0.326 | 0.340 | 0.082 | 0.270 | 0.200 | – |
+| banking77_k/acc (K=10) | 0.450 | 0.506 | 0.492 | 0.524 | 0.474 | 0.484 | 0.327 | 0.620 | 0.594 | – |
+| trec_fine/acc (K=50, held-out) | 0.110 | 0.068 | 0.112 | 0.112 | 0.112 | 0.188 | 0.066 | 0.052 | 0.040 | – |
+| ng20_test/acc (K=20, held-out) | 0.125 | 0.135 | 0.110 | 0.087 | 0.171 | 0.181 | 0.165 | 0.162 | 0.059 | – |
+| snli_test_paraphrase/acc (unseen label wordings) | 0.120 | 0.269 | 0.329 | 0.376 | 0.398 | 0.375 | 0.439 | 0.080 | 0.016 | 0.841 |
+| snli_test_hyponly/acc (premise blanked) | – | – | – | – | 0.648 | 0.652 | 0.615 | 0.346 | 0.387 | – |
+| clinc_k/auroc_null | 0.858 | 0.858 | 0.876 | 0.897 | 0.919 | 0.901 | 0.902 | 0.645 | 0.617 | – |
+| snli_null/auroc_null | 0.721 | 0.818 | 0.852 | 0.852 | 0.861 | 0.853 | 0.857 | 0.860 | 0.887 | – |
+| squad_null/auroc_null | 0.749 | 0.780 | 0.842 | 0.855 | 0.882 | 0.858 | 0.829 | 0.831 | 0.886 | – |
+| chaos_mnli/nll ↓ | 1.102 | 1.138 | 1.141 | 1.132 | 1.162 | 1.189 | 1.171 | 1.158 | 1.236 | 1.492 |
+| snli_test/ece ↓ | 0.029 | 0.023 | 0.030 | 0.024 | 0.031 | 0.022 | 0.033 | 0.393 | 0.494 | 0.036 |
+| fitted T | 0.96 | 0.96 | 1.04 | 0.96 | 1.12 | 1.12 | 1.12 | 3.63 | 4.58 | 0.96 |
+
+Noise floor — clean seed pair `joint_v1` vs `joint_v1_s1` (identical config): NLI/BoolQ ±0.7 pt, CLINC/HWU64 ±1,
+null AUROC ±0.014, ChaosNLI NLL ±0.05; but held-out label-space sets swing ±3–5 pts (banking77_k .411/.454, clinc_heldout
+.647/.692) and paraphrased labels ±8 (.619/.542). Claims on those sets need ≥ 5 pts or two seeds. `C_lora`'s paraphrase cell is by
+construction (it maps label strings to head indices). `C_lora` is 3k steps × 32 — a lower bound on the cross-encoder.
+
+**H2 (latency, H100, `main_v3` vs KV-cached prompted 1.7B, one 256-token state):** M=256 queries at K=4: ours 0.18 s
+(2.9× the M=1 cost; 0.62 ms/query marginal) vs 11.0 s (43 ms/query) → 69× cheaper; K=32: 35×; K=150: 19×. State
+encode is a flat 20 ms. Pending: rerun on `joint_v1` (queries pass through 20 layers against the KV cache).
+
+## 4. Hypothesis scorecard (pre-registered rules in PLAN.md / PLAN2.md)
+
+| H | rule | status |
+|---|---|---|
+| **H1** accuracy retention | ≥ cross-encoder − 2 on SNLI/MNLI; ≥ 0.9× prompted 8B on ANLI | **Fails for the tower family**: 70/65 vs 86/77 (C_lora), 82/82 (8B); ANLI 43.5 vs 45.4 needed. Wins where the label space is large or runtime-defined: CLINC 71 vs 39/39, HWU64 84 vs 62/2, BoolQ 66 vs 60 (C_lora). **`joint_v1` pending** — val NLL 0.56 at 3k steps vs 0.65 best-ever for the tower; §2.8. |
+| **H2** parallel cost | latency(M) ≪ M·latency(1) | **Holds**: 19–69× cheaper per query at M=256, growing with M. |
+| **H3** probability quality | beat C_lora and 8B on ChaosNLI NLL and SNLI ECE | **Holds**: NLL 1.16 vs 1.49 / 1.24; ECE 0.03 vs 0.036 / 0.49. Prompted LMs need T≈4 and are still poorly calibrated. |
+| **H4** null / unseen labels | AUROC > 0.85 on 3 null sets; held-out intents ≥ 0.8 | **Null: holds** (0.92 / 0.86 / 0.88). **Unseen labels: partial** — held-out CLINC intents 69% (8B: 39% acc / 88% among-K), Banking77 33% (8B: 20%), TREC/20NG < 20% for everyone. The hybrid frozen-space similarity is the whole mechanism (`abl_nohybrid`: Banking77 33 → 8). |
+
+Net: the *economics, calibration, typed output and null* half of the thesis is demonstrated; *accuracy retention* on
+pairwise NLI is not, for the fresh-tower design — and the diagnosis (§2.8) says why and what to change.
+
+### 3b. Phase 4 — R1 `joint_v1` (prefix-conditioned query encoding), final
+
+| metric | joint_v1 | main_v3 (tower) | B_1.7B | B_8B | C_lora |
+|---|---|---|---|---|---|
+| snli / mnli / anli / boolq acc | **0.910 / 0.874 / 0.544 / 0.815** | 0.701 / 0.648 / 0.435 / 0.663 | 0.791 / 0.702 / 0.445 / 0.782 | 0.818 / 0.823 / 0.504 / 0.863 | 0.855 / 0.768 / 0.376 / 0.598 |
+| clinc K=150 / hwu64 / clinc-heldout / banking77 | 0.688 / 0.816 / 0.647 / 0.306 | **0.708 / 0.836 / 0.689 / 0.326** | 0.450 / 0.030 / 0.530 / 0.270 | 0.387 / 0.020 / 0.390 / 0.200 | 0.393 / 0.623 / – / – |
+| paraphrased labels / hyp-only probe | **0.619** / 0.440 | 0.398 / 0.648 | 0.080 / 0.346 | 0.016 / 0.387 | (0.841) / – |
+| null AUROC clinc / snli / squad | 0.902 / **0.979 / 0.971** | **0.919** / 0.861 / 0.882 | .645/.860/.831 | .617/.887/.886 | – |
+| snli_soft NLL / unli NLL / chaos NLL | **0.558 / 0.530** / 1.264 | 0.814 / 0.613 / **1.162** | 1.016/.699/1.158 | 1.165/.698/1.236 | 0.642/.594/1.492 |
+| SNLI ECE (T) | **0.019** (1.12) | 0.031 (1.12) | 0.393 (3.6) | 0.494 (4.6) | 0.036 (0.96) |
+
+Reading: moving the state↔query interaction into the pretrained layers (query as causal suffix over the cached state) lifts
+NLI by +21/+23 pts, above both the fine-tuned cross-encoder and the prompted 8B, with the best calibration and null detection
+measured; the hypothesis-only probe drops to 44% (the model now reads the state; +47 pts from the premise vs +3–8 before).
+Costs: ~2–4 pts on large-K classification and unseen-intent sets, and worse ChaosNLI NLL (sharper on ambiguous items) —
+listwise candidates (IDEA2 §6) and Stage-B calibration training are the natural next steps for exactly those.
+
+**The "fancy classifier over Qwen" concern (raised 2026-09-17).** With joint encoding, Qwen does the semantic alignment;
+the decision head is the *interface*. Its measured value over the two "let Qwen do everything" alternatives: runtime-defined
+label spaces (unseen intents 65% vs 39% prompted-8B; paraphrased labels 62% vs 2%), large K (HWU64 82% vs 2%), an explicit
+null (AUROC .97 vs .89), calibration (ECE .02 vs .49), and one K-independent suffix pass per query. `abl_notower` (queued)
+tests whether the cross-attention slot itself still matters after joint encoding; if not, it should be removed.
+
+## 3c. Phase 2 (after the stop-and-rethink review; data v4 = K-decoupled nulls + choice-set/K-sweep/null-slice eval sets)
+
+All no-tower joint models; `abl_notower`/`mcq_lora` on data v3 (paired), `joint_v2`/`joint_lw`/`joint_emb` on data v4 (paired).
+
+| metric | ours (abl_notower, v3) | **MCQ-LoRA** (v3) | zs 8B letters | joint_v2 (v4) | joint_lw (v4, listwise) | **joint_emb** (v4, embedder cands) |
+|---|---|---|---|---|---|---|
+| snli / mnli / anli / boolq | **.908 / .877 / .547 / .818** | .853 / .727 / .400 / .768 | .34 / .36 / .34 / .61 | .905 / .873 / .524 / .818 | .906 / .867 / .523 / .822 | .906 / .873 / .524 / .817 |
+| clinc-150 / hwu64 | .784 / .862 | .715 / .580 | .00 / .02 | .777 / .862 | .709 / .834 | **.803 / .875** |
+| clinc-heldout acc / among-K | .612 / .800 | **.890 / .920** | .12 / .12 | .507 / .785 | .615 / .790 | .614 / .855 |
+| banking77 K=77 acc | .303 | **.568** | .01 | .286 | .309 | .440 |
+| banking77 K=10 acc / among-K | .473 / .613 | **.637 / .830** | .08 / .14 | .552 / .634 | .524 / .653 | .566 / .754 |
+| trec-coarse / trec-fine / ng20 among-K | .34 / .20 / .24 | **.62 / .43 / .53** | .17 / .04 / .16 | .35 / .19 / .24 | .30 / .20 / .22 | .38 / .22 / .31 |
+| paraphrased labels acc | .547 | .808 | .34 | .639 | .565 | **.810** |
+| clinc-OOS null recall | .657 | .388 | .74 | .723 | **.854** | .649 |
+| null AUROC clinc-k / snli / squad | .946 / .979 / .979 | .676 / .960 / .992 | .51 / .50 / .74 | .950 / .979 / .980 | .952 / .980 / .978 | .953 / .979 / .976 |
+| ChaosNLI NLL / SNLI ECE | 1.248 / .020 | **1.126** / .028 | 1.25 / .026 | 1.356 / .007 | 1.394 / .010 | 1.381 / **.005** |
+| P(∅ | gold absent), K=2 → K=150 (range) | – | – | – | .98 → .35 (.63) | .93 → .56 (**.37**) | .97 → .31 (.67) |
+| add-irrelevant Δlog-odds (IIA) | 0 | – | – | 0.000 | 0.144 | 0.000 |
+
+**Verdicts.**
+- *Decision head vs "Qwen does everything" (MCQ-LoRA, same everything but the readout):* the energy head wins in-distribution
+  (+5.5 SNLI, +15 MNLI, +15 ANLI, +5 BoolQ, +7 CLINC-150, +28 HWU64), on null detection (CLINC AUROC .95 vs .68) and on cost
+  (K-independent; MCQ training steps ~4× slower, two-stage chunking above 51 options). **MCQ-LoRA wins on unseen label spaces**
+  (+28 CLINC-heldout, +27 Banking77-77, TREC/20NG ≈ 2×, +26 paraphrased labels) because the option strings are read in context
+  with pretrained label semantics. The head is not decorative; it trades label-space generality for accuracy, calibration, null
+  and cost.
+- *Candidate encoder (`joint_emb`):* replacing mean-pooled decoder features by an embedding model is the best single change:
+  best in-distribution numbers, paraphrased labels 81% (= MCQ), Banking77-77 44% (from 29%), ECE .005. The remaining gap to
+  MCQ on unseen spaces is mostly **false null** (CLINC-heldout among-K .855 vs acc .614).
+- *Listwise (`joint_lw`):* reduces the structural K-dilution of the null (range .63 → .37; OOS recall 85%) but not to the ≤ .10
+  target, costs ~3–7 pts on large-K sets, and breaks IIA (as designed). H5: partial.
+- *H2, fair (`bench_fair`, prefix-sharing baseline):* per-query marginal at M=256: ours 0.7 / 1.5 / 4.4 / 25.5 ms vs B_fair
+  53 / 56 / 87 / 416 ms at K = 4 / 32 / 150 / 1000 → **73× / 37× / 20× / 16×**. Sharing the prefix barely helps the log-prob
+  baseline because its cost is K candidate continuations, not the state.
+- *Zero-shot 8B with enumerated letters* is at chance (a base model without instruction tuning cannot use the letter format);
+  the log-prob `B_8B` remains the prompted reference.
+
+## 3d. Follow-ups on `joint_emb` (2026-09-18, ~$10; `joint_emb_lw`, `joint_emb_s1` on pod 3)
+
+**(1) K-aware null bias, post-hoc (`--dump_logits` + `scripts/null_bias.py`, $0 after a 15-min eval dump).**
+Fit `s∅' = s∅ + α·log K + β` jointly with T on val by soft-CE, apply to every eval set without retraining.
+Result: **the val fit is a no-op** — α = 0.00, β = −0.25, T = 0.96 (val soft-CE 0.3897 → 0.3888). In-distribution the model
+has already learned to compensate for softmax dilution; the K-sweep range is unchanged (.67 → .70). Held-out sets move
+±1–2 pts (CLINC-heldout .612 → .627, TREC .208 → .232), CLINC-OOS −6.
+
+Cross-OOD transfer probe (fit on one unseen label space, apply to the others) shows *why* no scalar can close the false-null gap:
+
+| fit on | β | CLINC-heldout | TREC-coarse | Banking77-K | CLINC-OOS |
+|---|---|---|---|---|---|
+| val (in-dist.) | −0.25 | .627 | .232 | .552 | .590 |
+| Banking77-K (has gold-absent rows) | **+2.0** | .461 | .008 | .635 | .886 |
+| TREC-coarse (gold always present) | **−6.0** | **.850** | .376 | .377 | .001 |
+
+The fitted offset flips sign with the fitting set. CLINC-heldout's gap (.612 vs .853 among-K) closes only by effectively
+switching the null off (β = −6 → .850), which kills OOS detection (.001). **Verdict: the false-null gap on unseen label
+spaces is a novelty/absence confound, not a K-bias** — unfamiliar label *vocabulary* looks like "gold absent" (null AUROC
+.745 on Banking77-K vs .952 on trained CLINC vocabulary). Fix must come from training signal that separates the two
+(gold-present rows over held-out label vocabularies, i.e. label-space-level held-out splits in training), not from calibration.
+`runs/joint_emb_nullbias/results.json` holds the val-fitted variant in pcdm/train.py's schema.
+
+**(2) `joint_emb + listwise` (`joint_emb_lw`, $4).** Same as `joint_emb` plus the `SetMixer` (identity-at-init) over
+candidates. Best val NLL of any run (0.381 vs 0.389).
+
+| | joint_emb | **joint_emb_lw** | Δ |
+|---|---|---|---|
+| SNLI / MNLI / ANLI / BoolQ | .906 / .873 / .524 / .817 | .905 / .873 / .521 / .815 | 0 |
+| CLINC-150 / HWU64 | .803 / .875 | .763 / .869 | **−4** / −1 (listwise large-K cost; was −7 on layer-12 candidates) |
+| CLINC-heldout acc / among-K | .614 / .855 | **.696** / .866 | **+8** / +1 → false-null gap .24 → .17 |
+| Banking77-77 / Banking77-K / TREC-coarse / 20NG | .440 / .566 / .210 / .273 | .436 / .551 / .296 / .295 | ≈ (+9 TREC-coarse, no Banking77 loss) |
+| paraphrased labels | .810 | .820 | +1 |
+| CLINC-OOS null recall | .649 | **.823** | **+17** |
+| P(∅ \| absent) K=2 → K=150 | .97 → .31 (range .67) | .91 → .48 (range **.43**) | dilution halved, still > .10 target |
+| null AUROC clinc-k / irrq-intent / near-miss | .953 / .939 / .972 | .960 / .952 / .967 | ≈ |
+| ChaosNLI NLL / UNLI NLL / SNLI ECE | 1.381 / .554 / .005 | **1.323 / .531** / .006 | better on disputed items |
+| IIA add-irrelevant Δlog-odds / dup mass err | 0.000 / .047 | 0.168 / .046 | IIA broken by design; duplicates handled the same |
+
+Verdict (after the seed pair in (3)): the effects of listwise that clear 2× seed noise are **null-side** — OOS recall
++17/+22, P(∅|absent) range .67/.70 → .43 — and its cost, −4/−7 on CLINC-150 (the one large-K trained space). The apparent
+unseen-label gain (CLINC-heldout +8 vs seed 0) is +3 vs seed 1, i.e. within the ±5 seed spread; TREC/20NG/paraphrase shifts
+likewise. No NLI or Banking77 cost. IIA broken by design (Δlog-odds 0.17). H5 stays partial (range .43 > .10). Reading
+consistent with §3d(1): the set view helps *whether to abstain* (a coherent unfamiliar set vs one distractor), but does not
+close the novelty ⇒ null confound. **Default for null-critical use: `joint_emb_lw`; for large-K accuracy: `joint_emb`.**
+
+**(3) second `joint_emb` seed (`joint_emb_s1`, $4).** Noise floor for every claim below:
+
+| | seed 0 | seed 1 | |Δ| |
+|---|---|---|---|
+| SNLI / MNLI / ANLI / BoolQ | .906 / .873 / .524 / .817 | .908 / .874 / .531 / .817 | ≤ .007 |
+| CLINC-150 / HWU64 | .803 / .875 | .829 / .869 | .026 / .007 |
+| CLINC-heldout acc / among-K | .614 / .855 | .665 / .866 | .051 / .011 |
+| Banking77-77 / Banking77-K / TREC-coarse / 20NG | .440 / .566 / .210 / .273 | .470 / .561 / .246 / .314 | .03 / .00 / .04 / .04 |
+| paraphrased labels | .810 | .836 | .026 |
+| CLINC-OOS recall / null AUROC clinc-k | .649 / .953 | .598 / .959 | .051 / .007 |
+| ChaosNLI NLL / SNLI ECE / val NLL | 1.381 / .005 / .389 | 1.359 / .009 / .384 | .02 / .004 / .005 |
+| P(∅ \| absent) range | .665 | .701 | .036 |
+
+Rule of thumb from both seed pairs (`joint_v1`, `joint_emb`): NLI ±0.7, trained large-K ±3, unseen label spaces and OOS
+±5. Any single-seed difference under those is noise; this demotes several earlier "+2–4" readings in §3c to ties.
+
+## 3e. Data v5 — label-vocabulary diversity (`joint_emb_lw_v5`, 2026-09-18, A100 ≈ $5)
+
+Test of the §3d verdict ("the false-null gap on unseen label spaces needs training signal, not calibration"). **One variable
+changed**: training classification data = 30 label vocabularies × ≤ 4,000 rows (14 new sources: bbc-news, subj, CR, enron-spam,
+amazon-counterfactual, sst2, tweet-stance, arxiv-11, patent-9, bitext-support-27, student-subjects, hate/offensive, imdb,
+yelp-5) instead of v4's 16 vocabularies × up to 30,000 rows. NLI/BoolQ/SQuAD/CLINC untouched; **eval files byte-identical to
+v4** (v5's eval dir overwritten with v4's); same config as `joint_emb_lw`, same seed, 12k steps.
+
+| | joint_emb_lw (v4) | **joint_emb_lw_v5** | Δ | seed floor |
+|---|---|---|---|---|
+| Banking77 K=77 | .436 | **.527** | **+9** | ±3 |
+| Banking77-K acc / among-K | .551 / .757 | **.606 / .817** | +5.5 / +6 | ±1 |
+| TREC-fine / TREC-coarse | .180 / .296 | **.308 / .356** | **+13** / +6 | ±4 |
+| 20NG among-K | .295 | .336 | +4 | ±4 |
+| CLINC-heldout acc / among-K | .696 / .866 | **.762** / .876 | +7 / +1 | ±5 |
+| Banking77-K null AUROC | .752 | **.804** | +5 | ±0.5 |
+| SNLI / MNLI / ANLI / BoolQ | .905 / .873 / .521 / .815 | .909 / .880 / **.555** / **.834** | +.4 / +.7 / **+3.4** / +1.9 | ±.7 |
+| CLINC-150 / HWU64 | .763 / .869 | .784 / .818 | +2 / **−5** (HWU64 train rows 9k → 4k) | ±3 |
+| paraphrased labels | .820 | .837 | +2 | ±3 |
+| CLINC-OOS recall / P(∅ \| absent) range | .823 / .43 | .735 / .52 | **−9** / worse | ±5 |
+| null AUROC clinc-k / irrq-intent / near-miss-hwu64 | .960 / .952 / .967 | .961 / .971 / .942 | ≈ / +2 / −2.5 | |
+| ChaosNLI NLL / SNLI ECE (raw → T) | 1.323 / .003 → .006 | **1.273** / .009 → .020 | T = 1.22 fitted on v5's classification-heavier val over-softens NLI | |
+
+**Verdict: the unseen-label gap is mostly data.** Every unseen-vocabulary metric moved 1.5–3× the seed floor in the same
+direction, and the novelty ⇒ null confound shrank (Banking77-K null AUROC .75 → .80). The gap to MCQ-LoRA narrowed from
+~25 pts to 4–20: Banking77-77 .527 vs .568, TREC-fine .308 vs .430, 20NG .336 vs .534, CLINC-heldout .762 vs .890. Bonus:
+ANLI +3.4 and BoolQ +1.9 from *classification* diversity — the shared LoRA was over-fitting a few intent vocabularies.
+Costs: the capped in-distribution intent set (HWU64 −5) and the null side (OOS recall −9, K-dilution range .43 → .52) — the
+model now abstains less on unfamiliar-looking sets, which is exactly the trade §3d predicted.
+Next knobs are data-build costs, not model changes: more vocabularies (60+), lower cap (1–2k), and a per-family T (or
+per-task T) instead of one global T.
+
+## 3f. MMLU-Pro — the one number TypeSafe/Jev publishes (2026-09-19, $0.3)
+
+`scripts/mmlu_pro_eval.py`: 1,200 items, stratified over 14 categories (seed 0), 10 options (K = 10 for 986 items), gold
+always present, T fitted on v4 val. Jev: 84.6% (third-party 1,200-item sample, ECE .031). Ours:
+
+| | acc | among-K | ECE | NLL |
+|---|---|---|---|---|
+| joint_emb | .082 | .132 | .33 | 3.39 |
+| joint_emb_lw | .090 | .130 | .31 | 3.32 |
+| joint_emb_lw_v5 | .092 | .123 | .39 | 3.85 |
+| random (K = 10) | .10 | .10 | – | 2.30 |
+| `B_8B` cloze log-prob (option as continuation, other options not visible; 600 items) | .185 | .225 | .08 | 2.31 |
+| **`mcq_lora`** (same 1.7B, options rendered in the suffix, letter readout, evidence-only training) | **.235** | **.307** | .19 | 2.41 |
+| `B_1.7B` cloze (600 items) | 0.115 | 0.143 | 0.05 | 2.37 |
+
+**E0 decomposition (PLAN3):** the interface is the first-order cause. `mcq_lora` — identical backbone and training data, zero
+knowledge MCQ rows — recovers .235/.307 because the LM *reads the options against each other*; the bi-encoder head cannot
+(9%). The 8B cloze baseline, which scores each option blind to the others, sits *below* the 1.7B options-in-context readout —
+so the distillation teacher for E3 must see the options, and the same-backbone retention target is ≈ .30 (Qwen3-1.7B
+direct-answer with options in context). Depth (20 vs 28 layers) is still confounded in this table; E1 separates it.
+
+**Chance, and confidently wrong.** Three stacked reasons: (1) nothing in training is parametric-knowledge QA — every task is
+"the answer is in the state", so the head learned evidence ↔ candidate fit, which is meaningless for "3.2 × 10⁵ J" vs
+"the court lacked jurisdiction"; (2) Qwen3-1.7B-Base *in full* is ~30–35% on MMLU-Pro and we tap layer 20 of 28, cutting
+the layers where answer formation happens; (3) the novelty ⇒ null confound (§3d) fires — among-K > acc means ~30% of items
+are abstained on because the option strings look like an unfamiliar vocabulary. Reading: PCDM as built is a
+decision-over-evidence model (NLI .91, BoolQ .83, 150-way intents .80 at supervised-model level); Jev is a general-knowledge
+System-One model. This benchmark measures the latter and we never set out to have it — a different class of model, not a
+worse version. What would make the comparison apples-to-apples: Jev on our evidence-grounded eval files (needs API access),
+and the prompted `B_8B` log-prob baseline on the same 1,200 items to separate "backbone knowledge" from "our head" (queued).
+
+## 3g. PLAN3 E1 — depth under joint encoding (`tap28_v5`, 2026-09-19, $5) — **killed**
+
+Same as `joint_emb_lw_v5` (tap 20) but the suffix runs all 28 layers with LoRA on 21–28. Pre-registered rule: adopt if
+MMLU-Pro ≥ 15% and the evidence suite stays within seed floor.
+
+| | tap 20 (`joint_emb_lw_v5`) | tap 28 |
+|---|---|---|
+| SNLI / MNLI / ANLI / BoolQ | .909 / .880 / .555 / .834 | .880 / **.809** / **.468** / **.707** |
+| CLINC-150 / HWU64 / CLINC-heldout / Banking77-77 | .784 / .818 / .762 / .527 | .775 / .796 / .731 / .490 |
+| CLINC-OOS recall / null AUROC clinc-k | .735 / .961 | .667 / .951 |
+| MMLU-Pro acc / among-K / ECE | .092 / .123 / .39 | .091 / .117 / .28 |
+| best val NLL | .371 | .452 |
+
+Depth is not the lever: last-layer states hurt evidence alignment (the v1 finding survives joint encoding) and add nothing
+on knowledge through the bi-encoder interface. `[h20;h28]` was cancelled (h28 alone adds no MMLU signal, so the concat
+cannot). Combined with E0 (§3f): the +17 from `mcq_lora` is the *interface* (options read in context), not depth or size.
+E3 (compile the option-conditioned teacher into a candidate-independent Z) is the remaining lever within the cost constraint.
+
+## 3h. PLAN3 E2 — factorized null (`factnull_v5`, 2026-09-19, $5) — **killed as a K-dilution fix; kept as a finding**
+
+P(∅) = r(set statistics, h), P(a_j) = (1−r)·softmax(s)_j, T on candidate scores only; same config/data/seed as
+`joint_emb_lw_v5`. Rule: K-sweep range ≤ .10, OOS ≥ .80, near-miss AUROC ≥ .95, large-K within ±3.
+
+| | softmax null (`joint_emb_lw_v5`) | factored |
+|---|---|---|
+| NLI / BoolQ | .909 / .880 / .555 / .834 | .908 / .879 / .552 / .828 |
+| CLINC-150 / HWU64 | .784 / .818 | .765 / .798 |
+| CLINC-heldout acc / among-K | .762 / .876 | .717 / .875 (more abstention, same discrimination) |
+| Banking77-77 / Banking77-K / TREC-fine / 20NG | .527 / .606 / .308 / .336 | .490 / .639 / .222 / .293 |
+| CLINC-OOS recall | .735 | **.780** |
+| null AUROC clinc-k / irrq / near-miss hwu64 / clinc | .961 / .971 / .942 / .906 | .958 / .977 / .935 / .894 |
+| P(∅ \| absent) K=2 → 150 (range) | .94 → .41 (.52) | .93 → .45 (.48) |
+| IIA Δlog-odds / dup mass err / val NLL | .243 / .030 / .371 | .121 / .030 / **.365** |
+
+**Why it cannot work, and what the K-sweep actually measures.** Null AUROC *by K* on the sweep is .99 / .96 / .90 / .85 at
+K = 2 / 10 / 50 / 150 for every model we have (softmax, factored, listwise, pointwise). The null loses *discrimination*
+with K, not calibration: at K = 150 "gold absent" leaves the gold's sibling intents in the set, so absence is a near-miss
+judgment the head cannot make — the sweep conflates K with difficulty. Modeling abstention as answer-set support does not
+change that (the gate's max-score statistic legitimately rises with K), and any consistent probabilistic model has P(∅|absent)
+falling with K when near-misses carry mass. Consequences: (1) the "range ≤ .10" target is mis-specified; the right target is
+null AUROC at *fixed difficulty* — a sibling-excluded K-sweep (`ksweep_*_nosib`) is added to the eval; (2) the lever for
+large-K abstention is fine-grained discrimination (E3's option-conditioned teacher), not the null's functional form;
+(3) factored null stays available (`--null factored`) — +4.5 OOS, best val NLL — but is not the default.
+
+**Sibling-excluded K-sweep (`ksweep_clinc_nosib`, `joint_emb_lw_v5`):** P(∅|absent) / null AUROC at K = 2 / 50 / 150 =
+.95/.99 → .69/.94 → .59/.90 without siblings vs .94/.99 → .56/.90 → .41/.85 with. So about half of the large-K drop was
+near-miss difficulty and half is genuine K-dependence — an extreme-value effect over 149 unrelated distractors that costs
+9 AUROC points on its own. The correct statement of "K-dilution" is therefore: discrimination degrades with K even at fixed
+difficulty, and near-misses roughly double the effect; neither the softmax form nor set-support modeling changes it.
+
+## 3i. Fair latency, corrected (`bench_a100`, A100 80GB PCIe, 2026-09-19)
+
+Two artifacts fixed in `decide` (per-query embedder calls → one batched call; per-candidate Python lookups → one gather).
+Baseline `B_batched` = log-prob scoring with the state prefix shared **and queries batched in chunks of 32** (explicit dense
+causal+pad mask; matches sequential `B_fair` to 2e-5). Per-query marginal at M = 256, warm candidate vocabulary:
+
+| K | ours | B_batched | B_fair (sequential) | ours vs batched | peak mem ours / batched |
+|---|---|---|---|---|---|
+| 4 | 1.29 ms | 4.3 ms | 50.7 ms | **3.3×** | 8.8 / 13.6 GB |
+| 32 | 1.27 | 20.3 | 57.8 | **16×** | 8.8 / 25.9 |
+| 150 | 1.34 | 92.1 | 141.8 | **69×** | 9.1 / 25.4 |
+| 1000 | 2.44 | 650.8 | 731.0 | **267×** | 14.6 / 46.0 |
+
+Retires the earlier "73× at K = 4" (that baseline did not batch across queries). The right statement is L(K) = C_LM + α·N_candidate-tokens with small α — expensive LM compute independent of K, then cheap
+approximately linear candidate work (1.3 ms to K = 150, 2.4 ms at K = 1000; the O(K·d) scorer term PLAN3 factorizes in E3) — not "flat in K". **Caveat (PI memo):** these are
+*warm* numbers — candidate vectors precomputed. For runtime-novel candidates (MMLU-style) the candidate encoder is on the
+request path; E3-lat measures cold vs warm per candidate encoder.
+
+## 3j. PLAN3 E3 — compiling a listwise teacher into a decision state (2026-09-19; closed — negative, see the choices-only control)
+
+**Corpus (`data_kb`, `scripts/distill_corpus.py`):** 147,446 rows from MMLU-aux (40k), AQuA (40k), MedMCQA (20k), LogiQA
+(12.6k), SciQ (11.7k), CSQA (9.7k), QASC (8.1k), OBQA (5k), ARC (3.4k); val 3,001; TruthfulQA-MC1 held out (817); GPQA
+gated. **Audit (`scripts/kb_audit.py`, `runs/kb_audit.json`):** 127,180 unique normalized stems (duplication is
+within-source: MMLU-aux 9.1k groups, AQuA 2.5k; cross-source ≤ 18 pairs) — the corpus is ~127k independent items, not
+147k. Leakage vs the frozen 1,200 MMLU-Pro items: exact 1, normalized 1–2, MinHash@0.8 1, stem+options 0 → **2 items**
+(qids 8011, 8375; `data_kb/leaked_qids.json`), excluded from reported MMLU-Pro numbers.
+
+**Teacher (`teacher_kb`):** `mcq_lora` warm start, 4k steps on data_kb, options rendered in the suffix, letter readout.
+MMLU-Pro acc .294 / among-K **.310** / ECE .10 (vs `mcq_lora` .235 / .307): the corpus mostly removed abstention;
+knowledge is at the 1.7B ceiling. TruthfulQA-MC1 .321 / .425. Knowledge Retention denominator = .310 (8B 5-shot = scale
+reference only). This run labels ONE option set per row (ordinary listwise KD); same-Z multi-set supervision (E3-ms,
+`scripts/multiset.py`) is the follow-up if the ladder is positive.
+
+**Teacher choice-set behaviour (`mmlu_cf`):** orig .312 among-K; remove-3 .376 among-K but acc **.073** (the null
+letter shifts with K — abstention error .30); add-3-unrelated .273 (−4); replace-hardest .307; near-dup .399; reorder
+Δp .097; IIA Δlog-odds **.179**. The listwise teacher is choice-set-fragile.
+
+**E3b — `zr` student (R = 8 probes, token MaxSim, tiny cold-capable candidate encoder, single-set KD, $5.5):**
+
+| | baseline `joint_emb_lw_v5` | `e3b_zr` | teacher |
+|---|---|---|---|
+| MMLU-Pro among-K / acc / ECE | .123 / .092 / .385 | **.157 / .157 / .039** | .310 / .294 / .100 |
+| **KR_raw** (among-K / teacher among-K) | 0.40 | **0.51** | 1.00 |
+| **KR_excess** ((among-K − chance .10) / (teacher − chance)) | 0.11 | **0.27** | 1.00 |
+| Abstention error (among-K − acc) | .031 | **.000** | .016 |
+| TruthfulQA-MC1 among-K / kb val among-K | – | .286 / .344 | .425 / – |
+| counterfactual orig / remove3 / add3 / replace / near-dup / reorder | – | .158 / .230 / .113 / .153 / .112 / .157 | .312 / .376 / .273 / .307 / .399 / .312 |
+| IIA Δlog-odds / reorder Δp | 0 / 0 | **0 / 0** (exact) | .179 / .097 |
+| SNLI / MNLI / ANLI / BoolQ | .909 / .880 / .555 / .834 | .905 / .873 / .541 / .826 (within noise) | – |
+| CLINC-150 / HWU64 | .784 / .818 | .724 / .784 | – |
+| CLINC-heldout / Banking77-77 / TREC-fine / 20NG | .762 / .527 / .308 / .336 | **.391 / .097 / .138 / .261** | – |
+| CLINC-OOS / null AUROC clinc-k / ChaosNLI | .735 / .961 / 1.273 | .568 / .909 / 1.313 | – |
+
+Readings. (1) E3 more than doubles the above-chance teacher capability captured by a candidate-blind Z under ordinary
+single-set KD — KR_excess .11 → .27 (raw .40 → .51; "half the knowledge compiles" is the wrong reading, 10-way chance is .10) — with MMLU calibration improved (ECE .39 → .04) and no abstention error; the student is exactly
+set-stable where the teacher is fragile. (2) `add3_unrel` costs the student 4.5 pts under exact IIA, so the residual is
+discrimination (unrelated options sometimes outscore the gold), not set-dependence per se — `zr_set` decides whether
+O(K) set-conditioning recovers it. (3) **Unseen label spaces collapsed** (Banking77-77 .527 → .097): the tiny candidate
+encoder (Qwen embedding table + 2 layers from scratch) carries no pretrained label semantics; all label-space transfer in
+this project came from Qwen3-Embedding (§5a). The PI's two-tier structure is therefore required, not optional — semantic
+embedder for the label-space tier, tiny encoder for cold runtime candidates. `e3d_zr_emb` (same head with the semantic
+embedder) is queued to confirm the head keeps label transfer. Evidence tasks otherwise held within seed noise (CLINC-150
+−6, HWU64 −3 are the same-encoder effect on trained label spaces).
+
+**E3c — `zr_set` (zr + one O(K) cross-attention from the probes over all candidate tokens; same data, seed, steps; $5.5):**
+MMLU-Pro among-K .147 vs `zr` .157 (KR_excess .23 vs .27; within the ±1-pt SE of 1,200 items), counterfactuals track `zr`
+(remove3 .216 / add3 .107 / near-dup .096), learned IIA Δlog-odds .034, reorder exact. Evidence identical. Null side
+better: CLINC-OOS .568 → .727, null AUROC .909 → .924, MMLU ECE .011, ChaosNLI 1.31 → 1.23. Reading: **under single-set
+KD there is no supervision for set dependence, so the set-conditioning path cannot learn what the teacher's residual
+r_j(Z, A) is** — the ladder's `zr ≈ zr_set` is the expected null result of single-set training, not evidence that the
+residual is small. E3-ms (same-Z, multi-set, symmetrized teacher, Δ-log-odds targets) is the test that can separate them.
+
+**E3a — `z1` (single decision vector, factorized bilinear scorer; $5.5) and the complete ladder:**
+
+| MMLU-Pro | `z1` | `zr` | `zr_set` | teacher |
+|---|---|---|---|---|
+| among-K | **.171** | .157 | .147 | .310 |
+| KR_raw / KR_excess | .55 / **.34** | .51 / .27 | .48 / .23 | 1 / 1 |
+| ECE | .046 | .039 | .011 | .100 |
+| counterfactual orig / remove3 / add3 / replace / near-dup / reorder | .172 / .237 / .142 / .182 / .131 / .170 | .158 / .230 / .113 / .153 / .112 / .157 | .147 / .216 / .107 / .138 / .096 / .149 | .312 / .376 / .273 / .307 / .399 / .312 |
+| TruthfulQA among-K / kb val among-K | .267 / .352 | .286 / .344 | .274 / .346 | .425 / – |
+| CLINC-OOS / null AUROC clinc-k | .493 / .929 | .568 / .909 | .727 / .924 | – |
+| SNLI / MNLI / ANLI / BoolQ | .907 / .876 / .536 / .817 | .905 / .873 / .541 / .826 | .909 / .875 / .537 / .831 | – |
+
+Ladder reading (PI frame, 2026-09-19): z1 ≈ zr ≈ zr_set ≈ .15–.17 ≪ teacher .31 — **neither decision-state capacity nor
+set-dependence is the bottleneck under single-set KD**; the single vector retains as much as eight probes or probes + set
+conditioning (differences within ~2 SE of n = 1,200). About a quarter to a third of the teacher's above-chance capability
+compiles into a candidate-blind Z regardless of head form; the rest is either irreducible without option-conditioned LM
+computation or needs (i) the same-Z multi-set + Δ-log-odds signal (E3-ms pilot) and/or (ii) a semantic candidate encoder
+(`zr_emb`). Set-conditioning buys null quality only (OOS .49 → .57 → .73 across the ladder) — consistent with §3h: the
+null benefits from seeing the set even when accuracy does not.
+
+**Scale reference (`mcq8B_5shot_mmlu`, Qwen3-8B-Base, 5-shot letter prompt, $0.5):** among-K .287, acc .285, ECE .06;
+reorder Δp .21, IIA Δlog-odds .21. Below the fine-tuned 1.7B teacher — few-shot letter prompting of a base model is a
+weak, symbol-biased protocol, not a size ceiling. The proper scale reference is an 8B fine-tuned options-in-context teacher
+(~$15; deferred). The 1.7B teacher's .310 stays the KR denominator.
+
+**E3-lat — warm vs cold candidate latency (A100, ms/query at M = 256; cold = candidate strings arrive with the request,
+nothing cached):**
+
+| candidate encoder | K = 4 warm / cold | K = 32 | K = 150 | cold/warm |
+|---|---|---|---|---|
+| Qwen3-Embedding-0.6B (label-space tier, `joint_emb_lw`) | 1.65 / 2.23 | 1.74 / 2.33 | 2.52 / 3.77 | 1.35 / 1.34 / 1.50 |
+| tiny (embedding table + 2 layers, `e3b_zr`) | **0.78 / 0.79** | 1.03 / 1.08 | 0.75 / 0.87 | **1.01 / 1.05 / 1.15** |
+
+Both meet the ≤ 1.5× rule (the embedder tier exactly at the bar at K = 150). The tiny tier is essentially cold-free and
+~2× cheaper warm, but carries no label semantics (§3j E3b); the embedder tier keeps label transfer and pays 35–50% for
+novel strings. Two tiers, or the PI's follow-up — distill Qwen3-Embedding into the tiny encoder on a large phrase corpus —
+are the two ways to get one encoder with both properties.
+
+**Choices-only / shuffled-question control (`scripts/mmlu_probes.py`, PI memo; Balepur et al. ACL 2024) — decisive:**
+
+| among-K | normal | choices only (question = ".") | shuffled question | question-dependent gain |
+|---|---|---|---|---|
+| teacher (1.7B, options in context) | .310 | .222 | .208 | **+.088** |
+| `z1` student | .171 | .181 | .147 | −.010 |
+| `zr` student | .157 | .166 | .182 | **−.009** |
+| `zr_set` student | .147 | .162 | .151 | −.014 |
+
+Every student's whole above-chance score is candidate-set priors (uniform across heads → the training signal, not the architecture) (option-text artifacts learned from the corpus); the
+question contributes nothing. **Retraction:** §3j's "KR_excess .27 / a quarter to a third of the teacher's above-chance
+capability compiles into Z" is wrong — under single-set KD, *no question-dependent knowledge compiled into Z*. The
+teacher's own question-dependent component is small (+.088 among-K over its choices-only score), so the target E3 is
+chasing at 1.7B is ~9 points, not ~21. Consequences: (1) every MMLU-Pro number in this section must be read as
+(normal − choices-only); (2) the E3-ms pilot's primary criterion becomes question-dependent gain > 0 (with
+counterfactual KL / Δ-reproduction secondary); (3) the honest framing of E3 so far: the decision-state factorization
+transferred the teacher's *candidate priors and calibration* (ECE .39 → .04) but not its question-conditioned knowledge.
+
+**E3-ms pilot (same-Z multi-set supervision; 2026-09-19, $3.5) — killed by its pre-registered rule.** 30k corpus rows ×
+(orig + 6 variants: remove/add-unrelated/reorder = invariance; replace-hardest/near-dup/remove-strong = set-context),
+teacher symmetrized over 3 permutations, Δ-log-odds targets over shared candidates; `zr_set` continued 4k steps from
+`e3c_zr_set` with `CE + KD + γ·Huber(Δ^S − Δ^T)` vs a steps-matched single-set control from the same init.
+
+| | control (single-set) | multi-set + Δ |
+|---|---|---|
+| MMLU-Pro among-K / acc / ECE | .124 / .124 / .035 | .130 / .098 / .071 |
+| counterfactual kl_teacher (orig / add3 / replace / near-dup / reorder) | .48 / .48 / .46 / .46 / .48 | .56 / .54 / .55 / .52 / .56 |
+| Δ-log-odds MAE (add3 / replace / near-dup / reorder) | .742 / .673 / .731 / .776 | .739 / .673 / .731 / .776 |
+| near-dup among-K / CLINC-OOS / null AUROC | .089 / .701 / .930 | .046 / .572 / .918 |
+| SNLI / MNLI / BoolQ | .913 / .881 / .831 | .911 / .881 / .833 |
+
+No criterion moved in the right direction: teacher-KL got worse, Δ reproduction is *identical* (the O(K) set-conditioning
+path learned no set dependence even with direct Δ supervision — its zero-initialised cross-attention stayed inert at γ = 1
+over 4k steps), MMLU is noise, near-dup/OOS degraded. Δ_q probes: multi-set normal .130 / choices-only .113 / shuffled-question .130 (Δ_q = +.017 vs choices-only, **0.000 vs
+shuffled**); control .124 / .147 / .147 (−.023). A wrong question helps the multi-set model exactly as much as the right one —
+no question-dependent knowledge; the +.017 is a candidate-prior artifact of the choices-only rendering. The stricter
+Δ_q(shuffled) = normal − shuffled is adopted as the primary measure from here. Verdict for the candidate-blind compilation branch at 1.7B: **no question-dependent knowledge compiles
+into Z under single-set or multi-set distillation**; what transfers is candidate priors and calibration. The branch stops
+here (PLAN4 §10, §19 Phase A); the mainline is native choice (§3k).
+
+## 3k. Redirect — PLAN4 (2026-09-19): closed-set System-One decision model
+
+The candidate-blind Z(x, q) constraint was stronger than the product/research goal. The E3 ladder + choices-only control
+(§3j) showed that under single-set KD no question-dependent knowledge compiles into a candidate-blind state, while the same
+backbone *with options in context* has it (Δ_q = +.088). PLAN4 redirects the mainline to P(y | x, q, A): the closed choice
+set participates in one non-generative decision pass (state KV-cached, one suffix per query, no per-candidate LM call, no
+answer generation), read out by a direct head over the terminal decision state h_D with candidate representations
+(N2 semantic, N3 contextual, N2N3 hybrid) vs the letter-logit control N1. Large K routes through the existing energy scorer
+→ top-r → native choice. E3-ms continues as the optional compilation branch. Success axes (PLAN4 §15): evidence retention,
+Δ_q ≈ teacher's, decision quality (NLL/ECE/Brier/ChaosNLI/null, disaggregated abstention), one-suffix-per-query latency
+over K = 2…256. `pcdm/report_native.py` prints that table.
+
+## 3l. PLAN4 Phase B/C — `native_choice_v1` (2026-09-19/20, H100)
+
+`--readout native`: state prefix + query + lettered options + terminal decision token in ONE suffix through all 28 layers
+(LoRA on 21–28); h_D = terminal state; N2 = factorized bilinear scorer over (h_D, Qwen3-Embedding candidate); factored null
+over set statistics; options shuffled every step; training mix = data v5 + data_kb (hard labels), 12k steps, 0.72 s/step.
+
+| | PCDM `joint_emb_lw_v5` | E3 `zr` | **`nc_n2`** | `nc_n1` (letter readout, same mix) | teacher (N1, kb only) |
+|---|---|---|---|---|---|
+| MMLU-Pro among-K / acc / ECE | .123 / .092 / .39 | .157 / .157 / .04 | **.198 / .143 / .16** | pending | .310 / .294 / .10 |
+| TruthfulQA-MC1 among-K / kb val among-K | – | .286 / .344 | **.401 / .463** | | .425 / – |
+| SNLI / MNLI / ANLI / BoolQ | .909 / .880 / .555 / .834 | .905 / .873 / .541 / .826 | **.854 / .742 / .410 / .775** | | (`mcq_lora`: .853 / .727 / .400 / .768) |
+| CLINC-150 / HWU64 | .784 / .818 | .724 / .784 | .695 / .721 | | |
+| CLINC-heldout / 20NG / TREC-fine / Banking77-77 | .762 / .336 / .308 / .527 | .391 / .261 / .138 / .097 | **.800** / .382 / .154 / **.012** | | |
+| CLINC-OOS / null AUROC clinc-k / snli | .735 / .961 / .980 | .568 / .909 / .980 | .251 / .795 / .960 | | |
+| P(∅ \| absent) K = 2 / 10 / 50 / 150 | .94 / .81 / .56 / .41 | – | .57 / .61 / .38 / **1.00** | | |
+| counterfactual orig / remove3 / add3 / replace / near-dup / reorder | – | .158 / .230 / .113 / .153 / .112 / .157 | .198 / .237 / .146 / .182 / .167 / .196 | | .312 / .376 / .273 / .307 / .399 / .312 |
+| IIA Δlog-odds / reorder Δp | 0 / 0 | 0 / 0 | .379 / .059 | | .179 / .097 |
+| ChaosNLI NLL / SNLI NLL | 1.273 / .257 | 1.313 / .265 | **1.175** / .385 | | |
+
+**`nc_n1` (letter readout, same mix) — the §16 comparison:** MMLU-Pro among-K **.325** / acc .273 / ECE .086 (above the kb-only
+teacher's .310), TruthfulQA .465, kb val .547, CLINC-heldout **.918**, Banking77-77 .531, 20NG .541; but SNLI/MNLI/ANLI/BoolQ
+.838 / .684 / .377 / .769, HWU64 .510, CLINC-OOS .633, null AUROC .826, IIA .46, reorder Δp .17, val NLL .512 (vs N2 .451).
+**§16 rule: "N1 works, N2 fails → focus on the readout, not scale."** N1 *is* a readout over h_D — h_D·E[letter_j], where
+the letter embedding carries slot identity that h_D encodes; a bilinear scorer against a slot-agnostic semantic candidate
+cannot recover "the answer is slot C". N3 (h_D against each option's own contextual states, which carry slot identity) is the
+direct fix and is queued as the last run in budget. Across the three axes no single model wins: knowledge N1 ≫ N2 > PCDM;
+evidence PCDM ≫ N2 > N1; null PCDM ≫ N1 > N2 — empirical support for the two-regime architecture, and the evidence
+regression of the options-in-suffix formulation is the open problem.
+
+**Δ_q probes (choices-only / shuffled-question), PLAN4 §15B:**
+
+| | normal | choices-only | shuffled-q | Δ_q | Δ_q / teacher |
+|---|---|---|---|---|---|
+| teacher (kb only) | .310 | .222 | .208 | .088 | 1.00 |
+| `nc_n1` (letters) | .325 | .213 | .211 | **.112** | 1.27 |
+| `nc_n2` (direct head) | .198 | .121 | .139 | **.077** | **0.87** |
+| E3 `zr` (candidate-blind) | .157 | .166 | .182 | −.009 | ≈ 0 |
+
+(Under the stricter shuffled-question variant adopted in §3j: teacher .102, N1 .114, N3 .116, N2 .058, v2 .074, v3 .103 —
+same ordering, smaller ratios: N3 = 1.14× teacher, N2 = 0.57×.) The direct head N2 retains 57–87% of the teacher's
+question-dependent knowledge depending on the variant; its lower raw score is mostly
+*less candidate-prior exploitation* (choices-only .121 vs .213) — N2 is less artifact-driven, not less knowledgeable, with a
+third of N1's order bias (reorder Δp .06 vs .17). This is the first non-generative readout in the project that exposes
+question-conditioned parametric knowledge; the candidate-blind Z never did. N3 (contextual candidates) tests whether the
+rest of the raw gap is recoverable. (`false_abstain` column in `pcdm/report_native.py` needs verification — it disagrees with
+among-K − acc; use the latter until fixed.)
+
+**`nc_n3` (h_D scored against each option's own contextual hidden states, slot identity preserved; $9):**
+
+| same mix / steps | MMLU-Pro among-K / acc / ECE | TruthfulQA / kb val | CLINC-heldout / Banking77-77 / 20NG / TREC-fine | IIA / reorder Δp | SNLI / MNLI / ANLI / BoolQ / CLINC-150 / HWU64 | null AUROC / OOS / P(∅\|absent) K=150 |
+|---|---|---|---|---|---|---|
+| `nc_n1` letters | .325 / .273 / .086 | .465 / .547 | .918 / .531 / .541 / .414 | .463 / .165 | .838 / .684 / .377 / .769 / .697 / .510 | .826 / .633 / .20 |
+| `nc_n2` semantic | .198 / .143 / .162 | .401 / .463 | .800 / .012 / .382 / .154 | .379 / .059 | .854 / .742 / .410 / .775 / .695 / .721 | .795 / .251 / 1.00 |
+| **`nc_n3` contextual** (Δ_q **.111** = 1.26× teacher; choices-only .203, shuffled .198) | **.314** / .133 / .459 | **.461 / .580** | **.916 / .497 / .559 / .400** | **.126** / .101 | **.863 / .752 / .431** / .737 / **.740** / .660 | .803 / .204 / .99 |
+| PCDM energy | .123 / .092 / .385 | – | .762 / .527 / .336 / .308 | 0 / 0 | .909 / .880 / .555 / .834 / .784 / .818 | .961 / .735 / .41 |
+
+**§16, first branch: N3 ≈ N1 → adopt direct native choice.** The mechanistic prediction held — the direct head needs
+candidate representations that carry slot identity (the option's own contextual states), not slot-agnostic semantic
+vectors; with them the non-generative readout matches the letter readout on every knowledge and unseen-label set, with a
+quarter of its IIA fragility (.13 vs .46; one run — v2/v3 with the same readout give .25/.21) and evidence retention
+between N1 and N2 (better on SNLI/MNLI/ANLI, worse on BoolQ .737 vs .769/.775 and HWU64 .660 vs .721). Established: *candidate-
+conditioned pretrained reasoning can be exposed directly as typed probabilities without the generative answer interface.*
+Two known defects, both in the null/calibration layer rather than the decision: (i) the native null does not transfer
+across K — abstention error .18 on MMLU-Pro (acc .133 vs among-K .314), ECE .46, P(∅|absent) .99 at K = 150 while OOS
+recall is .20; the set-statistics gate over h_D sees score distributions at K = 77–150 unlike the kb-heavy mix; (ii) the
+evidence gap to the energy path (5–13 pts) persists for all native readouts — the options-in-suffix formulation, not the
+readout, is the cause. Next (PLAN4 §16 "proceed to calibration training", §15 axes A and C): a K-robust native null
+(train the null on the energy path's per-K null distribution, or route ∅ through the energy tier), and the evidence
+regression (mixing ratio, evidence tasks rendered without letters, longer training). Budget exhausted at this point.
+
+Readings on `nc_n2`: (1) knowledge moves — MMLU-Pro .198 (best non-letter readout so far),
+TruthfulQA .401 ≈ teacher; (2) **evidence regresses 5–15 pts to `mcq_lora`'s level** — the options-in-suffix formulation
+costs evidence accuracy at 1.7B/12k steps regardless of readout (PLAN4 §15A not met as trained); (3) **the native null
+does not generalize across K** — abstains on everything at K = 150 (P(∅|absent) 1.00, Banking77-77 .012) while
+under-firing on OOS (.25): the set-statistics gate over h_D sees score distributions at K = 77–150 unlike anything in the
+kb-heavy mix; (4) set-dependent by design (IIA .38), modest order bias (Δp .06 with per-step shuffling).
+
+## 3m. PLAN5 Phase 5A — native-choice latency with state-KV reuse (`bench_native`, H100, 2026-09-20)
+
+`nc_n3` native path (state prefix cached once; per query ONE right-padded option-aware suffix, batched in chunks of 32,
+h_D + option spans pooled, scored) vs the energy path (`joint_emb_lw`) vs the query-batched log-prob baseline; per-query
+marginal ms at M = 256, real intent-label candidates.
+
+| L_s = 256 | K = 2 | 4 | 10 | 32 | 64 | 128 | 256 |
+|---|---|---|---|---|---|---|---|
+| suffix tokens | 31 | 43 | 79 | 233 | 470 | 1040 | 2320 |
+| **native** | **1.07** | 1.14 | 1.55 | 3.38 | 6.44 | 17.3 | 43.8 |
+| energy | 0.97 | 0.96 | 0.96 | 0.98 | 0.96 | 1.01 | 1.06 |
+| batched log-prob | 2.12 | 2.77 | 4.59 | 12.2 | 22.8 | 49.8 | 101.7 |
+| native / energy | 1.1× | 1.2× | 1.6× | 3.4× | 6.7× | 17× | 41× |
+
+Longer states (rerun with native chunk 8 / baseline chunk 4, so small-K native marginals are less batched than above):
+
+| | K = 2 | 4 | 10 | 32 | 64 | 128 | 256 |
+|---|---|---|---|---|---|---|---|
+| L_s = 1000: native / energy / batched | 3.7 / 1.34 / 11.9 | 3.7 / 1.33 / 13.0 | 3.8 / 1.34 / 18.6 | 4.8 / 1.36 / 38.4 | 8.2 / 1.36 / 66.9 | 18.1 / 1.43 / 128.6 | 38.7 / 1.48 / 247.5 |
+| L_s = 2000: native / energy / batched | 3.7 / 1.90 / 13.9 | 3.8 / 1.91 / 17.3 | 4.1 / 1.93 / 27.6 | 5.9 / 1.90 / 63.8 | OOM (baseline) | | |
+
+Reading (corrected after review): at fixed chunk 8 native is *flat* in L_s (3.69 ms at 1k vs 3.66 at 2k for K = 2); the
+1.07 → 3.7 ms jump from the L_s = 256 table is the chunk change (32 → 8), not the prefix. The energy path is the one that
+grows with L_s (0.97 → 1.34 → 1.90 ms). The baseline at L_s ≥ 1k runs at chunk 4 with a per-sub-batch KV copy, so its
+numbers here are inflated; the 2–3× statement holds only for the L_s = 256 run.
+
+Single-decision and small-batch latency (L_s = 256; total ms per decision incl. the state pass):
+
+| | M = 1 (one decision) | M = 32 (marginal ms) |
+|---|---|---|
+| native, K = 2 / 10 / 32 | **52 / 53 / 52** | 1.8 / 2.2 / 4.1 |
+| energy, K = 2 / 10 / 32 | 83 / 84 / 85 | 2.8 / 2.8 / 2.9 |
+| batched log-prob, K = 2 / 10 / 32 | 65 / 67 / 69 | 2.6 / 5.1 / 12.7 |
+
+At M = 1 every path is fixed-cost dominated (state pass ≈ 20–23 ms + one forward) and **native is the fastest for
+K ≤ 32 (≈ 52 ms on an H100)** — the energy path carries the embedder and its own overheads. The K-scaling above is a
+throughput statement at M = 256; a service answering one bounded decision at a time is native-first regardless of K ≤ 32.
+
+Caveats: the batched log-prob baseline deep-copies its KV cache per sub-batch (pre-existing; inflates it at large K —
+the energy-vs-native comparison is the clean one); K = 256 candidates are 226 real intent names + 30 synthetic labels;
+bench.json for this run was lost to the OOM (numbers transcribed from the log; the rerun checkpoints per row).
+
+**Operating region (corrected).** The bench's own crossover field says: at M ≥ 32 the energy path is cheaper at *every* K
+(K* = 2); native is cheaper only at M = 1, and there only because its fixed per-call overhead is lower (K* = 128 at M = 1).
+So "K* ≈ 10–32" is a chosen cost ratio (native ≤ 1.6–3.4× energy), not a measured crossover. The honest statement: native
+choice costs 10–60% more than the energy path per query up to K ≈ 10 and 3.4× at K = 32 in throughput mode, is the faster
+path for single decisions, and scales linearly in option tokens; large sets go energy → top-r → native with r set by the
+latency budget (PLAN4 §9). One suffix per query, no
+generation, no per-candidate LM call — the systems requirement of PLAN4 §15D holds; latency scales with total option tokens,
+not with K per se.
+
+## 3n. PLAN5 Phase 5B — support gate × native choice (`scripts/compose_support.py`, eval-time, $1)
+
+P(∅) = 1 − r with r = 1 − P_energy(∅) from `joint_emb_lw_v5`; P(a_j) = r · P_native(a_j | answerable) from `nc_n3`; no
+retraining; aligned per row by candidate string over the shared eval sets.
+
+| | energy | native | **composed** |
+|---|---|---|---|
+| MMLU-Pro among-K / acc / abstention error / ECE | .123 / .095 / .028 / .392 | .314 / .133 / .182 / .459 | **.314 / .222 / .092 / .204** |
+| CLINC-OOS null recall | .739 | .194 | **.786** |
+| null AUROC clinc-k / snli / squad | .961 / .980 / .975 | .803 / .964 / .992 | .961 / .980 / .975 |
+| P(∅ \| absent) K = 2 / 50 / 150 | .94 / .59 / .45 | .86 / .40 / .99 | .94 / .59 / .45 |
+| CLINC-heldout / Banking77-77 | .756 / .529 | **.916** / .497 | .794 / .483 |
+| SNLI | .910 | .863 | .863 |
+
+Reading: the composition inherits native's choice (among-K unchanged at .314) and the energy path's support signal
+(OOS, AUROC, K-sweep = energy's). MMLU abstention error halves and ECE drops .46 → .20 — but not "for free": the
+evidence-trained null still abstains on 9% of closed-book questions, and on unseen label spaces it imports the energy
+path's novelty ⇒ null confound (CLINC-heldout .916 → .794). Verdict: keep the two-expert split for support vs choice;
+the support gate needs either the v5-style label-diversity treatment or a rule that closed-book (no-evidence) questions are
+not gated by the evidence null. `compose_n3_T` (energy T = 1.22 applied to r) is within noise of the T = 1 composition.
+**With `nc_v2` (native null fixed, §3p):** composing the energy gate now *hurts* closed-book decisions (MMLU acc .282 → .216,
+ECE .037 → .185) and buys only +9 OOS recall (.699 → .791). Rule adopted: the evidence-trained support gate applies to
+evidence-grounded decisions only; closed-book abstention is the native head's own.
+
+## 3o. PLAN5 Phase 5C — evidence/knowledge fusion at score level (`scripts/fuse_scores.py`, eval-time, $0)
+
+Geometric mixture over shared candidates, s_j = s_j^E + g·s_j^N (energy null as support gate), swept over g on the
+`joint_emb_lw_v5` + `nc_n3` dumps:
+
+| g | MMLU-Pro among-K | SNLI / MNLI / ANLI / BoolQ | CLINC-150 | CLINC-heldout | Banking77-77 | OOS recall | SNLI ECE |
+|---|---|---|---|---|---|---|---|
+| 0 (= energy) | .123 | .910 / .881 / .554 / .835 | .782 | .756 | .529 | .739 | .009 |
+| 0.5 | .190 | .908 / .878 / .539 / .835 | **.802** | .784 | **.563** | .732 | .037 |
+| 1 | .224 | .902 / .866 / .527 / .822 | **.806** | .793 | **.576** | .730 | .053 |
+| 2 | .253 | .893 / .846 / .507 / .803 | .799 | **.803** | .576 | .728 | .077 |
+| native alone (`nc_n3`) | .314 | .863 / .752 / .431 / .737 | .740 | .916 | .497 | .194 | – |
+| oracle (best g per set) | .253 | .910 / .881 / .554 / .835 | .806 | .803 | .578 | .739 | .009 |
+| val-selected global g = 0.25 | .158 | .909 / .878 / .544 / .835 | .797 | .772 | .550 | .733 | .026 |
+
+Linear mixture behaves the same (g = 0.5: MMLU .230, CLINC .795, Banking77 .565, OOS .785, SNLI .904).
+
+Reading: on label-space decisions the two experts are **complementary** — at g ≈ 0.5–1 fusion beats both (CLINC-150 +2.4
+over energy / +6.6 over native; Banking77-77 +5 / +8) for ≤ 1.5 pts of NLI. On closed-book knowledge a global g caps at
+.25 vs native's .314, and on NLI any g > 0 costs. The oracle row (evidence sets at g = 0, label/knowledge sets at g ≥ 1)
+is the target for a *per-input* gate; a val-selected global g captures little because val is evidence-heavy. Caveats (review): g is selected on the eval sets and the oracle row is a per-column max over the grid — an upper bound, not a
+result; and the fused scores were not re-temperature-fitted, so probability quality degrades with g (Banking77 NLL 2.04 → 2.65,
+ChaosNLI 1.27 → 1.97, ANLI ECE .17 → .30 from g = 0 to 2) — accuracy gains only until T is refit per g. Energy rows in §3n/§3o are
+the T = 1 dump (MMLU acc .095 / ECE .392), not the T-fitted results.json (.092 / .385). Verdict for PLAN5 §4: not interference —
+complementary *accuracy* signals with a task-dependent mixing weight; a learned per-input gate g(x, q) with a refit T is the
+experiment, not a global mix.
+
+## 3p. PLAN5 Phase 5A-v2 — letter-free native choice (`nc_v2`: `<choice>` tags, per-step shuffle, perm-consistency λ = 0.1; H100, $9)
+
+| | `nc_n3` (letters) | **`nc_v2`** (tags) | goal |
+|---|---|---|---|
+| MMLU-Pro among-K / acc / abstention error / ECE | .314 / .133 / .181 / .459 | .286 / **.282** / **.004** / **.040** | keep knowledge: **failed** on Δ_q |
+| Δ_q (normal − choices-only; shuffled) | .111 (.203; .198) | **.066** (.220; .212) | 0.75× teacher vs 1.26× |
+| TruthfulQA / kb val | .461 / .580 | .477 / .538 | |
+| reorder Δp / IIA Δlog-odds | .101 / .126 | .116 / .247 | Δp < .03: **failed** |
+| SNLI / MNLI / ANLI / BoolQ / CLINC-150 / HWU64 | .863 / .752 / .431 / .737 / .740 / .660 | .863 / .756 / .441 / .727 / .749 / .663 | recover evidence: **unchanged** |
+| CLINC-heldout / Banking77-77 / 20NG / TREC-fine | .916 / .497 / .559 / .400 | .903 / .357 / .536 / .334 | |
+| CLINC-OOS / null AUROC clinc-k / P(∅\|absent) K = 150 | .204 / .803 / .99 | **.707 / .953 / .28** | (unplanned) native null fixed |
+
+Readings. (1) **The native null is fixed by the rendering**: with no letter-rendered "none of the above" line, ∅ is purely the
+head's decision over set statistics, and the K-pathology of §3l disappears (abstention error .18 → .004, OOS .20 → .71,
+AUROC .80 → .95). But the question-dependent signal drops (Δ_q .111 → .066) while option-prior exploitation rises
+(choices-only .203 → .220) — among-K hides this; only the probe shows it — for abstention this beats the support-gate composition (§3n) on closed-book questions,
+though the composition still wins on evidence-grounded nulls — and the composition keeps N3's full Δ_q. (2) Letters were **not** the cause of
+the evidence gap (unchanged) nor of the order sensitivity (Δp .10 → .12; perm-consistency at λ = 0.1 did nothing — with
+letters gone, position is the only identity signal in the suffix, so the LM's positional bias survives). (3) Large tagged
+suffixes hurt unseen label spaces at K = 77 (Banking77-77 −14). Net: `nc_v2` met none of its three goals; its null fix is real. **`nc_v3` (letters for options, no rendered ∅ line, no perm
+loss; $9) isolates the two factors:** Δ_q **.108** (≈ N3's .111; v2 .066), among-K .287, acc .273 (abstention error .014),
+ECE .069, null AUROC .940, P(∅|absent) at K = 150 .56, choices-only .178 (the least option-prior exploitation of any native
+model), OOS .435 (v2 .707), evidence .858 / .740, reorder Δp .117, Banking77-77 .317. Reading with the review's caveats: v2 vs v3 differ in rendering *and* perm-loss (0.1 vs 0), v3 vs n3 drop the ∅ line
+*and* "Answer:" — neither factor is isolated, and Δ_q .066 vs .108 is ~1.7 SE unpaired at one seed. What is supported:
+removing the rendered ∅ line removes the MMLU over-abstention (abstention error .18 → .014); tags + perm-loss cost
+.03–.04 Δ_q at one seed. What is *not* supported: "the null is fixed" — the K-pathology moved from K = 10 to K = 77:
+Banking77-77 false-abstain is .36 (v2) and .52 (v3) vs .01 for n3, and v3's K-sweep is non-monotone (K100 .09, K150 .56).
+`nc_v3` is the best native checkpoint on Δ_q + closed-book calibration, not on abstention generally.
+Order sensitivity is untouched by any rendering (Δp .10–.12). Next levers: inference-time symmetrization
+(average over 2–3 permutations; 2–3× native cost, still under the log-prob baseline), λ ≫ 0.1, and for the evidence gap the
+formulation itself (mixing ratio / evidence rows rendered without options / longer training).
+
+## 3q. JevBench (fstandhartinger/jevbench v1.2.1, public subset; 2026-09-20)
+
+Harness: 231 public decisions (72 standard / 48 easy / 111 hard; the 146 judge items and all held-out items are not
+public), typed `noul` (yes/no) / `choice` (K = 2–6) / `score` (ordinal); models return a probability distribution over the
+exact label set; native distributions only (`pcdm_jev/`, `scripts/jevbench_run.py`; adversarially reviewed, defects fixed).
+**This is a public-subset run — not a ranked entry** (the harness ranks only ≥ 95% coverage incl. judge); comparisons
+below are per-item on the identical 231 ids from the harness's own `per-task.json`.
+
+| accuracy on the same public ids | standard (72) | easy (48) | hard (111) | notes |
+|---|---|---|---|---|
+| **PCDM energy** `joint_emb_lw_v5` | .403 | .875 | .360 | Brier .75 / .20 / .84; p50 .19 s |
+| **PCDM native** `nc_n3` | .417 | .854 | .306 | Brier .70 / .20 / .84; p50 .13 s |
+| **PCDM native** `nc_v2` (letter-free, null fixed) | .472 | **.938** | .315 | Brier .64 / .18 / .77; p50 .13 s |
+| **PCDM native** `nc_v3` (letters, no ∅ line) | .472 | .812 | .297 | |
+| `nc_n3` with `noul` labels reversed (order control) | .458 | .854 | .351 | ±4 pts from label order alone |
+| open-jev-deberta-v3-large (classifier, local CPU) | .431 | 1.00 | .378 | closest transport to ours |
+| GLiNER2 / jeff (GLiFormer 400M) / Laya (ModernBERT) | .639 / .750 / .694 | 1.00 | .369 / .387 / .351 | small encoders trained on the task family |
+| open-alternative-jev (Qwen3.5-4B) | .833 | 1.00 | .568 | |
+| system-one-open (Gemma E2B LoRA) / system-one (Qwen3-8B) | .931 / – | 1.00 | .486 / .486 | |
+| SemIf (Qwen3.5-4B) / OpenJev (26B-A4B) / djev | .986 / .972 / .986 | 1.00 | .613 / .640 / .676 | |
+| Jev 1.13.0 (closed) | .986 | 1.00 | .730 | |
+
+Disclosures (per the review): probabilities are the head's softmax **conditioned on non-∅** (P(∅) dropped; mean p_null
+.20 energy / .03 native, share > .5: 14% of hard items for energy, 0% native); checkpoints trained at 256-token states /
+64-token queries and run at 4096 / 256 (68% of hard states and 33–58% of energy queries exceed training length; none
+truncated); latency is in-process on one H100, one decision at a time, model load excluded, cold label embedding included
+(energy) — the harness's ×2 + 0.15 s self-hosted adjustment would apply, and their p50 is over standard+judge; cost is
+null (no tariff); option order = harness label order (reversed-order control: standard .417 → .458, hard .306 → .351 for `nc_n3`); compose mode
+≡ native under the harness and is not reported; harness commit, checkpoint sha256 and `uv.lock` are in each run's manifest.
+
+Reading: majority/chance baselines are .311 standard / .284 easy / .336 hard — **PCDM's hard-tier numbers are at chance**,
+standard is 1.5–3 SE above chance (n = 72, SE .058), and the reversed-label swing (±4) is larger than the differences
+between our own models, so no ranking among n3/v2/v3 is supported. PCDM lands with the untrained classifiers
+(DeBERTa-large .431/.378), not with systems trained on workflow decisions (.83–.99 standard). JevBench shifts the leading hypothesis from architecture to training distribution: PCDM performs well on
+easy bounded decisions but degrades sharply on harder rubric-conditioned workflow judgments, the family Jev is explicitly
+optimized for (PLAN6). It does not *prove* the gap is task family; live alternatives: state length (native hard .444 on the 36 states ≤ 256 tokens vs
+.240 on the 75 longer ones; energy .36 / .36), `noul` at K = 2 where native is at chance (.46–.50) while energy gets .62,
+and the ∅-conditioning (14% of energy hard items had p_null > .5 and were forced to answer). The strongest evidence *for*
+task family over size is on the leaderboard itself: a Gemma-E2B LoRA reaches .931 standard. The
+architecture side is competitive (p50 .13–.19 s raw vs .17–.24 s for the GPU entries, native distributions, K up to 6
+trivially). `nc_v2`'s better calibration lifts easy to .938 and standard to .472 with no task training. JevBench is
+therefore the target task family for Phase 6/7 (typed primitives + rubric-conditioned decision data + calibration), not a
+benchmark to tune on; the 72 MIT-licensed original items are the only public training-eligible material and are too few.
+
+## 3r. The depth confound resolved — native N3 at tap 20 (`nc_n3_tap20`, H100, 2026-09-20, $9)
+
+The review of §3l–§3q flagged that every candidate-blind student was trained at tap 20 and every native model at 28 layers,
+so "the native formulation costs evidence" (§3l) and "candidate-blind Z cannot compile knowledge" (§3j) were confounded
+with depth. Same N3 readout, same v5 + kb mix, same steps, `--tap_layer 20`:
+
+| | energy `joint_emb_lw_v5` | native N3 @ 28 (`nc_n3`) | **native N3 @ 20** |
+|---|---|---|---|
+| SNLI / MNLI / ANLI / BoolQ | .909 / .880 / .555 / .834 | .863 / .752 / .431 / .737 | **.906 / .865 / .519 / .834** |
+| CLINC-150 / HWU64 | .784 / .818 | .740 / .660 | **.862** / .801 |
+| MMLU-Pro among-K / acc / ECE | .123 / .092 / .385 | .314 / .133 / .459 | **.363** / .133 / .592 |
+| TruthfulQA / kb val | – | .461 / .580 | .348 / .593 |
+| CLINC-heldout / 20NG / TREC-fine / Banking77-77 | .762 / .336 / .308 / .527 | .916 / .559 / .400 / .497 | **.955 / .589 / .430** / .063 |
+| CLINC-OOS / null AUROC clinc-k / snli | .735 / .961 / .980 | .204 / .803 / .964 | .639 / .840 / .979 |
+| P(∅ \| absent) K = 2 / 50 / 150 | .94 / .59 / .45 | .86 / .40 / .99 | .92 / .61 / 1.00 |
+| reorder Δp / IIA | 0 / 0 | .101 / .126 | .077 / .136 |
+| best val NLL | .371 | .430 | **.341** |
+
+**The evidence gap was depth, not the options-in-suffix formulation.** At tap 20 the native readout is at energy level on
+every evidence task (within 1–3 pts; +8 on CLINC-150) *and* keeps all of the question-dependent knowledge: Δ_q(shuffled) **.118** vs .117 for N3 @ 28 (1.16× the teacher;
+choices-only variant .100 vs .111). The raw among-K gain (.314 → .363) is mostly higher option-prior exploitation
+(choices-only .203 → .263), so read it as "same knowledge, evidence recovered", not "more knowledge". The two-regime story for accuracy (§3l, §3o) collapses into one model; what the energy path
+still owns is K-flat cost (§3m) and the null. Remaining defects are exactly the rendered-∅-line ones of §3p (abstention error
+.23 on MMLU, Banking77-77 .063, K = 150 → always abstain), which `letters_nonull` addressed in `nc_v3` — `nc_v3_tap20` is
+queued as the candidate for a single coherent PCDM v2 model. TruthfulQA fell (.461 → .348) — to be read with the seed pair.
+This also reopens §3g ("depth is not the lever"): it was not the lever for the *candidate-blind* readout; for the
+candidate-aware readout, depth is the difference between losing and keeping evidence reasoning.
+
+## 3s. Closure — candidate-blind Z at full depth (`e3b_zr_tap28`, H100, 2026-09-20, ~$9)
+
+PLAN6 asked for this as a *closure* experiment, not an improvement attempt: every candidate-blind student in §3j was tapped
+at layer 20, and §3r showed depth is decisive for the candidate-*aware* readout, so "Δ_q ≈ 0 for Z" could still have been a
+tap-20 artifact. Same `zr` head, same v5 + kbt mix, same KD (α = 1, β = 1, T = 2), same 12k steps, all 28 layers:
+
+| | `e3b_zr` @ 20 | **`e3b_zr_tap28`** | teacher |
+|---|---|---|---|
+| MMLU-Pro among-K / choices-only / shuffled-q | .157 / .166 / .182 | .147 / .177 / .156 | .310 / .222 / .208 |
+| Δ_q (choices-only) / Δ_q (shuffled, primary) | −.009 / −.026 | **−.030 / −.008** | .088 / .102 |
+| SNLI / MNLI / ANLI / BoolQ | .905 / .873 / .541 / .826 | .881 / .807 / .462 / .712 | – |
+| CLINC-150 / HWU64 / CLINC-heldout | .724 / .784 / .391 | .702 / .787 / .290 | – |
+| kbt val (agreement with teacher) | .326 | .314 | – |
+| best val NLL | .384 | .463 | – |
+
+**Closed: the candidate-blind negative is not a depth artifact.** With the full backbone the decision state still carries
+no question-dependent knowledge (Δ_q_sh −.008, within the ±.02 noise of §3j; among-K *falls* to .147), while the
+evidence tasks regress exactly as §3l/§3r predict for a last-layer tap (BoolQ −11, ANLI −8, MNLI −7). Depth therefore
+separates the two readouts cleanly: it recovers evidence for the option-conditioned suffix (§3r) and does nothing for a state
+computed before the options are known. This is the strongest form of contribution #2 in NOVELTY.md — under this
+factorization, priors and calibration distill, question-conditioned parametric knowledge does not, at any tap. No further
+candidate-blind runs are planned.
+
+## 3t. One model — native N3 @ tap 20 without the rendered ∅ line (`nc_v3_tap20`, H100, 2026-09-20, ~$9)
+
+§3r recovered evidence at tap 20 but kept the rendered "none of the above" pathologies; §3p's `letters_nonull` removed the
+∅ line at 28 layers and lost evidence. This run combines them: N3, factored null, `letters_nonull`, tap 20, same v5 + kb
+mix and steps. Matched control = `nc_n3_tap20` (identical except `--nc_render letters`).
+
+| | `nc_n3_tap20` (∅ line) | **`nc_v3_tap20`** (no ∅ line) | energy `joint_emb_lw_v5` |
+|---|---|---|---|
+| SNLI / MNLI / ANLI / BoolQ | .906 / .865 / .519 / .834 | .904 / .865 / .507 / .834 | .909 / .880 / .555 / .834 |
+| CLINC-150 / HWU64 / 20NG / TREC-fine | .862 / .801 / .589 / .430 | .845 / .757 / .515 / .468 | .784 / .818 / .336 / .308 |
+| Δ_q shuffled (primary) / choices-only | .118 / .100 | **.122** / .098 | ≈0 |
+| MMLU-Pro among-K / **acc** / false-abstain | .363 / .133 / .692 | .354 / **.353** / **.003** | .123 / .092 / – |
+| MMLU-cf KL to teacher (orig) | 2.43 | **.27** | – |
+| Banking77-77 acc / false-abstain | .063 / .924 | **.579** / .135 | .527 / – |
+| CLINC-OOS acc / CLINC-K null AUROC | .639 / .840 | **.798** / **.973** | .735 / .961 |
+| K-sweep CLINC null AUROC K = 5 / 20 / 50 / 150 | .97 / .94 / .91 / 1.00† | .98 / .95 / .92 / .95 | .98 / .94 / .90 / .85 |
+| K-sweep Banking77 null AUROC K = 5 / 20 / 77 | .91 / .80 / .00† | **.90 / .83 / .69** | .85 / .75 / .66 |
+| P(∅ \| absent) K = 5 / 50 / 150 (CLINC) | .02 / .61 / 1.00 | .89 / .67 / .64 | .88 / .56 / .41 |
+| cse_* paired null AUROC (banking / clinc / hwu64) | .968 / .995 / .987 | .862 / .976 / .926 | – |
+| reorder max Δp / IIA dlo | .077 / .136 | .123 / .180 | 0 / 0 |
+| TruthfulQA MC1 | .230 | .275 | – |
+| best val NLL | .341 | .347 | .371 |
+
+† degenerate: always-abstain (K = 150 CLINC, K = 77 Banking77) or never-abstain (K = 5), see §3p/§3r.
+
+**The rendered ∅ line was the null pathology, and removing it at tap 20 costs nothing on knowledge.** With ∅ a pure head
+decision the K-sweep is monotone and smooth (no K = 5 collapse, no K = 77/150 always-abstain), null AUROC now matches or
+beats the energy path at *every* K on both sweeps, MMLU-Pro false-abstain drops from .692 to .003 (acc .133 → .353, KL to
+the teacher 2.43 → .27), and Banking77-77 goes from unusable to .579 — all with Δ_q unchanged (.122) and NLI/BoolQ at
+energy level. The costs are real but smaller: intent/topic label spaces lose 2–7 pts (HWU64 .801 → .757, 20NG .589 → .515)
+and the paired choice-set null probes lose 2–10 pts AUROC; order fragility rises (reorder .077 → .123 — still a letter
+interface). This is the single-model candidate PLAN5/PLAN6 asked for, and it is the base and the matched baseline for
+Phase 6A (§3v).
+
+**JevBench, same public 231 ids (§3q protocol and disclosures):** standard **.694** / easy **1.00** / hard .378
+(Brier .47 / .02 / .74; ECE .135 / .057 / .209), versus .472 / .812 / .297 for `nc_v3` at 28 layers and .417 / .854 / .306
+for `nc_n3`. The standard gain is 3.8 SE (n = 72, SE .058) and concentrated where the null/letter pathology had been
+eating answers: routing 2/12 → 10/12, extraction 6/12 → 12/12, policy 5/12 → 8/12 (ordinal 7 → 5, adequacy 6 → 6).
+With **no workflow training** this puts PCDM at the level of the small encoders trained on the task family (Laya .694, GLiNER2 .639)
+and above open-jev-deberta (.431); hard is still within 1 SE of chance (.378 vs .336; long_policy .21 → .42, multi_hop 0 → .33,
+temporal/probability/tradeoff flat or down). So part of the §3q "training-distribution" gap was our own null artifact;
+the remaining standard gap to the workflow-trained systems (.83–.99) and all of the hard gap are what Phase 6A tests.
+
+## 3u. Learned per-input expert gate — negative (`scripts/gate_experts.py`, eval-time on dumped logits, ~$1)
+
+PLAN6 item 3: a tiny gate (193 params, MLP over per-input signals available at inference — energy max-p / entropy /
+top-2 margin / P(∅), the same four for native, log K, log query length; `energy_only` and `native_only` ablations
+with 129 params) mixes the energy expert `joint_emb_lw_v5` and the native expert `nc_n3` in log-space, trained on the
+v5 val logits only (no task ids), evaluated on 31 held-out sets. The number that decides whether routing is worth
+anything is the oracle envelope P(either expert correct) against the best single expert *per set* (which itself
+needs a task id) and the gate.
+
+| mean accuracy over the 31 sets | energy | native `nc_n3` | best single expert per set | **learned gate** | oracle (either correct) |
+|---|---|---|---|---|---|
+| all features | .736 | .700 | .769 | **.745** | .861 |
+| energy-only / native-only features | | | | .742 / .743 | |
+
+Val NLL .368 (g = 0) → .345 (gate) → .338 (+T). The gate recovers **+0.9 of the +12.5 envelope** and stays 2.4 pts below
+the per-set best expert: where native is clearly better (CLINC-heldout .916 vs .762, 20NG .559 vs .336, TREC-coarse
+.630 vs .356) the gate sits near the energy number (.772 / .455 / .422) — its mean g on those sets is .13–.52, i.e. the
+per-input signals do not identify "this is a label-space decision the native reader should own". The three feature sets
+are indistinguishable (±.003). The envelope is large (+12.5), so complementarity is real, but it is not recoverable from
+confidence statistics; a task id would be needed, and that is not a System-One primitive. Not promoted — and with
+§3t's `nc_v3_tap20` at energy level on evidence, the two-expert frontier this gate was meant to exploit has mostly
+closed on its own (the remaining energy-only advantages are K-flat cost and the paired-null probes).
+
+## 3v. Seed pair for the N1-vs-N3 claim (`nc_n1_s1`, `nc_n3_s1`; H100, 2026-09-20, ~$18)
+
+§3l rested on one seed per readout. Matched seed-1 replicates (28 layers, v5 + kb, 12k steps; only `--seed 1` changed):
+
+| | N1 letters s0 / **s1** | N3 direct s0 / **s1** | teacher |
+|---|---|---|---|
+| Δ_q shuffled (primary) | .114 / **.104** | .117 / **.094** | .102 |
+| Δ_q choices-only | .112 / .093 | .111 / .070 | .088 |
+| MMLU-Pro among-K | .325 / .318 | .314 / .301 | .310 |
+| SNLI / MNLI / ANLI / BoolQ | .838 / .684 / .377 / .769 → .831 / .664 / .393 / .764 | .863 / .752 / .431 / .737 → .851 / .719 / .437 / .746 | – |
+| CLINC-150 / HWU64 | .697 / .510 → .708 / .532 | .740 / .660 → .741 / .674 | – |
+| reorder max Δp / IIA dlo | .165 / .463 → .165 / .443 | .101 / .126 → .109 / .094 | 0 / 0 |
+| MMLU false-abstain | .254 → .297 | .646 → .543 | – |
+
+Seed-to-seed spread of Δ_q_sh is ≈ .01–.02 for both readouts; N1 and N3 stay within it of each other and of the
+teacher (N1 mean .109, N3 mean .106, teacher .102). The evidence advantage of N3 over N1 (SNLI +2, MNLI +6–7, ANLI +4–5,
+CLINC +3–4, HWU64 +14–15) and its lower order fragility (reorder .10–.11 vs .165; IIA .09–.13 vs .44–.46) hold in both
+seeds. The §3l claim — *the direct contextual readout keeps the letter interface's question-dependent knowledge while
+removing most of its order artifacts* — is replicated. MMLU false-abstain moves ±.05–.10 between seeds for both
+readouts, so §3p/§3t's abstention numbers should be read at that resolution (the .69 → .003 change of §3t is far outside it).
+
+## 3w. PLAN6 Phase 6A — typed workflow / rubric training on the frozen backbone (`nc_v3_tap20_wf`, H100 NVL, 2026-09-20, ~$12)
+
+Hypothesis (PLAN6, PI memo 15:00): *given a sound native decision architecture (§3t), does rubric-conditioned training
+solve the remaining workflow gap?* Matched pair: `nc_v3_tap20` (v5 + kb) vs `nc_v3_tap20_wf` = same config +
+`data_wf` (72k, 12 families, 37% in rubric groups) + `data_wf_hf` (86.6k: cua-s1-forms 60k, systemone-lite 20k, jev-4b
+6.6k programmatic gold), family-balanced sampler E .35 / K .25 / W .40 (PLAN6 queue review), 12k steps. Held-out: 3
+whole workflow families (eligibility / tool_select / urgency), 3 rubric styles, the rubric-flip pairs, and every external
+set below (typed-decisions, PagerDuty, tree-choice, jevlogs, Mind2Web, cua test/demo, jev-4b adversarial, systemone
+hard). Two evaluation passes: train-time (1,500 rows/file, states truncated to 256 tokens, `results.json`) and post-hoc
+at full state length (`scripts/eval_wf.py`, first 500 rows/file, both models on the identical rows — the numbers below).
+
+> **Correction (adversarial review, 2026-09-20 20:30).** The "full-length" numbers below come from `scripts/eval_wf.py
+> --limit 500`, which takes the *first* 500 rows of each file. Several eval files are family- or label-ordered, so those
+> slices are not representative: `jevlogs_triage` rows 0–749 are all `yes` (the file is 70% `no`) — ".162 → .832" is a
+> yes-rate, not accuracy, and the representative 1,500-row train-time pass gives **.497 (chance)**; `pagerduty_trigger`'s
+> head is 250 `page` + 250 `yes` with zero negatives (train-time pass **.603**); `wf_rubric_flip`'s head is 250 eligibility
+> pairs only (1 of 3 families, K = 2), where a coin flip scores flip-rate .50 — the informative number on that slice is
+> both-correct .25 → .49; `typed_decisions_test`'s head is 1 of 4 workflows. `wf_heldout_*`, `wf_rubric_shuffled`, cua,
+> jev-4b, systemone and tree-choice heads are shuffled and representative. Consequently: the external line is **0–1 of 5
+> up, not 4 of 5** (Mind2Web .438 is +3 over always-`no`; tree-choice +4 on the 375 valid rows; typed-decisions −6 on one
+> workflow); Δ_r reweighted to the shuffled file's type mix is .244 → .305 (direction holds, magnitude smaller); the
+> held-out *choice* family (tool_select) starts at .89 — a ceiling, not rubric generalization — so "every held-out axis
+> ≥ +10" leans on noul/score/style; JevBench's 72 standard items are 36 states × 2 paraphrases, so the +4-item gain is
+> ~11 up / 7 down (McNemar p ≈ .5) and §3t's "3.8 SE" is ~2.7 SE at n_eff = 36. Held-out *content* caveat: `routing` and
+> `categorical` train on HWU64/SNIPS/MASSIVE/MTOP and AG News utterances (E-tier sources), so "held-out family" means
+> held-out rubric form, not held-out text. Also unexplained: the `_wf` JevBench p50 latency is .554 s vs .077 s for the
+> baseline on the same architecture (different pod: H100 NVL + torch 2.11/cu128 vs SXM + 2.14/cu130) — to be re-measured.
+> The full-file, stratified re-evaluation of both checkpoints (§3x) supersedes every W/external number in this section;
+> Second review (forward): the E drop is not "entirely" abstention — among-K accuracy also fell (CLINC-150 acc_k
+> .867 → .822, TREC-fine .532 → .500, HWU64 .798 → .769), i.e. ~⅔ abstention / ⅓ discrimination, consistent with a
+> null-gate operating-point shift (the factored gate reads max/margin/lse of the option scores; W rows are near-
+> deterministic, so ordinary E margins now read as "uncertain") plus 2.3× fewer E steps — and the catch-all mechanism
+> predicts the wrong sign (it explains p_null → 0.000 on every JevBench item and W null-recall 1.0, not the E rise).
+> JevBench hard is a state-length split, not a plateau: items ≤ 256 tokens .39 → **.64** (n = 36), > 1,024 tokens
+> .40 → .23 (n = 40, almost all long_policy / multi_hop); mean max-p .65 → .90 and confidently-wrong (> .9) hard items
+> 8 → 20. Strictly, ΔE = −11/−10 on two sets fails the rule → PLAN6 branch **(b)** (fix mixing/null), not (a).
+> the verdict's *robust* parts are the calibration regression (Brier .27 → .54 on typed-decisions, held-out score NLL
+> 1.24 → 2.07, JevBench hard Brier .74 → .88) and the E over-abstention on CLINC/TREC (full test sets).
+
+**W — held-out workflow (same 500 rows, full length)**
+
+| | `nc_v3_tap20` | **`_wf`** | Δ | NLL |
+|---|---|---|---|---|
+| held-out family: choice / noul / score | .890 / .548 / .400 | **.994 / .682 / .514** | **+10.4 / +13.4 / +11.4** | .42→.02 / .83→.85 / 1.24→**2.07** |
+| held-out rubric styles | .578 | **.904** | **+32.6** | .98→.22 |
+| rubric-flip: flip rate / pair acc / both correct | .312 / .592 / – | **.504** / .736 / .488 | +.19 / +14 | |
+| Δ_r = own rubric − shuffled rubric (family mean) | .613 − .328 = .285 | .730 − .386 = **.344** | ↑ | shuffled NLL 1.5→4.6 |
+| trained-source shift splits: systemone hard / jev-4b adversarial | .458 / .652 | .888 / .940 | +43 / +29 | |
+| cua-s1-forms test (signature-disjoint) / real demo | .314 / .173 | .998 / 1.000 | +68 / +83 | |
+
+**External, never trained (same rows):** Mind2Web .254 → .438 (+18), jevlogs .162 → .832 (+67; block-level labels,
+caveated), PagerDuty .736 → .762 (+3), tree-choice .452 → .494 (+4; 125/500 flat K = 320 rows overflow the 1,024-token
+native suffix and are scored as chance — the energy front-end's job, §3m), **typed-decisions .332 → .276 (−6) with NLL
+1.40 → 2.40 and Brier .27 → .54** (soft probabilistic gold; the model became sharper, not righter).
+
+**JevBench (same 231 public ids, §3q protocol):** standard .694 → **.750** (Brier .47 → .40; ordinal 5 → 10/12,
+policy 8 → 9, adequacy 6 → 5, intent 9 → 8; +4 items ≈ 1 SE), easy 1.00 → 1.00 (Brier .02 → .001), hard .378 → .387
+(flat; **Brier .74 → .88, ECE .21 → .37** — long_policy .42 → .16, multi_hop .33 → .17 down; trap .38 → .75,
+adversarial .33 → .67, temporal .20 → .33 up).
+
+**E / K retention (full sets, train-time pass):** SNLI −1.0, MNLI −1.6, BoolQ −0.3, ANLI −2.6, HWU64 −2.2, 20NG +0.7,
+CLINC-OOS **+10.5**; but **CLINC-150 −11.2 (.845 → .734) and TREC-fine −9.6 (.468 → .372)** — both entirely from
+false-abstain (.054 → .168, .198 → .342; coverage .95 → .83, .80 → .66) while CLINC-K acc holds (.892) and
+paired-null AUROC is unchanged. K: MMLU-Pro among-K .354 → .331 (−2.3), Δ_q_sh .122 → .119 (probe), kb val +2.0,
+TruthfulQA −0.9. Val NLL .347 → .384 (E sampled at .35 instead of ~.8).
+
+**Verdict against the PLAN6 rule.** W ✓ (every held-out axis ≥ +10; styles +33), rubric dependence ✓ (flip rate
+.31 → .50, Δ_r up, shuffled-rubric NLL 3× worse — it is reading the rubric, not memorising priors), K ✓ (within 3),
+external: see the correction above (0–1 of 5 on representative rows; pending §3x). **E ✗ on two label-space sets**, and the failure
+mode is specific: the ∅ threshold on intent/topic label spaces shifted toward abstaining (CLINC-OOS +10.5 at the same
+time), while discrimination is intact (CLINC-K .892, paired-null AUROC unchanged). The direction is not the naive one —
+only 0.9% of W rows carry a null target (1,481 of 158,606; v5 has 21.4%) — so the cause is a mixing effect to be tested
+rather than asserted: E's share fell from ~.8 to .35 of each batch, and W's routing/extraction/cua rows train a
+rendered catch-all option (`other` / `not_stated` / `skip`) that competes with ∅ on exactly these label spaces. Either
+way it is a sampling/null-weighting defect (PI branch *b*), not lost discrimination.
+The second defect is calibration: everywhere the gold is soft or ordinal (held-out score NLL 1.24 → 2.07, typed-decisions,
+JevBench hard Brier) accuracy rose or held while probability quality fell — the workflow data is almost all hard
+labels. So the answer to the Phase-6 question is **yes for rubric execution, no for probability quality**: rubric-conditioned
+training on this backbone is what moves held-out workflow decisions (+10–33) and JevBench standard, hard stays at
+chance, and the two regressions have known, cheap causes. Architecture stays frozen (branch *a*); the next dollar goes
+to (1) a mixing fix — null-bearing rows inside W and/or E ≥ .45 — re-run as a matched seed, (2) Phase 6B typed
+primitives (Noul as Bernoulli vs 2-way Choice; Score as ordinal vs K-way Choice — the ordinal gain 5 → 10 on JevBench
+says Score is the type to test first), then (3) calibration with proper scoring on soft targets. Not: more data volume, scale.
+
+## 3x. Phase 6A re-evaluated on every row (`scripts/eval_wf.py` batched + stratified; H100, 2026-09-20, ~$1)
+
+Supersedes the W/external numbers of §3w. Both checkpoints, all 63,932 rows of `data_wf/eval` + `data_wf_hf/eval`, full
+state length (4,096), batched scoring (241 rows/s vs 3 rows/s for the old one-row decider path; suffix overflow 0 on every
+file, so tree-choice K = 320 is now scored rather than counted as chance). `wf_rubric_flip.jsonl` regenerated so its
+1,031 pairs interleave all three held-out families. Full tables: `REPORT_3x_draft.md`; raw: `runs/*/eval_wf_full.json`.
+
+| file (n) | base | **wf** | floor (majority) | note |
+|---|---|---|---|---|
+| held-out family: tool_select choice (1,500) | .894 | .989 | .213 | ceiling effect (base already .89) |
+| held-out family: eligibility noul (1,500) | .555 | **.699** | .583 | base below floor |
+| held-out family: urgency score (1,502) | .404 | **.498** | .355 | NLL 1.24 → **2.09**, Brier .68 → .81 |
+| held-out rubric styles, 12 trained families (1,627) | .559 | **.901** | .364 | 11/12 families gain (+9 to +65); fact flat |
+| rubric-flip, 3 families (1,031 pairs) | flip .615 / both .429 | **.720 / .565** | – | eligibility both-correct .24 → .50; urgency .16 → .19; tool_select .88 → .99 |
+| rubric-shuffled (3,775) | .330 | .390 | .360 | NLL 1.51 → **4.65** (tool_select 2.6 → 10.1) |
+| trained-source shift: systemone hard (5,400) / jev-4b adversarial (600) | .447 / .637 | **.897 / .932** | .442 / .428 | |
+| trained-source: cua test (24,370) / real demo (196) | .335 / .179 | **.997 / 1.000** | .070 / .270 | |
+| **external** tree-choice, K to 320 (720) | .506 | .539 | .114 | genuine, small |
+| **external** typed-decisions test, soft gold (2,000) | .487 | .457 | .290 | NLL 1.22 → **2.03**, Brier .24 → .42 |
+| **external** jevlogs (5,080) | .697 | .522 | **.697** | base = floor; wf **below** floor |
+| **external** PagerDuty (6,000) | .776 | .779 | **.792** | both below floor |
+| **external** Mind2Web (1,600) | .300 | .427 | **.427** | wf = floor |
+
+**What survives.** Held-out rubric *styles* +34 across 11 of 12 families, held-out noul/score families +14/+9 (choice is
+a ceiling), rubric-flip both-correct .43 → .57 with the flip rate up in all three families, and the trained-source shift
+splits (+45/+30). **What does not.** Every untouched external set is at or below its constant-prediction floor for both
+checkpoints except tree-choice (+3, real) and typed-decisions (−3 accuracy, NLL 1.22 → 2.03): jevlogs base sits exactly
+on the majority floor and wf falls *below* it; PagerDuty both below floor; Mind2Web wf equals the floor. So the honest
+external line for Phase 6A is **1 up, 1 down, 3 at floor** — the workflow corpora teach our generator's and the trained
+sources' decision shapes, not yet the general abstraction. **On rubric dependence the two probes disagree** and both are
+reported: on our held-out families wf is far more confident-and-wrong under a swapped rubric (NLL ×3, up to ×4 on
+tool_select) and flips answers more often; on the 36 short JevBench-hard items, swapping each rubric for another
+same-type item's rubric leaves accuracy unchanged (.611 → .611, chance .384; `scripts/probe_jev_shuffle.py`) — there,
+the ≤ 256-token gain of §3w's second review is state/candidate prior, not rubric execution (n = 36; same-type rubrics
+may be near-interchangeable, which weakens the probe). The calibration regression is confirmed everywhere gold is soft
+or ordinal and is larger than the train-time pass showed. Verdict unchanged in direction, sharper in wording: rubric
+training moves *our* workflow families and the trained sources; it has not moved the general external tests, and it
+costs probability quality — PLAN6 branch (b) plus calibration, which PLAN7's tracks B/C and the (T, b) refit address.
+
+## 3y. Calibration at $0 — null-logit offset, soft-target refit, two probes (`--calib_sets`, 2026-09-20)
+
+Two eval-time knobs are now fitted jointly on a chosen calibration set: temperature T (as before) and a scalar offset
+b on logit P(∅) (identical operation for both null forms; b = 0 reproduces every earlier number bit-for-bit; T and b are
+argmax-preserving among candidates — acc_k is unchanged in every run below). Full tables: `REPORT_calib_draft.md`.
+
+| refit on typed-decisions-train + wf val | `nc_v3_tap20` | `nc_v3_tap20_wf` |
+|---|---|---|
+| fitted (T, b) | (1.04, **−1.75**) | (1.04, **+3.0**) |
+| held-out score NLL / typed-decisions NLL | – | 2.03 → **1.09** / 1.95 → **1.19** |
+| CLINC-150 false-abstain / coverage | .053 → **.022** / ↑ | coverage .83 → **.05–.09** (CLINC, TREC-fine, HWU64, 20NG) |
+
+**One global null threshold cannot serve both label-space evidence tasks and workflow/soft-target tasks.** The same
+recipe pushes b in opposite directions for the two checkpoints: for the baseline it *reduces* abstention and genuinely
+fixes CLINC-150; for the wf model the soft sets pull b to +3.0, which repairs their NLL (beating the review's ~1.3 / ≤1.4
+predictions) and collapses intent/topic coverage to 5–9%. The review's mechanism-1 prediction (refit → CLINC-150
+false-abstain ~.06 for wf) is falsified in direction. This is the memo's "avoid relying on a single global temperature"
+made concrete: calibration must be per decision type / per family (Phase 10), not a bigger single knob; the E
+over-abstention of §3w is fixed by mixing (§3z), not by b.
+
+**Probes.** (a) CLINC-150 with an appended `other` candidate: P(other) ≈ .0005, P(∅) −.017 — no generic
+catch-all-competes-with-∅ effect; the catch-all hypothesis of §3w stays demoted. (b) JevBench hard, the 36 items with
+state ≤ 256 tokens, wf model: own rubric .611 = swapped same-type rubric .611 (chance .384) — the short-state gain of
+§3w's second review is not rubric execution (n = 36; same-type rubrics may be near-interchangeable).
+
+## 3z. PLAN7 Track B — mixture sweep, null augmentation, long states (six matched 1.7B runs, 3 × H100, 2026-09-20, ~$60)
+
+Same recipe as `nc_v3_tap20_wf` (§3w) with only the sampler / data changed; 12k steps, seed 0. Train-time evaluation
+(full E/K sets; W sets 1,500 rows at 256-token states — the full-row `eval_wf` pass is being added). `--null_aug W:0.20`
+= 20% of W rows duplicated with the gold (and any rendered catch-all) removed → ∅; `long_e45` = `--max_state 1024` +
+23k extra long policy rows (`wf/train_long.jsonl`) at bs 16 (memory-conservative; confounds it with a 4× smaller batch).
+
+| E / K / W | base | 6A (.35/.25/.40) | e50 (.50/.20/.30) | e45 (.45/.20/.35) | **e45 + null** | e40a (.40/.25/.35) | e40b (.40/.20/.40) | long_e45 (1024, bs 16) |
+|---|---|---|---|---|---|---|---|---|
+| CLINC-150 acc / false-abstain | .845 / .05 | .734 / .17 | .809 / .07 | .779 / .10 | **.805 / .08** | .775 / .12 | .814 / .04 | .741 / .13 |
+| TREC-fine | .468 / .20 | .372 / .34 | .482 / .13 | .408 / .27 | .444 / .12 | .358 / .28 | .404 / .32 | .466 / .29 |
+| HWU64 / 20NG | .757 / .515 | .735 / .522 | .773 / .560 | .736 / .492 | .779 / .552 | .746 / .525 | .768 / .449 | .669 / .567 |
+| SNLI / MNLI / BoolQ / ANLI | .904/.865/.834/.507 | .894/.849/.831/.481 | .898/.855/.835/.492 | .895/.849/.833/.491 | .898/.855/.835/.495 | .893/.848/.839/.489 | .891/.850/.838/.486 | .888/.840/.821/.464 |
+| MMLU-Pro among-K / Δ_q_sh | .353 / .122 | .330 / .119 | .342 / .122 | .338 / .115 | **.353 / .143** | .338 / .117 | .322 / .138 | .329 / .116 |
+| held-out noul / score / style | – | .699 / .497 / .899 | .696 / .500 / .888 | .693 / .517 / .895 | .654 / .507 / .891 | .666 / .513 / .905 | .678 / .523 / .901 | .663 / .518 / .829 |
+| typed-decisions NLL / held-out score NLL | – | 1.95 / 2.03 | 1.91 / 1.74 | 1.82 / 1.52 | 2.19 / 2.04 | 2.22 / 1.88 | 2.18 / 1.43 | **1.37 / 1.26** |
+| JevBench standard / hard / Brier(std) | .694 / .378 / .47 | .750 / .387 / .40 | .708 / .441 / .40 | **.833** / .396 / – | .806 / .396 / **.33** | .736 / .405 / .43 | .736 / .351 / – | .806 / **.450** / .30 |
+| JevBench hard: long_policy / multi_hop | .42 / .33 | .16 / .17 | .16 / .33 | – | .16 / .28 | – | – | **.37 / .28** |
+
+**Mixing fixes E (branch b confirmed).** Raising E from .35 to .45–.50 brings NLI/BoolQ to within 1 pt of the base and
+intent/topic sets to within 3–4 pts (CLINC-150 −3.6 to −4.0 is the one remaining budget breach), with W unchanged
+within 1–4 pts. **Null augmentation of W does what the (T, b) refit could not (§3y):** e45 → e45+null lowers false-abstain
+on CLINC .10 → .08 and TREC .27 → .12 and lifts CLINC/TREC/HWU64/20NG by +2.6/+3.6/+4.3/+6.0 and MMLU-Pro to the base's
+.353 with the highest Δ_q_sh of any run (.143), at −4 on held-out noul; it also gives the best JevBench-standard Brier
+(.33). **Long states recover the long-state families** (JevBench long_policy .16 → .37, multi_hop .17 → .28; hard .45,
+the best of any run) and, unexpectedly, the best soft-target NLLs (typed-decisions 1.37, held-out score 1.26) — but at
+bs 16 it loses HWU64 −9, CLINC −10 and styles −7, so length and batch are confounded; a full-batch (`--grad_accum`)
+version is running as the Release-1 candidate (`r1_cand`: E .45 / K .20 / W .35 + null-aug + 1,024 states). JevBench
+standard moves ±5 between mixes at n_eff = 36 — treat .81–.83 vs .75 as ~1 SE, the Brier and per-family hard numbers as the
+signal. Pareto choice pending the full-row `eval_wf` on all six: **e45 + null** on E/K/calibration, **long** on hard.
+
+**Full-row `eval_wf` (all 63,932 rows, 4,096-token states) on the six:** held-out noul / score / style and flip
+both-correct — e50 .697/.499/.889/.575, e45 .690/.518/.894/.581, e40a .667/.511/.905/.555, e40b .679/.522/.900/.560,
+e45+null .654/.508/.892/.557, long .663/.520/.829/.542 (6A: .699/.498/.901/.565) — i.e. W is flat across mixes within
+±4 except the long run's styles (−7). typed-decisions NLL: long **1.40**, e45 1.92, e50 1.98, e40b 2.16, e40a 2.21,
+e45+null **2.44** — null augmentation buys E and MMLU at the price of soft-target NLL (the model now spends mass on ∅ where
+the gold has none), the mirror image of §3y's (T, b) finding; e40b has the lowest CLINC-150 false-abstain (.037) at
+.814 but the worst 20NG (.449) and MMLU (.322). No single mix dominates: **E → e50/e45+null; K → e45+null; soft
+calibration → long; hard → long.** `r1_cand` (e45 + null + 1,024 states at full batch) tests whether the union holds.
+
+## 3aa. Release-1 candidate `r1_cand` — the union of Track B's levers at full batch (H100, 2026-09-21, ~$12)
+
+`nc_v3_tap20_wf` recipe + E .45 / K .20 / W .35 + `--null_aug W:0.20` + `--max_state 1024` with the 23k long rows,
+effective batch 64 (`--grad_accum 4`), 12k steps. Train-time evaluation; JevBench per-item.
+
+| | base | 6A | e45+null | long_e45 (bs 16) | **r1_cand** |
+|---|---|---|---|---|---|
+| CLINC-150 / TREC-fine / HWU64 / 20NG | .845 / .468 / .757 / .515 | .734 / .372 / .735 / .522 | .805 / .444 / .779 / .552 | .741 / .466 / .669 / .567 | **.807 / .456 / .785 / .554** |
+| SNLI / MNLI / BoolQ / ANLI | .904/.865/.834/.507 | .894/.849/.831/.481 | .898/.855/.835/.495 | .888/.840/.821/.464 | .892/.856/.834/.489 |
+| MMLU-Pro among-K / Δ_q_sh | .353 / .122 | .330 / .119 | .353 / .143 | .329 / .116 | .347 / .130 |
+| held-out noul / score / style | – | .699 / .497 / .899 | .654 / .507 / .891 | .663 / .518 / .829 | .688 / **.548** / .901 |
+| held-out score NLL / typed-decisions NLL | – | 2.03 / 1.95 | 2.04 / 2.19 | **1.26 / 1.37** | 1.32 / 1.91 |
+| JevBench std / hard / Brier(hard) | .694 / .378 / .74 | .750 / .387 / .88 | .806 / .396 / .88 | .806 / **.450** / .79 | .764 / .369 / **.90** |
+| JevBench long_policy / multi_hop | .42 / .33 | .16 / .17 | .16 / .28 | .37 / .28 | .11 / .28 |
+
+**The union holds on E / K / W and fails on JevBench hard.** Every retention budget is met or within noise (CLINC −3.8
+is the only breach, at the edge; HWU64/20NG above base; MMLU −0.6 with Δ_q .130; held-out score .548 is the best of any
+run and its NLL keeps the long-state benefit, 1.32) — this is the best 1.7B checkpoint on our own suites. But the hard
+tier is the worst of the sweep (.369, Brier .90, long_policy 2/19) and typed-decisions NLL is back to 1.91: the long-state
+gains of `long_e45` did not transfer at effective batch 64. The two runs differ in batch (16 vs 64) and null-aug, so the
+small batch — 4× fewer examples seen, less sharpening — is the live variable, not the 1,024-token window itself. Two
+matched follow-ups are running: `r1_bs16` (same args, bs 16) and `r1_null10` (null-aug .10). **`r1_bs16`
+(same args, bs 16, i.e. 4× fewer examples) confirms it:** JevBench hard .450 (Brier **.76**, the best of any run;
+multi_hop .44, long_policy .26), typed-decisions NLL 1.39, held-out score NLL 1.63 — and E/K/W all lower (CLINC .733,
+MMLU .323, held-out noul .609, styles .825, val NLL .421). Small batch is not a recipe, it is *under-fitting*: the
+hard-tier and soft-target gains come from the model being less sharp, at the price of everything in-distribution. That
+is the cleanest evidence yet that the hard tier at 1.7B is a probability-quality problem — the same model, less
+confident, scores higher — and that the fix is an objective/calibration change (Track E on the U corpus), not data
+volume or batch size. **`r1_null10`** (null-aug .10 instead of .20, otherwise `r1_cand`): CLINC .813 / fa .05, TREC fa .25 → .17,
+HWU64 .788, 20NG .560, MMLU .343 (Δ_q .108), held-out noul/score/style .671/.543/.909, typed NLL 2.01, JevBench
+.764 / 1.00 / .387 (Brier std .36) — the same model within noise; the recipe is insensitive to the null-aug fraction in
+[.10, .20]. **Release-1 recipe at 1.7B is therefore fixed as `r1_cand`'s** (E .45 / K .20 / W .35, null-aug .1–.2,
+1,024-token states, effective batch 64); what changes for `typical-small` is the data (DecisionMix v2: `data_wh`,
+`data_u`), the typed heads (§3ac) and the calibration objective — not the mix. Regardless of their
+outcome, hard-tier probability quality is now the clearest remaining defect at 1.7B and is what Phase 6B/10 (typed heads,
+calibration on the U corpus) must fix; the scaling ladder (§3ab) says whether it is also capacity.
+
+## 3ab. PLAN7 Track A — the scaling ladder (same recipe at 4B / 8B / 14B) and zero-shot controls (H100, 2026-09-21; in progress)
+
+Recipe = `nc_v3_tap20_wf` (§3w) unchanged except backbone and tap (Qwen3-4B-Base tap 26/36, 8B 26/36, 14B 28/40;
+LoRA r16 on the top 8 kept layers; effective batch 64 via `--grad_accum`; 12k steps). Zero-shot controls = the frozen
+base model reading next-token letter logits over the rendered options (`pcdm_jev` `mcq_zero_shot`), no training.
+
+| | 1.7B `nc_v3_tap20_wf` | **4B `ladder_4b`** | 8B | 14B |
+|---|---|---|---|---|
+| CLINC-150 / TREC-fine / HWU64 / 20NG | .734 / .372 / .735 / .522 | **.850 / .516** / .787 / .577 | .769 / .486 / .740 / .452 | .834 / .472 / **.792 / .668** |
+| SNLI / MNLI / BoolQ / ANLI | .894 / .849 / .831 / .481 | .909 / **.868** / .865 / .536 | .853 / .831 / .822 / .468 | **.910** / .864 / **.894 / .588** |
+| MMLU-Pro among-K / Δ_q_sh / TruthfulQA | .330 / .119 / .267 | .457 / .193 / .386 | .290 / .093 / .277 | **.514 / .246 / .472** |
+| held-out noul / score / style | .699 / .497 / .899 | .841 / .533 / .919 | .681 / .543 / .882 | **.887 / .558 / .919** |
+| held-out score NLL / typed-decisions acc | 2.03 / .422 | 2.15 / .483 | 1.67 / .407 | **2.87** / **.567** |
+| JevBench std / easy / hard | .750 / 1.00 / .387 | .833 / 1.00 / .432 | .667 / 1.00 / .396 | **.875 / 1.00 / .468** |
+| JevBench Brier std / hard | .40 / .88 | .29 / .83 | .55 / .83 | **.17** / .85 |
+| JevBench p50 latency (s, in-process H100) | .077 (base) / .554 (wf, NVL) | .089 | .087 | .070 |
+| JevBench hard: long_policy / multi_hop / trap / tradeoff | .16 / .17 / .75 / .33 | – | – | **.05** / .44 / 1.00 / .67 |
+| `pcdm/bench.py --native` L_s = 256: single decision K = 2 / 32 / 256 (ms)† | 65 / 66 / 96 | 90 / 94 / 114 | 70 / 71 / 126 | 61 / 62 / 158 |
+| marginal ms per query, M = 32, K = 2 / 32 / 128 / 256 | 4.0 / 4.7 / 18.4 / 36.0 | 5.9 / 12.1 / 21.9 / 49.9 | | |
+| peak memory K = 2 → 256 (GB) | – | 14.5 → 18.6 | 29.3 → 34.1 | 51.6 → 57.5 |
+| zero-shot control: JevBench std / easy / hard | .583 / .833 / .369 | .722 / 1.00 / .414 | .375 / .354 / .360 (**broken**, see note) | .819 / 1.00 / .441 |
+| zero-shot Brier std / hard | .58 / .73 | .46 / .71 | – | .30 / **.60** |
+| 3-shot control: JevBench std / easy / hard | .528 / 1.00 / .369 | .778 / 1.00 / .441 | .556 / .958 / .369 | .819 / 1.00 / **.559** |
+| best val NLL | .384 | .332 | .411 | **.307** |
+
+† per-pod numbers (different hosts / torch builds). **Apples-to-apples on one pod, same torch build** (`apples_*`):
+
+| one pod, L_s = 256 | 1.7B | 4B | 14B |
+|---|---|---|---|
+| single decision, K = 2 / 32 / 256 (ms) | 45 / 46 / 106 | 56 / 56 / 118 | 60 / 62 / 157 |
+| marginal per query, M = 32, K = 2 / 32 / 256 (ms) | 2.7 / 3.7 / 28.0 | 3.3 / 6.1 / 50.6 | 3.9 / 11.7 / 109.7 |
+| peak memory, K = 2 → 256 (GB) | 6.4 → 9.3 | 14.6 → 18.6 | 51.6 → 57.5 |
+
+Monotone in size at every K. A single decision costs 45 → 56 → 60 ms (1.7B → 4B → 14B): the KV-cached state and a
+short suffix dominate, so an 8× larger model is 1.3× slower per decision. Batched marginal cost scales more steeply with
+size *and* K (2.7 → 3.9 ms at K = 2; 28 → 110 ms at K = 256) — at high K the energy front-end (§3m) matters more for
+big models, not less. Capability per millisecond (JevBench standard / single-decision ms): 1.7B .750/45, 4B .833/56,
+14B .875/60 — the 4B is the knee.
+
+**4B, same recipe: everything moves at once.** Evidence goes *above* the 1.7B base (CLINC +10 over 1.7B-wf and +0.5 over
+the 1.7B base, TREC +14, ANLI +5, BoolQ +3), false-abstain collapses (CLINC .17 → .01, TREC .34 → .00) without any
+mixing fix, knowledge jumps (among-K .330 → .457, Δ_q .119 → **.193**, TruthfulQA +12), held-out workflow noul +14 and
+styles +2, JevBench standard .750 → .833 with the best Brier of any run (.29), hard .387 → .432. What does not move is the
+soft-target calibration (held-out score NLL 2.15) — that is a data/objective defect (all-hard-label W), not capacity, and
+is what Phase 10 is for. Cost: single decision 90 ms vs 65 ms (1.4×), batched marginal 5.9 vs 4.0 ms per query at K = 2 and 50 vs 36 at
+K = 256 (1.4–1.5×), JevBench p50 .089 vs .077 s — roughly 1.4× the 1.7B's cost for +8 JevBench-standard, +13 MMLU
+among-K, +14 held-out noul and evidence above the 1.7B base. 4B is the first "typical-medium" candidate. **Zero-shot controls:** the frozen backbone alone climbs
+.583 → .722 → .819 (1.7B → 4B → 14B) on standard and .369 → .414 → .441 on hard, i.e. hard moves slowly with Qwen3 scale
+even without training, and the frozen 14B (Brier hard .60) is the best-calibrated model on the hard tier. Our training
+adds +11 standard / +2 hard on top of the frozen 4B. The frozen-8B control is at chance on *easy* (.354) 0-shot because Qwen3-8B-Base's letter
+distribution after an "A. … Answer:" prompt is "always A" regardless of content (reproduced with vanilla HF code; 3 shots
+break it: easy .958, standard .556 — still below the 4B's .778). **8B trained is non-monotonic too:** with the identical
+recipe (tap 26/36) it lands *below the 1.7B* on almost everything (MMLU among-K .290, Δ_q .093, SNLI .853, JevBench
+standard .667 / Brier .55, val NLL .411 vs .332 for 4B), matching its own weak frozen control. Same fraction tap, same
+LoRA depth, same lr — the 8B checkpoint is the outlier, not the recipe; a tap/lr sweep on 8B is the only way to say
+whether it is recoverable, and it is deferred until the 14B point says whether the ladder is otherwise monotone.
+
+**14B, same recipe: the ladder is monotone except at 8B.** JevBench standard .875 with **Brier .17** (leaderboard
+neighbourhood: open-alternative-jev .833, system-one-open .931), hard .468 (≈ system-one-open's .486; above every
+sub-4B entry), MMLU among-K .514 with Δ_q .246 (2.4× the teacher), TruthfulQA .472, held-out noul .887, typed-decisions
+argmax agreement .567, 20NG .668 — and JevBench p50 .070 s, i.e. *no slower per decision than the 1.7B* on the same
+harness (the KV-cached state and a short suffix dominate; the bench at K = 2 is 61 ms). What does not scale: (i) the
+long-state families — long_policy **.05** at 14B (.42 at the 1.7B base, .16 after workflow training): trained at
+256-token states, the bigger model is more confidently wrong on 1–2k-token policies, so 1,024-token training (§3z/§3aa)
+is mandatory at every size; (ii) soft-target calibration — held-out score NLL 2.87, the worst of the ladder (sharper
+model, all-hard-label W), which the ordinal-smoothed Score head (§3ac) and the U corpus address. Read together: capacity
+buys standard-tier accuracy, knowledge and in-distribution workflow decisions at roughly constant latency; the hard tier
+and probability quality are data/objective problems at every size. The sharpest version of that: the *frozen* 14B with three exemplars scores **.559 on hard** (0-shot .441)
+versus .468 for our trained 14B — at 14B our current training data makes the hard tier *worse* than the base model
+with shots, while lifting standard from .819 to .875. The trained model is confidently wrong where the frozen one is
+merely uncertain (hard Brier .85 vs .60). Fixing that — long states, soft targets, the calibration objective — is the
+whole of Phase 10, and the frozen-with-shots number is its target at every size.
+
+## 3ac. PLAN7 Track C — typed primitives: Score (ordinal) and Noul (Bernoulli) on the native head (H100, 2026-09-21, ~$3)
+
+Five matched arms, each `--init_from nc_v3_tap20_wf/best.pt`, same recipe, 3k steps on the score-only (or noul-only) rows
+of data_wf + data_wf_hf (`--qtype_filter`), sampler off. Arm-vs-arm only: the type-only fine-tune lowers the other
+types (styles .84–.87 vs the parent's .90), identically across arms. Full tables: `REPORT_6b_draft.md`.
+
+**Score** — K-way Choice (control) vs K-way + ordinal-smoothed targets (τ = 0.7, `--ordinal_smooth`) vs a
+cumulative-link head (`--score_head cumlink`: scalar utility + thresholds from the rendered level texts):
+
+| | K-way (A) | **ordinal-smoothed (B)** | cumulative-link (C) |
+|---|---|---|---|
+| held-out urgency: acc / NLL / Brier / ECE / ordinal MAE | .505 / 2.07 / .79 / .35 / .58 | .508 / **1.23 / .68 / .19 / .55** | .485 / 2.42 / .85 / .37 / .62 |
+| typed-decisions score rows: acc / NLL / Brier | .356 / 2.23 / .40 | .340 / **1.88 / .38** | .303 / 2.30 / .51 |
+| systemone-lite hard score: acc / NLL / MAE | .853 / .37 / .15 | **.939 / .22 / .06** | .923 / .22 / .08 |
+| JevBench std / hard (acc, Brier) | .764 (.40) / .360 (.88) | .708 (.47) / **.459 (.70)** | **.792 (.38)** / .450 (.92) |
+| JevBench ordinal items (12) | 9 / Brier .43 | 9 / .41 | 9 / **.38** |
+
+Ordinal smoothing changes *no decision* on the 12 JevBench ordinal items (identical per-item predictions to the
+control) and improves every probability-quality metric — held-out score NLL 2.07 → 1.23, ECE .35 → .19, JevBench hard
+Brier .88 → .70 with hard accuracy .360 → .459 — for zero head code. The cumulative-link head wins JevBench standard
+and ordinal Brier but is worse on every internal/soft-gold set; with only 3k steps for its fresh parameters it is an
+open follow-up, not a rejection. **Adopt `--ordinal_smooth 0.7` for Score.**
+
+**Noul** — 2-way Choice over ["no","yes"] (control) vs a Bernoulli head `P(yes) = σ(w·h_D)` with no rendered candidates
+(`--noul_head bern`):
+
+| | 2-way Choice (A) | **Bernoulli (B)** |
+|---|---|---|
+| held-out eligibility: acc / NLL / Brier / ECE | .701 / .78 / .45 / .16 | .711 / .73 / .44 / .16 |
+| **PagerDuty** (external, floor .792): acc / NLL / Brier | .602 / 1.04 / .61 | **.886 / .28 / .16** |
+| Mind2Web noul rows: acc / NLL | .636 / .66 | **.785 / .51** |
+| typed-decisions noul rows: acc / NLL / Brier | .467 / 1.72 / .55 | **.492 / 1.21 / .44** |
+| reversed-label control, mean / max |ΔP(yes)| | .01–.15 / .55 | **0 / 0** (exact, all 9 sets) |
+
+The Bernoulli head is better or equal on 6 of 7 noul sets, is exactly order-invariant by construction (the 2-way readout
+moves up to .55 under label reversal), is cheaper at inference (no rendered candidates), and gives the first untouched
+external set that clears its constant-prediction floor by a margin: PagerDuty .602 → **.886** (floor .792). JevBench is
+excluded from the Noul decision (its public set has almost no true yes/no items; the Bernoulli arm's JevBench run is a
+graceful-degradation ceiling). **Adopt `--noul_head bern` for Noul.** Choice keeps the N3 readout. Both are additive
+flags on the frozen architecture; Release 1 trains with them on.
+
+## 3ad. First DecisionMix v2 run — `r1_dmv2` (r1 recipe + hard curriculum `data_wh` + uncertainty corpus `data_u`; H100, 2026-09-21, ~$12)
+
+`r1_cand` args with `data_wh` (60.6k, levels 1–7, 100% counterfactual rubric groups; level 7 and three domains, two
+styles, one grammar per level held out) and `data_u` (31k soft-target rows: UNLI-val, AmbiEnt, four closed-form
+generators) added; sampler E .40 / K .20 / W .30 (data_wf + wf_hf + long + wh) / U .10; 12k steps. Matched control =
+`r1_cand`, never trained on either corpus, scored on the identical wh/u files (full rows).
+
+| | `r1_cand` | **`r1_dmv2`** |
+|---|---|---|
+| CLINC-150 acc / false-abstain | .808 / .052 | **.821 / .033** (lowest false-abstain of any run) |
+| TREC-fine / HWU64 / 20NG / MMLU among-K (Δ_q) | .456 / .785 / .554 / .347 (.130) | .474 / .726 / .501 / .333 (.110) |
+| held-out (data_wf) noul / score / style / flip both-correct | .687 / .548 / .901 / .564 | .658 / .501 / .876 / .519 |
+| typed-decisions NLL (full file) | 2.06 | **1.71** |
+| wh held-out family / grammar / style | .481 / .507 / .491 (NLL 3.0 / 3.2 / 1.8) | **.827 / .881 / .888** (NLL .63 / .24 / .31) |
+| wh rubric-flip acc / shuffled acc (NLL) | .477 / .446 (2.2 / 2.6) | **.710** / .405 (.74 / 3.4) |
+| wh level 7 (never trained: temporal / units / EV / trade-off) | .477 (1.08) | .498 (1.26) |
+| u ChaosNLI / real held-out / synthetic held-out: acc (NLL) | .584 (1.27) / .685 (.86) / .741 (.83) | .537 (**1.00**) / .623 (**.67**) / .909 (**.67**) |
+| JevBench std / hard (Brier) | .764 / .369 (.90) | .750 / **.441 (.79)** |
+| JevBench hard: adversarial / ambiguous / multi_hop / long_policy | .33 / .57 / .28 / .11 | **.83 / .71 / .39** / .16 |
+
+**The curriculum transfers within its grammar and not beyond it; the U corpus buys calibration, not accuracy.**
+Held-out families/grammars/styles inside the rule-engine's world jump +34–37 with the rubric-flip accuracy .48 → .71,
+while level 7 — the temporal / unit / expected-value / trade-off composition the generator never trains — stays at
+~.50 for both models, as does the JevBench temporal/probability/trade-off block: what we generated is learned; what we
+did not generate is not. On the uncertainty sets the never-soft-trained control has *higher argmax accuracy* on all
+three while `r1_dmv2` has better NLL on ChaosNLI and the real held-out set (and both on synthetic) — soft targets teach
+the model to spread probability, which costs top-1 and helps likelihood; typed-decisions NLL improves 2.06 → 1.71, the
+first training-side calibration gain, and JevBench hard Brier .90 → .79 with hard .369 → .441 (adversarial .33 → .83,
+ambiguous .57 → .71 — the WH families that exist in the curriculum). The costs: the original W sets dilute 3–5 pts at a
+fixed W share now split over four corpora, MMLU −1.4, HWU64 −6. Verdict: DecisionMix v2 goes into Release 1 (with the W
+share raised back and the typed heads of §3ac on), and the generator's next job is the level-7 families, because
+nothing else in the suite moves them.
+
+## 3ae. Release-1 candidate at 1.7B — `ts1b` (r1 mix + DecisionMix v2 + ordinal-smoothed Score + per-row Bernoulli Noul + 1,024-token states; H100, 2026-09-21, ~$12 + $10 lost to the routing bug)
+
+`ts1` collapsed to chance because `--noul_head bern` was global (every row rendered query-only and scored by the
+Bernoulli head — it had only ever been run on noul-only arms). Fixed per row (commit 7b9d520: rows whose candidates are
+exactly {yes, no} use the Bernoulli head; every other row is bit-identical to the K-way path; 140 tests) and rerun as
+`ts1b`. Family weights E .40 / K .15 / W .35 / U .10. Full-row `eval_wf` for all W/external sets; JevBench per item.
+
+| | `typical-small-preview` (§3t/§3w) | `r1_dmv2` (§3ad) | **`ts1b`** | 1.7B base |
+|---|---|---|---|---|
+| CLINC-150 / TREC-fine / HWU64 / 20NG | .734 / .372 / .735 / .522 | .820 / .474 / .726 / .501 | .804 / **.508** / .761 / .540 | .845 / .468 / .757 / .515 |
+| SNLI / MNLI / BoolQ / ANLI | .894 / .849 / .831 / .481 | .894 / .852 / .834 / .501 | .894 / .859 / .824 / .497 | .904 / .865 / .834 / .507 |
+| MMLU-Pro among-K / Δ_q_sh / false-abstain | .330 / .119 / .006 | .333 / .110 / – | .343 / .127 / .005 | .353 / .122 / .003 |
+| held-out noul / score / style / flip both-correct (full rows) | .699 / .498 / .901 / .565 | .658 / .501 / .876 / .519 | **.715** / **.520** / .859 / **.581** | – |
+| held-out score NLL / typed-decisions NLL (full rows) | 2.03 / 2.06 | 1.56 / 1.71 | **1.01 / 1.25** | – / 1.22 |
+| wh held-out family / grammar / style / level 7 / flip | – | .827 / .881 / .888 / .498 / .710 | **.836 / .898 / .896** / .495 / **.718** | – |
+| u ChaosNLI / real held-out / synthetic (acc, NLL) | – | .537 (1.00) / .623 (.67) / .909 (.67) | .547 (1.00) / **.649** (.66) / .916 (.67) | – |
+| external: PagerDuty (floor .792) / jevlogs (.697) / Mind2Web (.427) / tree-choice / typed-decisions acc | .779 / .522 / .427 / .539 / .457 | .651† / .500† / .346† / – / .421† | **.817 / .710** / .357 / .474 / **.510** | .776 / .697 / .300 / .506 / .487 |
+| JevBench std / easy / hard (Brier std / hard; ECE std) | .750 / 1.00 / .387 (.40 / .88; .15) | .750 / 1.00 / .441 (.42 / .79) | .694 / 1.00 / .432 (.40 / .79; **.11**) | .694 / 1.00 / .378 (.47 / .74) |
+| Noul reversed-label |ΔP(yes)| max | up to .55 | – | **0** (10/11 sets; .009 on one) | – |
+
+† train-time 1,500-row/256-token pass for `r1_dmv2` (not re-run at full length).
+
+**Read.** Against the frozen preview, `ts1b` keeps E and K inside budget (CLINC −4 vs the untrained base is the one
+edge; TREC/20NG above base), raises held-out noul/score/flip, halves the soft-target NLLs (score 2.03 → 1.01,
+typed-decisions 2.06 → 1.25 — at 1.7B this is the calibration the under-fit runs had, without their accuracy loss),
+beats or ties `r1_dmv2` on every curriculum and uncertainty set, is exactly order-invariant on Noul, and is the first
+1.7B model above the constant-prediction floor on PagerDuty (.817) and jevlogs (.710, marginal). It gives back held-out
+styles (−4), Mind2Web (below floor again), tree-choice (−6), and JevBench standard (.750 → .694, ~1 SE at n_eff = 36;
+extraction 12 → 9 of 12) while JevBench hard rises (.387 → .432, Brier .88 → .79). Net: a broader, far better-calibrated
+model that trades ~1 SE of JevBench-standard for it. **Decision: freeze `ts1b` as `typical-small` (Release 1 at 1.7B)**,
+with the preview kept as the reference; the 4B `tm1b` decides `typical-medium`.
+
+## 3af. Release-1 candidate at 4B — `tm1b` (H100, 2026-09-21, ~$15 + $8 lost to the routing bug)
+
+Same recipe as `ts1b` (§3ae) on Qwen3-4B-Base, tap 26/36, effective batch 64 (`--grad_accum 4`, 58 GB). Matched control =
+`ladder_4b` (§3ab: same backbone, the 6A recipe — no typed heads, no DecisionMix v2, 256-token states). Full rows.
+
+| | `ladder_4b` | **`tm1b`** | `ts1b` (1.7B) |
+|---|---|---|---|
+| CLINC-150 / TREC-fine / HWU64 / 20NG | .850 / .516 / .787 / .577 | .847 / .414 / .769 / .588 | .804 / .508 / .761 / .540 |
+| SNLI / MNLI / BoolQ / ANLI | .909 / .868 / .865 / .536 | .909 / .861 / .843 / .544 | .894 / .859 / .824 / .497 |
+| MMLU-Pro among-K / Δ_q_sh / TruthfulQA | .457 / .193 / .386 | .458 / .193 / **.408** | .343 / .127 / .257 |
+| held-out noul / score / style / flip (full rows) | .841 / .535 / .923 / .785 | .811 / .528 / .859 / .786 | .715 / .520 / .859 / .581 |
+| held-out score NLL / typed-decisions acc, NLL | 2.37 / .465, 1.88 | **1.02** / **.532, 1.18** | 1.01 / .510, 1.25 |
+| wh family / grammar / style / **level 7** / flip / shuffled | – | .874 / .893 / .891 / **.544** / .743 / .378 (NLL 3.4) | .836 / .898 / .896 / .495 / .718 / .410 |
+| u ChaosNLI / real / synthetic | – | .513 / .658 / .907 | .547 / .649 / .916 |
+| external: PagerDuty (floor .792) / jevlogs (.697) / Mind2Web (.427) / tree-choice | .790 / .487 / .559 / .713 | **.838** / .673 / .544 / .690 | .817 / .710 / .357 / .474 |
+| JevBench std / easy / hard (Brier std / hard; ECE std) | .833 / 1.00 / .432 (.29 / .83; .12) | .806 / 1.00 / .423 (.30 / .77; **.09**) | .694 / 1.00 / .432 (.40 / .79; .11) |
+| single decision ms K = 2 / 32 / 256 (same pod as `ladder_4b`) | 56 / 56 / 118 | 57 / 58 / 96 | 45 / 46 / 106 |
+
+**Read.** The Release-1 recipe on 4B keeps knowledge (MMLU .458, Δ_q .193, TruthfulQA +2), keeps NLI, halves the
+soft-target NLLs again (score 2.37 → 1.02, typed-decisions 1.88 → 1.18 with accuracy +7), is the first model above .50 on
+level-7 composition (.544), clears the PagerDuty floor (.838), and is the best-calibrated model on JevBench standard
+(ECE .086) — at unchanged latency. It gives back TREC-fine (−10, the one clear regression; K = 50 fine-grained topics),
+held-out styles (−6), noul (−3) and ~2 JevBench items on standard and 1 on hard (within n_eff = 36 noise). **Decision:
+freeze `tm1b` as `typical-medium`.** The 4B remains the knee of capability per millisecond: it beats `typical-small` by
++4–11 on evidence, +11 on MMLU among-K, +10 on held-out noul, +5 on level 7 and +11 on JevBench standard for 1.25× the
+per-decision latency. Open at 4B, same as at 1.7B: the hard tier (.42, long_policy .21, temporal/trade-off ≤ .2) and
+TREC-fine.
+
+## 3ag. Towards `typical-large` — the long-state bug, frozen controls, and the Qwen3.5 port (2026-09-21/22; runs in flight)
+
+**A data bug behind the hard-tier collapse at scale.** `data_wf_long` (the 23k "long policy" rows added in §3z) renders
+`Case: <facts> <request>` *last*; measured state lengths are p10/p50/p90 = 1,190 / 1,845 / 2,490 tokens, and training
+right-truncates at `--max_state` — so at 1,024 (Release 1) 98.8% of those rows lost their facts, and at 256 (the ladder)
+all of them did. Every model since §3z was trained to answer long policies confidently from unreadable states, which
+is exactly the long_policy .05 of the 14B (§3ab) and .21 of `typical-medium`. Fixes (commit 2fad326): facts-first
+regeneration (`wf/train_long_v2.jsonl`, case position < 8% of the text), `--drop_truncated` (rows longer than the window
+are dropped, never cut), `--grad_ckpt`, `--best_on` (checkpoint selection on the uncertainty + curriculum val NLL),
+`--brier_lambda`, and frozen-backbone teacher labels via `scripts/teacher_label.py --zero_shot --shots 3`.
+(Correction 2026-09-24: `--brier_lambda` was listed here but the run args record 0.0; no Brier term was trained.)
+A second bug (commit 6d0a7e3): the SDPA padding mask was built as `long`, which forces PyTorch's O(L²) math kernel — the
+cause of the 14B OOMs at 3,072-token states (and of the ladder's memory pain); `bool` fixed it.
+
+**Frozen controls (letter logits over the rendered options, 3 exemplars, same public 231 ids):**
+
+| frozen backbone | standard | easy | hard | Brier hard |
+|---|---|---|---|---|
+| Qwen3-1.7B-Base | .528 | 1.00 | .369 | .71 |
+| Qwen3-4B-Base | .778 | 1.00 | .441 | .67 |
+| Qwen3-4B (instruct) | .778 | 1.00 | .423 | .95 |
+| Qwen3-8B-Base | .556 | .958 | .369 | .74 |
+| Qwen3-14B-Base | .819 | 1.00 | .559 | .60 |
+| **Qwen3.5-4B-Base** | .764 | 1.00 | **.495** | **.60** |
+
+Instruct-tuning of Qwen3 changes nothing on this task; the Qwen3.5 generation buys +5 hard and a 4B whose hard-tier
+calibration matches the frozen 14B's, but not standard — the leaderboard's .83–.99 standard on the same checkpoint
+(SemIf, open-alternative-jev) comes from their rendering/method, which we are now replicating as a probe.
+
+**Qwen3.5 port (commit 9b1ffac).** Base checkpoints exist at 0.8B / 2B / 4B / 9B / 27B / 35B-A3B — a complete
+replacement ladder. Differences handled: the VL wrapper config (`text_config`, `.language_model` unwrapped), the hybrid
+stack (3× Gated-DeltaNet + 1× full attention; tap at 71% keeps 4 of 6 full-attention layers at 0.8B), LoRA targets
+(`in_proj_qkv/z/b/a`, `out_proj` on DeltaNet layers; q/k/v/o on attention layers; MLP everywhere), and a
+transformers-5.17 cache gap (`LinearAttentionLayer` lacks `batch_repeat_interleave`) patched in `native_kv_decide`.
+Cached-vs-full parity 1e-7; Qwen3 behaviour unchanged (153 tests); the public `inference/` package mirrors it.
+
+**In flight:** `tl1b` (Qwen3-14B, facts-first long rows, 3,072-token states, frozen-14B KD, 8k steps, best-on
+calibration val) and its matched `tl1b_nokd`; `tm2` (Release-1 recipe on Qwen3.5-4B-Base, 2,048 states); the SemIf
+rendering probe. Pass rule for `typical-large`: hard ≥ .559 or hard Brier ≤ .65, long_policy ≥ .35, CLINC-150 / MMLU
+among-K within 2 of `ladder_14b`.
+
+**Serving latency (public `inference/` package, one H100, warm state = prefix KV cached; `runs/serve_bench2/`).** The
+serving path was deep-copying the whole prefix KV cache on every decision; replaced by a stride-0 view (bit-identical,
+zero bytes) plus cached masks/position tensors and a rendered-option cap. Per warm decision p50: **1.7B 21–25 → 15.5–17
+ms, 4B 26–27 → 19–21 ms**, Qwen3.5-4B 42–53 → 34–46 ms (its DeltaNet layers ran reference kernels on that pod; to be
+re-measured with FLA + causal-conv1d). `torch.compile`/CUDA graphs were tried and rejected: 8 ms on one shape but Δp up
+to .1 across shape buckets and stale-buffer crashes with the mutable HF cache — manual per-bucket graph capture is the
+remaining path to ~10 ms. No quantisation.
+
+**Ops lessons (memory):** a pod created with `--startSSH` never reaches "ready" on this account and bills anyway (12
+stalls, ~$13); `--ports "22/tcp"` boots in 30 s. Stop = wipe without a volume. Never `set -x` across an `.env` source.
+
+## 3ah. `tl1b` — the 14B with the long-state fix and a frozen-teacher (H100, 2026-09-22, ~$35)
+
+Recipe: `ladder_14b`'s backbone (Qwen3-14B-Base, tap 28/40) with everything §3ag prescribed — facts-first long corpus,
+`--drop_truncated`, 3,072-token states, DecisionMix v2 + U, typed heads, KD from the frozen 14B's 3-shot letter
+distribution (α·CE + β·KL, T = 2) on 63k labelled rows, checkpoint selected on the uncertainty + curriculum val NLL,
+8k steps, effective batch 64.
+
+| | `ladder_14b` (old recipe) | **`tl1b`** | frozen 14B, 3-shot |
+|---|---|---|---|
+| JevBench std / easy / hard | .875 / 1.00 / .468 | **.931** / 1.00 / .450 | .819 / 1.00 / .559 |
+| JevBench Brier std / hard | .17 / .85 | .18 / **.66** | .30 / .60 |
+| hard: long_policy / multi_hop / trap / adversarial | .05 / .44 / 1.00 / .67 | **.158 / .611** / 1.00 / .667 | – |
+| hard: temporal / probability / tradeoff | .33 / .50 / .67 | .20 / .30 / .17 | – |
+| MMLU-Pro among-K / Δ_q_sh | .487 / .246 | .486 / .235 | – |
+| CLINC-150 / TREC-fine / HWU64 / 20NG | .834 / .472 / .792 / .668 | .827 / **.508** / .760 / .690 | – |
+| SNLI / MNLI / BoolQ / ANLI | .910 / .864 / .894 / .588 | .911 / .868 / .882 / .583 | – |
+| held-out noul / score / style | .887 / .558 / .919 | .831 / **.621** / .882 | – |
+| held-out score NLL / typed-decisions acc, NLL | 2.87 / .567, 1.96 | **0.95** / **.600, 1.04** | – |
+| wh family / level 7 / rubric-flip; u real | – | .893 / **.620** / .847; .728 | – |
+| single decision K = 2 / 32 / 256 (ms) | 61 / 62 / 158 | 59 / 62 / 156 | – |
+
+**Verdict: the fixes did what they were predicted to do, and the pass rule still fails on the hard tier.**
+JevBench standard .875 → **.931** (the best number this project has produced, level with `system-one-open` on the public
+ids) with knowledge, NLI and latency unchanged; the calibration collapse of §3ab is gone — held-out score NLL 2.87 →
+0.95, typed-decisions 1.96 → 1.04, JevBench hard Brier .85 → .66; long_policy tripled (.05 → .158) and multi_hop
+.44 → .611; level-7 composition reached **.620**, the first time any model has been clearly above chance there. What did not move: hard-tier *accuracy* (.468 → .450, within noise at n = 111) and the serial-symbolic families
+(temporal .20, probability .30, tradeoff .17). The pass rule (hard ≥ .559 or Brier ≤ .65; long_policy ≥ .35) is
+missed on both counts — narrowly on Brier (.656) — so **`tl1b` is not released as `typical-large` yet**; the frozen
+14B with three exemplars still leads it on hard (.559), which keeps §3ab's uncomfortable finding alive: our training
+buys standard-tier accuracy and calibration, and still costs hard-tier accuracy at 14B.
+(The `ladder_14b` per-family values in this table are recomputed from `jev_native_ladder_14b/hard/results.jsonl`;
+an earlier draft of §3ab quoted .20/.40 for temporal/probability from a transcription error.)
+
+## 3ai. `tl1b_nokd` — the KD control, and what it leaves confounded (H100, 2026-09-22, ~$30)
+
+`tl1b` bundled five changes at once (facts-first long corpus, `--drop_truncated`, a 3,072-token window,
+`--brier_lambda`, calibration-based `--best_on`) *plus* KD from the frozen 14B. (Correction 2026-09-24: `--brier_lambda`
+was listed here but the run args record 0.0; no Brier term was trained.) `tl1b_nokd` is the matched control:
+identical recipe, `--distill_beta 0`, one flag different. All values below read from the artefacts on
+`guychuk/pcdm-runs` (`jev_native_*/hard/summary.json`, `.../original/summary.json`), not from run logs.
+
+| | `ladder_14b` (old recipe) | `tl1b` (KD) | **`tl1b_nokd`** (no KD) |
+|---|---|---|---|
+| JevBench standard | .875 | **.931** | .917 |
+| JevBench easy | 1.00 | 1.00 | 1.00 |
+| JevBench hard | .468 | .450 | **.477** |
+| JevBench Brier standard | .173 | .175 | **.127** |
+| JevBench Brier hard | .85 | **.656** | .682 |
+| hard: long_policy (n = 19) | .053 | .158 | **.211** |
+| val NLL | – | 0.438 | **0.410** |
+| CLINC-150 | .834 | .827 | .822 |
+| MMLU-Pro among-K | .514 | .498 | .498 |
+
+**The teacher contributed nothing measurable, and was slightly negative where it was supposed to help.** KD was
+added to buy hard-tier reasoning; removing it *improved* hard accuracy (.450 → .477), long_policy (.158 → .211),
+standard Brier (.175 → .127) and val NLL (0.438 → 0.410), at the cost of 1.4 points of standard accuracy
+(.931 → .917) — and both KD arms leave knowledge and intent untouched. Because `--distill_beta` is the only flag
+that differs, this is one of the few clean matched pairs in the record; the caveat is that it is a single seed, and
+the standard-tier gap is well inside what §3v's seed pair showed as run-to-run spread. Per-family hard for `nokd`:
+adversarial .833 (n=6), ambiguous .429 (n=7), judge_hard .588 (n=17), long_policy .211 (n=19), multi_hop .50 (n=18),
+probability .50 (n=10), routing_hard 1.00 (n=5), temporal_numeric .20 (n=15), tradeoff .167 (n=6), trap 1.00 (n=8).
+
+**What this does *not* establish.** With KD eliminated, the credit for the long_policy recovery (.053 → .211) falls to
+"the truncation fix" — but that is still four changes in a trenchcoat. Nothing in the record separates facts-first
+rendering from `--drop_truncated`, the wider window, or calibration-based checkpoint selection (not a Brier term —
+correction 2026-09-24: no run in this pair trained one). §3ag
+states the mechanism (states right-truncate, so a `Case:` rendered last was dropped 98.8% of the time at
+`max_state` 1,024) and the mechanism is well-evidenced as a *description of the data*; it is not evidenced as the
+*cause* of the metric movement. The paper says so explicitly rather than claiming the stronger version.
+
+**The ablation that closes it (in flight, ~$12).** The counterfactual corpus was never deleted — `data_wf_long`
+retains both renders, and they are a genuinely matched pair: identical rows, identical labels, identical state
+lengths (p50 8,702 chars in both), differing only in where `Case:` sits (p50 0.000 vs 0.976 of the text). Two 1.7B
+arms, byte-identical flags, `--max_state 1024` with `--drop_truncated` deliberately **off** so truncation bites as it
+did in Release 1, differing only in which file is `data_wf_long/train.jsonl`
+(`wf/train_long_v2.jsonl` = facts-first, `wf/train_long.jsonl` = facts-last on `guychuk/pcdm-data`). Primary metric:
+JevBench hard `long_policy`. Pre-registered prediction, recorded before the runs land: facts-last should sit near
+`ladder_14b`'s floor while facts-first recovers most of the gap, with knowledge and intent matched. **If both arms
+land near .05, render order was not the cause and §3ag's mechanism paragraph is wrong and must be rewritten** — that
+outcome is more valuable than a confirmation, because the mechanism is currently load-bearing in both the report and
+the paper.
+
+
+## 3aj. Tap-depth sweep at 1.7B — 54% / 61% / 64% (3 H100s, 2026-09-22, ~$20)
+
+The tap layer (how far up the backbone the state prefix is read) was fixed at 71% by §3f and never re-tested
+against the Release-1 recipe. Three matched runs at tap 15 / 17 / 18 of 28 (54% / 61% / 64%), updated defaults
+(`max_state` 2,048, `--drop_truncated`, `--grad_ckpt`, `--best_on data_u_val,data_wh_val`, 8k steps). JevBench
+values below re-read from `jev_native_ts1c_tap*/{original,hard}/summary.json` on the hub.
+
+| | `ts1b` (§3ae, old recipe) | tap15 (54%) | tap17 (61%) | tap18 (64%) |
+|---|---|---|---|---|
+| JevBench standard / hard | .694 / .432 | **.764** / .324 | .708 / **.441** | **.764** / **.441** |
+| JevBench Brier standard | .40 | **.375** | .441 | .414 |
+| CLINC / TREC / HWU64 / 20NG | .804/.508/.761/.540 | .828/.560/.782/.468 | .796/.434/.762/.482 | .824/.556/.761/.542 |
+| MMLU among-K / Δ_q_sh | .343 / .127 | .320 / .120 | .317 / .123 | .331 / .117 |
+| held-out noul / score / style | .715/.520/.859 | .628/.473/.868 | .626/.515/.855 | .608/.555/.838 |
+| W NLL score / typed | 1.01 / 1.25 | 1.79 / 1.50 | 1.15 / 1.27 | 1.02 / 1.24 |
+| wh family / level 7 / flip | .836 / .495 / .718 | .820/.481/.715 | .848/**.503**/.732 | .839/.490/.717 |
+| single decision K=2 / 256 (ms) | – | 66.6 / 111.2 | **50.8** / 113.6 | 53.1 / 114.2 |
+
+**No free win, and the sweep does not support a depth story.** Quality rises weakly and non-monotonically toward
+tap18, but every gain sits inside the spread §3v measured between two seeds of the same config, and the one large
+signal — tap15's W NLL (1.79 / 1.50 against ~1.0–1.2 for the other two) — is a single-arm outlier that has not been
+reproduced. Δ_q_sh is flat across all three taps (.117–.123), so there is no shallow-tap "compilation" cliff of the
+kind §3e was hunting. **Two caveats that limit what this table can be used for**: (1) the `ts1b` column is the *old*
+recipe (`max_state` 1,024, 12k steps, no `--drop_truncated`/`--best_on`), so it is a shape reference, not a matched
+baseline — the matched tap20 control under the updated defaults has not been run; (2) the latency column is almost
+certainly noise, not depth — it reports the *shallowest* tap as the *slowest* at low K (66.6 ms at tap15 vs 50.8 at
+tap17), which is backwards, since a shallower tap can only reduce the one-time state pass. K=256 latency is flat
+(111–114 ms) across all three, as expected, because tap depth barely touches decision-batching cost.
+
+**Later correction (§3ak-d).** The `ts1b` comparison column is mismatched on the *corpus* as well as the recipe:
+these tap runs trained on the facts-first corpus and `ts1b` did not, and `ts1c` (the tap-20 control) turns out to
+be 34.9 points better than `ts1b` on long states while reading as indistinguishable on JevBench. The tap-depth
+conclusion below is unaffected — the three tap arms are matched to each other — but nothing in this table should
+be read as a `ts1b`-vs-`ts1c` comparison.
+
+**Verdict: tap stays at 71%.** Nothing here clears the bar for changing a frozen architecture parameter, and the
+sweep's own baseline is mismatched. Recorded as a closed negative; re-open only with a matched tap20 arm.
+
+
+## 3ak. The render-order ablation, and confidence intervals that change several earlier readings (2026-09-22)
+
+Two matched 1.7B arms, byte-identical flags, differing only in whether `data_wf_long` renders `Case:` first
+(p50 0.000 of the text) or last (p50 0.976). `--max_state 1024`, `--drop_truncated` deliberately **off**, so
+truncation bites as it did in Release 1. Corpora verified identical in row count (23,318) and differing in md5.
+Tokenizer `truncation_side` is `right`, verified empirically (keeps the start, drops the end), so facts-last rows
+did lose their `Case:` at train time -- the §3ag mechanism description is accurate as a description of the data.
+
+| | arm A `trunc_first` | arm B `trunc_last` |
+|---|---|---|
+| JevBench standard | .750 | .736 |
+| JevBench hard | .378 | **.396** |
+| hard: long_policy (n = 19) | **.316** (6/19) | .105 (2/19) |
+
+**The pre-registered primary metric moves in the predicted direction and is not significant.** long_policy
+.105 -> .316 is the effect §3ag predicts, but it is 2 items against 6 out of 19: Fisher exact two-sided
+**p = 0.232**, bootstrap 95% CI on the difference **[-0.053, +0.474]**, which contains zero. Hard *aggregate*
+goes the other way (arm A .378 < arm B .396). Standard is a coin-flip apart. **The ablation therefore does not
+establish the truncation mechanism**; it is consistent with it and underpowered to confirm it.
+
+**A render-mismatch effect that is larger and much better powered than the truncation effect.** On a held-out
+long-state set built for this purpose (n = 605, `scripts/make_long_eval.py`; zero exact-state overlap with either
+training corpus, Case-stem overlaps dropped), scored with **no truncation at all** (eval window 4,096; state p50
+1,965 tokens, max 2,843):
+
+| arm B (facts-last-trained) scored on | overall | policy_permit (n=330, K=2, floor **.612**) | action_select (n=275, K=4, floor .233) |
+|---|---|---|---|
+| facts-**first** render (mismatched) | .640 | **.615 — at the floor** | .669 |
+| facts-**last** render (matched) | **.830** | **.842** | .815 |
+
+With the identical 605 items and the Case fully visible in both, moving the Case from the end to the start costs
+arm B **23 points** on policy_permit and drops it exactly onto the majority-class floor. It is not that the model
+cannot use the facts; it uses them only where its training put them. So a substantial part of what §3ag attributes
+to truncation is **train/test render mismatch**, and by the same argument `ladder_14b`'s long_policy .053 against
+`tl1b`'s .158 is partly a render-match effect too, since `ladder_14b` trained facts-last and was scored on
+JevBench's fixed render. (Arm A's two cells were still running at the time of writing.)
+
+### 3ak-a. The completed 2x2 — the truncation fix is real, and larger than JevBench could see
+
+Arm A's two cells landed after the section above was written and they **overturn its interim reading**. Both arms
+scored on the same 605 held-out long states, under both renders, with no truncation at eval:
+
+| trained on | scored on | overall | policy_permit (floor .612) | action_select (floor .233) |
+|---|---|---:|---:|---:|
+| facts-first | facts-first *(matched)* | **.942** | **.933** | **.953** |
+| facts-first | facts-last | .797 | .788 | .807 |
+| facts-last | facts-first | .640 | .615 *(at floor)* | .669 |
+| facts-last | facts-last *(matched)* | .830 | .842 | .815 |
+
+**Comparing each model in its own matched condition — which removes the render-mismatch confound entirely —
+facts-first training is ahead by 11.2 points: .942 vs .830, 95% CI [+.077, +.147], z = 6.2, p = 5e-10.**
+Per family: policy_permit +.091 [+.043, +.139], action_select +.138 [+.086, +.190]. The facts-first model is also
+the more robust of the two: it loses 14.5 points when the render is switched against it, the facts-last model
+loses 19.0.
+
+So all three effects are real and they were stacked on top of each other:
+1. **The truncation fix genuinely works**, and at n = 605 the effect is unambiguous (p = 5e-10).
+2. **Render mismatch is also real and large** — it is what dragged arm B to its majority-class floor (.615) in
+   the single-render comparison of §3ak, and it is why that comparison looked like it refuted the mechanism.
+3. **JevBench's long_policy could not resolve any of this** at n = 19 (p = .232). The metric was the problem, not
+   the mechanism.
+
+**Correction to §3ak.** That section, written when only arm B's two cells existed, concluded that "a substantial
+part of what §3ag attributes to truncation is train/test render mismatch". With the full 2x2 that is too strong:
+render mismatch is a genuine and separately-measurable effect, but it does **not** explain away the truncation
+effect, which survives at 11.2 points in the matched comparison. §3ag's mechanism stands. The honest summary is
+that the original single-render ablation design was inadequate — it confounded the thing being measured with
+render compatibility, and only the 2x2 separates them.
+
+
+### 3ak-c. The 2x2 replicated at 14B
+
+Same 605 held-out long states, same two renders, no truncation at eval. `tl1b_nokd` is the facts-first 14B
+(the KD-free arm, so no distillation confound); `ladder_14b` is the facts-last 14B trained under the old recipe.
+
+| model | trained on | scored on | overall | policy_permit | action_select |
+|---|---|---|---:|---:|---:|
+| `tl1b_nokd` | facts-first | facts-first *(matched)* | **.997** | .997 | .996 |
+| `tl1b_nokd` | facts-first | facts-last | .921 | .933 | .905 |
+| `ladder_14b` | facts-last | facts-first | .851 | .839 | .865 |
+| `ladder_14b` | facts-last | facts-last *(matched)* | .919 | .930 | .905 |
+
+**Matched-condition gap at 14B: +.078, 95% CI [+.055, +.100], p = 7e-12** — against +.112 [+.077, +.147],
+p = 5e-10 at 1.7B. The effect replicates at two scales an order of magnitude apart, with the smaller gap at 14B
+simply because the facts-first 14B is at ceiling (.997).
+
+Two further readings:
+- **`ladder_14b` is not incapable on long states — it scores .919 in its own matched render.** Its JevBench
+  `long_policy` of .053 was therefore never a pure capability measurement: it compounds the truncation damage with
+  a render mismatch against JevBench's fixed format, and an n=19 sample on top. This is the cleanest available
+  illustration of why the rendering factor has to be controlled before a benchmark delta is read as capability.
+- The facts-first 14B loses 7.6 points when the render is switched against it, the facts-last 14B 6.8 — at 14B the
+  robustness difference seen at 1.7B (14.5 vs 19.0) essentially disappears. Capacity appears to buy render
+  tolerance, which the 1.7B pair alone would have missed.
+
+
+### 3ak-d. `ts1c` is already the fixed `typical-small` — no retrain needed
+
+The released `typical-small` (`ts1b`) predates the facts-first fix. `ts1c` — the tap-20 control from the §3aj tap
+sweep, trained on the updated defaults (`max_state` 2048, `--drop_truncated`, `--best_on`, tap 20, 8k steps) after
+the fix — was never scored on long states, because at the time nobody knew that was the axis that mattered. It is:
+
+| 1.7B checkpoint | facts-first | facts-last | policy_permit (facts-first) |
+|---|---:|---:|---:|
+| **`ts1c`** (fixed recipe) | **.947** | .790 | **.948** |
+| `typical-small` = `ts1b` (released) | .598 | .798 | .536 |
+| arm A `trunc_first` (facts-first) | .942 | .797 | .933 |
+| arm B `trunc_last` (facts-last) | .640 | .830 | .615 |
+
+`ts1c` reproduces arm A almost exactly (.947 vs .942) and beats the released checkpoint by **+34.9 points** on
+facts-first long states (+41.2 on the policy_permit family), while giving up nothing measurable on facts-last
+(.790 vs .798). It is strictly the better model for any caller who puts case facts before the policy body, and no
+worse for callers who do not.
+
+**The same holds at 4B.** `tm2` (Qwen3.5-4B, post-fix recipe) scores **.950** facts-first against the released
+`typical-medium`'s .612 (+33.8; policy_permit .967 vs .555), and *gains* slightly on facts-last (.879 vs .866).
+
+| supersedes | replacement | facts-first | facts-last |
+|---|---|---:|---:|
+| `typical-small` (.598 / .798) | `ts1c` | **.947** | .790 |
+| `typical-medium` (.612 / .866) | `tm2` | **.950** | .879 |
+
+**Consequences.**
+1. Both v2 releases are card-and-upload jobs, not training runs — the checkpoints exist.
+2. This is the second time a checkpoint's real improvement was invisible on JevBench: `ts1c` scores .708/.432
+   there against `ts1b`'s .694/.432, i.e. indistinguishable, while being 35 points better on the axis the fix
+   targeted. §3aj filed `ts1c`'s tap sweep as a negative on exactly those JevBench-shaped grounds.
+3. It also means the three tap-sweep checkpoints inherited the fix, so §3aj's comparison against the `ts1b`
+   baseline was mismatched on the corpus as well as on the recipe — a second reason its table is a shape
+   reference rather than a matched baseline.
+
+
+### 3ak-e. Seed-1 replicate — complete, and it convicts the JevBench metric
+
+A second independent seed of the whole pair, byte-identical flags apart from `--seed 1`.
+
+| run | JevBench std | hard | `long_policy` (n=19) | long-605 facts-first | long-605 facts-last |
+|---|---:|---:|---:|---:|---:|
+| seed-0 arm A (facts-first) | .750 | .378 | 6/19 | **.942** | .797 |
+| seed-0 arm B (facts-last) | .736 | .396 | 2/19 | **.640** | .830 |
+| seed-1 arm A (facts-first) | .792 | .405 | 5/19 | **.937** | .777 |
+| seed-1 arm B (facts-last) | .708 | .387 | **5/19** | **.631** | .826 |
+
+**The matched-condition gap is +.112 at seed 0 and +.111 at seed 1.** Every cell of the n=605 measurement
+reproduces to within a point (.942/.937 facts-first, .640/.631 facts-last, .830/.826 and .797/.777 on the
+mismatched renders). For a 1.7B model trained from a different seed on a 23k-row corpus, that is about as stable
+as an empirical result gets, and it is the measurement the truncation conclusion rests on.
+
+**The pre-registered JevBench metric contradicts itself across seeds on the same comparison.** `long_policy` gives
+facts-first 6/19 against facts-last 2/19 at seed 0 — a 4-item gap in the predicted direction — and 5/19 against
+**5/19** at seed 1, exactly zero. Same two recipes, same protocol, opposite verdicts, while the n=605 set reports
++.112 and +.111. This is the sharpest evidence in the record that the metric, not the mechanism, was the problem:
+a 19-item family cannot distinguish a real 11-point effect from nothing, and one seed of it would have supported
+either conclusion depending which seed was run first. Had seed 1 been the only run, §3ag would have been recorded
+as refuted.
+
+**Methodological consequence.** Pre-registering a decision rule on a metric is not sufficient; the rule has to be
+pre-registered on a metric with the power to resolve the effect size in question. The pass rule for
+`typical-large` (hard ≥ .559, long_policy ≥ .35) fails that test on both terms and should be restated on the
+n=605 set and the paired tests before it gates another release.
+
+
+## 3ak-b. Cluster-bootstrap confidence intervals on the JevBench public subset
+
+`scripts/jev_ci.py`. The standard tier is 72 items but only **36 independent states** (each appears as two
+paraphrases sharing a `group`), so standard is cluster-bootstrapped over `group`; hard has one item per group.
+20,000 resamples.
+
+| run | standard | 95% CI | hard | 95% CI |
+|---|---:|---|---:|---|
+| `ladder_14b` | .875 | [.792, .944] | .468 | [.378, .559] |
+| `tl1b` (KD) | .931 | [.861, .986] | .450 | [.360, .541] |
+| `tl1b_nokd` (no KD) | .917 | [.833, .986] | .477 | [.387, .568] |
+| arm A `trunc_first` | .750 | [.625, .861] | .378 | [.288, .468] |
+| arm B `trunc_last` | .736 | [.597, .861] | .396 | [.306, .486] |
+
+**Every hard-tier comparison in this record is inside the noise.** The hard interval is ±9 points at n = 111, and
+±6–13 points on standard at n_eff = 36. Consequences for claims already written down:
+
+- **§3ai overstated the KD control.** It says the teacher "contributed nothing measurable and was slightly
+  negative on the hard tier". `tl1b` .450 [.360, .541] against `tl1b_nokd` .477 [.387, .568] is an overlap of
+  almost the entire interval. The honest statement is that **no effect of KD is detectable at this sample size in
+  either direction**, which is a weaker claim than "KD did not help" and much weaker than "KD hurt". The direction
+  was consistent across several metrics, which is worth saying, but it is not evidence of a negative effect.
+- The `ladder_14b` -> `tl1b` standard gain (.875 -> .931) also has overlapping intervals; the paired
+  within-model comparisons and the n=605 set are the only places in this project with real statistical power.
+- The pre-registered `typical-large` pass rule ("hard >= .559") is a *point* threshold on a quantity whose 95%
+  interval is ±9 points wide. It should be restated as a rule on a lower confidence bound, or on a metric with
+  more items, before it is used to gate another release.
+
+
+## 5. Phase-4 log (all items below are complete as of 2026-09-18; kept as the chronological record — current status is in PROJECT.md)
+
+- `joint_v1` — **done** (§3b). Decision rule (SNLI ≥ 80) met with margin.
+- `tower_big` — R2 control, **done**: 4×1024-d tower with separate encoding is *worse* than 2×512 (SNLI 64.1 vs 68.5, val NLL
+  0.83 vs 0.70). Capacity was never the bottleneck; the pre-registered read-out (R1 ≥ 80 and R2 ≤ 72) holds on both legs.
+- Closure checks (2026-09-18): real-model KV-cache `decide` == concatenation path (Δ ≤ 1e-3 over chunk sizes 1/2/3/5/64;
+  permutation-consistent; repeat-exact) → no per-query state recomputation, no query↔query leakage. Near-duplicate leak
+  audit (MinHash, char-5-gram) running; Codex demanded two stronger "Qwen does everything" baselines (native candidate
+  log-probs with the same joint prefix + val-fitted null threshold, uncapped; candidate-blind per-family heads on the
+  joint representation) — queued as eval-only runs on the joint_v1 checkpoint.
+- Queued (IDEA2 Phase 1): `bench_joint` (H2 with KV-cache queries), `joint_v1_s1` (second seed), `joint_24k` (2 epochs),
+  `abl_notower` (direct head vs tower). Cost guard (`costguard.sh`) stops idle pods every 10 min.
+- **`abl_notower` (done, 2026-09-18): the cross-attention slot is removed from the design.** Same data/steps as `joint_v1`,
+  tower replaced by mean-pooled (state-conditioned) query tokens → same scorer/null. NLI unchanged (90.8/87.7/54.7 vs
+  91.0/87.4/54.4); CLINC K=150 **78.4 vs 68.8**, HWU64 86.2 vs 81.6, unseen-intent among-K 0.80 vs 0.74, CLINC-OOS null recall
+  **65.7% vs 32.3%**, null AUROC .946 vs .902; best val NLL of any run (0.389 vs 0.419). The joint backbone does the
+  interaction; the slot only added a harder-to-train bottleneck. Default is now `--tower_layers 0`.
+- **`joint_v2` (data v4, no tower) — done.** In-distribution unchanged; null cleaner (CLINC-OOS recall 72.3%, ECE 0.007;
+  new slices: irrelevant-question AUROC .99/.91, near-miss .91/.96). Choice-set battery: independent scoring is exactly
+  IIA (Δlog-odds = 0 under add-irrelevant), reorder exact, duplicate mass error 2–4%. **But P(∅|gold absent) still falls
+  0.98 → 0.35 from K=2 to K=150 (range 0.63)** with nulls present at every K in training — the K-dependence is structural
+  (softmax dilution), not a data prior. That is the test for the listwise head (`joint_lw`, target range ≤ 0.10).
+- Review (REVIEW.md) done; Phase 2 in flight: `joint_v1_s1` (seed), `mcq_lora` (the "Qwen does everything" baseline),
+  `zs_mcq_8B`, `bench_fair`, `joint_v2` (data v4 control, no tower), `joint_lw` (listwise), `joint_emb` (embedding-model
+  candidates — the $0 probe showed the candidate encoder is the unseen-label bottleneck).
+
+## 6. Where the project stands (2026-09-23) and what is next
+
+Rewritten 2026-09-23. The previous version of this section was dated 2026-09-21 and several of its claims did not
+survive the statistical work in §3ak-b; where a reading has been superseded it is marked below rather than deleted,
+because the supersessions are part of the record.
+
+### 6.1 The architecture, frozen since §3r
+
+Backbone truncated at ~71% depth, LoRA r16 on the kept top layers, the state text KV-cached once as a prefix, the
+question and its runtime-defined candidates rendered into a short causal suffix against that cache, and a contextual
+readout (N3) scoring the terminal decision state against each candidate's own hidden state. No answer token is
+generated. Three typed outputs — Choice (categorical), Score (ordinal-smoothed), Noul (per-row Bernoulli) — plus a
+factored abstention gate.
+
+### 6.2 What is established, and how strongly
+
+1. **Candidate-blind decision states do not preserve question-conditioned capability.** Six factorisations and
+   objectives, every tested depth, with a shuffled-question control (Δ_q) separating genuine question dependence
+   from candidate-set priors: all candidate-blind variants sit in a ±.02 Δ_q band while teacher/N1/N3 sit at
+   .09–.12 (§3j, §3s). Candidate-aware suffix computation recovers it, and the contextual readout keeps it with a
+   quarter of the letter interface's order fragility (§3l, §3v). **This is the project's strongest result** and the
+   one with no close prior art. Scoped, not an impossibility theorem.
+
+2. **The evidence-vs-knowledge trade-off was two artifacts, not a trade-off:** last-layer features, and the rendered
+   "none of the above" line. Removing both gives one model rather than two experts; fusion, support gating and
+   learned routing are all unnecessary (§3n–§3o, §3r, §3t, §3u).
+
+3. **Typed primitives are contracts on the output distribution, and they work.** Ordinal-smoothed Score targets fix
+   Score calibration with zero top-1 decision changes; a Bernoulli Noul head is exactly order-invariant and was the
+   first thing to beat an untouched external floor by a wide margin (PagerDuty .602 → .886) (§3ac).
+
+4. **Rubric-conditioned workflow data teaches the decision shapes it contains, not a general abstraction.** Held-out
+   rubric styles +34, held-out families +9–14; external suites (jevlogs, PagerDuty, Mind2Web) at or below their
+   constant-prediction floors for K-way Choice (§3w–§3x). DecisionMix v2 transfers within its rule grammar and not
+   beyond it; level-7 composition sits near .50 for every model at every size (§3ad).
+
+5. **Training mixture is a first-class variable**, on a par with architecture: E .45–.50 restores evidence, and
+   ∅-augmented W rows fix abstention where an eval-time null offset cannot, because one global threshold cannot
+   serve E and W at once (§3y–§3aa).
+
+6. **The long-state truncation defect was real and its fix is demonstrated.** `data_wf_long` rendered the case facts
+   last; with right-truncation (verified empirically) at a 1,024-token window, 98.8% of long rows lost their facts,
+   and every model since §3z was trained to answer long policies from unreadable states. A matched facts-first vs
+   facts-last ablation, scored in each model's own render so that render compatibility is not confounded with the
+   effect, gives **+.112 [+.077, +.147] at 1.7B (p = 5e-10)** and **+.078 [+.055, +.100] at 14B (p = 7e-12)**,
+   replicated at a second seed (+.111) (§3ak-a, §3ak-c, §3ak-e).
+
+7. **Rendering is a first-class experimental factor, and benchmark score = capability + interface compatibility.**
+   Three independent demonstrations: frozen-model rendering alone moves JevBench standard by 12.5 points at 9B
+   (p < .001); a train/test render mismatch moves a held-out family 23 points and drops the model onto its
+   majority-class floor; and `ladder_14b`, whose JevBench `long_policy` reads .053, scores **.919** on 605 held-out
+   long states in its own matched render (§3ak-a, §3ak-c). This is a methodological finding about comparing
+   architectures, including ours — it is not a reason to discount anyone else's numbers.
+
+8. **The hard tier is unresolved at every size, and fine-tuning can make it worse.** A frozen 14B with three
+   exemplars beats our trained 14B on the hard tier by **+.108 [+.027, +.189], p = .015** on a paired per-item test
+   (§3ab, §3ak-b). Whether that reflects a limit of direct readout or of this training recipe is open; the rendering
+   confound in point 7 weakens any strong causal reading.
+
+### 6.3 What the confidence intervals changed (§3ak-b)
+
+Cluster-bootstrapped over the paraphrase `group`, because JevBench's standard tier is 72 items but only **36
+independent states**: hard is **±9 points at n = 111**, standard **±6–13 at n_eff = 36**.
+
+- **Every adjacent pair of checkpoints in this record is statistically indistinguishable on JevBench.** Only paired
+  per-item tests have the power to say anything, and only three survive: frozen-beats-trained on hard (p = .015),
+  the rendering effect (p < .001), and nothing else.
+- **Superseded:** the previous §6 claimed scale lifts standard-tier accuracy "monotonically" across
+  1.7B → 4B → 14B. Those gaps are inside the interval. The ladder is a ladder, not a scaling law, and the 8B point
+  remains an anomaly.
+- **Superseded:** §3ai's reading that the frozen teacher was "slightly negative" on the hard tier. Paired test gives
+  +.027 [−.027, +.090], p = .45 — no effect detectable in either direction at this sample size.
+- **`tl2` (9B) vs `tm2` (4B) are both exactly 55/111 on hard but are not the same model** — zero of 111 probability
+  vectors match and they disagree on 26 items, 13 each way. McNemar p = 1.000, paired CI [−.090, +.090]. The
+  benchmark cannot resolve 4B vs 9B; that is not a tie.
+- **The pre-registered `typical-large` pass rule (hard ≥ .559, long_policy ≥ .35) is not fit for purpose**: both
+  terms are point thresholds on quantities whose intervals are wider than the effects being gated. It must be
+  restated on a lower confidence bound, or on metrics with enough items, before it gates another release.
+
+### 6.4 The metric lesson, stated plainly
+
+JevBench's hard-tier `long_policy` family has **n = 19**. Across two seeds of the same matched comparison it gave
+6/19 vs 2/19 and then 5/19 vs 5/19 — a four-item gap, then exactly zero — while the purpose-built 605-item set gave
++.112 and +.111 on the same pair. Had the second seed been the one we ran first, §3ag would have been recorded as
+refuted. Separately, that same family gave `tl1b_semif` a .053 that the 605-item set showed to be .974.
+
+Three conclusions this project nearly reached from that one 19-item cell would have been wrong. Pre-registering a
+decision rule is not sufficient; the rule has to be pre-registered on a metric with the power to resolve the effect
+size in question. Where a question mattered, the fix was to build an eval set large enough to answer it
+(`scripts/make_long_eval.py`, n = 605, leak-checked) rather than to analyse the small one harder.
+
+### 6.5 Releases as of 2026-09-23
+
+| release | checkpoint | backbone | status |
+|---|---|---|---|
+| `typical-small-preview` | `nc_v3_tap20_wf` | Qwen3-1.7B-Base | historical reference, kept public |
+| `typical-small` **v2** | `ts1c` | Qwen3-1.7B-Base | shipped 2026-09-23, supersedes `ts1b` |
+| `typical-medium` **v2** | `tm2` | **Qwen3.5-4B-Base** | shipped 2026-09-23, supersedes `tm1b` |
+| `typical-large` | — | — | **withheld**: `tl1b` missed its pass rule, and the rule itself needs restating |
+
+Both v2 releases are trades, and both cards say so. Small gains +34.9 on long states and loses 6.5 on held-out
+Noul, 4.8 on BoolQ, 3.7 on uncertainty, 3.4 on Score, 2.8 on style. Medium gains +33.8 long-state, +7.2 JevBench
+hard and +5.6 standard, and loses 5.5 on CLINC-150 and 5.3 on HWU64. v1 weights remain in each repo's git history.
+The Qwen3.5-capable `inference/typical/backbone.py` was published to all three repos before the medium weights,
+because 60 of `tm2`'s 124 LoRA tensors sit on modules the previous code did not know.
+
+### 6.6 What is open, in priority order
+
+1. **Restate the release gate** on the n=605 set and paired tests before any further release decision.
+2. **Level-7 composition** (temporal, numeric, expected-value, trade-off) — near .50 at every size, and the one axis
+   nothing in the suite has moved. Generator work, not scale.
+3. **The hard tier / frozen-backbone gap** — is direct readout insufficient, or is the recipe? Design an experiment
+   that separates them, controlling rendering.
+4. **Phase 10 calibration objective** on the U corpus (log + λ·Brier + ordinal, per-type reporting, no global T).
+5. **Retrain Small without the regression** — v2's Noul/BoolQ/Score losses are a data-mixture question, not an
+   architectural one.
+6. **Large-K path** (energy → top-r → native): the batched marginal cost at K = 256 grows 4× from 1.7B to 14B.
+7. **Training-code release** — the repo is private; every public card currently promises it.
+
+Closed and not reopened: candidate-blind Z compilation, further readout variants, confidence-only routing, null
+functional forms, depth/tap sweeps (§3aj, a matched negative).
+
+## 7. Decision log (why things were done)
+
+- 2026-09-16 v0 on Mac: frozen 0.6B + cached features so every ablation was minutes; found the sink-token, fixed-classifier
+  and null-leak bugs; H2 shape confirmed. Decided a GPU phase was needed because both F and C sat at the frozen-feature ceiling.
+- 2026-09-17 v1 design (deep-reasoner + Codex): LoRA top-8 on 1.7B, label-diverse data, hybrid scorer, H100 ≤ $50.
+  Local gate (16 tests, smoke, mini run) before renting; GPU smoke caught CPU-bound collate + fp32 LoRA copies.
+- `main_s0` failed H1 (58.6). Diagnosis chain: hypothesis-only probe → last-layer tap → tap 20; rogue dims → z-score;
+  null over-firing → data v3. Cut `main_4B` (scale was not the bottleneck) and ablations the diagnostics had answered.
+- Second pod added to halve wall-clock (same cost); cost $ ≈ $37 by end of phase 3.
+- Literature review (Poly-encoders, ColBERT, DeFormer, PreTTR, LUMEN) + Codex review converged: the cross-encoder is itself
+  late-interaction (causal); interaction must run through pretrained layers → `--joint` (bit-exact causal invariance test).
+- Rejected for now: distillation (second-order once joint works), deeper tower (control only), two-layer taps, KDA (IDEA2 §18).
+- Open questions carried into the review: is the tower needed after joint encoding; listwise candidates for the choice-set
+  effects and unseen-label sets; ChaosNLI sharpness vs calibration (Stage B); TREC/20NG remain < 20% for every model.

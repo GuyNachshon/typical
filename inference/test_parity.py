@@ -13,7 +13,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INFERENCE_DIR = Path(__file__).resolve().parent
-for p in (str(REPO_ROOT), str(INFERENCE_DIR)):
+for p in (str(REPO_ROOT), str(REPO_ROOT / "pcdm"), str(INFERENCE_DIR)):
     if p not in sys.path:
         sys.path.insert(0, p)
 

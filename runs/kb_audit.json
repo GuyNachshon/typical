@@ -1,0 +1,194 @@
+{
+  "n_mmlu_pro": 1200,
+  "n_kb_train": 147446,
+  "n_kb_val": 3001,
+  "checks": {
+    "exact": {
+      "n": 1,
+      "pct": 0.08,
+      "qids": [
+        8011
+      ]
+    },
+    "normalized": {
+      "n": 1,
+      "pct": 0.08,
+      "qids": [
+        8011
+      ]
+    },
+    "normalized_numcollapse": {
+      "n": 2,
+      "pct": 0.17,
+      "qids": [
+        8375,
+        8011
+      ]
+    },
+    "near_dup": {
+      "n": 1,
+      "pct": 0.08,
+      "qids": [
+        8011
+      ]
+    },
+    "stem_and_options": {
+      "n": 0,
+      "pct": 0.0,
+      "qids": []
+    }
+  },
+  "leaked_qids_total": [
+    8011,
+    8375
+  ],
+  "cross_source_dedup": {
+    "n_train_rows": 147446,
+    "n_unique_normalized_stems": 127180,
+    "n_duplicate_groups": 13556,
+    "duplicate_group_sizes_top20": [
+      25,
+      21,
+      19,
+      18,
+      17,
+      16,
+      16,
+      15,
+      14,
+      14,
+      14,
+      14,
+      13,
+      13,
+      13,
+      13,
+      13,
+      13,
+      12,
+      12
+    ],
+    "source_pair_matrix": {
+      "aqua_rat": {
+        "aqua_rat": 2522,
+        "arc_challenge": 0,
+        "arc_easy": 0,
+        "commonsense_qa": 0,
+        "logiqa": 0,
+        "medmcqa": 0,
+        "mmlu_aux": 0,
+        "openbookqa": 0,
+        "qasc": 0,
+        "sciq": 0
+      },
+      "arc_challenge": {
+        "aqua_rat": 0,
+        "arc_challenge": 1,
+        "arc_easy": 2,
+        "commonsense_qa": 0,
+        "logiqa": 0,
+        "medmcqa": 0,
+        "mmlu_aux": 1,
+        "openbookqa": 0,
+        "qasc": 0,
+        "sciq": 0
+      },
+      "arc_easy": {
+        "aqua_rat": 0,
+        "arc_challenge": 2,
+        "arc_easy": 5,
+        "commonsense_qa": 0,
+        "logiqa": 0,
+        "medmcqa": 0,
+        "mmlu_aux": 2,
+        "openbookqa": 2,
+        "qasc": 0,
+        "sciq": 0
+      },
+      "commonsense_qa": {
+        "aqua_rat": 0,
+        "arc_challenge": 0,
+        "arc_easy": 0,
+        "commonsense_qa": 1,
+        "logiqa": 0,
+        "medmcqa": 0,
+        "mmlu_aux": 0,
+        "openbookqa": 0,
+        "qasc": 0,
+        "sciq": 0
+      },
+      "logiqa": {
+        "aqua_rat": 0,
+        "arc_challenge": 0,
+        "arc_easy": 0,
+        "commonsense_qa": 0,
+        "logiqa": 912,
+        "medmcqa": 0,
+        "mmlu_aux": 0,
+        "openbookqa": 0,
+        "qasc": 0,
+        "sciq": 0
+      },
+      "medmcqa": {
+        "aqua_rat": 0,
+        "arc_challenge": 0,
+        "arc_easy": 0,
+        "commonsense_qa": 0,
+        "logiqa": 0,
+        "medmcqa": 431,
+        "mmlu_aux": 0,
+        "openbookqa": 0,
+        "qasc": 0,
+        "sciq": 0
+      },
+      "mmlu_aux": {
+        "aqua_rat": 0,
+        "arc_challenge": 1,
+        "arc_easy": 2,
+        "commonsense_qa": 0,
+        "logiqa": 0,
+        "medmcqa": 0,
+        "mmlu_aux": 9112,
+        "openbookqa": 0,
+        "qasc": 0,
+        "sciq": 0
+      },
+      "openbookqa": {
+        "aqua_rat": 0,
+        "arc_challenge": 0,
+        "arc_easy": 2,
+        "commonsense_qa": 0,
+        "logiqa": 0,
+        "medmcqa": 0,
+        "mmlu_aux": 0,
+        "openbookqa": 96,
+        "qasc": 18,
+        "sciq": 1
+      },
+      "qasc": {
+        "aqua_rat": 0,
+        "arc_challenge": 0,
+        "arc_easy": 0,
+        "commonsense_qa": 0,
+        "logiqa": 0,
+        "medmcqa": 0,
+        "mmlu_aux": 0,
+        "openbookqa": 18,
+        "qasc": 376,
+        "sciq": 10
+      },
+      "sciq": {
+        "aqua_rat": 0,
+        "arc_challenge": 0,
+        "arc_easy": 0,
+        "commonsense_qa": 0,
+        "logiqa": 0,
+        "medmcqa": 0,
+        "mmlu_aux": 0,
+        "openbookqa": 1,
+        "qasc": 10,
+        "sciq": 64
+      }
+    }
+  }
+}

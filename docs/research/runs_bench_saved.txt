@@ -1,0 +1,13 @@
+=== Ours (F) === one 256-token state, K=4 per query, MPS, median of 5
+   M   t_state(ms)   t_queries(ms)   total(ms)   ratio
+   1         43.63           90.49      134.13    1.00
+   8         43.11          153.56      196.68    1.47
+  64         43.19          502.32      545.51    4.07
+ 256         43.61         1532.10     1575.71   11.75
+
+=== Baseline B (Qwen3-0.6B-Base, full 28 layers, score each (state,question,candidate) sequence) ===
+   M    time(ms)   ratio
+   1      247.29    1.00
+   8     2065.32    8.35
+  64    17458.77   70.60
+ 256    (not measured: ~8 x 100 s; linear extrapolation ~70 s)

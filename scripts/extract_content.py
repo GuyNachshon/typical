@@ -1,6 +1,6 @@
 """Pull every word the site shows into one markdown file, for review away from the design.
 
-    uv run --with markdown python scripts/extract_content.py   ->  CONTENT.md
+    uv run --with markdown python scripts/extract_content.py   ->  docs/site/CONTENT.md
 
 index.html is parsed straight out of the HTML so what lands here is what a visitor reads, not
 what a draft said. research.html is generated from site/research.md, so that file is quoted at
@@ -17,7 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
-OUT = ROOT / "CONTENT.md"
+OUT = ROOT / "docs" / "site" / "CONTENT.md"
 
 SKIP_TAGS = {"script", "style", "iframe", "canvas", "svg", "noscript"}
 # tag -> how it should read in the extract

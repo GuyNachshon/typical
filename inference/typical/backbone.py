@@ -1,4 +1,4 @@
-"""Frozen backbone + LoRA adapter -- trimmed port of the training repo's encode.py, for
+"""Frozen backbone + LoRA adapter -- trimmed port of the training repo's pcdm/encode.py, for
 inference only. Only what native_kv_decide touches: tokenizer, .model (the raw HF causal
 trunk, tap-truncated), LoRA weight loading. No FeatureCache/EmbedEncoder/forward() --
 the native serving path reads hidden states straight off Backbone.model, never through a
@@ -39,7 +39,7 @@ def pick_device(device: str = "auto") -> str:
 
 class LoRALinear(nn.Module):
     """Frozen base nn.Linear (bf16) + a low-rank fp32 adapter on top. Numerics verbatim
-    from encode.py's LoRALinear (scale = alpha / r); dropout is a no-op once .eval()'d."""
+    from pcdm/encode.py's LoRALinear (scale = alpha / r); dropout is a no-op once .eval()'d."""
 
     def __init__(self, base: nn.Linear, r: int, alpha: float, dropout: float):
         super().__init__()
@@ -71,7 +71,7 @@ class Backbone(nn.Module):
             self.tokenizer.pad_token = self.tokenizer.eos_token
         model = AutoModel.from_pretrained(name, dtype=torch.bfloat16, attn_implementation="sdpa")
         # Qwen3.5 family: AutoModel resolves to the VL wrapper (.visual + .language_model) even for
-        # a text-only checkpoint -- see encode.py's Backbone for the long form. Take the text trunk.
+        # a text-only checkpoint -- see pcdm/encode.py's Backbone for the long form. Take the text trunk.
         if hasattr(model, "language_model") and hasattr(model, "visual"):
             model = model.language_model
         self.model = model
@@ -79,7 +79,7 @@ class Backbone(nn.Module):
         self.d = self.model.config.hidden_size
         n_layers = self.model.config.num_hidden_layers
         # tap_layer: drop every layer above T (semantics live mid-depth, not at the final,
-        # next-token-shaped layer of a base LM) -- see encode.py's Backbone for the long form.
+        # next-token-shaped layer of a base LM) -- see pcdm/encode.py's Backbone for the long form.
         if 0 < tap_layer < n_layers:
             self.model.layers = self.model.layers[:tap_layer]
             self.model.config.num_hidden_layers = tap_layer
@@ -90,7 +90,7 @@ class Backbone(nn.Module):
         if lora_r > 0:
             for layer in self.model.layers[-lora_layers:]:
                 # Qwen3.5 linear_attention layers have linear_attn (Gated DeltaNet) instead of
-                # self_attn; mlp is present on every layer either way -- see encode.py's Backbone.
+                # self_attn; mlp is present on every layer either way -- see pcdm/encode.py's Backbone.
                 parents = [p for p in (getattr(layer, "self_attn", None), getattr(layer, "linear_attn", None),
                                         getattr(layer, "mlp", None)) if p is not None]
                 for parent in parents:

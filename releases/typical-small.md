@@ -144,12 +144,40 @@ these artefacts.
 |---|---|---|---|
 | `ts1c` | 61 / 58 / 118 | 3.4 / 3.8 / 25.8 | 6.2 → 9.1 |
 
-A single decision costs ~58–61 ms across most of K (the KV-cached state and a short suffix dominate)
-and roughly doubles to 118 ms only at K = 256; batched marginal cost is 3.4 ms/query at K = 2, rising
-to 25.8 ms/query at K = 256. Capability per millisecond works out to JevBench standard .708 at 61 ms
-per single decision at K = 2. The cross-size version of that ladder (1.7B vs 4B vs 14B) is
-`_not measured for this checkpoint_`: `tm2` has no latency benchmark, so the two release checkpoints
-cannot be placed on a common latency axis.
+**Two different latency numbers exist for this checkpoint and they measure different things. Do not
+present either without its protocol.** The table above is the apples-to-apples ladder: one pod, one
+torch build, L_s = 256, state encode included, on the pre-optimisation serving path. It is for
+comparing rungs of the size ladder against each other, not for quoting as the cost of a decision in
+production. Neither is comparable to a leaderboard latency measured serially over a network.
+
+On the ladder protocol a single decision costs ~58-61 ms across most of K (the KV-cached state and a
+short suffix dominate) and roughly doubles to 118 ms only at K = 256; batched marginal cost is
+3.4 ms/query at K = 2, rising to 25.8 ms/query at K = 256. The cross-size version of that ladder
+(1.7B vs 4B vs 14B) is `_not measured for this checkpoint_`: `tm2` has no latency benchmark, so the
+two release checkpoints cannot be placed on a common latency axis.
+
+## Deployment caveat: put case facts at the END of a long state
+
+**Read this before using the checkpoint on anything longer than a paragraph.** This checkpoint was
+trained before the facts-first corpus fix (REPORT §3ag), so it carries that corpus's positional
+bias: `data_wf_long` rendered `Case: <facts>` *after* the policy body, training right-truncates at
+`--max_state 1024`, and 98.8% of those rows therefore lost their facts before the model saw them.
+The model learned to answer long policies from where its training data put the evidence.
+
+Scored on 605 held-out long states (`scripts/make_long_eval.py`), identical items, differing only in
+where the `Case:` block sits, no truncation at eval:
+
+| | facts **before** the policy body | facts **after** it | cost |
+|---|---:|---:|---:|
+| `typical-small` | .598 | .798 | **-20.0 pts** |
+
+Rendered facts-first, this checkpoint sits on the majority-class floor for the yes/no family -- it
+has stopped reading the evidence rather than reading it poorly.
+
+Callers write their own state text, so this is under your control: **render the policy or document
+first and the case facts last.** Retrained checkpoints on the fixed corpus do not show the bias
+(REPORT §3ak-a/§3ak-c; the facts-first 14B reaches .997 on the same set), and retraining this
+checkpoint on it is the next planned release work.
 
 ## Known limitations
 
@@ -160,8 +188,10 @@ cannot be placed on a common latency axis.
 - Mind2Web stays below its constant-prediction floor (.364 vs floor .427) — general web-agent
   candidate sets remain outside what this training distribution covers.
 - Level-7 composition (temporal / unit / expected-value / trade-off reasoning, `wh_level7`) sits at
-  .524 against a .460 floor — barely above constant prediction; nothing trained so far moves it,
-  because the generator never produces this composition.
+  .524 against a .460 floor. That is marginally above constant prediction and 30-odd points below
+  the same checkpoint's held-out family / grammar / style scores. Earlier versions of this card said
+  "chance"; the gap to the in-distribution families is the finding, not the level. Nothing trained
+  so far moves it, because the generator never produces this composition.
 - JevBench hard is .432 with Brier .722, ECE .241 and ordinal MAE .817; within that tier
   `long_policy` is the weakest family at .211 (n = 19), then `temporal_numeric` .333 (n = 15) and
   `tradeoff` .333 (n = 6). Probability quality on soft/ordinal gold is still the clearest open defect
@@ -175,13 +205,19 @@ cannot be placed on a common latency axis.
 ## License
 
 - Backbone (`Qwen/Qwen3-1.7B-Base`): Apache-2.0.
-- Training data: per-source licenses triaged in PLAN6.md's dataset-survey table (mostly MIT /
-  Apache-2.0 / CC-BY-4.0 for the trained sources; `jevlogs` is research-licensed and used only as a
-  caveated held-out sanity eval, never trained on).
-- `data_wh` / `data_u` (PLAN7 Track D): `data_wh` is a programmatic rule-engine corpus generated
-  in-repo (`scripts/decisionmix_v2.py`), no external license constraints. `data_u`'s UNLI validation
-  split is MIT; `metaeval/ambient` (trained on, ambiguous rows) and `metaeval/chaos-mnli-ambiguity`
-  (eval-only, never trained on) do not declare a license on their HF cards — flagged, not asserted.
+- Training data: per-source licenses triaged in PLAN6.md's dataset-survey table. **Two trained
+  sources are non-commercial and were previously mis-summarised here as permissive:
+  ANLI (`facebook/anli`, in the E mix) is CC BY-NC 4.0, and SciQ (11.7k rows of `data_kb`) is
+  CC BY-NC 3.0.** The rest of the trained mix is MIT / Apache-2.0 / CC-BY-4.0 or generated in-repo.
+  `jevlogs` is research-licensed and used only as a caveated held-out sanity eval, never trained
+  on. Whether non-commercially-licensed training data constrains use of the Apache-2.0 weights is
+  unsettled; this card states what went in and does not assert a conclusion. LogiQA2, MedMCQA and
+  AQuA have not yet been re-triaged to this standard.
+- New in this release (PLAN7 Track D, `data_wh` / `data_u`): `data_wh` is a programmatic rule-engine
+  corpus generated in-repo (`scripts/decisionmix_v2.py`), no external license constraints. `data_u`'s
+  UNLI validation split is MIT; `metaeval/ambient` (trained on, ambiguous rows) and
+  `metaeval/chaos-mnli-ambiguity` (eval-only, never trained on) do not declare a license on their HF
+  cards — flagged, not asserted.
 - JevBench numbers in this card are a **public-subset run** against `fstandhartinger/jevbench`
   (harness version `jevbench-v1`; 72 standard / 48 easy / 111 hard public ids) — not a submitted or
   ranked leaderboard entry.

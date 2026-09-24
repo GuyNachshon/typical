@@ -1,0 +1,37 @@
+\section{Limitations}
+\label{sec:limitations}
+
+Typical makes text-only decisions over candidate sets that fit in a short suffix; sets in the hundreds
+go through a shortlisting front end (\Cref{sec:results:cost}). Multi-step composition is the main open
+problem: on DecisionMix level 7 (never trained) the v1 1.7B and 4B models score .495 and .544 against a
+.441 guess rate and the 14B model .620, and on the JevBench hard tier a frozen 14B backbone with three
+exemplars beats our trained 14B (paired $+.108$ $[+.027, +.189]$, $p = .015$; \Cref{app:hard-tier}). A
+fixed-depth pass has limited serial computation \citep{merrill2023parallelism}, which intermediate
+tokens extend \citep{merrill2024expressive,feng2023chain}. Formatting is the one factor in
+\Cref{tab:dependence} that scale reduces without removing (6.8--7.6 points at 14B), and Choice is
+order-robust rather than order-invariant. The readout and evidence-first results are replicated across
+seeds; other rows are single runs, JevBench numbers use its 231 public items (unranked), and
+rubric-generalization results share one rule engine between training and held-out families. The
+training code is not yet released.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+Typical reads decisions straight out of a pretrained language model. Given a document, a question and
+options supplied at request time, it returns a probability for each option and for abstaining, with no
+generated text, in 45\,ms at 1.7B and 60\,ms at 14B.
+
+The central lesson is that such a model is only as good as what its decision depends on, and accuracy
+does not tell you. We tested each input and factor directly. In every configuration we tested, the decision carried
+question-dependent knowledge only when the candidates were read inside the forward pass: six designs that compute the
+decision state before seeing them all stayed within .03 of zero on $\dq$. It depends on the evidence when the head reads at
+71\% of depth, and on long documents when training places the evidence first (+11.2 points). It depends
+on the rubric when training uses counterfactual rubric groups (+35--40 points on held-out rule
+families). A Bernoulli head makes yes/no answers independent of label order, and removing the rendered ``none of the above'' option, leaving abstention to the gate, cuts MMLU-Pro
+false abstention from .692 to .003. Formatting is the one factor we reduced without removing: a trained
+model still depends on the layout it was trained in, less so at 14B.
+
+The tests themselves, $\dq$ and render-crossed evaluation, apply to any system that scores candidates,
+and we recommend reporting them alongside accuracy. The 1.7B and 4B models are public with an inference
+package. Multi-step composition is the open problem, and adding a small amount of intermediate
+computation before the typed readout is the natural next step.

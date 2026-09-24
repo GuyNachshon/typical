@@ -1,0 +1,17 @@
+Software that asks a language model for a decision needs a probability for each option it supplies,
+and a way to say that none of them fit. Typical reads that distribution directly from a pretrained
+language model's hidden states, without generating text. It encodes the input document once, reads each
+question with its candidate options in a short suffix, and scores every candidate at 71\% of the
+network's depth, returning a choice, an ordinal score or a yes/no probability, plus a separate
+probability of abstaining. The hard part of building such a model is making the decision depend on the
+right inputs. A model can score well while ignoring the question, the evidence or the rubric, or while
+shifting with label order and with how many options it is offered, and accuracy shows none of it. We
+built Typical around tests that do. A shuffled-question control, $\dq$, shows that question-dependent
+knowledge appears only when the candidates are read inside the forward pass, in every configuration we
+tested. Training on counterfactual rubric groups makes the model use the rubric, lifting held-out rule families
+by 35--40 points over a model never trained on them, and when training truncates long documents,
+placing the evidence first adds 11.2 points. A Bernoulli head
+makes yes/no answers invariant to label order, and removing the ``none of the above'' option from the candidates, leaving abstention to a separate gate,
+cuts MMLU-Pro false abstention from .692 to .003. A decision takes 45\,ms at
+1.7B and 60\,ms at 14B, and the 14B model reaches .931 on the JevBench standard tier. We release 1.7B
+and 4B models and an inference package.

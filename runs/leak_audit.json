@@ -1,0 +1,884 @@
+{
+  "anli_test": {
+    "n": 3200,
+    "state": {
+      "n": 3200,
+      "exact": 0,
+      "near_lo": 7,
+      "near_hi": 4,
+      "near_lo_pct": 0.22,
+      "near_hi_pct": 0.12
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.969,
+        "eval": "Seeking common ground amid sensitive differences on democracy, Bush and Putin agreed Thursday, on new efforts to keep nuclear arms away from terrorists as well as from sovereign nations like Iran and ",
+        "train": "seeking common ground amid sensitive differences on democracy, bush and putin agreed thursday, on new efforts to keep nuclear arms away from terrorists as well as sovereign nations like iran and north"
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "The Volkswagen Citi Golf was a car produced by Volkswagen in South Africa from 1984 until 21 August 2009. It was a face-lifted version of the original Volkswagen Golf Mk1 hatchback, which ceased produ",
+        "train": "volkswagen citi golf. the volkswagen citi golf was a car produced by volkswagen in south africa from 1984 until 21 august 2009. it was a face-lifted version of the original volkswagen golf mk1 hatchba"
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "The Volkswagen Citi Golf was a car produced by Volkswagen in South Africa from 1984 until 21 August 2009. It was a face-lifted version of the original Volkswagen Golf Mk1 hatchback, which ceased produ",
+        "train": "volkswagen citi golf. the volkswagen citi golf was a car produced by volkswagen in south africa from 1984 until 21 august 2009. it was a face-lifted version of the original volkswagen golf mk1 hatchba"
+      },
+      {
+        "jaccard": 0.906,
+        "eval": "American Beauty is a lost 1927 American silent film romantic drama produced and distributed by First National Pictures. This film was directed by Richard Wallace and starred Billie Dove. It was based ",
+        "train": "american beauty (1927 film). american beauty is a lost 1927 silent film romantic drama produced and distributed by first national pictures. this film was directed by richard wallace and starred billie"
+      },
+      {
+        "jaccard": 0.891,
+        "eval": "Bega Group is one of the largest Romanian holding companies, located in Timi\u015foara, Timi\u015f County. The holding is formed by 35 different companies. The company owns the largest industrial park in Buchar",
+        "train": "bega group. bega group is one of the largest romanian holding companies located in timi\u015foara timi\u015f county. the holding si formed by 35 different companies. the company ownes the largest industrial par"
+      }
+    ],
+    "val_state_near_lo_pct": 0.0,
+    "hyp": {
+      "n": 3200,
+      "exact": 7,
+      "near_lo": 7,
+      "near_hi": 7,
+      "near_lo_pct": 0.22,
+      "near_hi_pct": 0.22
+    },
+    "pair": {
+      "n": 3200,
+      "exact": 0,
+      "near_lo": 0,
+      "near_hi": 0,
+      "near_lo_pct": 0.0,
+      "near_hi_pct": 0.0
+    },
+    "pair_top5": []
+  },
+  "banking77_k": {
+    "n": 3076,
+    "state": {
+      "n": 3076,
+      "exact": 0,
+      "near_lo": 1,
+      "near_hi": 1,
+      "near_lo_pct": 0.03,
+      "near_hi_pct": 0.03
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.922,
+        "eval": "I lost my phone!",
+        "train": "i lost my phone"
+      }
+    ],
+    "val_state_near_lo_pct": 0.0
+  },
+  "banking77_test": {
+    "n": 3076,
+    "state": {
+      "n": 3076,
+      "exact": 0,
+      "near_lo": 1,
+      "near_hi": 1,
+      "near_lo_pct": 0.03,
+      "near_hi_pct": 0.03
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.922,
+        "eval": "I lost my phone!",
+        "train": "i lost my phone"
+      }
+    ],
+    "val_state_near_lo_pct": 0.0
+  },
+  "boolq_val": {
+    "n": 3270,
+    "state": {
+      "n": 3270,
+      "exact": 0,
+      "near_lo": 161,
+      "near_hi": 127,
+      "near_lo_pct": 4.92,
+      "near_hi_pct": 3.88
+    },
+    "state_top5": [
+      {
+        "jaccard": 1.0,
+        "eval": "The German Shepherd (German: Deutscher Sch\u00e4ferhund, German pronunciation: (\u02c8\u0283\u025b\u02d0f\u0250\u02cch\u028ant)) is a breed of medium to large-sized working dog that originated in Germany. The breed's officially recognized n",
+        "train": "the german shepherd (german: deutscher sch\u00e4ferhund, german pronunciation: (\u02c8\u0283\u025b\u02d0f\u0250\u02cch\u028ant)) is a breed of medium to large-sized working dog that originated in germany. the breed's officially recognized n"
+      },
+      {
+        "jaccard": 1.0,
+        "eval": "Rampage is a 2018 American science fiction monster film directed by Brad Peyton, and loosely based on the video game series of the same name by Midway Games. The film stars Dwayne Johnson, Naomie Harr",
+        "train": "rampage is a 2018 american science fiction monster film directed by brad peyton, and loosely based on the video game series of the same name by midway games. the film stars dwayne johnson, naomie harr"
+      },
+      {
+        "jaccard": 1.0,
+        "eval": "In the United States, there is no federal law regulating the practice of tattooing. However, all 50 states and the District of Columbia have statutory laws requiring a person receiving a tattoo be 18 ",
+        "train": "in the united states, there is no federal law regulating the practice of tattooing. however, all 50 states and the district of columbia have statutory laws requiring a person receiving a tattoo be 18 "
+      },
+      {
+        "jaccard": 1.0,
+        "eval": "In Mexico, Belgium, Germany and Austria, the philosophy of the law holds that it is human nature to want to escape. In those countries, escapees who do not break any other laws are not charged for any",
+        "train": "in mexico, belgium, germany and austria, the philosophy of the law holds that it is human nature to want to escape. in those countries, escapees who do not break any other laws are not charged for any"
+      },
+      {
+        "jaccard": 1.0,
+        "eval": "Superfecundation is the fertilization of two or more ova from the same cycle by sperm from separate acts of sexual intercourse, which can lead to twin babies from two separate biological fathers. The ",
+        "train": "superfecundation is the fertilization of two or more ova from the same cycle by sperm from separate acts of sexual intercourse, which can lead to twin babies from two seperate biological fathers. the "
+      }
+    ],
+    "val_state_near_lo_pct": 0.0
+  },
+  "chaos_mnli": {
+    "n": 1576,
+    "state": {
+      "n": 1576,
+      "exact": 0,
+      "near_lo": 7,
+      "near_hi": 4,
+      "near_lo_pct": 0.44,
+      "near_hi_pct": 0.25
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.953,
+        "eval": "The Honorable Bill Archer, Chairman The Honorable Charles B. Rangel Ranking Minority Member Committee on Ways and Means House of Representatives",
+        "train": "the honorable bill archer chairman the honorable charles b. rangel ranking minority member committee on ways and means house of representatives"
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "iii Program Letter 1998-1, published on February 12, 1998, called upon all LSC recipients to analyze any progress made toward the development of the legal services model envisioned by state planners.",
+        "train": "17 program letter 1998-1, published on february 12, 1998, called upon all lsc recipients to analyze any progress made toward the development of the legal services model envisioned by state planners."
+      },
+      {
+        "jaccard": 0.938,
+        "eval": "Since the rules were issued as interim rules and not as general notices of proposed rulemaking, they are not subject to the Unfunded Mandates Reform Act of 1995.",
+        "train": "since the rules were issued as interim final rules and not as general notices of proposed rulemaking, the rules are not subject to the unfunded mandates reform act of 1995."
+      },
+      {
+        "jaccard": 0.922,
+        "eval": "The cuts will take the biggest bite out of Land of Lincoln, a network of eight offices and 40 lawyers who help clients in southern Illinois with problems like eviction, access to Social Security and o",
+        "train": "the cuts will take the biggest bite out of land of lincoln, a network of eight offices and 40 lawyers who help clients in southern illinois with problems such as eviction, access to social security an"
+      },
+      {
+        "jaccard": 0.891,
+        "eval": "Pesticide concentrations should not exceed USEPA's Ambient Water Quality chronic criteria values where available.",
+        "train": "pesticide concentrations should not exceed usepa's national ambient water quality chronic criteria values where available."
+      }
+    ],
+    "val_state_near_lo_pct": 0.0,
+    "hyp": {
+      "n": 1576,
+      "exact": 3,
+      "near_lo": 3,
+      "near_hi": 3,
+      "near_lo_pct": 0.19,
+      "near_hi_pct": 0.19
+    },
+    "pair": {
+      "n": 1576,
+      "exact": 0,
+      "near_lo": 0,
+      "near_hi": 0,
+      "near_lo_pct": 0.0,
+      "near_hi_pct": 0.0
+    },
+    "pair_top5": []
+  },
+  "clinc_heldout": {
+    "n": 890,
+    "state": {
+      "n": 890,
+      "exact": 0,
+      "near_lo": 0,
+      "near_hi": 0,
+      "near_lo_pct": 0.0,
+      "near_hi_pct": 0.0
+    },
+    "state_top5": [],
+    "val_state_near_lo_pct": 0.0
+  },
+  "clinc_k": {
+    "n": 4449,
+    "state": {
+      "n": 4449,
+      "exact": 0,
+      "near_lo": 44,
+      "near_hi": 14,
+      "near_lo_pct": 0.99,
+      "near_hi_pct": 0.31
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.969,
+        "eval": "i do not know",
+        "train": "i do not know."
+      },
+      {
+        "jaccard": 0.969,
+        "eval": "could you repeat that",
+        "train": "could you repeat that."
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "what is the square root of 36",
+        "train": "what is the square root of 5"
+      },
+      {
+        "jaccard": 0.938,
+        "eval": "what name do you have for me",
+        "train": "so what name do you have for me"
+      },
+      {
+        "jaccard": 0.938,
+        "eval": "i didn't catch that",
+        "train": "i didn't catch that."
+      }
+    ],
+    "val_state_near_lo_pct": 0.0
+  },
+  "clinc_oos": {
+    "n": 999,
+    "state": {
+      "n": 999,
+      "exact": 0,
+      "near_lo": 2,
+      "near_hi": 2,
+      "near_lo_pct": 0.2,
+      "near_hi_pct": 0.2
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.969,
+        "eval": "what is global warming",
+        "train": "what is global warming?"
+      },
+      {
+        "jaccard": 0.922,
+        "eval": "why is the sky blue",
+        "train": "why is the sky blue?"
+      }
+    ],
+    "val_state_near_lo_pct": 0.0
+  },
+  "clinc_test": {
+    "n": 4449,
+    "state": {
+      "n": 4449,
+      "exact": 0,
+      "near_lo": 44,
+      "near_hi": 14,
+      "near_lo_pct": 0.99,
+      "near_hi_pct": 0.31
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.969,
+        "eval": "i do not know",
+        "train": "i do not know."
+      },
+      {
+        "jaccard": 0.969,
+        "eval": "could you repeat that",
+        "train": "could you repeat that."
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "what is the square root of 36",
+        "train": "what is the square root of 5"
+      },
+      {
+        "jaccard": 0.938,
+        "eval": "what name do you have for me",
+        "train": "so what name do you have for me"
+      },
+      {
+        "jaccard": 0.938,
+        "eval": "i didn't catch that",
+        "train": "i didn't catch that."
+      }
+    ],
+    "val_state_near_lo_pct": 0.0
+  },
+  "hwu64_test": {
+    "n": 1076,
+    "state": {
+      "n": 1076,
+      "exact": 0,
+      "near_lo": 58,
+      "near_hi": 28,
+      "near_lo_pct": 5.39,
+      "near_hi_pct": 2.6
+    },
+    "state_top5": [
+      {
+        "jaccard": 1.0,
+        "eval": "would you please confirm the instruction.",
+        "train": "could you please confirm the instruction."
+      },
+      {
+        "jaccard": 1.0,
+        "eval": "who is singing this song",
+        "train": "who is singing this song?"
+      },
+      {
+        "jaccard": 0.984,
+        "eval": "turn off the room light",
+        "train": "turn off the room lights"
+      },
+      {
+        "jaccard": 0.969,
+        "eval": "turn off the sound",
+        "train": "turn off the sounds"
+      },
+      {
+        "jaccard": 0.969,
+        "eval": "play my favourite podcasts",
+        "train": "play my favourite podcast"
+      }
+    ],
+    "val_state_near_lo_pct": 0.09
+  },
+  "mnli_val": {
+    "n": 2947,
+    "state": {
+      "n": 2947,
+      "exact": 0,
+      "near_lo": 13,
+      "near_hi": 7,
+      "near_lo_pct": 0.44,
+      "near_hi_pct": 0.24
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.969,
+        "eval": "4) Clinton's job rating fell from 60 to 55 points in a Washington Post poll, apparently because pollees disapproved of his use of the White House for fund raising.",
+        "train": "2) clinton's job rating fell from 60 to 55 points in a washington post poll, apparently because pollees disapproved of his use of the white house for fund raising."
+      },
+      {
+        "jaccard": 0.969,
+        "eval": "At the delta of the Rh??ne, where its two arms spill into the Medi?\u00adter?\u00adra?\u00adnean, the Camargue has been reclaimed from the sea to form a national nature reserve.",
+        "train": "at the delta of the rhine, where its two arms spill into the medi?\u00adter?\u00adra?\u00adnean, the camargue has been reclaimed from the sea to form a national nature reserve."
+      },
+      {
+        "jaccard": 0.969,
+        "eval": "4) Clinton's job rating fell from 60 to 55 points in a Washington Post poll, apparently because pollees disapproved of his use of the White House for fund raising.",
+        "train": "2) clinton's job rating fell from 60 to 55 points in a washington post poll, apparently because pollees disapproved of his use of the white house for fund raising."
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "The Honorable Bill Archer, Chairman The Honorable Charles B. Rangel Ranking Minority Member Committee on Ways and Means House of Representatives",
+        "train": "the honorable bill archer chairman the honorable charles b. rangel ranking minority member committee on ways and means house of representatives"
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "The Honorable Bill Archer, Chairman The Honorable Charles B. Rangel Ranking Minority Member Committee on Ways and Means House of Representatives",
+        "train": "the honorable bill archer chairman the honorable charles b. rangel ranking minority member committee on ways and means house of representatives"
+      }
+    ],
+    "val_state_near_lo_pct": 0.0,
+    "hyp": {
+      "n": 2947,
+      "exact": 10,
+      "near_lo": 14,
+      "near_hi": 12,
+      "near_lo_pct": 0.48,
+      "near_hi_pct": 0.41
+    },
+    "pair": {
+      "n": 2947,
+      "exact": 0,
+      "near_lo": 3,
+      "near_hi": 0,
+      "near_lo_pct": 0.1,
+      "near_hi_pct": 0.0
+    },
+    "pair_top5": [
+      {
+        "jaccard": 0.891,
+        "eval": "the honorable bill archer, chairman the honorable charles b. rangel ranking minority member committee on ways and means house of representatives ||| bill archer is a member of the house of representat",
+        "train": "the honorable bill archer chairman the honorable charles b. rangel ranking minority member committee on ways and means house of representatives ||| rangel is a member of the committee."
+      },
+      {
+        "jaccard": 0.859,
+        "eval": "since the rules were issued as interim rules and not as general notices of proposed rulemaking, they are not subject to the unfunded mandates reform act of 1995. ||| the rules were issued as interim r",
+        "train": "since the rules were issued as interim final rules and not as general notices of proposed rulemaking, the rules are not subject to the unfunded mandates reform act of 1995. ||| since the rules weren't"
+      },
+      {
+        "jaccard": 0.844,
+        "eval": "yeah what do you do ||| what is it that you do?",
+        "train": "uh-huh so what do you do ||| what is it that you do?"
+      }
+    ],
+    "near_dup_indices_file": "runs/leak_audit_nearDup_mnli_val.json"
+  },
+  "ng20_test": {
+    "n": 7315,
+    "state": {
+      "n": 7315,
+      "exact": 0,
+      "near_lo": 2,
+      "near_hi": 1,
+      "near_lo_pct": 0.03,
+      "near_hi_pct": 0.01
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.938,
+        "eval": "unfortunately not",
+        "train": "unfortunately not:"
+      },
+      {
+        "jaccard": 0.844,
+        "eval": "Would you like fries with that, sir?",
+        "train": "would you like fries with that?"
+      }
+    ],
+    "val_state_near_lo_pct": 0.0
+  },
+  "snli_null": {
+    "n": 4989,
+    "state": {
+      "n": 4989,
+      "exact": 0,
+      "near_lo": 14,
+      "near_hi": 7,
+      "near_lo_pct": 0.28,
+      "near_hi_pct": 0.14
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.953,
+        "eval": "A man in a lab coat is looking through a microscope.",
+        "train": "a woman in a lab coat is looking through a microscope."
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "A man in a lab coat is looking through a microscope.",
+        "train": "a woman in a lab coat is looking through a microscope."
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      }
+    ],
+    "val_state_near_lo_pct": 0.0,
+    "hyp": {
+      "n": 4989,
+      "exact": 601,
+      "near_lo": 790,
+      "near_hi": 718,
+      "near_lo_pct": 15.83,
+      "near_hi_pct": 14.39
+    },
+    "pair": {
+      "n": 4989,
+      "exact": 0,
+      "near_lo": 1,
+      "near_hi": 0,
+      "near_lo_pct": 0.02,
+      "near_hi_pct": 0.0
+    },
+    "pair_top5": [
+      {
+        "jaccard": 0.812,
+        "eval": "a man in a lab coat is looking through a microscope. ||| a man is looking through a microscope",
+        "train": "a woman in a lab coat is looking through a microscope . ||| a man peering through a microscope ."
+      }
+    ]
+  },
+  "snli_test": {
+    "n": 4989,
+    "state": {
+      "n": 4989,
+      "exact": 0,
+      "near_lo": 14,
+      "near_hi": 7,
+      "near_lo_pct": 0.28,
+      "near_hi_pct": 0.14
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.953,
+        "eval": "A man in a lab coat is looking through a microscope.",
+        "train": "a woman in a lab coat is looking through a microscope."
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "A man in a lab coat is looking through a microscope.",
+        "train": "a woman in a lab coat is looking through a microscope."
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      }
+    ],
+    "val_state_near_lo_pct": 0.0,
+    "hyp": {
+      "n": 4989,
+      "exact": 601,
+      "near_lo": 790,
+      "near_hi": 718,
+      "near_lo_pct": 15.83,
+      "near_hi_pct": 14.39
+    },
+    "pair": {
+      "n": 4989,
+      "exact": 0,
+      "near_lo": 1,
+      "near_hi": 0,
+      "near_lo_pct": 0.02,
+      "near_hi_pct": 0.0
+    },
+    "pair_top5": [
+      {
+        "jaccard": 0.812,
+        "eval": "a man in a lab coat is looking through a microscope. ||| a man is looking through a microscope",
+        "train": "a woman in a lab coat is looking through a microscope . ||| a man peering through a microscope ."
+      }
+    ],
+    "near_dup_indices_file": "runs/leak_audit_nearDup_snli_test.json"
+  },
+  "snli_test_hyponly": {
+    "n": 4989,
+    "state": {
+      "n": 4989,
+      "exact": 0,
+      "near_lo": 0,
+      "near_hi": 0,
+      "near_lo_pct": 0.0,
+      "near_hi_pct": 0.0
+    },
+    "state_top5": [],
+    "val_state_near_lo_pct": 0.0
+  },
+  "snli_test_paraphrase": {
+    "n": 4989,
+    "state": {
+      "n": 4989,
+      "exact": 0,
+      "near_lo": 14,
+      "near_hi": 7,
+      "near_lo_pct": 0.28,
+      "near_hi_pct": 0.14
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.953,
+        "eval": "A man in a lab coat is looking through a microscope.",
+        "train": "a woman in a lab coat is looking through a microscope."
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "A man in a lab coat is looking through a microscope.",
+        "train": "a woman in a lab coat is looking through a microscope."
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      }
+    ],
+    "val_state_near_lo_pct": 0.0,
+    "hyp": {
+      "n": 4989,
+      "exact": 601,
+      "near_lo": 790,
+      "near_hi": 718,
+      "near_lo_pct": 15.83,
+      "near_hi_pct": 14.39
+    },
+    "pair": {
+      "n": 4989,
+      "exact": 0,
+      "near_lo": 1,
+      "near_hi": 0,
+      "near_lo_pct": 0.02,
+      "near_hi_pct": 0.0
+    },
+    "pair_top5": [
+      {
+        "jaccard": 0.812,
+        "eval": "a man in a lab coat is looking through a microscope. ||| a man is looking through a microscope",
+        "train": "a woman in a lab coat is looking through a microscope . ||| a man peering through a microscope ."
+      }
+    ]
+  },
+  "snli_test_qpara": {
+    "n": 1994,
+    "state": {
+      "n": 1994,
+      "exact": 0,
+      "near_lo": 2,
+      "near_hi": 2,
+      "near_lo_pct": 0.1,
+      "near_hi_pct": 0.1
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.953,
+        "eval": "A man in a lab coat is looking through a microscope.",
+        "train": "a woman in a lab coat is looking through a microscope."
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      }
+    ],
+    "val_state_near_lo_pct": 0.0,
+    "hyp": {
+      "n": 1994,
+      "exact": 249,
+      "near_lo": 332,
+      "near_hi": 299,
+      "near_lo_pct": 16.65,
+      "near_hi_pct": 14.99
+    },
+    "pair": {
+      "n": 1994,
+      "exact": 0,
+      "near_lo": 1,
+      "near_hi": 0,
+      "near_lo_pct": 0.05,
+      "near_hi_pct": 0.0
+    },
+    "pair_top5": [
+      {
+        "jaccard": 0.812,
+        "eval": "a man in a lab coat is looking through a microscope. ||| a man is looking through a microscope",
+        "train": "a woman in a lab coat is looking through a microscope . ||| a man peering through a microscope ."
+      }
+    ]
+  },
+  "snli_test_soft": {
+    "n": 4989,
+    "state": {
+      "n": 4989,
+      "exact": 0,
+      "near_lo": 14,
+      "near_hi": 7,
+      "near_lo_pct": 0.28,
+      "near_hi_pct": 0.14
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.953,
+        "eval": "A man in a lab coat is looking through a microscope.",
+        "train": "a woman in a lab coat is looking through a microscope."
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "A man in a lab coat is looking through a microscope.",
+        "train": "a woman in a lab coat is looking through a microscope."
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      }
+    ],
+    "val_state_near_lo_pct": 0.0,
+    "hyp": {
+      "n": 4989,
+      "exact": 601,
+      "near_lo": 790,
+      "near_hi": 718,
+      "near_lo_pct": 15.83,
+      "near_hi_pct": 14.39
+    },
+    "pair": {
+      "n": 4989,
+      "exact": 0,
+      "near_lo": 1,
+      "near_hi": 0,
+      "near_lo_pct": 0.02,
+      "near_hi_pct": 0.0
+    },
+    "pair_top5": [
+      {
+        "jaccard": 0.812,
+        "eval": "a man in a lab coat is looking through a microscope. ||| a man is looking through a microscope",
+        "train": "a woman in a lab coat is looking through a microscope . ||| a man peering through a microscope ."
+      }
+    ]
+  },
+  "squad_null": {
+    "n": 4000,
+    "state": {
+      "n": 4000,
+      "exact": 0,
+      "near_lo": 9,
+      "near_hi": 6,
+      "near_lo_pct": 0.23,
+      "near_hi_pct": 0.15
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.984,
+        "eval": "In the mid-1950s, Frank Burnet, inspired by a suggestion made by Niels Jerne, formulated the clonal selection theory (CST) of immunity. On the basis of CST, Burnet developed a theory of how an immune ",
+        "train": "in the mid-1950s, frank burnet, inspired by a suggestion made by niels jerne, formulated the clonal selection theory (cst) of immunity. on the basis of cst, burnet developed a theory of how an immune "
+      },
+      {
+        "jaccard": 0.984,
+        "eval": "In the mid-1950s, Frank Burnet, inspired by a suggestion made by Niels Jerne, formulated the clonal selection theory (CST) of immunity. On the basis of CST, Burnet developed a theory of how an immune ",
+        "train": "in the mid-1950s, frank burnet, inspired by a suggestion made by niels jerne, formulated the clonal selection theory (cst) of immunity. on the basis of cst, burnet developed a theory of how an immune "
+      },
+      {
+        "jaccard": 0.984,
+        "eval": "In the mid-1950s, Frank Burnet, inspired by a suggestion made by Niels Jerne, formulated the clonal selection theory (CST) of immunity. On the basis of CST, Burnet developed a theory of how an immune ",
+        "train": "in the mid-1950s, frank burnet, inspired by a suggestion made by niels jerne, formulated the clonal selection theory (cst) of immunity. on the basis of cst, burnet developed a theory of how an immune "
+      },
+      {
+        "jaccard": 0.969,
+        "eval": "Immunology is strongly experimental in everyday practice but is also characterized by an ongoing theoretical attitude. Many theories have been suggested in immunology from the end of the nineteenth ce",
+        "train": "immunology is strongly experimental in everyday practice but is also characterized by an ongoing theoretical attitude. many theories have been suggested in immunology from the end of the nineteenth ce"
+      },
+      {
+        "jaccard": 0.969,
+        "eval": "Immunology is strongly experimental in everyday practice but is also characterized by an ongoing theoretical attitude. Many theories have been suggested in immunology from the end of the nineteenth ce",
+        "train": "immunology is strongly experimental in everyday practice but is also characterized by an ongoing theoretical attitude. many theories have been suggested in immunology from the end of the nineteenth ce"
+      }
+    ],
+    "val_state_near_lo_pct": 0.0
+  },
+  "trec_coarse": {
+    "n": 500,
+    "state": {
+      "n": 500,
+      "exact": 0,
+      "near_lo": 1,
+      "near_hi": 1,
+      "near_lo_pct": 0.2,
+      "near_hi_pct": 0.2
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.969,
+        "eval": "Where is the Grand Canyon ?",
+        "train": "where is the grand canyon"
+      }
+    ],
+    "val_state_near_lo_pct": 0.0
+  },
+  "trec_fine": {
+    "n": 500,
+    "state": {
+      "n": 500,
+      "exact": 0,
+      "near_lo": 1,
+      "near_hi": 1,
+      "near_lo_pct": 0.2,
+      "near_hi_pct": 0.2
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.969,
+        "eval": "Where is the Grand Canyon ?",
+        "train": "where is the grand canyon"
+      }
+    ],
+    "val_state_near_lo_pct": 0.0
+  },
+  "unli_test": {
+    "n": 3031,
+    "state": {
+      "n": 3031,
+      "exact": 0,
+      "near_lo": 5,
+      "near_hi": 3,
+      "near_lo_pct": 0.16,
+      "near_hi_pct": 0.1
+    },
+    "state_top5": [
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      },
+      {
+        "jaccard": 0.953,
+        "eval": "Two dogs are playing together.",
+        "train": "two dogs are playing together"
+      },
+      {
+        "jaccard": 0.938,
+        "eval": "Dog running through the snow.",
+        "train": "a dog running through the snow."
+      },
+      {
+        "jaccard": 0.828,
+        "eval": "A woman rests her head on a man's shoulder.",
+        "train": "a young woman rests her head on a man's shoulder."
+      },
+      {
+        "jaccard": 0.812,
+        "eval": "Children are playing outside in a fountain.",
+        "train": "children playing outside in a fountain."
+      }
+    ],
+    "val_state_near_lo_pct": 0.0,
+    "hyp": {
+      "n": 3031,
+      "exact": 226,
+      "near_lo": 318,
+      "near_hi": 280,
+      "near_lo_pct": 10.49,
+      "near_hi_pct": 9.24
+    },
+    "pair": {
+      "n": 3031,
+      "exact": 0,
+      "near_lo": 0,
+      "near_hi": 0,
+      "near_lo_pct": 0.0,
+      "near_hi_pct": 0.0
+    },
+    "pair_top5": []
+  }
+}

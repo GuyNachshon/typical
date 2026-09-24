@@ -1,11 +1,11 @@
 """Reads runs/**/*.json (+ hand-transcribed REPORT.md/release-card numbers) and writes
 site/data/research-*.json for research.html. Run: uv run python scripts/precompute_research.py
 
-ponytail: same pattern as precompute.py -- G6/G7 (held-out + external sets) have one
+ponytail: same pattern as site/precompute.py -- G6/G7 (held-out + external sets) have one
 unambiguous JSON source (eval_wf*.json) so they're read programmatically; G8 (the six-day
 lineage) and G5's family-weight donut live only as prose/args in REPORT.md and the release
 cards, so they're hand-transcribed here with a "source" cite per point, same convention
-precompute.py already uses for models.json.
+site/precompute.py already uses for models.json.
 """
 import json
 import re
@@ -335,7 +335,7 @@ def build_trace():
             "type": q["type"], "question": q["question"], "labels": cand_texts,
             "render": "query_only" if is_bern else "letters_nonull",
             "is_bern": is_bern, "suffix_text": text, "suffix_tokens": len(x_ids),
-            "T": len(x_ids) + 1,  # + trailing eos tail (native.py's _pack `tail=(eos,)`)
+            "T": len(x_ids) + 1,  # + trailing eos tail (pcdm/native.py's _pack `tail=(eos,)`)
             "spans": spans, "K": len(cand_texts),
         }
 
@@ -353,7 +353,7 @@ def build_trace():
 
     # Noul label-swap: render the escalate question's candidates in both orders. query_only
     # ignores candidate text entirely, so both renders are byte-identical -- that's the proof,
-    # not an assertion about the head, of exact order-invariance (native.py::_render_query_only).
+    # not an assertion about the head, of exact order-invariance (pcdm/native.py::_render_query_only).
     noul_q = next(q for q in queries if q["type"] == "noul")
     order_a = noul_q["labels"]
     order_b = list(reversed(order_a))

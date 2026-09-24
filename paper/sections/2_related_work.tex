@@ -1,0 +1,42 @@
+\section{Related work}
+\label{sec:related}
+
+\paragraph{Decisions in hidden states.} Probes recover linearly decodable structure from hidden states
+\citep{alain2017probes}, and that structure changes with depth \citep{tenney2019pipeline,belrose2023tunedlens}.
+Circuit analysis localizes where a multiple-choice model binds its chosen option to a symbol
+\citep{lieberum2023circuit}, and \citet{wong2026models} decode the winning option in content space
+before that binding happens, a result \citet{bhatt2026representation} trace across languages. Typical
+deploys the pre-symbol decision as the interface and reads it at mid-depth, where upper layers are
+partly redundant \citep{gromov2024deeperlayers,men2024shortgpt}.
+
+\paragraph{Answer symbols and runtime labels.} Letter answers carry order and symbol biases
+\citep{zheng2024selectionbias,pezeshkpour2024optionorder}, first-token probabilities disagree with the
+text a model generates \citep{wang2024firsttoken}, and format constraints can cost accuracy
+\citep{tam2024speakfreely}. $\dq$ (\Cref{def:deltaq}) extends the choices-only control of
+\citet{balepur2024artifacts} to a shuffled real question. Runtime labels have been scored through
+entailment \citep{yin2019zeroshot}, joint schema encoders \citep{zaratiana2025gliner2}, cross-encoders
+\citep{nogueira2019bertrerank}, dual encoders \citep{reimers2019sbert} and late interaction
+\citep{humeau2020polyencoders,khattab2020colbert}, and decoder classification heads fix labels as
+indices \citep{li2023labelsupervised}. Typical renders all candidates in one causal suffix, so each
+candidate's state carries its slot and its set, and $\dq$ measures what candidate-independent scoring
+gives up (\Cref{sec:analysis:deltaq}).
+
+\paragraph{Computation per decision.} Prefix caching and sharing are established serving techniques
+\citep{kwon2023pagedattention,zheng2023sglang,gim2023promptcache}, and speculative decoding shortens the
+decode loop \citep{leviathan2023speculative}; Typical has no decode loop. Chain-of-thought supplies the
+serial computation that a fixed-depth pass lacks \citep{wei2022cot,merrill2023parallelism,feng2023chain,
+merrill2024expressive}, as do pause tokens \citep{goyal2024pause} and latent reasoning
+\citep{hao2024coconut}; \Cref{sec:limitations} connects this to the decisions Typical finds hardest.
+
+\paragraph{Output contracts and training.} Score's soft ordinal target follows ordinal regression
+\citep{frank2001ordinal,cao2020coral}. The abstention gate descends from the reject option
+\citep{chow1970reject,geifman2017selective} and confidence-based out-of-scope detection
+\citep{hendrycks2017msp,larson2019clinc}. We evaluate probabilities with proper scoring rules
+\citep{gneiting2007scoringrules} alongside temperature-scaled calibration \citep{guo2017calibration},
+and train with LoRA \citep{hu2022lora} and distillation \citep{hinton2015distillation}. Compositional
+generalization benchmarks \citep{lake2018scan,keysers2020cfq} motivate the held-out composition level of
+DecisionMix (\Cref{sec:train:rubric}), and work on evidence position in long contexts
+\citep{liu2024lostmiddle} and silent data-pipeline defects \citep{sambasivan2021datacascades} motivates
+the render-crossed design (\Cref{sec:results:long}). Among JevBench's open entries, only GLiNER2
+\citep{zaratiana2025gliner2} and a ModernBERT-based model \citep{warner2024modernbert} have method
+papers.

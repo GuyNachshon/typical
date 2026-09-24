@@ -2,7 +2,7 @@
 """Record site/data/replays.json: precomputed /api/decide responses for every demo in
 presets.json, keyed by the same hash js/api.js::hashKey computes client-side from
 (state, queries) - so static deployments (no local server) can replay a live result
-instead of showing nothing. Requires server.py running on :8787 (uv run uvicorn
+instead of showing nothing. Requires site/server.py running on :8787 (uv run uvicorn
 server:app --port 8787).
 
 Query dicts are built with keys in the exact order {type, question, labels} everywhere,
@@ -133,7 +133,7 @@ def main():
         try:
             res = post_decide(state, queries)
         except urllib.error.URLError as e:
-            print(f"FAILED {label}: {e} - is server.py running on :8787?", file=sys.stderr)
+            print(f"FAILED {label}: {e} - is site/server.py running on :8787?", file=sys.stderr)
             raise SystemExit(1)
         key = hash_key(state, queries)
         replays[key] = res
