@@ -146,7 +146,8 @@ export function mountFilmFx(host, getSource, opts = {}) {
   let lastFilter = 'none'; // what the pulse is currently grading with, for verification
   let switching = null; // set during the hand-over, read when the buffer is composited
   let phase = 'boot'; // 'boot' | 'collapse' | 'flash' | 'expand' | 'live', exposed for verification
-  const bootChars = BOOT_LINES.join('\n').length;
+  const bootLines = opts.bootLines ?? BOOT_LINES;
+  const bootChars = bootLines.join('\n').length;
   // Every load, not once per session: a reload that skipped it read as the opening being broken.
   // It is short enough to sit through, and reduced motion still skips it outright.
   const skipBoot = still || opts.boot === false;
@@ -414,7 +415,7 @@ export function mountFilmFx(host, getSource, opts = {}) {
     const x0 = Math.round(W * 0.085);
     let y = Math.round(H * 0.72);
     let left = b.typed;
-    for (const line of BOOT_LINES) {
+    for (const line of bootLines) {
       if (left <= 0) break;
       const shown = line.slice(0, left);
       left -= line.length + 1;

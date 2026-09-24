@@ -73,6 +73,16 @@ window.Doom = {
     await new Promise(r => setTimeout(r, 60));
     return norm(Doom.state().angle - a0);
   },
+  // Aim and fire as one physical action. The turn remains bounded by `deg`; only the fire key
+  // overlaps it, and both keys are released even if the turn is interrupted.
+  async turnAndFire(key, deg, maxMs = 1500) {
+    Doom.key('fire', true);
+    try {
+      return await Doom.turnBy(key, deg, maxMs);
+    } finally {
+      Doom.key('fire', false);
+    }
+  },
   // skill 1..5 as in the menu; loads E1M1 on the next game tic.
   newGame(skill = 3) {
     Module._typical_new_game(skill - 1);

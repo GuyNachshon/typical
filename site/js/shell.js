@@ -578,7 +578,11 @@ function mountFilm(ctx, ids = {}) {
     // the target and walk in first. Print both so the film doesn't look like it fires blindly.
     if (action !== move) sentEl.textContent = `${sentence}  →  ${move} · engine: ${action}`;
     const spec = keyPress(st, move, action);
-    try { if (typeof spec[1] === 'object') await D.turnBy(spec[0], spec[1].deg); else await D.press(spec[0], spec[1]); } catch {}
+    try {
+      if (move === 'shoot' && action.startsWith('turn ') && typeof spec[1] === 'object' && D.turnAndFire) await D.turnAndFire(spec[0], spec[1].deg);
+      else if (typeof spec[1] === 'object') await D.turnBy(spec[0], spec[1].deg);
+      else await D.press(spec[0], spec[1]);
+    } catch {}
     setTimeout(loop, 380);
   }
   resetNav(); loop();

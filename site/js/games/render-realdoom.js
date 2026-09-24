@@ -15,8 +15,11 @@ const KEYMAP = {
 };
 
 // [key, ms] -> a timed press; [key, { deg }] -> a closed-loop turn (games/doom/index.html).
-function applyMove(doom, spec) {
+// A shoot decision keeps firing during its bounded aim turn, instead of alternating aim/fire
+// across model ticks and repeatedly passing the target.
+function applyMove(doom, spec, fireWhileTurning = false) {
   if (!spec || !doom) return Promise.resolve();
+  if (fireWhileTurning && typeof spec[1] === 'object' && doom.turnAndFire) return doom.turnAndFire(spec[0], spec[1].deg);
   return typeof spec[1] === 'object' ? doom.turnBy(spec[0], spec[1].deg) : doom.press(spec[0], spec[1]);
 }
 
@@ -186,10 +189,11 @@ export async function mount(el, { decide, mode } = {}) {
       lastDecision = decision;
 
       const action = resolveIntent(currState, move); // the model aims; the engine presses the key
-      if (action === 'shoot') shots += 1;
       const killsBefore = currState.kills ?? 0;
-      await applyMove(doom, keyPress(currState, move, action));
+      const ammoBefore = currState.ammo ?? 0;
+      await applyMove(doom, keyPress(currState, move, action), move === 'shoot' && action.startsWith('turn '));
       const after = doom.state();
+      shots += Math.max(0, ammoBefore - (after.ammo ?? ammoBefore));
       if ((after.kills ?? 0) > killsBefore) {
         const delta = after.kills - killsBefore;
         kills += delta;

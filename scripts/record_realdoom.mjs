@@ -74,10 +74,13 @@ async function main() {
     if (move === gold) rule_agreement += 1;
     const action = resolveIntent(state, move); // the model aims; the engine presses the key
     const [key, hold] = keyPress(state, move, action);
-    if (action === 'shoot') shots += 1;
     const killsBefore = state.kills ?? 0;
-    await page.evaluate(({ key, hold }) => (typeof hold === 'object' ? window.Doom.turnBy(key, hold.deg) : window.Doom.press(key, hold)), { key, hold });
+    await page.evaluate(({ key, hold, fireWhileTurning }) => {
+      if (fireWhileTurning && typeof hold === 'object') return window.Doom.turnAndFire(key, hold.deg);
+      return typeof hold === 'object' ? window.Doom.turnBy(key, hold.deg) : window.Doom.press(key, hold);
+    }, { key, hold, fireWhileTurning: move === 'shoot' && action.startsWith('turn ') });
     const after = await page.evaluate(() => window.Doom.state());
+    shots += Math.max(0, (state.ammo ?? 0) - (after.ammo ?? state.ammo ?? 0));
     if ((after.kills ?? 0) > killsBefore) kills += after.kills - killsBefore;
     health_end = after.health ?? health_end;
 
