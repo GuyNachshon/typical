@@ -1806,9 +1806,22 @@ size in question. Where a question mattered, the fix was to build an eval set la
 | release | checkpoint | backbone | status |
 |---|---|---|---|
 | `typical-small-preview` | `nc_v3_tap20_wf` | Qwen3-1.7B-Base | historical reference, kept public |
-| `typical-small` **v2** | `ts1c` | Qwen3-1.7B-Base | shipped 2026-09-23, supersedes `ts1b` |
+| `typical-small` **v3** | `ts1b_semif` | Qwen3-1.7B-Base | shipped 2026-09-24, supersedes `ts1c` (v2, one day earlier) |
 | `typical-medium` **v2** | `tm2` | **Qwen3.5-4B-Base** | shipped 2026-09-23, supersedes `tm1b` |
-| `typical-large` | — | — | **withheld**: `tl1b` missed its pass rule, and the rule itself needs restating |
+| `typical-large-preview` | `tl1b_semif` | Qwen3-14B-Base | shipped 2026-09-24 as a **preview**: fails the pass rule, published with the failing numbers |
+
+**Pass-rule verdicts for every 14B run** — `(hard ≥ .559 OR hard Brier ≤ .65) AND long_policy ≥ .35`:
+
+| run | hard | Brier | term 1 | long_policy (n=19) | term 2 | overall |
+|---|---:|---:|---|---:|---|---|
+| `tl1b` | .450 | .656 | fail | .158 | fail | fail |
+| `tl1b_nokd` | .477 | .682 | fail | .211 | fail | fail |
+| **`tl1b_semif`** | .468 | **.634** | **PASS** | .053 | fail | fail |
+| `ladder_14b` | .468 | .849 | fail | .053 | fail | fail |
+
+`tl1b_semif` is the only 14B to clear any term. Its term-2 failure is on the 19-item family §3ak-e shows flipping
+between seeds; the powered measurement of the same capability puts it at **.974** on n = 605. We did not rewrite
+the rule after seeing the result — it ships as a preview — but both facts belong in the record.
 
 Both v2 releases are trades, and both cards say so. Small gains +34.9 on long states and loses 6.5 on held-out
 Noul, 4.8 on BoolQ, 3.7 on uncertainty, 3.4 on Score, 2.8 on style. Medium gains +33.8 long-state, +7.2 JevBench
